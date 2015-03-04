@@ -24,7 +24,7 @@ from phonenumbers import NumberParseException
 from redis_cache import get_redis_connection
 from smartmin.models import SmartModel
 from temba.nexmo import NexmoClient
-from temba.orgs.models import Org, OrgLock, APPLICATION_SID, NEXMO_UUID
+from temba.orgs.models import Org, OrgLock, APPLICATION_SID, NEXMO_UUID, PLIVO_APP_ID
 from temba.temba_email import send_temba_email
 from temba.utils import analytics, random_string, dict_to_struct, dict_to_json
 from twilio.rest import TwilioRestClient
@@ -47,6 +47,7 @@ ZENVIA = 'ZV'
 SHAQODOON = 'SQ'
 VERBOICE = 'VB'
 CLICKATELL = 'CT'
+PLIVO = 'PL'
 
 SEND_URL = 'send_url'
 SEND_METHOD = 'method'
@@ -54,6 +55,8 @@ USERNAME = 'username'
 PASSWORD = 'password'
 KEY = 'key'
 API_ID = 'api_id'
+AUTH_ID = 'auth_id'
+AUTH_TOKEN = ''
 
 SEND = 'S'
 RECEIVE = 'R'
@@ -73,6 +76,7 @@ RELAYER_TYPE_CHOICES = ((ANDROID, _("Android")),
                         (EXTERNAL, _("External")),
                         (TWITTER, _("Twitter")),
                         (CLICKATELL, _("Clickatell")),
+                        (PLIVO, _("Plivo")),
                         (SHAQODOON, _("Shaqodoon")))
 
 # how many outgoing messages we will queue at once
@@ -95,7 +99,8 @@ RELAYER_TYPE_CONFIG = {
     HUB9: dict(scheme='tel', max_length=1600),
     TWITTER: dict(scheme='twitter', max_length=140),
     SHAQODOON: dict(scheme='tel', max_length=1600),
-    CLICKATELL: dict(scheme='tel', max_length=420)
+    CLICKATELL: dict(scheme='tel', max_length=420),
+    PLIVO: dict(scheme='tel', max_length=1600)
 }
 
 TEMBA_HEADERS = {'User-agent': 'RapidPro'}
@@ -181,6 +186,37 @@ class Channel(SmartModel):
                                       role=role, parent=parent,
                                       org=org, created_by=user, modified_by=user)
 
+    @classmethod
+    def add_plivo_channel(cls, org, user, country, phone_number):
+        client = org.get_plivo_client()
+
+        org_plivo_app_id = org.config_json()[PLIVO_APP_ID]
+
+        plivo_number = phone_number.strip('+ ').replace(' ', '')
+
+        plivo_response_status, plivo_response = client.get_number(params=dict(number=plivo_number))
+
+        if plivo_response_status != 200:
+            plivo_response_status, plivo_number = client.buy_phone_number(params=dict(number=plivo_number))
+
+            if plivo_response_status != 201:
+                raise Exception(_("There was a problem claiming that number, please check the balance on your account."))
+
+            plivo_response_status, plivo_response = client.get_number(params=dict(number=plivo_number))
+
+        if plivo_response_status == 200:
+            plivo_response_status, plivo_response = client.modify_number(params=dict(number=plivo_number,
+                                                                                     app_id=org_plivo_app_id))
+            if plivo_response_status != 202:
+                raise Exception(_("There was a problem updating that number, please try again."))
+
+        phone_number = '+' + plivo_number
+        phone = phonenumbers.format_number(phonenumbers.parse(phone_number, None),
+                                           phonenumbers.PhoneNumberFormat.NATIONAL)
+
+        return Channel.objects.create(channel_type=PLIVO, country=country,
+                                      name=phone, address=phone_number, uuid=str(uuid4()),
+                                      org=org, created_by=user, modified_by=user)
 
     @classmethod
     def add_nexmo_channel(cls, org, user, country, phone_number):
