@@ -1,41 +1,42 @@
-from __future__ import unicode_literals
+from __future__ import absolute_import, unicode_literals
 
-from operator import attrgetter
-from django.core.urlresolvers import reverse
-from django.core.files.storage import default_storage
-from django.contrib.humanize.templatetags.humanize import intcomma
-from django.contrib import messages
-from django.db.models import Sum
-from django.http import HttpResponse, HttpResponseRedirect
-from django.forms import Form
-from django.utils.text import slugify
+import json
+import plivo
 import pycountry
+import re
+
+from collections import OrderedDict
+from django import forms
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import authenticate, login
+from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
+from django.core.urlresolvers import reverse
+from django.core.validators import validate_email
+from django.db import IntegrityError
+from django.db.models import Sum
+from django.forms import Form
+from django.http import HttpResponse, HttpResponseRedirect
+from django.utils import timezone
+from django.utils.http import urlquote
+from django.utils.text import slugify
+from django.utils.translation import ugettext_lazy as _
+from operator import attrgetter
+from smartmin.views import SmartCRUDL, SmartCreateView, SmartFormView, SmartReadView, SmartUpdateView, SmartListView, SmartTemplateView
+from temba.channels.models import Channel
 from temba.contacts.models import ExportContactsTask
-from temba.flows.models import Flow, ExportFlowResultsTask
+from temba.flows.models import ExportFlowResultsTask
+from temba.formax import FormaxMixin
 from temba.msgs.models import ExportMessagesTask
 from temba.nexmo import NexmoClient
-from temba.channels.models import Channel, ANDROID, TWILIO, NEXMO, KANNEL
-from temba.formax import FormaxMixin
-from collections import OrderedDict
-
-import re
-import traceback
-import json
-from timezones.forms import TimeZoneField
-from datetime import timedelta
-
-from django.core.exceptions import ValidationError
-from django.contrib.auth import authenticate, login
-from django.core.validators import validate_email
-from django.utils import timezone
-from django.utils.translation import ugettext_lazy as _
-from smartmin.views import *
-from .models import Org, OrgCache, OrgEvent, TopUp, MT_SMS_EVENTS, MO_SMS_EVENTS, MT_CALL_EVENTS, MO_CALL_EVENTS, ALARM_EVENTS, Invitation, UserSettings, Language
-from .bundles import BUNDLE_CHOICES, BUNDLES, WELCOME_TOPUP_SIZE
 from temba.utils import analytics, build_json_response
-
+from timezones.forms import TimeZoneField
 from twilio.rest import TwilioRestClient
-import plivo
+from .bundles import WELCOME_TOPUP_SIZE
+from .models import Org, OrgCache, OrgEvent, TopUp, Invitation, UserSettings
+from .models import MT_SMS_EVENTS, MO_SMS_EVENTS, MT_CALL_EVENTS, MO_CALL_EVENTS, ALARM_EVENTS
 
 
 def check_login(request):
@@ -47,9 +48,9 @@ def check_login(request):
     them to the normal user login page
     """
     if request.user.is_authenticated():
-       return HttpResponseRedirect(settings.LOGIN_REDIRECT_URL)
+        return HttpResponseRedirect(settings.LOGIN_REDIRECT_URL)
     else:
-       return HttpResponseRedirect(settings.LOGIN_URL)
+        return HttpResponseRedirect(settings.LOGIN_URL)
 
 
 class OrgPermsMixin(object):
@@ -116,6 +117,7 @@ class OrgPermsMixin(object):
 
         return self.has_org_perm(self.permission)
 
+
 class OrgObjPermsMixin(OrgPermsMixin):
 
     def get_object_org(self):
@@ -175,14 +177,14 @@ class ModalMixin(SmartFormView):
                 return HttpResponseRedirect(self.get_success_url())
             else:  # pragma: no cover
                 response = self.render_to_response(self.get_context_data(form=form,
-                                                                     success_url=self.get_success_url(),
-                                                                     success_script=getattr(self, 'success_script', None)))
+                                                                         success_url=self.get_success_url(),
+                                                                         success_script=getattr(self, 'success_script', None)))
                 response['Temba-Success'] = self.get_success_url()
                 return response
 
         except IntegrityError as e:  # pragma: no cover
             message = str(e).capitalize()
-            errors = self.form._errors.setdefault(forms.forms.NON_FIELD_ERRORS, forms.util.ErrorList())
+            errors = self.form._errors.setdefault(forms.forms.NON_FIELD_ERRORS, forms.utils.ErrorList())
             errors.append(message)
             return self.render_to_response(self.get_context_data(form=form))
 
@@ -421,8 +423,8 @@ class UserSettingsCRUDL(SmartCRUDL):
 
 
 class OrgCRUDL(SmartCRUDL):
-    actions = ('signup', 'home', 'webhook', 'edit', 'join', 'grant', 'create_login', 'choose', 'manage_accounts',
-               'create', 'manage', 'update', 'country', 'languages', 'clear_cache', 'download',
+    actions = ('signup', 'home', 'webhook', 'edit', 'join', 'grant', 'create_login', 'choose',
+               'manage_accounts', 'manage', 'update', 'country', 'languages', 'clear_cache', 'download',
                'twilio_connect', 'twilio_account', 'nexmo_account', 'nexmo_connect', 'export', 'import',
                'plivo_connect', 'plivo_account')
 
@@ -980,10 +982,6 @@ class OrgCRUDL(SmartCRUDL):
                 if self.request.user.is_superuser:
                     return HttpResponseRedirect(reverse('orgs.org_manage'))
 
-                elif not user_orgs:
-                    messages.info(request, _("Your account is not associated to an organization. Please create an organization."))
-                    return HttpResponseRedirect(reverse('orgs.org_create'))
-
                 elif user_orgs.count() == 1:
                     org = user_orgs[0]
                     self.request.session['org_id'] = org.pk
@@ -1164,38 +1162,6 @@ class OrgCRUDL(SmartCRUDL):
 
             context['org'] = self.get_object()
             return context
-
-    class Create(SmartCreateView):
-        title = _("Create Your Organization")
-        form_class = OrgSignupForm
-        fields = ('name', 'timezone')
-        success_message = ''
-
-        def get_success_url(self):
-            return "%s?start" % reverse('public.public_welcome')
-
-        def pre_save(self, obj):
-            obj = super(OrgCRUDL.Create, self).pre_save(obj)
-
-            user = self.request.user
-            obj.created_by = user
-            obj.modified_by = user
-
-            slug = Org.get_unique_slug(self.form.cleaned_data['name'])
-            obj.slug = slug
-
-            return obj
-
-        def post_save(self, obj):
-            obj = super(OrgCRUDL.Create, self).post_save(obj)
-            obj.administrators.add(self.request.user)
-
-            self.request.session['org_id'] = obj.pk
-
-            return obj
-
-        def has_permission(self, request, *args, **kwargs):
-            return self.request.user.is_authenticated()
 
     class Grant(SmartCreateView):
         title = _("Create Organization Account")
