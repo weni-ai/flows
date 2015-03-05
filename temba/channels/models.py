@@ -1323,6 +1323,47 @@ class Channel(SmartModel):
                                response_status=response.status_code)
 
     @classmethod
+    def send_plivo_message(cls, channel, msg, text):
+        import plivo
+        from temba.msgs.models import Msg, WIRED
+        from temba.orgs.models import PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN, PLIVO_UUID
+
+        client = plivo.RestAPI(channel.org_config[PLIVO_AUTH_ID], channel.org_config[PLIVO_AUTH_ID])
+        status_url = reverse('api.plivo_handler', args=['status', channel.org_config[PLIVO_UUID]])
+
+        payload = {'src': channel.address.lstrip('+'),
+                   'dst': msg.urn_path.lstrip('+'),
+                   'text': text,
+                   'url': status_url,
+                   'method': 'POST'}
+
+        try:
+            plivo_response_status, plivo_response = client.send_message(params=payload)
+        except Exception as e:
+            raise SendException(unicode(e),
+                                method='POST',
+                                request=json.dumps(payload),
+                                response=plivo_response,
+                                response_status=plivo_response_status)
+
+        if plivo_response_status != 200 and plivo_response_status != 201 and plivo_response_status != 202:
+            raise SendException("Got non-200 response [%d] from API" % plivo_response_status,
+                                method='POST',
+                                request=json.dumps(payload),
+                                response=plivo_response,
+                                response_status=plivo_response_status)
+
+        external_id = plivo_response['message_uuid'][0]
+        Msg.mark_sent(channel.config['r'], msg, WIRED, external_id)
+
+        ChannelLog.log_success(msg=msg,
+                               description="Successfully delivered",
+                               method='POST',
+                               request=json.dumps(payload),
+                               response=plivo_response,
+                               response_status=plivo_response_status)
+
+    @classmethod
     def get_pending_messages(cls, org):
         """
         We want all messages that are:
@@ -1381,7 +1422,8 @@ class Channel(SmartModel):
                       TWITTER: Channel.send_twitter_message,
                       VUMI: Channel.send_vumi_message,
                       SHAQODOON: Channel.send_shaqodoon_message,
-                      ZENVIA: Channel.send_zenvia_message}
+                      ZENVIA: Channel.send_zenvia_message,
+                      PLIVO: Channel.send_plivo_message}
 
         # Check whether we need to throttle ourselves
         # This isn't an ideal implementation, in that if there is only one Channel with tons of messages
