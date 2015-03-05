@@ -694,7 +694,7 @@ class Org(SmartModel):
         client = plivo.RestAPI(auth_id, auth_token)
         app_name = "%s/%d" % (settings.TEMBA_HOST.lower(), self.pk)
 
-        message_url = reverse('api.plivo_handler', args=['receive', plivo_uuid])
+        message_url = "https://" + settings.TEMBA_HOST + "%s" % reverse('api.plivo_handler', args=['receive', plivo_uuid])
         answer_url = "https://" + settings.AWS_STORAGE_BUCKET_NAME + "/plivo_voice_unavailable.xml"
 
         plivo_response_status, plivo_response = client.get_applications()
@@ -736,6 +736,7 @@ class Org(SmartModel):
             auth_id = config.get(PLIVO_AUTH_ID, None)
             auth_token = config.get(PLIVO_AUTH_TOKEN, None)
             plivo_app = config.get(PLIVO_APP_ID, None)
+            plivo_uuid = config.get(PLIVO_UUID, None)
             return auth_id and auth_token and plivo_app
         else:
             return False
