@@ -1332,7 +1332,8 @@ class Channel(SmartModel):
         url = 'https://api.plivo.com/v1/Account/%s/Message/' % channel.org_config[PLIVO_AUTH_ID]
 
         client = plivo.RestAPI(channel.org_config[PLIVO_AUTH_ID], channel.org_config[PLIVO_AUTH_TOKEN])
-        status_url = reverse('api.plivo_handler', args=['status', channel.org_config[PLIVO_UUID]])
+        status_url = "https://" + settings.TEMBA_HOST + "%s" % reverse('api.plivo_handler',
+                                                                       args=['status', channel.org_config[PLIVO_UUID]])
 
         payload = {'src': channel.address.lstrip('+'),
                    'dst': msg.urn_path.lstrip('+'),
