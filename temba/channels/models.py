@@ -1328,7 +1328,10 @@ class Channel(SmartModel):
         from temba.msgs.models import Msg, WIRED
         from temba.orgs.models import PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN, PLIVO_UUID
 
-        client = plivo.RestAPI(channel.org_config[PLIVO_AUTH_ID], channel.org_config[PLIVO_AUTH_ID])
+        # url used for logs and exceptions
+        url = 'https://api.plivo.com/v1/Account/%s/Message/' % channel.org_config[PLIVO_AUTH_ID]
+
+        client = plivo.RestAPI(channel.org_config[PLIVO_AUTH_ID], channel.org_config[PLIVO_AUTH_TOKEN])
         status_url = reverse('api.plivo_handler', args=['status', channel.org_config[PLIVO_UUID]])
 
         payload = {'src': channel.address.lstrip('+'),
@@ -1342,6 +1345,7 @@ class Channel(SmartModel):
         except Exception as e:
             raise SendException(unicode(e),
                                 method='POST',
+                                url=url,
                                 request=json.dumps(payload),
                                 response=plivo_response,
                                 response_status=plivo_response_status)
@@ -1349,6 +1353,7 @@ class Channel(SmartModel):
         if plivo_response_status != 200 and plivo_response_status != 201 and plivo_response_status != 202:
             raise SendException("Got non-200 response [%d] from API" % plivo_response_status,
                                 method='POST',
+                                url=url,
                                 request=json.dumps(payload),
                                 response=plivo_response,
                                 response_status=plivo_response_status)
@@ -1359,6 +1364,7 @@ class Channel(SmartModel):
         ChannelLog.log_success(msg=msg,
                                description="Successfully delivered",
                                method='POST',
+                               url=url,
                                request=json.dumps(payload),
                                response=plivo_response,
                                response_status=plivo_response_status)
