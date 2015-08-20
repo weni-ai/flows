@@ -3513,6 +3513,25 @@ class DuplicateValueTest(FlowFileTest):
         value = Value.objects.get(run=run)
         self.assertEquals("Red", value.category)
 
+class HandlingExceptionTest(FlowFileTest):
+
+    def test_handling_exception(self):
+        # this flow has three main actions:
+        # 1) sends a message
+        # 2) adds the contact to a group
+        # 3) updates the contact's name
+        flow = self.get_flow('exception')
+
+        # we want to make sure that none of those take place if the third action blows up
+
+        # patch contact update_value to blow up
+        with patch('requests.get') as mock:
+
+        msg1 = Msg.create_incoming(self.channel, self.contact.get_urn(), "exception")
+
+
+    test_handling_exception.active = True
+
 
 class WebhookLoopTest(FlowFileTest):
 

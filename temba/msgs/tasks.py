@@ -4,6 +4,7 @@ import logging
 
 from celery.signals import celeryd_init
 from datetime import timedelta
+from django.db import transaction
 from django.conf import settings
 from django.utils import timezone
 from django.core.cache import cache
@@ -12,7 +13,7 @@ from redis_cache import get_redis_connection
 from temba.contacts.models import Contact
 from temba.urls import init_analytics
 from temba.utils.mage import mage_handle_new_message, mage_handle_new_contact
-from .models import Msg, ExportMessagesTask, PENDING, HANDLE_EVENT_TASK, MSG_EVENT, FIRE_EVENT
+from .models import Msg, ExportMessagesTask, PENDING, HANDLE_EVENT_TASK, MSG_EVENT, FIRE_EVENT, ERRORED
 from temba.utils.queues import pop_task
 import time
 
@@ -37,14 +38,27 @@ def process_message_task(msg_id, from_mage=False, new_contact=False):
             print "M[%09d] Processing - %s" % (msg.id, msg.text)
             start = time.time()
 
-            # if message was created in Mage...
-            if from_mage:
-                mage_handle_new_message(msg.org, msg)
-                if new_contact:
-                    mage_handle_new_contact(msg.org, msg.contact)
+            # we perform all of these in a transaction, that way we can roll back if needbe and nothing will remain
+            # in an invalid state
 
-            Msg.process_message(msg)
-            print "M[%09d] %08.3f s - %s" % (msg.id, time.time() - start, msg.text)
+            try:
+                with transaction.atomic():
+                    # if message was created in Mage...
+                    if from_mage:
+                        mage_handle_new_message(msg.org, msg)
+                        if new_contact:
+                            mage_handle_new_contact(msg.org, msg.contact)
+
+                    Msg.process_message(msg)
+                    print "M[%09d] %08.3f s - %s" % (msg.id, time.time() - start, msg.text)
+
+            except Exception as e:
+                # this message will be retried later, reset our queued on
+                msg.queued_on = timezone.now()
+                msg.save()
+
+                import traceback
+                traceback.print_exc(e)
 
 @task(track_started=True, name='send_broadcast')
 def send_broadcast_task(broadcast_id):
@@ -178,7 +192,7 @@ def check_messages_task():
             handle_event_task.delay()
 
             # also check any incoming messages that are still pending somehow, reschedule them to be handled
-            unhandled_messages = Msg.objects.filter(direction=INCOMING, status=PENDING, created_on__lte=five_minutes_ago)
+            unhandled_messages = Msg.objects.filter(direction=INCOMING, status=PENDING, queued_on__lte=five_minutes_ago)
             unhandled_messages = unhandled_messages.exclude(channel__org=None).exclude(contact__is_test=True)
             unhandled_count = unhandled_messages.count()
 
