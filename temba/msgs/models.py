@@ -891,7 +891,7 @@ class Msg(models.Model):
 
         return handled
 
-    def handle(self, delay=0):
+    def handle(self):
         if self.direction == OUTGOING:
             raise ValueError(ugettext("Cannot process an outgoing message."))
 

@@ -3569,7 +3569,8 @@ class HandlingExceptionTest(FlowFileTest):
                 # and that our message is scheduled to be queued in the future
                 self.assertTrue(msg1.queued_on > timezone.now())
 
-    test_handling_exception.active = True
+                # and that there is no outgoing mesage
+                self.assertFalse(Msg.objects.filter(direction=OUTGOING))
 
 class WebhookLoopTest(FlowFileTest):
 
