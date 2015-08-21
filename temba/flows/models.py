@@ -561,13 +561,15 @@ class Flow(TembaModel, SmartModel):
             flow.ensure_current_version()
             action_set = ActionSet.get(flow, step.step_uuid)
 
-            destination = Flow.get_node(flow, action_set.destination, action_set.destination_type)
-            if destination:
-                flow.add_step(step.run, destination, previous_step=step, arrived_on=timezone.now())
+            # our action set may have disappeared, in that case we just move on, ignoring this flow
+            if action_set:
+                destination = Flow.get_node(flow, action_set.destination, action_set.destination_type)
+                if destination:
+                    flow.add_step(step.run, destination, previous_step=step, arrived_on=timezone.now())
 
-                # if we pushed them forward, we want to consider any step type
-                # they just arrived at instead of just rulesets
-                step_type_filter = None
+                    # if we pushed them forward, we want to consider any step type
+                    # they just arrived at instead of just rulesets
+                    step_type_filter = None
 
         steps = FlowStep.get_active_steps_for_contact(msg.contact, step_type=step_type_filter)
         for step in steps:
@@ -1569,7 +1571,8 @@ class Flow(TembaModel, SmartModel):
 
         # update our expiration date on our runs, we do this by calculating it on one run then updating all others
         run.update_expiration(timezone.now())
-        FlowRun.objects.filter(contact__in=batch_contact_ids, created_on=now).update(expires_on=run.expires_on)
+        FlowRun.objects.filter(contact__in=batch_contact_ids, created_on=now).update(expires_on=run.expires_on,
+                                                                                     modified_on=timezone.now())
 
         # if we have some broadcasts to optimize for
         message_map = dict()
@@ -2874,6 +2877,8 @@ class FlowVersion(SmartModel):
                     version_number=self.version_number)
 
 class FlowRun(models.Model):
+    org = models.ForeignKey(Org, null=True, related_name='runs', db_index=False)
+
     flow = models.ForeignKey(Flow, related_name='runs')
 
     contact = models.ForeignKey(Contact, related_name='runs')
@@ -2890,20 +2895,21 @@ class FlowRun(models.Model):
     created_on = models.DateTimeField(default=timezone.now,
                                       help_text=_("When this flow run was created"))
 
-    expires_on = models.DateTimeField(blank=True,
-                                      null=True,
+    expires_on = models.DateTimeField(null=True,
                                       help_text=_("When this flow run will expire"))
 
-    expired_on = models.DateTimeField(blank=True,
-                                      null=True,
+    expired_on = models.DateTimeField(null=True,
                                       help_text=_("When this flow run expired"))
+
+    modified_on = models.DateTimeField(auto_now=True, null=True,
+                                       help_text=_("When this flow run was last updated"))
 
     start = models.ForeignKey('flows.FlowStart', null=True, blank=True, related_name='runs',
                               help_text=_("The FlowStart objects that started this run"))
 
     @classmethod
     def create(cls, flow, contact, start=None, call=None, fields=None, created_on=None, db_insert=True):
-        args = dict(flow=flow, contact=contact, start=start, call=call, fields=fields)
+        args = dict(org=flow.org, flow=flow, contact=contact, start=start, call=call, fields=fields)
 
         if created_on:
             args['created_on'] = created_on
@@ -3034,6 +3040,10 @@ class FlowRun(models.Model):
             if not point_in_time:
                 point_in_time = now
             self.expires_on = point_in_time + timedelta(minutes=self.flow.expires_after_minutes)
+            self.modified_on = now
+
+            # save our updated fields
+            self.save(update_fields=['expires_on', 'modified_on'])
 
             # if it's in the past, just expire us now
             if self.expires_on < now:

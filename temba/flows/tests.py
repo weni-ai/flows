@@ -5,6 +5,7 @@ import datetime
 import json
 import os
 import pytz
+import time
 
 from datetime import timedelta
 from decimal import Decimal
@@ -16,8 +17,8 @@ from mock import patch
 from redis_cache import get_redis_connection
 from smartmin.tests import SmartminTest
 from temba.contacts.models import Contact, ContactGroup, ContactField, TEL_SCHEME
-from temba.msgs.models import Broadcast, Label, Msg, INCOMING, SMS_NORMAL_PRIORITY, SMS_HIGH_PRIORITY, PENDING, FLOW, \
-    QUEUED, HANDLED
+from temba.msgs.models import Broadcast, Label, Msg, INCOMING, SMS_NORMAL_PRIORITY, SMS_HIGH_PRIORITY, PENDING, FLOW
+from temba.msgs.models import OUTGOING, HANDLED
 from temba.orgs.models import Org, Language
 from temba.tests import TembaTest, MockResponse, FlowFileTest, uuid
 from temba.triggers.models import Trigger, FOLLOW_TRIGGER, CATCH_ALL_TRIGGER, MISSED_CALL_TRIGGER, INBOUND_CALL_TRIGGER
@@ -3127,6 +3128,8 @@ class FlowsTest(FlowFileTest):
         first_run = flow.runs.all()[0]
         first_expires = first_run.expires_on
 
+        time.sleep(1)
+
         # start it again
         self.send_message(flow, "RED", restart_participants=True)
 
@@ -3138,8 +3141,29 @@ class FlowsTest(FlowFileTest):
         self.assertEquals(first_expires, first_run.expires_on)
 
         # new run should have a different expires on
-        new_run = flow.runs.all()[1]
-        self.assertTrue(new_run.expires_on != first_run.expires_on)
+        new_run = flow.runs.all().order_by('-expires_on').first()
+        self.assertTrue(new_run.expires_on > first_expires)
+
+    def test_flow_expiration_updates(self):
+        flow = self.get_flow('favorites')
+        self.assertEquals("Good choice, I like Red too! What is your favorite beer?", self.send_message(flow, "RED"))
+
+        # get our current expiration
+        run = flow.runs.get()
+        self.assertEquals(flow.org, run.org)
+
+        starting_expiration = run.expires_on
+        starting_modified = run.modified_on
+
+        time.sleep(1)
+
+        # now fire another messages
+        self.assertEquals("Mmmmm... delicious Turbo King. If only they made red Turbo King! Lastly, what is your name?", self.send_message(flow, "turbo"))
+
+        # our new expiration should be later
+        run = flow.runs.get()
+        self.assertTrue(run.expires_on > starting_expiration)
+        self.assertTrue(run.modified_on > starting_modified)
 
     def test_flow_expiration(self):
         flow = self.get_flow('favorites')
@@ -3567,3 +3591,28 @@ class WebhookLoopTest(FlowFileTest):
         with patch('requests.get') as mock:
             mock.return_value = MockResponse(200, '{ "text": "second message" }')
             self.assertEquals("second message", self.send_message(flow, "second"))
+
+
+class GhostActionNodeTest(FlowFileTest):
+
+    def test_ghost_action_node_test(self):
+        # load our flows
+        self.get_flow('parent_child_flow')
+        flow = Flow.objects.get(name="Parent Flow")
+
+        # start the flow
+        flow.start([], [self.contact])
+
+        # at this point, our contact has to active flow runs:
+        # one for our parent flow at an action set (the start flow action), one in our child flow at the send message action
+
+        # let's remove the actionset we are stuck at
+        ActionSet.objects.filter(flow=flow).delete()
+
+        # create a new message and get it handled
+        msg = self.create_msg(contact=self.contact, direction='I', text="yes")
+        Flow.find_and_handle(msg)
+
+        # we should have gotten a response from our child flow
+        self.assertEquals("I like butter too.",
+                          Msg.objects.filter(direction=OUTGOING).order_by('-created_on').first().text)
