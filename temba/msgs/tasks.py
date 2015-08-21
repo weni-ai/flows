@@ -37,28 +37,8 @@ def process_message_task(msg_id, from_mage=False, new_contact=False):
         with r.lock(key, timeout=120):
             print "M[%09d] Processing - %s" % (msg.id, msg.text)
             start = time.time()
-
-            # we perform all of these in a transaction, that way we can roll back if needbe and nothing will remain
-            # in an invalid state
-
-            try:
-                with transaction.atomic():
-                    # if message was created in Mage...
-                    if from_mage:
-                        mage_handle_new_message(msg.org, msg)
-                        if new_contact:
-                            mage_handle_new_contact(msg.org, msg.contact)
-
-                    Msg.process_message(msg)
-                    print "M[%09d] %08.3f s - %s" % (msg.id, time.time() - start, msg.text)
-
-            except Exception as e:
-                # this message will be retried later, reset our queued on
-                msg.queued_on = timezone.now()
-                msg.save()
-
-                import traceback
-                traceback.print_exc(e)
+            Msg.process_message(msg, from_mage=from_mage, new_contact=new_contact)
+            print "M[%09d] %08.3f s - %s" % (msg.id, time.time() - start, msg.text)
 
 @task(track_started=True, name='send_broadcast')
 def send_broadcast_task(broadcast_id):

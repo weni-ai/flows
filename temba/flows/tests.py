@@ -16,7 +16,8 @@ from mock import patch
 from redis_cache import get_redis_connection
 from smartmin.tests import SmartminTest
 from temba.contacts.models import Contact, ContactGroup, ContactField, TEL_SCHEME
-from temba.msgs.models import Broadcast, Label, Msg, INCOMING, SMS_NORMAL_PRIORITY, SMS_HIGH_PRIORITY, PENDING, FLOW
+from temba.msgs.models import Broadcast, Label, Msg, INCOMING, SMS_NORMAL_PRIORITY, SMS_HIGH_PRIORITY, PENDING, FLOW, \
+    QUEUED, HANDLED
 from temba.orgs.models import Org, Language
 from temba.tests import TembaTest, MockResponse, FlowFileTest, uuid
 from temba.triggers.models import Trigger, FOLLOW_TRIGGER, CATCH_ALL_TRIGGER, MISSED_CALL_TRIGGER, INBOUND_CALL_TRIGGER
@@ -3525,13 +3526,26 @@ class HandlingExceptionTest(FlowFileTest):
         # we want to make sure that none of those take place if the third action blows up
 
         # patch contact update_value to blow up
-        with patch('requests.get') as mock:
+        with patch.object(ContactField, 'get_or_create') as mock:
+            mock.side_effect = Exception("Kabooom")
 
-        msg1 = Msg.create_incoming(self.channel, self.contact.get_urn(), "exception")
+            # create our incoming message, we don't use pending because we want to trigger handling manually
+            msg1 = Msg.create_incoming(self.channel, ('tel', self.contact.get_urn().path), "exception", status=HANDLED)
 
+            # handle it, this will throw
+            try:
+                Msg.process_message(msg1)
+                self.fail("Message processing should have thrown")
+            except:
+                msg1 = Msg.objects.get(id=msg1.id)
+
+                # now assert that our contact hasn't been added to any groups
+                self.assertFalse(self.contact.user_groups.all())
+
+                # and that our message is scheduled to be queued in the future
+                self.assertTrue(msg1.queued_on > timezone.now())
 
     test_handling_exception.active = True
-
 
 class WebhookLoopTest(FlowFileTest):
 
