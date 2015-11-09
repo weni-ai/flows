@@ -980,7 +980,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
         'temba.api.authentication.APITokenAuthentication',
     ),
-    'PAGINATE_BY': 250,
+    'PAGE_SIZE': 250,
     'DEFAULT_RENDERER_CLASSES': (
         'temba.api.renderers.DocumentationRenderer',
         'rest_framework.renderers.JSONRenderer',
