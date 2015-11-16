@@ -1,5 +1,7 @@
 from __future__ import unicode_literals
 
+import pycountry
+
 from django import template
 from temba.contacts.models import Contact, ContactURN, FACEBOOK_SCHEME, TEL_SCHEME, TWITTER_SCHEME, TWILIO_SCHEME, URN_ANON_MASK
 
@@ -10,6 +12,7 @@ URN_SCHEME_ICONS = {TEL_SCHEME: 'icon-mobile-2',
                     TWILIO_SCHEME: 'icon-twilio_original',
                     FACEBOOK_SCHEME: 'icon-facebook'}
 
+
 @register.filter
 def contact_field(contact, arg):
     value = contact.get_field_display(arg)
@@ -18,17 +21,21 @@ def contact_field(contact, arg):
     else:
         return '--'
 
+
 @register.filter
 def tel(contact, org):
     return contact.get_urn_display(org=org, scheme=TEL_SCHEME)
+
 
 @register.filter
 def short_name(contact, org):
     return contact.get_display(org, short=True)
 
+
 @register.filter
 def name_or_urn(contact, org):
     return contact.get_display(org)
+
 
 @register.filter
 def format_urn(urn_or_contact, org):
@@ -41,6 +48,17 @@ def format_urn(urn_or_contact, org):
     else:
         raise ValueError('Must be a URN or contact')
 
+
 @register.filter
 def urn_icon(urn):
     return URN_SCHEME_ICONS.get(urn.scheme, '')
+
+
+@register.filter
+def lang_name(code):
+    """
+    Returns the name of a language with the given code. Differs from Django's language_name tag in that it considers all
+    possible languages and not just those configured as translation languages.
+    """
+    lang = pycountry.languages.get(iso639_3_code=code)
+    return lang.name if lang else None

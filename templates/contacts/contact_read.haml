@@ -112,20 +112,31 @@
 
             .clearfix
         .span3
-          .contact_fields
-            -if contact_fields
+          -if contact.language
+            .contact_fields
               .contact_fields_title
-                -trans "Contact Fields"
-            -for field in contact_fields
+                -trans "Details"
               .contact_field
                 .contact_field_label
-                  {{field.label|title}}
+                  -trans "Language"
                 .contact_field_value
-                  {{ object|contact_field:field.key }}
+                  {{contact.language|lang_name|default:"--"}}
               .clearfix
 
-          .contact_fields
-            -if contact_fields
+          -if contact_fields
+            .contact_fields
+              .contact_fields_title
+                -trans "Custom Fields"
+              -for field in contact_fields
+                .contact_field
+                  .contact_field_label
+                    {{field.label|title}}
+                  .contact_field_value
+                    {{ object|contact_field:field.key }}
+                .clearfix
+
+          -if upcoming_events
+            .contact_fields
               .contact_fields_title
                 -trans "Scheduled Messages"
 
