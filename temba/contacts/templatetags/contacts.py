@@ -3,14 +3,15 @@ from __future__ import unicode_literals
 import pycountry
 
 from django import template
-from temba.contacts.models import Contact, ContactURN, FACEBOOK_SCHEME, TEL_SCHEME, TWITTER_SCHEME, TWILIO_SCHEME, URN_ANON_MASK
+from temba.contacts.models import Contact, ContactURN, FACEBOOK_SCHEME, TEL_SCHEME, TWITTER_SCHEME, TWILIO_SCHEME, EXTERNAL_SCHEME, URN_ANON_MASK
 
 register = template.Library()
 
 URN_SCHEME_ICONS = {TEL_SCHEME: 'icon-mobile-2',
                     TWITTER_SCHEME: 'icon-twitter',
                     TWILIO_SCHEME: 'icon-twilio_original',
-                    FACEBOOK_SCHEME: 'icon-facebook'}
+                    FACEBOOK_SCHEME: 'icon-facebook',
+                    EXTERNAL_SCHEME: 'icon-channel-external'}
 
 
 @register.filter
