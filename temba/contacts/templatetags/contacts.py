@@ -61,5 +61,9 @@ def lang_name(code):
     Returns the name of a language with the given code. Differs from Django's language_name tag in that it considers all
     possible languages and not just those configured as translation languages.
     """
-    lang = pycountry.languages.get(iso639_3_code=code)
-    return lang.name if lang else None
+    if code:
+        try:
+            return pycountry.languages.get(iso639_3_code=code).name
+        except KeyError:
+            pass
+    return None

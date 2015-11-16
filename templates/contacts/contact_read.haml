@@ -112,16 +112,15 @@
 
             .clearfix
         .span3
-          -if contact.language
-            .contact_fields
-              .contact_fields_title
-                -trans "Details"
-              .contact_field
-                .contact_field_label
-                  -trans "Language"
-                .contact_field_value
-                  {{contact.language|lang_name|default:"--"}}
-              .clearfix
+          .contact_fields
+            .contact_fields_title
+              -trans "Details"
+            .contact_field
+              .contact_field_label
+                -trans "Language"
+              .contact_field_value
+                {{contact.language|lang_name|default:"--"}}
+            .clearfix
 
           -if contact_fields
             .contact_fields
