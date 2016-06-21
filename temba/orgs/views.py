@@ -1,9 +1,14 @@
 from __future__ import absolute_import, unicode_literals
 
+import base64
+import hashlib
+import hmac
 import json
 import logging
 import plivo
+import requests
 import six
+import time
 
 from collections import OrderedDict
 from datetime import datetime
@@ -40,7 +45,7 @@ from temba.utils.middleware import disable_middleware
 from timezones.forms import TimeZoneField
 from twilio.rest import TwilioRestClient
 from .bundles import WELCOME_TOPUP_SIZE
-from .models import Org, OrgCache, OrgEvent, TopUp, Invitation, UserSettings
+from .models import Org, OrgCache, OrgEvent, TopUp, Invitation, UserSettings, TRANSFERTO_KEY, TRANSFERTO_SECRET
 from .models import MT_SMS_EVENTS, MO_SMS_EVENTS, MT_CALL_EVENTS, MO_CALL_EVENTS, ALARM_EVENTS
 from .models import SUSPENDED, WHITELISTED, RESTORED
 
@@ -426,7 +431,7 @@ class OrgCRUDL(SmartCRUDL):
     actions = ('signup', 'home', 'webhook', 'edit', 'join', 'grant', 'accounts', 'create_login', 'choose',
                'manage_accounts', 'manage', 'update', 'country', 'languages', 'clear_cache', 'download',
                'twilio_connect', 'twilio_account', 'nexmo_configuration', 'nexmo_account', 'nexmo_connect', 'export',
-               'import', 'plivo_connect', 'service', 'surveyor')
+               'import', 'plivo_connect', 'service', 'surveyor', 'transferto_account')
 
     model = Org
 
@@ -1629,6 +1634,9 @@ class OrgCRUDL(SmartCRUDL):
                 if client:
                     formax.add_section('twilio', reverse('orgs.org_twilio_account'), icon='icon-channel-twilio')
 
+            if self.has_org_perm('orgs.org_transferto_account'):
+                formax.add_section('user', reverse('orgs.org_transferto_account'), icon='icon-wrench', action='redirect')
+
             if self.has_org_perm('orgs.org_profile'):
                 formax.add_section('user', reverse('orgs.user_edit'), icon='icon-user', action='redirect')
 
@@ -1647,6 +1655,89 @@ class OrgCRUDL(SmartCRUDL):
             # only pro orgs get multiple users
             if self.has_org_perm("orgs.org_manage_accounts") and org.is_pro():
                 formax.add_section('accounts', reverse('orgs.org_accounts'), icon='icon-users', action='redirect')
+
+    class TransfertoAccount(InferOrgMixin, OrgPermsMixin, SmartUpdateView):
+
+        success_message = ""
+
+        class TransfertoAccountForm(forms.ModelForm):
+            api_key = forms.CharField(label=_("TransfetTo API key"), required=False)
+            api_secret = forms.CharField(label=_("TransferTo API secret"), required=False)
+            disconnect = forms.CharField(widget=forms.HiddenInput, max_length=6, required=True)
+
+            def clean(self):
+                super(OrgCRUDL.TransfertoAccount.TransfertoAccountForm, self).clean()
+                if self.cleaned_data.get('disconnect', 'false') == 'false':
+                    api_key = self.cleaned_data.get('api_key', None)
+                    api_secret = self.cleaned_data.get('api_secret', None)
+
+                    try:
+                        url = 'https://api.transferto.com/v1.1/ping'
+                        api_key = api_key.strip()
+                        api_secret = api_secret.strip()
+                        nonce = int(time.time())
+
+                        message = bytes(api_key + str(nonce) ).encode('utf-8')
+                        secret = bytes(api_secret).encode('utf-8')
+
+                        hmac_header = base64.b64encode(hmac.new(secret, message, digestmod=hashlib.sha256).digest())
+
+                        headers = dict()
+                        headers['X-TransferTo-apikey'] = api_key
+                        headers['X-TransferTo-nonce'] = nonce
+                        headers['X-transferTo-hmac'] = hmac_header
+                        response = requests.get(url, headers=headers)
+                    except:
+                        raise ValidationError(_("Your TransferTo API key and secret seem invalid. "
+                                                "Please check them again and retry."))
+
+                    if response.status_code != 200:
+                        raise ValidationError(_("Your TransferTo API key and secret seem invalid. "
+                                                "Please check them again and retry."))
+
+                return self.cleaned_data
+
+            class Meta:
+                model = Org
+                fields = ('api_key', 'api_secret', 'disconnect')
+
+        form_class = TransfertoAccountForm
+        submit_button_name = "Save"
+        success_url = '@orgs.org_home'
+
+        def get_context_data(self, **kwargs):
+            context = super(OrgCRUDL.TransfertoAccount, self).get_context_data(**kwargs)
+            if self.object.is_connected_to_transferto():
+                config = self.object.config_json()
+                api_key = config.get(TRANSFERTO_KEY, None)
+                key_length = len(api_key)
+                context['transferto_api_key'] = '%s%s' % ('\u066D' * (key_length - 12), api_key[-12:])
+
+            return context
+
+        def derive_initial(self):
+            initial = super(OrgCRUDL.TransfertoAccount, self).derive_initial()
+            config = self.object.config_json()
+            initial['api_key'] = config.get(TRANSFERTO_KEY, None)
+            initial['api_secret'] = config.get(TRANSFERTO_SECRET, None)
+            initial['disconnect'] = 'false'
+            return initial
+
+        def form_valid(self, form):
+            disconnect = form.cleaned_data.get('disconnect', 'false') == 'true'
+            if disconnect:
+                user = self.request.user
+                org = user.get_org()
+                org.remove_transferto_account()
+                return HttpResponseRedirect(reverse('orgs.org_home'))
+            else:
+                user = self.request.user
+                org = user.get_org()
+                api_key = form.cleaned_data['api_key']
+                api_secret = form.cleaned_data['api_secret']
+
+                org.connect_transferto(api_key, api_secret)
+                return super(OrgCRUDL.TransfertoAccount, self).form_valid(form)
 
     class TwilioAccount(InferOrgMixin, OrgPermsMixin, SmartUpdateView):
 

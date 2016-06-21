@@ -1151,6 +1151,47 @@ class OrgTest(TembaTest):
                     org.refresh_from_db()
                     self.assertFalse(org.is_connected_to_twilio())
 
+    def test_transferto_model_methods(self):
+        self.assertFalse(self.org.is_connected_to_transferto())
+
+        self.org.connect_transferto('key', 'secret')
+
+        self.assertTrue(self.org.is_connected_to_transferto())
+
+        self.org.remove_transferto_account()
+
+        self.assertFalse(self.org.is_connected_to_transferto())
+
+    def test_transferto_account(self):
+        self.login(self.admin)
+
+        # connect transferTo
+        transferto_account_url = reverse('orgs.org_transferto_account')
+
+        with patch('requests.get') as mock_get:
+            mock_get.return_value = MockResponse(401, '{"message":"Unauthorized"}')
+            response = self.client.post(transferto_account_url, dict(api_key='key', api_secret='secret'))
+            self.assertContains(response, "Your TransferTo API key and secret seem invalid.")
+            self.assertFalse(self.org.is_connected_to_transferto())
+
+        with patch('requests.get') as mock_get:
+            mock_get.return_value = MockResponse(200, '{"status":"up"}')
+            self.client.post(transferto_account_url, dict(api_key='key', api_secret='secret', disconnect='false'))
+
+            # transferTo should be connected
+            self.org = Org.objects.get(pk=self.org.pk)
+            self.assertTrue(self.org.is_connected_to_transferto())
+            self.assertEqual(self.org.config_json()['TRANSFERTO_KEY'], 'key')
+            self.assertEqual(self.org.config_json()['TRANSFERTO_SECRET'], 'secret')
+
+            # and disconnect
+            self.client.post(transferto_account_url, dict(api_key='key', api_secret='secret', disconnect='true'))
+
+            self.org = Org.objects.get(pk=self.org.pk)
+            self.assertFalse(self.org.is_connected_to_transferto())
+            self.assertFalse(self.org.config_json()['TRANSFERTO_KEY'])
+            self.assertFalse(self.org.config_json()['TRANSFERTO_SECRET'])
+
     def test_connect_nexmo(self):
         self.login(self.admin)
 

@@ -90,6 +90,9 @@ NEXMO_KEY = 'NEXMO_KEY'
 NEXMO_SECRET = 'NEXMO_SECRET'
 NEXMO_UUID = 'NEXMO_UUID'
 
+TRANSFERTO_KEY = 'TRANSFERTO_KEY'
+TRANSFERTO_SECRET = 'TRANSFERTO_SECRET'
+
 ORG_STATUS = 'STATUS'
 SUSPENDED = 'suspended'
 RESTORED = 'restored'
@@ -550,6 +553,34 @@ class Org(SmartModel):
                 with r.lock(key, timeout=900):
                     pending = Channel.get_pending_messages(self)
                     Msg.send_messages(pending)
+
+    def connect_transferto(self, api_key, api_secret):
+        transferto_config = {TRANSFERTO_KEY: api_key.strip(), TRANSFERTO_SECRET: api_secret.strip()}
+
+        config = self.config_json()
+        config.update(transferto_config)
+        self.config = json.dumps(config)
+
+        # clear all our channel configurations
+        self.save(update_fields=['config'])
+
+    def is_connected_to_transferto(self):
+        if self.config:
+            config = self.config_json()
+            transferto_key = config.get(TRANSFERTO_KEY, None)
+            transferto_secret = config.get(TRANSFERTO_SECRET, None)
+
+            return transferto_key and transferto_secret
+        else:
+            return False
+
+    def remove_transferto_account(self):
+        if self.config:
+            config = self.config_json()
+            config[TRANSFERTO_KEY] = ''
+            config[TRANSFERTO_SECRET] = ''
+            self.config = json.dumps(config)
+            self.save()
 
     def connect_nexmo(self, api_key, api_secret):
         nexmo_uuid = str(uuid4())
