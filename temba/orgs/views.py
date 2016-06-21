@@ -1677,7 +1677,7 @@ class OrgCRUDL(SmartCRUDL):
                         api_secret = api_secret.strip()
                         nonce = int(time.time())
 
-                        message = bytes(api_key + str(nonce) ).encode('utf-8')
+                        message = bytes(api_key + str(nonce)).encode('utf-8')
                         secret = bytes(api_secret).encode('utf-8')
 
                         hmac_header = base64.b64encode(hmac.new(secret, message, digestmod=hashlib.sha256).digest())
