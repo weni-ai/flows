@@ -1154,7 +1154,7 @@ class OrgTest(TembaTest):
     def test_transferto_model_methods(self):
         self.assertFalse(self.org.is_connected_to_transferto())
 
-        self.org.connect_transferto('key', 'secret')
+        self.org.connect_transferto('login', 'token')
 
         self.assertTrue(self.org.is_connected_to_transferto())
 
@@ -1168,29 +1168,41 @@ class OrgTest(TembaTest):
         # connect transferTo
         transferto_account_url = reverse('orgs.org_transferto_account')
 
-        with patch('requests.get') as mock_get:
-            mock_get.return_value = MockResponse(401, '{"message":"Unauthorized"}')
-            response = self.client.post(transferto_account_url, dict(api_key='key', api_secret='secret'))
+        with patch('temba.orgs.views.post_transferto_request') as mock_post_transterto_request:
+            mock_post_transterto_request.return_value = MockResponse(200, 'Unexpected content')
+            response = self.client.post(transferto_account_url, dict(account_login='login', airtime_api_token='token',
+                                                                     disconnect='false'))
+
             self.assertContains(response, "Your TransferTo API key and secret seem invalid.")
             self.assertFalse(self.org.is_connected_to_transferto())
 
-        with patch('requests.get') as mock_get:
-            mock_get.return_value = MockResponse(200, '{"status":"up"}')
-            self.client.post(transferto_account_url, dict(api_key='key', api_secret='secret', disconnect='false'))
+            mock_post_transterto_request.return_value = MockResponse(200, 'info_txt=pong\r\n'
+                                                                          'authentication_key=123\r\n'
+                                                                          'error_code=0\r\n'
+                                                                          'error_txt=Transaction successful\r\n')
 
+            response = self.client.post(transferto_account_url, dict(account_login='login', airtime_api_token='token',
+                                                                     disconnect='false'))
             # transferTo should be connected
             self.org = Org.objects.get(pk=self.org.pk)
             self.assertTrue(self.org.is_connected_to_transferto())
-            self.assertEqual(self.org.config_json()['TRANSFERTO_KEY'], 'key')
-            self.assertEqual(self.org.config_json()['TRANSFERTO_SECRET'], 'secret')
+            self.assertEqual(self.org.config_json()['TRANSFERTO_ACCOUNT_LOGIN'], 'login')
+            self.assertEqual(self.org.config_json()['TRANSFERTO_AIRTIME_API_TOKEN'], 'token')
 
             # and disconnect
-            self.client.post(transferto_account_url, dict(api_key='key', api_secret='secret', disconnect='true'))
+            response = self.client.post(transferto_account_url, dict(account_login='login', airtime_api_token='token',
+                                                                     disconnect='true'))
 
             self.org = Org.objects.get(pk=self.org.pk)
             self.assertFalse(self.org.is_connected_to_transferto())
-            self.assertFalse(self.org.config_json()['TRANSFERTO_KEY'])
-            self.assertFalse(self.org.config_json()['TRANSFERTO_SECRET'])
+            self.assertFalse(self.org.config_json()['TRANSFERTO_ACCOUNT_LOGIN'])
+            self.assertFalse(self.org.config_json()['TRANSFERTO_AIRTIME_API_TOKEN'])
+
+            mock_post_transterto_request.side_effect = Exception('foo')
+            response = self.client.post(transferto_account_url, dict(account_login='login', airtime_api_token='token',
+                                                                     disconnect='false'))
+            self.assertContains(response, "Your TransferTo API key and secret seem invalid.")
+            self.assertFalse(self.org.is_connected_to_transferto())
 
     def test_connect_nexmo(self):
         self.login(self.admin)

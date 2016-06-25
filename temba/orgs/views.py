@@ -1,14 +1,9 @@
 from __future__ import absolute_import, unicode_literals
 
-import base64
-import hashlib
-import hmac
 import json
 import logging
 import plivo
-import requests
 import six
-import time
 
 from collections import OrderedDict
 from datetime import datetime
@@ -40,14 +35,14 @@ from temba.formax import FormaxMixin
 from temba.middleware import BrandingMiddleware
 from temba.nexmo import NexmoClient, NexmoValidationError
 from temba.orgs.models import get_stripe_credentials, NEXMO_UUID, NEXMO_SECRET, NEXMO_KEY
-from temba.utils import analytics, build_json_response, languages
+from temba.utils import analytics, build_json_response, languages, post_transferto_request
 from temba.utils.middleware import disable_middleware
 from timezones.forms import TimeZoneField
 from twilio.rest import TwilioRestClient
 from .bundles import WELCOME_TOPUP_SIZE
-from .models import Org, OrgCache, OrgEvent, TopUp, Invitation, UserSettings, TRANSFERTO_KEY, TRANSFERTO_SECRET
+from .models import Org, OrgCache, OrgEvent, TopUp, Invitation, UserSettings
 from .models import MT_SMS_EVENTS, MO_SMS_EVENTS, MT_CALL_EVENTS, MO_CALL_EVENTS, ALARM_EVENTS
-from .models import SUSPENDED, WHITELISTED, RESTORED
+from .models import SUSPENDED, WHITELISTED, RESTORED, TRANSFERTO_ACCOUNT_LOGIN, TRANSFERTO_AIRTIME_API_TOKEN
 
 
 def check_login(request):
@@ -1661,37 +1656,24 @@ class OrgCRUDL(SmartCRUDL):
         success_message = ""
 
         class TransfertoAccountForm(forms.ModelForm):
-            api_key = forms.CharField(label=_("TransfetTo API key"), required=False)
-            api_secret = forms.CharField(label=_("TransferTo API secret"), required=False)
+            account_login = forms.CharField(label=_("TransfetTo Account API Login"), required=False)
+            airtime_api_token = forms.CharField(label=_("TransferTo Airtime API Token"), required=False)
             disconnect = forms.CharField(widget=forms.HiddenInput, max_length=6, required=True)
 
             def clean(self):
                 super(OrgCRUDL.TransfertoAccount.TransfertoAccountForm, self).clean()
                 if self.cleaned_data.get('disconnect', 'false') == 'false':
-                    api_key = self.cleaned_data.get('api_key', None)
-                    api_secret = self.cleaned_data.get('api_secret', None)
+                    account_login = self.cleaned_data.get('account_login', None)
+                    airtime_api_token = self.cleaned_data.get('airtime_api_token', None)
 
                     try:
-                        url = 'https://api.transferto.com/v1.1/ping'
-                        api_key = api_key.strip()
-                        api_secret = api_secret.strip()
-                        nonce = int(time.time())
-
-                        message = bytes(api_key + str(nonce)).encode('utf-8')
-                        secret = bytes(api_secret).encode('utf-8')
-
-                        hmac_header = base64.b64encode(hmac.new(secret, message, digestmod=hashlib.sha256).digest())
-
-                        headers = dict()
-                        headers['X-TransferTo-apikey'] = api_key
-                        headers['X-TransferTo-nonce'] = nonce
-                        headers['X-transferTo-hmac'] = hmac_header
-                        response = requests.get(url, headers=headers)
+                        response = post_transferto_request(account_login, airtime_api_token, action='ping')
                     except:
                         raise ValidationError(_("Your TransferTo API key and secret seem invalid. "
                                                 "Please check them again and retry."))
 
-                    if response.status_code != 200:
+                    splitted_content = response.content.split('\r\n')
+                    if not ('error_code=0' in splitted_content and 'info_txt=pong' in splitted_content):
                         raise ValidationError(_("Your TransferTo API key and secret seem invalid. "
                                                 "Please check them again and retry."))
 
@@ -1699,7 +1681,7 @@ class OrgCRUDL(SmartCRUDL):
 
             class Meta:
                 model = Org
-                fields = ('api_key', 'api_secret', 'disconnect')
+                fields = ('account_login', 'airtime_api_token', 'disconnect')
 
         form_class = TransfertoAccountForm
         submit_button_name = "Save"
@@ -1709,17 +1691,16 @@ class OrgCRUDL(SmartCRUDL):
             context = super(OrgCRUDL.TransfertoAccount, self).get_context_data(**kwargs)
             if self.object.is_connected_to_transferto():
                 config = self.object.config_json()
-                api_key = config.get(TRANSFERTO_KEY, None)
-                key_length = len(api_key)
-                context['transferto_api_key'] = '%s%s' % ('\u066D' * (key_length - 12), api_key[-12:])
+                account_login = config.get(TRANSFERTO_ACCOUNT_LOGIN, None)
+                context['transferto_account_login'] = account_login
 
             return context
 
         def derive_initial(self):
             initial = super(OrgCRUDL.TransfertoAccount, self).derive_initial()
             config = self.object.config_json()
-            initial['api_key'] = config.get(TRANSFERTO_KEY, None)
-            initial['api_secret'] = config.get(TRANSFERTO_SECRET, None)
+            initial['account_login'] = config.get(TRANSFERTO_ACCOUNT_LOGIN, None)
+            initial['airtime_api_token'] = config.get(TRANSFERTO_AIRTIME_API_TOKEN, None)
             initial['disconnect'] = 'false'
             return initial
 
@@ -1733,10 +1714,10 @@ class OrgCRUDL(SmartCRUDL):
             else:
                 user = self.request.user
                 org = user.get_org()
-                api_key = form.cleaned_data['api_key']
-                api_secret = form.cleaned_data['api_secret']
+                account_login = form.cleaned_data['account_login']
+                airtime_api_token = form.cleaned_data['airtime_api_token']
 
-                org.connect_transferto(api_key, api_secret)
+                org.connect_transferto(account_login, airtime_api_token)
                 return super(OrgCRUDL.TransfertoAccount, self).form_valid(form)
 
     class TwilioAccount(InferOrgMixin, OrgPermsMixin, SmartUpdateView):

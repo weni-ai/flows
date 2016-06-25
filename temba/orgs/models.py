@@ -90,8 +90,8 @@ NEXMO_KEY = 'NEXMO_KEY'
 NEXMO_SECRET = 'NEXMO_SECRET'
 NEXMO_UUID = 'NEXMO_UUID'
 
-TRANSFERTO_KEY = 'TRANSFERTO_KEY'
-TRANSFERTO_SECRET = 'TRANSFERTO_SECRET'
+TRANSFERTO_ACCOUNT_LOGIN = 'TRANSFERTO_ACCOUNT_LOGIN'
+TRANSFERTO_AIRTIME_API_TOKEN = 'TRANSFERTO_AIRTIME_API_TOKEN'
 
 ORG_STATUS = 'STATUS'
 SUSPENDED = 'suspended'
@@ -554,8 +554,9 @@ class Org(SmartModel):
                     pending = Channel.get_pending_messages(self)
                     Msg.send_messages(pending)
 
-    def connect_transferto(self, api_key, api_secret):
-        transferto_config = {TRANSFERTO_KEY: api_key.strip(), TRANSFERTO_SECRET: api_secret.strip()}
+    def connect_transferto(self, account_login, airtime_api_token):
+        transferto_config = {TRANSFERTO_ACCOUNT_LOGIN: account_login.strip(),
+                             TRANSFERTO_AIRTIME_API_TOKEN: airtime_api_token.strip()}
 
         config = self.config_json()
         config.update(transferto_config)
@@ -567,18 +568,18 @@ class Org(SmartModel):
     def is_connected_to_transferto(self):
         if self.config:
             config = self.config_json()
-            transferto_key = config.get(TRANSFERTO_KEY, None)
-            transferto_secret = config.get(TRANSFERTO_SECRET, None)
+            transferto_account_login = config.get(TRANSFERTO_ACCOUNT_LOGIN, None)
+            transferto_airtime_api_token = config.get(TRANSFERTO_AIRTIME_API_TOKEN, None)
 
-            return transferto_key and transferto_secret
+            return transferto_account_login and transferto_airtime_api_token
         else:
             return False
 
     def remove_transferto_account(self):
         if self.config:
             config = self.config_json()
-            config[TRANSFERTO_KEY] = ''
-            config[TRANSFERTO_SECRET] = ''
+            config[TRANSFERTO_ACCOUNT_LOGIN] = ''
+            config[TRANSFERTO_AIRTIME_API_TOKEN] = ''
             self.config = json.dumps(config)
             self.save()
 
