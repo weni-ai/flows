@@ -1168,7 +1168,7 @@ class OrgTest(TembaTest):
         # connect transferTo
         transferto_account_url = reverse('orgs.org_transferto_account')
 
-        with patch('temba.orgs.views.post_transferto_request') as mock_post_transterto_request:
+        with patch('temba.events.models.AirtimeEvent.post_transferto_api_response') as mock_post_transterto_request:
             mock_post_transterto_request.return_value = MockResponse(200, 'Unexpected content')
             response = self.client.post(transferto_account_url, dict(account_login='login', airtime_api_token='token',
                                                                      disconnect='false'))

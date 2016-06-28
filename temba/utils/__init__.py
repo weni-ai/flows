@@ -1,16 +1,13 @@
 from __future__ import unicode_literals
 
 import calendar
-import hashlib
 import json
 import pytz
 import random
 import datetime
 import locale
-import time
 import resource
 
-import requests
 from dateutil.parser import parse
 from decimal import Decimal
 from django.conf import settings
@@ -483,20 +480,3 @@ def print_max_mem_usage(msg=None):
     print "=" * 80
     print msg + locale.format("%d", resource.getrusage(resource.RUSAGE_SELF).ru_maxrss, grouping=True)
     print "=" * 80
-
-
-def post_transferto_request(login, token, **kwargs):
-
-    url = 'https://fm.transfer-to.com/cgi-bin/shop/topup'
-
-    key = str(int(time.time()))
-    md5 = hashlib.md5()
-    md5.update(login + token + key)
-    md5 = md5.hexdigest()
-
-    data = kwargs
-    data.update(dict(login=login, key=key, md5=md5))
-
-    response = requests.post(url, data)
-
-    return response

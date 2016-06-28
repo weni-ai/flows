@@ -35,7 +35,7 @@ from temba.formax import FormaxMixin
 from temba.middleware import BrandingMiddleware
 from temba.nexmo import NexmoClient, NexmoValidationError
 from temba.orgs.models import get_stripe_credentials, NEXMO_UUID, NEXMO_SECRET, NEXMO_KEY
-from temba.utils import analytics, build_json_response, languages, post_transferto_request
+from temba.utils import analytics, build_json_response, languages
 from temba.utils.middleware import disable_middleware
 from timezones.forms import TimeZoneField
 from twilio.rest import TwilioRestClient
@@ -1667,7 +1667,8 @@ class OrgCRUDL(SmartCRUDL):
                     airtime_api_token = self.cleaned_data.get('airtime_api_token', None)
 
                     try:
-                        response = post_transferto_request(account_login, airtime_api_token, action='ping')
+                        from temba.events.models import AirtimeEvent
+                        response = AirtimeEvent.post_transferto_api_response(account_login, airtime_api_token, action='ping')
                     except:
                         raise ValidationError(_("Your TransferTo API key and secret seem invalid. "
                                                 "Please check them again and retry."))

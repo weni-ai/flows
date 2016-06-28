@@ -221,6 +221,7 @@ INSTALLED_APPS = (
     'temba.ivr',
     'temba.locations',
     'temba.values',
+    'temba.events',
 )
 
 # the last installed app that uses smartmin permissions
