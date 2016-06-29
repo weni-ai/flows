@@ -61,7 +61,8 @@ class AirtimeEvent(SmartModel):
         return content_json, response.content
 
     def fetch_msisdn_info(self):
-        content_json, content = self.get_transferto_response_json(action='msisdn_info', destination_msisdn=self.phone_number)
+        content_json, content = self.get_transferto_response_json(action='msisdn_info',
+                                                                  destination_msisdn=self.phone_number)
 
         AirtimeEvent.objects.filter(pk=self.pk).update(**{'data_json': json.dumps(content_json),
                                                           'dump_content': content})
@@ -109,8 +110,8 @@ class TransferAirtime(SmartModel):
 
     def topup(self):
         content_json, content = self.event.get_transferto_response_json(action='topup', reserve_id=self.transaction_id,
-                                                                         destination_msisdn=self.event.phone_number,
-                                                                         product=self.event.denomination)
+                                                                        destination_msisdn=self.event.phone_number,
+                                                                        product=self.event.denomination)
 
         update_fields = dict()
         error_code = content_json.get('error_code', None)

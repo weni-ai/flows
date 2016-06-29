@@ -1,7 +1,7 @@
 import json
 
 from mock import patch
-from temba.events.models import AirtimeEvent, TRANSFERTO_AIRTIME_API_URL, TransferAirtime
+from temba.events.models import AirtimeEvent, TransferAirtime
 from temba.tests import TembaTest, MockResponse
 
 
@@ -67,7 +67,6 @@ class AirtimeEventTest(TembaTest):
         self.assertFalse(self.airtime_event.update_denomination())
         self.assertFalse(self.airtime_event.denomination)
 
-
         self.airtime_event.data_json = json.dumps(dict(foo="allo", bar=["1", "2", "3"], product_list=1000))
         self.airtime_event.dump_content = "foo=allo\r\nbar=1,2,3\r\nproduct_list=1000\r\n"
         self.airtime_event.save()
@@ -109,34 +108,14 @@ class AirtimeEventTest(TembaTest):
         self.assertEqual(mock_transferto_response_json.call_count, 0)
 
         self.assertFalse(TransferAirtime.objects.all())
-        self.airtime_event.denomination=50
+        self.airtime_event.denomination = 50
         self.airtime_event.save()
 
         self.airtime_event.transfer_airtime()
 
-        airtime_event = AirtimeEvent.objects.get(pk=self.airtime_event.pk)
         self.assertTrue(TransferAirtime.objects.all())
         self.assertEqual(TransferAirtime.objects.all().count(), 1)
         self.assertEqual(mock_transferto_response_json.call_count, 2)
 
         transfer = TransferAirtime.objects.get()
         self.assertEqual(transfer.error_code, '0')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
