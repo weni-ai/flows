@@ -1,25 +1,47 @@
 import hashlib
 import json
-
+import requests
 import time
 
-import requests
 from django.db import models
+from django.utils import timezone
 
 from smartmin.models import SmartModel
-from temba.orgs.models import Org, TRANSFERTO_ACCOUNT_LOGIN, TRANSFERTO_AIRTIME_API_TOKEN
+from temba.api.models import get_api_user
 
+from temba.channels.models import Channel
+from temba.contacts.models import TEL_SCHEME
+from temba.orgs.models import Org, TRANSFERTO_ACCOUNT_LOGIN, TRANSFERTO_AIRTIME_API_TOKEN
+from temba.utils import datetime_to_str
 
 TRANSFERTO_AIRTIME_API_URL = 'https://fm.transfer-to.com/cgi-bin/shop/topup'
+LOG_DIVIDER = "%s\n\n\n" % ('=' * 20)
+
+PENDING = 'P'
+COMPLETE = 'C'
+FAILED = 'F'
+
+STATUS_CHOICES = ((PENDING, "Pending"),
+                  (COMPLETE, "Complete"),
+                  (FAILED, "Failed"))
 
 
 class AirtimeEvent(SmartModel):
-    org = models.ForeignKey(Org)
-    phone_number = models.CharField(max_length=64)
+    org = models.ForeignKey(Org,
+                            help_text="The organization that this event was triggered for")
+    status = models.CharField(max_length=1, choices=STATUS_CHOICES, default='P',
+                              help_text="The state this event is currently in")
+    channel = models.ForeignKey(Channel, null=True, blank=True,
+                                help_text="The channel that this event is relating to")
+    recipient = models.CharField(max_length=64)
     amount = models.FloatField()
     denomination = models.CharField(max_length=32, null=True, blank=True)
-    dump_content = models.TextField(null=True, blank=True)
-    data_json = models.TextField(null=True, blank=True)
+    transaction_id = models.CharField(max_length=256, null=True, blank=True)
+    reference_operator = models.CharField(max_length=64, null=True, blank=True)
+    airtime_amount = models.CharField(max_length=32, null=True, blank=True)
+    last_message = models.CharField(max_length=256, null=True, blank=True)
+    data = models.TextField(null=True, blank=True)
+    event_log = models.TextField(null=True, blank=True)
 
     @classmethod
     def post_transferto_api_response(cls, login, token, **kwargs):
@@ -58,71 +80,152 @@ class AirtimeEvent(SmartModel):
         response = AirtimeEvent.post_transferto_api_response(login, token, **kwargs)
         content_json = AirtimeEvent.translate_transferto_response_content_as_json(response.content)
 
-        return content_json, response.content
+        return response.status_code, content_json, response.content
 
-    def fetch_msisdn_info(self):
-        content_json, content = self.get_transferto_response_json(action='msisdn_info',
-                                                                  destination_msisdn=self.phone_number)
+    @classmethod
+    def trigger_flow_event(cls, amount, flow, run, node_uuid, contact, event):
+        org = flow.org
+        api_user = get_api_user()
 
-        AirtimeEvent.objects.filter(pk=self.pk).update(**{'data_json': json.dumps(content_json),
-                                                          'dump_content': content})
-
-    def update_denomination(self):
-        if not self.data_json or not self.amount:
+        # no-op if no webhook configured
+        if not amount:
             return
 
-        content_json = json.loads(self.data_json)
-        product_list = content_json.get('product_list', [])
+        json_time = datetime_to_str(timezone.now())
 
-        if not isinstance(product_list, list):
-            product_list = [product_list]
+        # get the results for this contact
+        results = flow.get_results(contact)
+        values = []
 
-        targeted_prices = [float(i) for i in product_list if float(i) <= float(self.amount)]
+        if results and results[0]:
+            values = results[0]['values']
+            for value in values:
+                value['time'] = datetime_to_str(value['time'])
+                value['value'] = unicode(value['value'])
 
-        updated = False
-        if targeted_prices:
-            denomination = max(targeted_prices)
-            updated = AirtimeEvent.objects.filter(pk=self.pk).update(**{'denomination': denomination})
+        # if the action is on the first node
+        # we might not have an sms (or channel) yet
+        channel = None
+        text = None
+        contact_urn = contact.get_urn()
 
-        return bool(updated)
+        if event:
+            text = event.text
+            channel = event.channel
+            contact_urn = event.contact_urn
 
-    def transfer_airtime(self):
-        if not self.denomination:
-            return
+        if channel:
+            channel_id = channel.pk
+        else:
+            channel_id = -1
 
-        content_json, content = self.get_transferto_response_json(action='reserve_id')
-        transaction_id = content_json.get('reserve_id')
+        steps = []
+        for step in run.steps.all().order_by('arrived_on'):
+            steps.append(dict(type=step.step_type,
+                              node=step.step_uuid,
+                              arrived_on=datetime_to_str(step.arrived_on),
+                              left_on=datetime_to_str(step.left_on),
+                              text=step.get_text(),
+                              value=step.rule_value))
 
-        transfer = TransferAirtime.objects.create(event=self, transaction_id=transaction_id,
-                                                  created_by=self.created_by, modified_by=self.created_by)
-        return transfer.topup()
+        data = dict(channel=channel_id,
+                    flow=flow.id,
+                    run=run.id,
+                    text=text,
+                    step=unicode(node_uuid),
+                    phone=contact.get_urn_display(org=org, scheme=TEL_SCHEME, full=True),
+                    contact=contact.uuid,
+                    urn=unicode(contact_urn),
+                    values=json.dumps(values),
+                    steps=json.dumps(steps),
+                    time=json_time,
+                    transferto_dumps=dict())
 
+        airtime_event = AirtimeEvent.objects.create(org=org, channel=channel, recipient=contact_urn.path,
+                                                    amount=amount, data=json.dumps(data),
+                                                    created_by=api_user,
+                                                    modified_by=api_user)
 
-class TransferAirtime(SmartModel):
-    event = models.ForeignKey(AirtimeEvent)
-    transaction_id = models.CharField(max_length=256)
-    error_code = models.CharField(max_length=64, null=True, blank=True)
-    error_txt = models.CharField(max_length=512, null=True, blank=True)
-    reference_operator = models.CharField(max_length=64, null=True, blank=True)
-    airtime_amount = models.CharField(max_length=32, null=True, blank=True)
-    dump_content = models.TextField(null=True, blank=True)
-    data_json = models.TextField(null=True, blank=True)
+        message = "None"
+        try:
+            action = 'msisdn_info'
+            request_kwargs = dict(action=action, destination_msisdn=airtime_event.recipient)
+            status_code, content_json, content = airtime_event.get_transferto_response_json(**request_kwargs)
 
-    def topup(self):
-        content_json, content = self.event.get_transferto_response_json(action='topup', reserve_id=self.transaction_id,
-                                                                        destination_msisdn=self.event.phone_number,
-                                                                        product=self.event.denomination)
+            error_code = content_json.get('error_code', None)
+            error_txt = content_json.get('error_txt', None)
 
-        update_fields = dict()
-        error_code = content_json.get('error_code', None)
-        update_fields['error_code'] = error_code
-        update_fields['error_txt'] = content_json.get('error_txt', None)
-        update_fields['reference_operator'] = content_json.get('reference_operator', None)
-        update_fields['airtime_amount'] = content_json.get('airtime_amount', None)
-        update_fields['data_json'] = json.dumps(content_json)
-        update_fields['dump_content'] = content
+            if error_code != 0:
+                message = "Got non-zero error code (%d) from TransferTo with message (%s)" % (error_code, error_txt)
+                airtime_event.status = FAILED
+                raise Exception(message)
 
-        if update_fields:
-            TransferAirtime.objects.filter(pk=self.pk).update(**update_fields)
+            data['transferto_dumps'][action] = dict(status_code=status_code, data=content_json)
+            airtime_event.data = json.dumps(data)
+            airtime_event.event_log += content + LOG_DIVIDER
 
-        return error_code
+            product_list = content_json.get('product_list', [])
+
+            if not isinstance(product_list, list):
+                product_list = [product_list]
+
+            targeted_prices = [float(i) for i in product_list if float(i) <= float(amount)]
+
+            if targeted_prices:
+                denomination = max(targeted_prices)
+                airtime_event.denomination = denomination
+
+            action = 'reserve_id'
+            request_kwargs = dict(action=action)
+            status_code, content_json, content = airtime_event.get_transferto_response_json(**request_kwargs)
+
+            error_code = content_json.get('error_code', None)
+            error_txt = content_json.get('error_txt', None)
+
+            if error_code != 0:
+                message = "Got non-zero error code (%d) from TransferTo with message (%s)" % (error_code, error_txt)
+                airtime_event.status = FAILED
+                raise Exception(message)
+
+            transaction_id = content_json.get('reserve_id')
+
+            data['transferto_dumps'][action] = dict(status_code=status_code, data=content_json)
+            airtime_event.data = json.dumps(data)
+            airtime_event.event_log += content + LOG_DIVIDER
+            airtime_event.transaction_id = transaction_id
+
+            action = 'topup'
+            request_kwargs = dict(action=action,
+                                  reserve_id=transaction_id,
+                                  msisdn=channel.address,
+                                  destination_msisdn=airtime_event.recipient,
+                                  product=airtime_event.denomination)
+            status_code, content_json, content = airtime_event.get_transferto_response_json(**request_kwargs)
+
+            data['transferto_dumps'][action] = dict(status_code=status_code, data=content_json)
+            airtime_event.data = json.dumps(data)
+            airtime_event.event_log += content + LOG_DIVIDER
+
+            error_code = content_json.get('error_code', None)
+            error_txt = content_json.get('error_txt', None)
+
+            if error_code != 0:
+                message = "Got non-zero error code (%d) from TransferTo with message (%s)" % (error_code, error_txt)
+                airtime_event.status = FAILED
+                raise Exception(message)
+
+            message = "Airtime Transferred Successfully"
+            airtime_event.status = COMPLETE
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+
+            airtime_event.status = FAILED
+            message = "Error transferring airtime: %s" % unicode(e)
+
+        finally:
+            airtime_event.last_message = message
+            airtime_event.save()
+
+        return airtime_event
