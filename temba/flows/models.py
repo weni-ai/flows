@@ -2809,6 +2809,7 @@ class RuleSet(models.Model):
     TYPE_WAIT_AUDIO = 'wait_audio'
     TYPE_WAIT_GPS = 'wait_gps'
 
+    TYPE_AIRTIME = 'airtime'
     TYPE_WEBHOOK = 'webhook'
     TYPE_FLOW_FIELD = 'flow_field'
     TYPE_FORM_FIELD = 'form_field'
@@ -2825,6 +2826,8 @@ class RuleSet(models.Model):
                     (TYPE_WAIT_DIGIT, "Wait for digit"),
                     (TYPE_WAIT_DIGITS, "Wait for digits"),
                     (TYPE_WEBHOOK, "Webhook"),
+                    (TYPE_AIRTIME, "Transfer Airtime"),
+                    (TYPE_FORM_FIELD, "Split by message form"),
                     (TYPE_FLOW_FIELD, "Split on flow field"),
                     (TYPE_CONTACT_FIELD, "Split on contact field"),
                     (TYPE_EXPRESSION, "Split by expression"))

@@ -56,6 +56,10 @@
       #split-on
         -trans "If the keypad entry before the # symbol.."
 
+    .airtime{ng-if:'formData.rulesetConfig.type == "airtime"'}><
+      .split-margin
+        Coming soon
+
     .webhook{ng-if:'formData.rulesetConfig.type == "webhook"'}><
       .split-margin
         %p{class:"description"}
