@@ -22,10 +22,10 @@ describe 'Controllers:', ->
 
     # wire up our mock flows
     flows = {
-      'favorites': { id: 1, languages:[] },
-      'rules_first': { id: 2, languages:[] },
-      'loop_detection': { id: 3, languages:[] },
-      'webhook_rule_first': { id: 4, languages:[] },
+      'favorites': { id: 1, languages:[], org_channel_countries:[]},
+      'rules_first': { id: 2, languages:[], org_channel_countries:[]},
+      'loop_detection': { id: 3, languages:[], org_channel_countries:[]},
+      'webhook_rule_first': { id: 4, languages:[], org_channel_countries:[]},
     }
 
     $http.whenGET('/contactfield/json/').respond([])
@@ -37,7 +37,8 @@ describe 'Controllers:', ->
       $http.whenGET('/flow/json/' + config.id + '/').respond(
         {
           flow: getJSONFixture(file + '.json').flows[0],
-          languages: config.languages
+          languages: config.languages,
+          org_channel_countries: config.org_channel_countries
         }
       )
 
