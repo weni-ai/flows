@@ -515,6 +515,20 @@ class Org(SmartModel):
         """
         return json.loads(self.webhook).get('headers', dict()) if self.webhook else dict()
 
+    def get_org_channel_countries(self):
+        org_channel_countries = []
+        channels_countries = self.channels.filter(is_active=True).exclude(country=None).values('country').distinct()
+
+        for country in channels_countries:
+            code = country['country']
+            country_obj = pycountry.countries.get(alpha2=code)
+            country_name = country_obj.name
+            currency = pycountry.currencies.get(numeric=country_obj.numeric)
+            org_channel_countries.append(dict(code=code, name=country_name, currency_code=currency.letter,
+                                              currency_name=currency.name))
+
+        return sorted(org_channel_countries, key=lambda k: k['name'])
+
     @classmethod
     def get_possible_countries(cls):
         return AdminBoundary.objects.filter(level=0).order_by('name')

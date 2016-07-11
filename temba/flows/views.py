@@ -1321,7 +1321,9 @@ class FlowCRUDL(SmartCRUDL):
 
             # all the translation languages for our org
             languages = [lang.as_json() for lang in flow.org.languages.all().order_by('orgs')]
-            return build_json_response(dict(flow=flow.as_json(expand_contacts=True), languages=languages))
+            org_channel_countries = flow.org.get_org_channel_countries()
+            return build_json_response(dict(flow=flow.as_json(expand_contacts=True), languages=languages,
+                                            org_channel_countries=org_channel_countries))
 
         def post(self, request, *args, **kwargs):
 

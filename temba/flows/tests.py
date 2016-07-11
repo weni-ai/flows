@@ -1735,6 +1735,9 @@ class FlowTest(TembaTest):
 
         # test getting the json
         response = self.client.get(reverse('flows.flow_json', args=[flow.pk]))
+        self.assertTrue('languages' in response.content)
+        self.assertTrue('org_channel_countries' in response.content)
+
         json_dict = json.loads(response.content)['flow']
 
         # test setting the json

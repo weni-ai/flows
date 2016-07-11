@@ -902,6 +902,25 @@ NodeEditorController = ($rootScope, $scope, $modalInstance, $timeout, $log, Flow
   formData.fieldIndex = Flow.getFieldSelection($scope.fieldIndexOptions, config.field_index, true)
   formData.fieldDelimiter = Flow.getFieldSelection($scope.fieldDelimiterOptions, config.field_delimiter, true)
 
+  airtimeAmountConfig = []
+  seenOrgCountries = []
+  for country in angular.copy(Flow.flow.org_channel_countries)
+    countryAirtime = country
+    countryCode = country.code
+    if config[countryCode]
+      countryAirtime.amount = parseFloat(config[countryCode]['amount'])
+    else
+      countryAirtime.amount = 0
+    seenOrgCountries.push(countryCode)
+
+    airtimeAmountConfig.push(countryAirtime)
+
+  for countryCode, countryConfig of config
+    if countryCode not in seenOrgCountries
+      airtimeAmountConfig.push(countryConfig)
+
+  formData.airtimeAmountConfig = airtimeAmountConfig
+
   # default webhook action
   if not $scope.ruleset.webhook_action
     $scope.ruleset.webhook_action = 'GET'
@@ -1232,9 +1251,13 @@ NodeEditorController = ($rootScope, $scope, $modalInstance, $timeout, $log, Flow
       rulesetConfig = $scope.formData.rulesetConfig
       contactField = $scope.formData.contactField
       flowField = $scope.formData.flowField
+      airtimeAmountConfig = $scope.formData.airtimeAmountConfig
 
       # save whatever ruleset type they are setting us to
       ruleset.ruleset_type = rulesetConfig.type
+
+      # clear previous config
+      ruleset.config = {}
 
       # settings for a message form
       if rulesetConfig.type == 'form_field'
@@ -1242,6 +1265,17 @@ NodeEditorController = ($rootScope, $scope, $modalInstance, $timeout, $log, Flow
         ruleset.config =
           field_index: $scope.formData.fieldIndex.id
           field_delimiter: $scope.formData.fieldDelimiter.id
+
+      else if rulesetConfig.type == 'airtime'
+        airtimeConfig = {}
+        for elt in airtimeAmountConfig
+          amount = elt.amount
+          try
+            elt.amount = parseFloat(amount)
+          catch
+            elt.amount = 0
+          airtimeConfig[elt.code] = elt
+        ruleset.config = airtimeConfig
 
       # update our operand if they selected a contact field explicitly
       else if ruleset.ruleset_type == 'contact_field'
