@@ -2989,6 +2989,20 @@ class RuleSet(models.Model):
             # return the webhook result body as the value
             return rule, result.body
 
+        elif self.ruleset_type == RuleSet.TYPE_AIRTIME:
+            from temba.events.models import AirtimeEvent
+
+            airtime_event = AirtimeEvent.trigger_flow_event(self.flow, run, self, run.contact, msg)
+
+            # rebuild our context again, the webhook may have populated something
+            context = run.flow.build_message_context(run.contact, msg)
+
+            rule = self.get_rules()[0]
+            rule.category = run.flow.get_base_text(rule.category)
+
+            # return the event status as the value
+            return rule, airtime_event.status
+
         else:
             # if it's a form field, construct an expression accordingly
             if self.ruleset_type == RuleSet.TYPE_FORM_FIELD:
