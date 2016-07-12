@@ -1135,6 +1135,8 @@ NodeEditorController = ($rootScope, $scope, $modalInstance, $timeout, $log, Flow
   stopWatching = $scope.$watch (->$scope.ruleset), ->
     complete = true
     for rule in $scope.ruleset.rules
+      if rule._config.type == 'airtime_status'
+        continue
       complete = complete and $scope.isRuleComplete(rule)
       if not complete
         break
@@ -1155,6 +1157,46 @@ NodeEditorController = ($rootScope, $scope, $modalInstance, $timeout, $log, Flow
 
     # start with an empty list of rules
     rules = []
+
+    # airtime rulesets have their own kind of rules
+    if ruleset.ruleset_type == 'airtime'
+
+      needs_completed = true
+      needs_failed = true
+
+      # see which airtime status rules we already have
+      for rule in ruleset.rules
+        if rule.type == 'airtime_status'
+          if rule.test.exit_status == 'completed'
+            needs_completed = false
+            rules.push(rule)
+          if rule.test.exit_status == 'failed'
+            needs_failed = false
+            rules.push(rule)
+
+      # if we don't have the completed rule add it
+      if needs_completed
+        rule =
+          uuid: uuid()
+          type: 'airtime_status'
+          test:
+            type: 'airtime_status'
+            exit_status: 'completed'
+          category: {}
+        rule['category'][Flow.flow.base_language] = 'Completed'
+        rules.push(rule)
+
+      # if we don't have the failed rule add it
+      if needs_failed
+        rule =
+          uuid: uuid()
+          type: 'airtime_status'
+          test:
+            type: 'airtime_status'
+            exit_status: 'failed'
+          category: {}
+        rule['category'][Flow.flow.base_language] = 'Failed'
+        rules.push(rule)
 
     # create rules off of an IVR menu configuration
     if ruleset.ruleset_type == 'wait_digit'
@@ -1225,17 +1267,18 @@ NodeEditorController = ($rootScope, $scope, $modalInstance, $timeout, $log, Flow
     if not category
       category = {}
 
-    category[flow.base_language] = allCategory
+    category[Flow.flow.base_language] = allCategory
 
-    # finally add it to the end of our rule list
-    rules.push
-      _config: Flow.getOperatorConfig("true")
-      test:
-        test: "true"
-        type: "true"
-      destination: destination
-      uuid: ruleId
-      category: category
+    # for all rules that require a catch all, append a true rule
+    if ruleset.ruleset_type != 'airtime'
+      rules.push
+        _config: Flow.getOperatorConfig("true")
+        test:
+          test: "true"
+          type: "true"
+        destination: destination
+        uuid: ruleId
+        category: category
 
     $scope.ruleset.rules = rules
 
@@ -1276,6 +1319,14 @@ NodeEditorController = ($rootScope, $scope, $modalInstance, $timeout, $log, Flow
             elt.amount = 0
           airtimeConfig[elt.code] = elt
         ruleset.config = airtimeConfig
+
+        # remove any non airtime rule
+        rules = []
+        for rule in ruleset.rules
+          if rule.type == 'airtime_status'
+            rules.push(rule)
+
+        ruleset.rules = rules
 
       # update our operand if they selected a contact field explicitly
       else if ruleset.ruleset_type == 'contact_field'

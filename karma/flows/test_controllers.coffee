@@ -193,6 +193,37 @@ describe 'Controllers:', ->
 
       $timeout.flush()
 
+    it 'should save airtime rulesets', ->
+      # load a flow
+      flowService.fetch(flows.favorites.id)
+      flowService.contactFieldSearch = []
+      $http.flush()
+
+      getRuleConfig = (type) ->
+        for ruleset in flowService.rulesets
+          if ruleset.type == type
+            return ruleset
+
+      ruleset = flowService.flow.rule_sets[0]
+      $scope.clickRuleset(ruleset)
+
+      $scope.dialog.opened.then ->
+        modalScope = $modalStack.getTop().value.modalScope
+
+        # simulate selecting airtime ruleset
+        modalScope.ruleset.ruleset_type = 'airtime'
+        modalScope.formData.rulesetConfig = getRuleConfig('airtime')
+
+        modalScope.okRules()
+
+      $timeout.flush()
+
+      ruleset = flowService.flow.rule_sets[0]
+
+      # our ruleset should have 2 rules
+      expect(ruleset.ruleset_type).toBe('airtime')
+      expect(ruleset.rules.length).toBe(2)
+
     it 'should filter action options based on flow type', ->
 
       # load a flow
