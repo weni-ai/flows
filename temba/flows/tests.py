@@ -4451,6 +4451,40 @@ class FlowsTest(FlowFileTest):
             self.assertEquals(2, self.contact.msgs.all().count())
             self.assertEquals('Message failed', self.contact.msgs.all()[0].text)
 
+    @patch('temba.events.models.AirtimeEvent.post_transferto_api_response')
+    def test_airtime_flow_trigger_event(self, mock_post_transferto):
+        mock_post_transferto.side_effect = [MockResponse(200, "error_code=0\r\nerror_txt=\r\ncountry=United States\r\n"
+                                                              "product_list=5,10,20,30\r\n"),
+                                            MockResponse(200, "error_code=0\r\nerror_txt=\r\nreserve_id=234\r\n"),
+                                            MockResponse(200, "error_code=0\r\nerror_txt=\r\n")]
+
+        flow = self.get_flow('airtime')
+        runs = flow.start_msg_flow([self.contact.id])
+        self.assertEquals(1, len(runs))
+        self.assertEquals(1, self.contact.msgs.all().count())
+        self.assertEquals('Message complete', self.contact.msgs.all()[0].text)
+
+        self.assertEquals(1, AirtimeEvent.objects.all().count())
+        airtime_event = AirtimeEvent.objects.all().first()
+        self.assertEqual(airtime_event.status, AirtimeEvent.COMPLETE)
+        self.assertEqual(airtime_event.last_message, "Airtime Transferred Successfully")
+
+        mock_post_transferto.side_effect = [MockResponse(200, "error_code=0\r\nerror_txt=\r\ncountry=Rwanda\r\n"
+                                                              "product_list=5,10,20,30\r\n"),
+                                            MockResponse(200, "error_code=0\r\nerror_txt=\r\nreserve_id=234\r\n"),
+                                            MockResponse(200, "error_code=0\r\nerror_txt=\r\n")]
+
+        runs = flow.start_msg_flow([self.contact.id])
+        self.assertEquals(1, len(runs))
+        self.assertEquals(2, self.contact.msgs.all().count())
+        self.assertEquals('Message failed', self.contact.msgs.all()[0].text)
+
+        self.assertEquals(2, AirtimeEvent.objects.all().count())
+        airtime_event = AirtimeEvent.objects.all().last()
+        self.assertEqual(airtime_event.status, AirtimeEvent.FAILED)
+        self.assertEqual(airtime_event.last_message, "Error transferring airtime: Failed by invalid amount "
+                                                     "configuration or missing amount configuration for Rwanda")
+
 
 class FlowMigrationTest(FlowFileTest):
 

@@ -114,6 +114,9 @@ class AirtimeEvent(SmartModel):
             channel = event.channel
             contact_urn = event.contact_urn
 
+        if not contact_urn:
+            contact_urn = contact.get_urn()
+
         if channel:
             channel_id = channel.pk
         else:
@@ -142,7 +145,7 @@ class AirtimeEvent(SmartModel):
                     transferto_dumps=dict())
 
         airtime_event = AirtimeEvent.objects.create(org=org, channel=channel, recipient=contact_urn.path,
-                                                    amount=0, data=json.dumps(data),
+                                                    amount=0, data=json.dumps(data), event_log='',
                                                     created_by=api_user,
                                                     modified_by=api_user)
 
@@ -152,7 +155,7 @@ class AirtimeEvent(SmartModel):
             request_kwargs = dict(action=action, destination_msisdn=airtime_event.recipient)
             status_code, content_json, content = airtime_event.get_transferto_response_json(**request_kwargs)
 
-            error_code = content_json.get('error_code', None)
+            error_code = int(content_json.get('error_code', None))
             error_txt = content_json.get('error_txt', None)
 
             if error_code != 0:
@@ -163,7 +166,8 @@ class AirtimeEvent(SmartModel):
             country_name = content_json.get('country', '')
             country_code = get_country_code_by_name(country_name)
             amount_config = ruleset.config_json()
-            amount = amount_config.get(country_code, 0)
+            country_config = amount_config.get(country_code, dict())
+            amount = country_config.get('amount', 0)
 
             data['transferto_dumps'][action] = dict(status_code=status_code, data=content_json)
             airtime_event.amount = amount
@@ -196,7 +200,7 @@ class AirtimeEvent(SmartModel):
             request_kwargs = dict(action=action)
             status_code, content_json, content = airtime_event.get_transferto_response_json(**request_kwargs)
 
-            error_code = content_json.get('error_code', None)
+            error_code = int(content_json.get('error_code', None))
             error_txt = content_json.get('error_txt', None)
 
             if error_code != 0:
@@ -214,7 +218,7 @@ class AirtimeEvent(SmartModel):
             action = 'topup'
             request_kwargs = dict(action=action,
                                   reserve_id=transaction_id,
-                                  msisdn=channel.address,
+                                  msisdn=channel.address if channel else '',
                                   destination_msisdn=airtime_event.recipient,
                                   product=airtime_event.denomination)
             status_code, content_json, content = airtime_event.get_transferto_response_json(**request_kwargs)
@@ -223,7 +227,7 @@ class AirtimeEvent(SmartModel):
             airtime_event.data = json.dumps(data)
             airtime_event.event_log += content + AirtimeEvent.LOG_DIVIDER
 
-            error_code = content_json.get('error_code', None)
+            error_code = int(content_json.get('error_code', None))
             error_txt = content_json.get('error_txt', None)
 
             if error_code != 0:
