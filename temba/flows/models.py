@@ -29,6 +29,7 @@ from enum import Enum
 from redis_cache import get_redis_connection
 from smartmin.models import SmartModel
 from temba.contacts.models import Contact, ContactGroup, ContactField, ContactURN, URN, TEL_SCHEME, NEW_CONTACT_VARIABLE
+from temba.events.models import AirtimeEvent
 from temba.locations.models import AdminBoundary, STATE_LEVEL, DISTRICT_LEVEL, WARD_LEVEL
 from temba.msgs.models import Broadcast, Msg, FLOW, INBOX, INCOMING, QUEUED, INITIALIZING, HANDLED, SENT, Label, PENDING
 from temba.orgs.models import Org, Language, UNREAD_FLOW_MSGS, CURRENT_EXPORT_VERSION
@@ -3003,6 +3004,15 @@ class RuleSet(models.Model):
             elif msg:
                 text = msg.text
 
+            if self.ruleset_type == RuleSet.TYPE_AIRTIME:
+                airtime_event = AirtimeEvent.trigger_flow_event(self.flow, run, self, run.contact, msg)
+
+                # rebuild our context again, the webhook may have populated something
+                context = run.flow.build_message_context(run.contact, msg)
+
+                # airtime test evaluate against the status of the airtime event
+                text = airtime_event.status
+
             try:
                 rules = self.get_rules()
                 for rule in rules:
@@ -5013,7 +5023,8 @@ class Test(object):
                 HasWardTest.TYPE: HasWardTest,
                 HasDistrictTest.TYPE: HasDistrictTest,
                 HasStateTest.TYPE: HasStateTest,
-                NotEmptyTest.TYPE: NotEmptyTest
+                NotEmptyTest.TYPE: NotEmptyTest,
+                AirtimeStatusTest.TYPE: AirtimeStatusTest,
             }
 
         type = json_dict.get(cls.TYPE, None)
@@ -5040,6 +5051,36 @@ class Test(object):
         side effects.
         """
         raise FlowException("Subclasses must implement evaluate, returning a tuple containing 1 or 0 and the value tested")
+
+
+class AirtimeStatusTest(Test):
+    """
+    {op: 'airtime_status'}
+    """
+    TYPE = 'airtime_status'
+    EXIT = 'exit_status'
+
+    STATUS_COMPLETED = 'completed'
+    STATUS_FAILED = 'failed'
+
+    STATUS_MAP = {STATUS_COMPLETED: AirtimeEvent.COMPLETE,
+                  STATUS_FAILED: AirtimeEvent.FAILED}
+
+    def __init__(self, exit_status):
+        self.exit_status = exit_status
+
+    @classmethod
+    def from_json(cls, org, json):
+        return AirtimeStatusTest(json.get('exit_status'))
+
+    def as_json(self):
+        return dict(type=AirtimeStatusTest.TYPE, exit_status=self.exit_status)
+
+    def evaluate(self, run, sms, context, text):
+        status = text
+        if status and AirtimeStatusTest.STATUS_MAP[self.exit_status] == status:
+            return 1, status
+        return 0, None
 
 
 class TrueTest(Test):

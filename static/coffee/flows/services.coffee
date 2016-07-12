@@ -905,6 +905,8 @@ app.factory 'Flow', ['$rootScope', '$window', '$http', '$timeout', '$interval', 
           for action in actionset.actions
             action.uuid = uuid()
 
+        flow.org_channel_countries = data.org_channel_countries
+
         languages = []
 
         # show our base language first

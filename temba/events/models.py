@@ -3,6 +3,7 @@ import json
 import requests
 import time
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -12,21 +13,21 @@ from temba.api.models import get_api_user
 from temba.channels.models import Channel
 from temba.contacts.models import TEL_SCHEME
 from temba.orgs.models import Org, TRANSFERTO_ACCOUNT_LOGIN, TRANSFERTO_AIRTIME_API_TOKEN
-from temba.utils import datetime_to_str
-
-TRANSFERTO_AIRTIME_API_URL = 'https://fm.transfer-to.com/cgi-bin/shop/topup'
-LOG_DIVIDER = "%s\n\n\n" % ('=' * 20)
-
-PENDING = 'P'
-COMPLETE = 'C'
-FAILED = 'F'
-
-STATUS_CHOICES = ((PENDING, "Pending"),
-                  (COMPLETE, "Complete"),
-                  (FAILED, "Failed"))
+from temba.utils import datetime_to_str, get_country_code_by_name
 
 
 class AirtimeEvent(SmartModel):
+    TRANSFERTO_AIRTIME_API_URL = 'https://fm.transfer-to.com/cgi-bin/shop/topup'
+    LOG_DIVIDER = "%s\n\n\n" % ('=' * 20)
+
+    PENDING = 'P'
+    COMPLETE = 'C'
+    FAILED = 'F'
+
+    STATUS_CHOICES = ((PENDING, "Pending"),
+                      (COMPLETE, "Complete"),
+                      (FAILED, "Failed"))
+
     org = models.ForeignKey(Org,
                             help_text="The organization that this event was triggered for")
     status = models.CharField(max_length=1, choices=STATUS_CHOICES, default='P',
@@ -53,7 +54,10 @@ class AirtimeEvent(SmartModel):
         data = kwargs
         data.update(dict(login=login, key=key, md5=md5))
 
-        response = requests.post(TRANSFERTO_AIRTIME_API_URL, data)
+        if not settings.SEND_WEBHOOKS:
+            raise Exception("!! Skipping WebHook send, SEND_WEBHOOKS set to False")
+
+        response = requests.post(cls.TRANSFERTO_AIRTIME_API_URL, data)
 
         return response
 
@@ -74,8 +78,8 @@ class AirtimeEvent(SmartModel):
 
     def get_transferto_response_json(self, **kwargs):
         config = self.org.config_json()
-        login = config.get(TRANSFERTO_ACCOUNT_LOGIN)
-        token = config.get(TRANSFERTO_AIRTIME_API_TOKEN)
+        login = config.get(TRANSFERTO_ACCOUNT_LOGIN, '')
+        token = config.get(TRANSFERTO_AIRTIME_API_TOKEN, '')
 
         response = AirtimeEvent.post_transferto_api_response(login, token, **kwargs)
         content_json = AirtimeEvent.translate_transferto_response_content_as_json(response.content)
@@ -83,13 +87,9 @@ class AirtimeEvent(SmartModel):
         return response.status_code, content_json, response.content
 
     @classmethod
-    def trigger_flow_event(cls, amount, flow, run, node_uuid, contact, event):
+    def trigger_flow_event(cls, flow, run, ruleset, contact, event):
         org = flow.org
         api_user = get_api_user()
-
-        # no-op if no webhook configured
-        if not amount:
-            return
 
         json_time = datetime_to_str(timezone.now())
 
@@ -109,7 +109,7 @@ class AirtimeEvent(SmartModel):
         text = None
         contact_urn = contact.get_urn()
 
-        if event:
+        if event and not contact.is_test:
             text = event.text
             channel = event.channel
             contact_urn = event.contact_urn
@@ -132,7 +132,7 @@ class AirtimeEvent(SmartModel):
                     flow=flow.id,
                     run=run.id,
                     text=text,
-                    step=unicode(node_uuid),
+                    step=unicode(ruleset),
                     phone=contact.get_urn_display(org=org, scheme=TEL_SCHEME, full=True),
                     contact=contact.uuid,
                     urn=unicode(contact_urn),
@@ -142,7 +142,7 @@ class AirtimeEvent(SmartModel):
                     transferto_dumps=dict())
 
         airtime_event = AirtimeEvent.objects.create(org=org, channel=channel, recipient=contact_urn.path,
-                                                    amount=amount, data=json.dumps(data),
+                                                    amount=0, data=json.dumps(data),
                                                     created_by=api_user,
                                                     modified_by=api_user)
 
@@ -157,12 +157,18 @@ class AirtimeEvent(SmartModel):
 
             if error_code != 0:
                 message = "Got non-zero error code (%d) from TransferTo with message (%s)" % (error_code, error_txt)
-                airtime_event.status = FAILED
+                airtime_event.status = AirtimeEvent.FAILED
                 raise Exception(message)
 
+            country_name = content_json.get('country', '')
+            country_code = get_country_code_by_name(country_name)
+            amount_config = ruleset.config_json()
+            amount = amount_config.get(country_code, 0)
+
             data['transferto_dumps'][action] = dict(status_code=status_code, data=content_json)
+            airtime_event.amount = amount
             airtime_event.data = json.dumps(data)
-            airtime_event.event_log += content + LOG_DIVIDER
+            airtime_event.event_log += content + AirtimeEvent.LOG_DIVIDER
 
             product_list = content_json.get('product_list', [])
 
@@ -171,9 +177,20 @@ class AirtimeEvent(SmartModel):
 
             targeted_prices = [float(i) for i in product_list if float(i) <= float(amount)]
 
+            denomination = None
             if targeted_prices:
                 denomination = max(targeted_prices)
                 airtime_event.denomination = denomination
+
+            if float(amount) <= 0:
+                message = "Failed by invalid amount configuration or missing amount configuration for %s" % country_name
+                airtime_event.status = AirtimeEvent.FAILED
+                raise Exception(message)
+
+            if denomination is None:
+                message = "No TransferTo denomination matched"
+                airtime_event.status = AirtimeEvent.FAILED
+                raise Exception(message)
 
             action = 'reserve_id'
             request_kwargs = dict(action=action)
@@ -184,14 +201,14 @@ class AirtimeEvent(SmartModel):
 
             if error_code != 0:
                 message = "Got non-zero error code (%d) from TransferTo with message (%s)" % (error_code, error_txt)
-                airtime_event.status = FAILED
+                airtime_event.status = AirtimeEvent.FAILED
                 raise Exception(message)
 
             transaction_id = content_json.get('reserve_id')
 
             data['transferto_dumps'][action] = dict(status_code=status_code, data=content_json)
             airtime_event.data = json.dumps(data)
-            airtime_event.event_log += content + LOG_DIVIDER
+            airtime_event.event_log += content + AirtimeEvent.LOG_DIVIDER
             airtime_event.transaction_id = transaction_id
 
             action = 'topup'
@@ -204,24 +221,24 @@ class AirtimeEvent(SmartModel):
 
             data['transferto_dumps'][action] = dict(status_code=status_code, data=content_json)
             airtime_event.data = json.dumps(data)
-            airtime_event.event_log += content + LOG_DIVIDER
+            airtime_event.event_log += content + AirtimeEvent.LOG_DIVIDER
 
             error_code = content_json.get('error_code', None)
             error_txt = content_json.get('error_txt', None)
 
             if error_code != 0:
                 message = "Got non-zero error code (%d) from TransferTo with message (%s)" % (error_code, error_txt)
-                airtime_event.status = FAILED
+                airtime_event.status = AirtimeEvent.FAILED
                 raise Exception(message)
 
             message = "Airtime Transferred Successfully"
-            airtime_event.status = COMPLETE
+            airtime_event.status = AirtimeEvent.COMPLETE
 
         except Exception as e:
             import traceback
             traceback.print_exc()
 
-            airtime_event.status = FAILED
+            airtime_event.status = AirtimeEvent.FAILED
             message = "Error transferring airtime: %s" % unicode(e)
 
         finally:

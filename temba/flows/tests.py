@@ -19,6 +19,7 @@ from mock import patch
 from temba.api.models import WebHookEvent
 from temba.channels.models import Channel, ChannelEvent
 from temba.contacts.models import Contact, ContactGroup, ContactField, ContactURN, URN, TEL_SCHEME
+from temba.events.models import AirtimeEvent
 from temba.locations.models import AdminBoundary, BoundaryAlias
 from temba.msgs.models import Broadcast, Label, Msg, INCOMING, SMS_NORMAL_PRIORITY, SMS_HIGH_PRIORITY, PENDING, FLOW
 from temba.msgs.models import OUTGOING
@@ -1735,6 +1736,9 @@ class FlowTest(TembaTest):
 
         # test getting the json
         response = self.client.get(reverse('flows.flow_json', args=[flow.pk]))
+        self.assertTrue('languages' in response.content)
+        self.assertTrue('org_channel_countries' in response.content)
+
         json_dict = json.loads(response.content)['flow']
 
         # test setting the json
@@ -4364,6 +4368,30 @@ class FlowsTest(FlowFileTest):
         simulate_url = "%s?lang=kli" % reverse('flows.flow_simulate', args=[favorites.pk])
         response = json.loads(self.client.post(simulate_url, json.dumps(dict(has_refresh=True)), content_type="application/json").content)
         self.assertEquals('Bleck', response['messages'][1]['text'])
+
+    def test_airtime_flow(self):
+        flow = self.get_flow('airtime')
+
+        airtime_event = AirtimeEvent.objects.create(org=self.org, status=AirtimeEvent.COMPLETE, amount=10,
+                                                    created_by=self.admin, modified_by=self.admin)
+
+        with patch('temba.flows.models.AirtimeEvent.trigger_flow_event') as mock_trigger_event:
+            mock_trigger_event.return_value = airtime_event
+
+            runs = flow.start_msg_flow([self.contact.id])
+            self.assertEquals(1, len(runs))
+            self.assertEquals(1, self.contact.msgs.all().count())
+            self.assertEquals('Message complete', self.contact.msgs.all()[0].text)
+
+            airtime_event.status = AirtimeEvent.FAILED
+            airtime_event.save()
+
+            mock_trigger_event.return_value = airtime_event
+
+            runs = flow.start_msg_flow([self.contact.id])
+            self.assertEquals(1, len(runs))
+            self.assertEquals(2, self.contact.msgs.all().count())
+            self.assertEquals('Message failed', self.contact.msgs.all()[0].text)
 
 
 class FlowMigrationTest(FlowFileTest):
