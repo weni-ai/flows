@@ -2671,10 +2671,11 @@ class ActionTest(TembaTest):
         self.assertEqual(resolved_urn, fb_urn)
 
         # but if we set our channel to tel, will override that
+        run.contact.clear_urn_cache()
         action = SetChannelAction(tel1_channel)
         action.execute(run, None, None)
 
-        self.contact.clear_urn_cache()
+        contact.clear_urn_cache()
         contact, resolved_urn = Msg.resolve_recipient(self.org, self.admin, self.contact, None)
         self.assertEqual(resolved_urn, urn)
         self.assertEqual(resolved_urn.channel, tel1_channel)
@@ -2692,6 +2693,12 @@ class ActionTest(TembaTest):
         Msg.create_incoming(tel2_channel, str(urn), "Incoming msg")
         urn.refresh_from_db()
         self.assertEqual(urn.channel, tel2_channel)
+
+        # make sure that switch will work across schemes as well
+        Msg.create_incoming(fb_channel, str(fb_urn), "Incoming FB message")
+        self.contact.clear_urn_cache()
+        contact, resolved_urn = Msg.resolve_recipient(self.org, self.admin, self.contact, None)
+        self.assertEqual(resolved_urn, fb_urn)
 
     def test_add_label_action(self):
         flow = self.flow
@@ -3967,32 +3974,6 @@ class FlowsTest(FlowFileTest):
         sms = Msg.all_messages.filter(contact=chw).order_by('-created_on')[0]
         self.assertEquals("Please follow up with Judy Pottier, she has reported she is in pain.", sms.text)
 
-    def test_flow_export_dynamic_group(self):
-        flow = self.get_flow('favorites')
-
-        # get one of our flow actionsets, change it to an AddToGroupAction
-        actionset = ActionSet.objects.filter(flow=flow).order_by('y').first()
-
-        # replace the actions
-        actionset.set_actions_dict([AddToGroupAction([dict(id=1, name="Other Group"), '@contact.name']).as_json()])
-        actionset.save()
-
-        # now try to export it
-        self.login(self.admin)
-        response = self.client.get(reverse('flows.flow_export', args=[flow.pk]))
-        self.assertEquals(200, response.status_code)
-
-        # try to import the flow
-        flow.delete()
-        definition = json.loads(response.content)
-        Flow.import_flows(definition, self.org, self.admin)
-
-        # make sure the created flow has the same action set
-        flow = Flow.objects.filter(name="%s" % flow.name).first()
-        actionset = ActionSet.objects.filter(flow=flow).order_by('y').first()
-
-        self.assertTrue('@contact.name' in actionset.get_actions()[0].groups)
-
     def test_flow_delete(self):
         from temba.campaigns.models import Campaign, CampaignEvent
         flow = self.get_flow('favorites')
@@ -4041,46 +4022,6 @@ class FlowsTest(FlowFileTest):
         # nor should our trigger
         trigger.refresh_from_db()
         self.assertFalse(trigger.is_active)
-
-    def test_flow_export(self):
-        flow = self.get_flow('favorites')
-
-        # now let's export it
-        self.login(self.admin)
-        response = self.client.get(reverse('flows.flow_export', args=[flow.pk]))
-        modified_on = flow.modified_on
-        self.assertEquals(200, response.status_code)
-
-        definition = json.loads(response.content)
-        self.assertEqual(CURRENT_EXPORT_VERSION, definition.get('version', 0))
-        self.assertEqual(1, len(definition.get('flows', [])))
-
-        # try importing it and see that we have an updated flow
-        Flow.import_flows(definition, self.org, self.admin)
-        flow = Flow.objects.filter(name="%s" % flow.name).first()
-        self.assertIsNotNone(flow)
-        self.assertNotEqual(modified_on, flow.modified_on)
-
-        # don't allow exports that reference other flows
-        new_mother = self.get_flow('new_mother')
-        flow = self.get_flow('references_other_flows',
-                             substitutions=dict(START_FLOW=new_mother.pk,
-                                                TRIGGER_FLOW=self.get_flow('pain_flow').pk))
-        response = self.client.get(reverse('flows.flow_export', args=[flow.pk]))
-        self.assertContains(response, "Sorry, this flow cannot be exported")
-        self.assertContains(response, "New Mother")
-        self.assertContains(response, "Pain Flow")
-
-        # now try importing it into a completey different org
-        trey = self.create_user("Trey Anastasio")
-        trey_org = Org.objects.create(name="Gotta Jiboo", timezone="Africa/Kigali", created_by=trey, modified_by=trey)
-        trey_org.administrators.add(trey)
-
-        response = self.client.get(reverse('flows.flow_export', args=[new_mother.pk]))
-        definition = json.loads(response.content)
-
-        Flow.import_flows(definition, trey_org, trey)
-        self.assertIsNotNone(Flow.objects.filter(org=trey_org, name="New Mother").first())
 
     def test_start_flow_action(self):
         self.import_file('flow_starts')

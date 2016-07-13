@@ -55,11 +55,6 @@ class FlowException(Exception):
         super(FlowException, self).__init__(*args, **kwargs)
 
 
-class FlowReferenceException(Exception):
-    def __init__(self, flow_names):
-        self.flow_names = flow_names
-
-
 FLOW_LOCK_TTL = 60  # 1 minute
 FLOW_LOCK_KEY = 'org:%d:lock:flow:%d:%s'
 
@@ -280,7 +275,7 @@ class Flow(TembaModel):
         return flow
 
     @classmethod
-    def export_definitions(cls, flows, fail_on_dependencies=True):
+    def export_definitions(cls, flows):
         """
         Builds a json definition fit for export
         """
@@ -288,25 +283,11 @@ class Flow(TembaModel):
         exported_flows = []
 
         for flow in flows:
-
             # only export current versions
             flow.ensure_current_version()
 
             # get our json with group names
-            flow_definition = flow.as_json(expand_contacts=True)
-            if fail_on_dependencies:
-                # if the flow references other flows, don't allow export yet
-                other_flows = set()
-                for action_set in flow_definition.get('action_sets', []):
-                    for action in action_set.get('actions', []):
-                        action_type = action['type']
-                        if action_type == StartFlowAction.TYPE or action_type == TriggerFlowAction.TYPE:
-                            other_flows.add(action['name'].strip())
-
-                if len(other_flows):
-                    raise FlowReferenceException(other_flows)
-
-            exported_flows.append(flow_definition)
+            exported_flows.append(flow.as_json(expand_contacts=True))
 
         # get all non-schedule based triggers that are active for these flows
         triggers = set()
@@ -4888,20 +4869,8 @@ class SetChannelAction(Action):
     def execute(self, run, actionset_uuid, msg, offline_on=None):
         # if we found the channel to set
         if self.channel:
-            # update all the contact URNs for this contact with the same scheme to use this channel
-            updated = ContactURN.objects.filter(contact=run.contact, scheme=self.channel.scheme).update(channel=self.channel)
-
-            # make sure that our current highest priority URN of this scheme is our absolute highest URN for this contact
-            if updated:
-                highest = ContactURN.objects.filter(contact=run.contact).order_by('-priority', '-id').first()
-                if highest and highest.scheme != self.channel.scheme:
-                    ContactURN.objects.filter(contact=run.contact,
-                                              scheme=self.channel.scheme).order_by('-priority', '-id').update(priority=highest.priority + 1)
-
-            self.log(run, _("Updated preferred channel to %s for %d URN") % (self.channel.name, updated))
-
-            # clear our URN cache so we recalculate priorities
-            run.contact.clear_urn_cache()
+            run.contact.set_preferred_channel(self.channel)
+            self.log(run, _("Updated preferred channel to %s") % self.channel.name)
             return []
         else:
             self.log(run, _("Channel not found, no action taken"))
