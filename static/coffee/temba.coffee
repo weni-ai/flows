@@ -442,7 +442,7 @@ class @Modax extends @ConfirmationModal
           if modal.listeners and modal.listeners.onFormLoaded
             modal.listeners.onFormLoaded()
 
-          prepareOmnibox()
+          prepareOmnibox('cg')
           select2field($('.select2_field'))
       )
 

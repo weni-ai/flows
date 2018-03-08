@@ -110,7 +110,7 @@
 -block extra-script
   {{ block.super }}
   :javascript
-    prepareOmnibox();
+    prepareOmnibox('cg');
 
 -block modal-script
   {{block.super}}
@@ -120,4 +120,4 @@
       useFontCheckbox("#id_include_active");
     });
 
-    prepareOmnibox();
+    prepareOmnibox('cg');
