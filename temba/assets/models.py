@@ -1,5 +1,7 @@
 import os
 
+import boto3
+
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.urlresolvers import reverse
@@ -47,6 +49,9 @@ class BaseAssetStore(object):
     """
     Base class for asset handlers. Assumes that pk is primary key of a db object with an associated asset.
     """
+
+    DOWNLOAD_EXPIRES = 600
+
     model = None
     key = None
     directory = None
@@ -73,20 +78,28 @@ class BaseAssetStore(object):
 
         # create a more friendly download filename
         remainder, extension = path.rsplit(".", 1)
+        if extension == "gz":
+            remainder, extension = remainder.rsplit(".", 1)
+            extension += ".gz"
+
         filename = "%s_%s.%s" % (self.key, pk, extension)
 
         # if our storage backend is S3
         if settings.DEFAULT_FILE_STORAGE == "storages.backends.s3boto.S3BotoStorage":  # pragma: needs cover
-            # generate our URL manually so that we can force the download name for the user
-            url = default_storage.connection.generate_url(
-                default_storage.querystring_expire,
-                method="GET",
-                bucket=default_storage.bucket.name,
-                key=default_storage._encode_name(path),
-                query_auth=default_storage.querystring_auth,
-                force_http=not default_storage.secure_urls,
-                response_headers={"response-content-disposition": "attachment;filename=%s" % filename},
+            session = boto3.Session(
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID, aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
             )
+            s3 = session.client("s3")
+
+            s3_params = {
+                "Bucket": default_storage.bucket.name,
+                "Key": default_storage._encode_name(path),
+                # force browser to download
+                "ResponseContentDisposition": "attachment;filename=%s" % filename,
+            }
+
+            # generate a temporaly URL manually so that we can force the download name for the user
+            url = s3.generate_presigned_url("get_object", Params=s3_params, ExpiresIn=BaseAssetStore.DOWNLOAD_EXPIRES)
 
         # otherwise, let the backend generate the URL
         else:

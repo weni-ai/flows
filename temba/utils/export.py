@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timedelta
 
 from openpyxl.utils.cell import get_column_letter
+from openpyxl.worksheet.write_only import WriteOnlyCell
 
 from django.core.files import File
 from django.core.files.temp import NamedTemporaryFile
@@ -132,6 +133,13 @@ class BaseExportTask(TembaModel):
         )
 
     def append_row(self, sheet, values):
+        row = []
+        for value in values:
+            cell = WriteOnlyCell(sheet, value=self.prepare_value(value))
+            row.append(cell)
+        sheet.append(row)
+
+    def append_xml_row(self, sheet, values):
         sheet.write("<Row>")
         for value in values:
             sheet.write("""<Cell><Data ss:Type="String">%s</Data></Cell>""" % value)
@@ -208,8 +216,8 @@ class TableExporter(object):
             % extra_sheet_name
         )
 
-        self.task.append_row(self.sheet, self.columns)
-        self.task.append_row(self.extra_sheet, self.extra_columns)
+        self.task.append_xml_row(self.sheet, self.columns)
+        self.task.append_xml_row(self.extra_sheet, self.extra_columns)
 
         self.sheet_row += 1
 
@@ -226,8 +234,8 @@ class TableExporter(object):
 
             self._add_sheet()
 
-        self.task.append_row(self.sheet, values)
-        self.task.append_row(self.extra_sheet, extra_values)
+        self.task.append_xml_row(self.sheet, values)
+        self.task.append_xml_row(self.extra_sheet, extra_values)
 
         self.sheet_row += 1
 
