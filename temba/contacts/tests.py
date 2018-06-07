@@ -1,13 +1,14 @@
 
 import copy
+import gzip
 import json
 import subprocess
 import time
+import xml.etree.ElementTree as ET
 from datetime import date, datetime, timedelta
 
 import pytz
 from mock import patch
-from openpyxl import load_workbook
 from smartmin.csv_imports.models import ImportTask
 from smartmin.models import SmartImportRowError
 from smartmin.tests import SmartminTestMixin, _CRUDLTest
@@ -5942,14 +5943,18 @@ class ContactFieldTest(TembaTest):
         def request_export(query=""):
             self.client.get(reverse("contacts.contact_export") + query)
             task = ExportContactsTask.objects.all().order_by("-id").first()
-            filename = "%s/test_orgs/%d/contact_exports/%s.xlsx" % (settings.MEDIA_ROOT, self.org.pk, task.uuid)
-            workbook = load_workbook(filename=filename)
-            return workbook.worksheets
+            filename = "%s/test_orgs/%d/contact_exports/%s.xml.gz" % (settings.MEDIA_ROOT, self.org.pk, task.uuid)
+            with gzip.open(filename, "rb") as f:
+                file_content = f.read()
+
+            workbook = ET.fromstring(file_content)
+            worksheets = workbook.getchildren()
+            return worksheets
 
         # no group specified, so will default to 'All Contacts'
         with self.assertNumQueries(43):
             export = request_export()
-            self.assertExcelSheet(
+            self.assertExcelXMLSheet(
                 export[0],
                 [
                     [
@@ -5985,7 +5990,7 @@ class ContactFieldTest(TembaTest):
         self.contactfield_2.save()
         with self.assertNumQueries(43):
             export = request_export()
-            self.assertExcelSheet(
+            self.assertExcelXMLSheet(
                 export[0],
                 [
                     [
@@ -6015,7 +6020,7 @@ class ContactFieldTest(TembaTest):
                     [contact.uuid, "Ben Haggerty", "", "", "+12067799294", "", "", "20-12-2015 08:30", "", "One"],
                 ],
             )
-            self.assertExcelSheet(
+            self.assertExcelXMLSheet(
                 export[1], [["Contact UUID", "Poppin Tags"], [contact2.uuid, "true"], [contact.uuid, "true"]]
             )
 
@@ -6027,7 +6032,7 @@ class ContactFieldTest(TembaTest):
         # but should have additional Twitter and phone columns
         with self.assertNumQueries(43):
             export = request_export()
-            self.assertExcelSheet(
+            self.assertExcelXMLSheet(
                 export[0],
                 [
                     [
@@ -6073,7 +6078,7 @@ class ContactFieldTest(TembaTest):
                     [contact4.uuid, "Stephen", "", "", "+12078778899", "", "", "stephen", "", "", ""],
                 ],
             )
-            self.assertExcelSheet(
+            self.assertExcelXMLSheet(
                 export[1],
                 [
                     ["Contact UUID", "Poppin Tags"],
@@ -6086,7 +6091,7 @@ class ContactFieldTest(TembaTest):
 
         # export a specified group of contacts (only Ben and Adam are in the group)
         with self.assertNumQueries(44):
-            self.assertExcelSheet(
+            self.assertExcelXMLSheet(
                 request_export("?g=%s" % group.uuid)[0],
                 [
                     [
@@ -6138,7 +6143,7 @@ class ContactFieldTest(TembaTest):
         ]
         with ESMockWithScroll(data=mock_es_data):
             with self.assertNumQueries(42):
-                self.assertExcelSheet(
+                self.assertExcelXMLSheet(
                     request_export("?s=name+has+adam+or+name+has+deng")[0],
                     [
                         [
@@ -6175,7 +6180,7 @@ class ContactFieldTest(TembaTest):
         mock_es_data = [{"_type": "_doc", "_index": "dummy_index", "_source": {"id": contact.id}}]
         with ESMockWithScroll(data=mock_es_data):
             with self.assertNumQueries(43):
-                self.assertExcelSheet(
+                self.assertExcelXMLSheet(
                     request_export("?g=%s&s=Hagg" % group.uuid)[0],
                     [
                         [
@@ -6209,7 +6214,7 @@ class ContactFieldTest(TembaTest):
 
         # now try with an anonymous org
         with AnonymousOrg(self.org):
-            self.assertExcelSheet(
+            self.assertExcelXMLSheet(
                 request_export()[0],
                 [
                     ["ID", "Contact UUID", "Name", "Language", "Third", "Second", "First"],
