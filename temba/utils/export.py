@@ -218,7 +218,9 @@ class TableExporter(object):
         Writes the passed in row to our exporter, taking care of creating new sheets if necessary
         """
         # time for a new sheet? do it
-        if self.sheet_row > BaseExportTask.MAX_EXCEL_ROWS:
+        if self.sheet_row >= BaseExportTask.MAX_EXCEL_ROWS:
+            self.sheet.write("""</Table></Worksheet>""")
+            self.extra_sheet.write("""</Table></Worksheet>""")
             self.sheet.close()
             self.extra_sheet.close()
 
