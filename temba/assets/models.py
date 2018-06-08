@@ -83,6 +83,7 @@ class BaseAssetStore(object):
         remainder, extension = path.rsplit(".", 1)
         if extension == "gz":
             remainder, extension = remainder.rsplit(".", 1)
+            extension += ".gz"
 
         filename = "%s_%s.%s" % (self.key, pk, extension)
 

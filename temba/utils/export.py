@@ -252,7 +252,7 @@ class TableExporter(object):
         print("Writing Excel workbook...")
         temp_file = gzip.open("%s.xml.gz" % uuid.uuid4(), mode="wt+")
         temp_file.write(
-            """<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:html="http://www.w3.org/TR/REC-html40">"""
+            """<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:html="http://www.w3.org/TR/REC-html40">"""
         )
         for fname in self.workbook:
             with open(fname) as infile:
