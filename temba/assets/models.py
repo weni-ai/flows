@@ -80,15 +80,16 @@ class BaseAssetStore(object):
             raise AssetFileNotFound()
 
         # create a more friendly download filename
+        content_encoding = "none"
         remainder, extension = path.rsplit(".", 1)
         if extension == "gz":
             remainder, extension = remainder.rsplit(".", 1)
-            extension += ".gz"
+            content_encoding = "gzip"
 
         filename = "%s_%s.%s" % (self.key, pk, extension)
 
         # if our storage backend is S3
-        if settings.DEFAULT_FILE_STORAGE == "storages.backends.s3boto.S3BotoStorage":  # pragma: needs cover
+        if settings.DEFAULT_FILE_STORAGE == "storages.backends.s3boto3.S3Boto3Storage":  # pragma: needs cover
             session = boto3.Session(
                 aws_access_key_id=settings.AWS_ACCESS_KEY_ID, aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
             )
@@ -99,6 +100,8 @@ class BaseAssetStore(object):
                 "Key": default_storage._encode_name(path),
                 # force browser to download
                 "ResponseContentDisposition": "attachment;filename=%s" % filename,
+                "ResponseContentType": "application/octet",
+                "ResponseContentEncoding": "%s" % content_encoding,
             }
 
             # generate a temporaly URL manually so that we can force the download name for the user
