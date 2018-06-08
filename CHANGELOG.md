@@ -1,3 +1,15 @@
+v3.0.419
+----------
+ * special case deleted scheme in urn parsing
+ * release urn messages when releasing a contact
+ * add delete reason to run
+
+v3.0.418
+----------
+ * Clear child run parent reference when releasing parent
+ * Make sync events release their alerts
+ * Release sessions, anonymize urns
+
 v3.0.417
 ----------
  * add protect to contacts and flows, you can fake the migrations in this release

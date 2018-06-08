@@ -4,6 +4,7 @@ import gzip
 import json
 import subprocess
 import time
+import uuid
 import xml.etree.ElementTree as ET
 from datetime import date, datetime, timedelta
 
@@ -19,11 +20,13 @@ from django.core.urlresolvers import reverse
 from django.db.models import Value as DbValue
 from django.db.models.functions import Concat, Substr
 from django.test import TestCase, TransactionTestCase
+from django.test.utils import override_settings
 from django.utils import timezone
 
 from temba.api.models import WebHookEvent, WebHookResult
 from temba.campaigns.models import Campaign, CampaignEvent, EventFire
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
+from temba.contacts.models import DELETED_SCHEME
 from temba.contacts.search import contact_es_search, evaluate_query, is_phonenumber
 from temba.contacts.views import ContactListView
 from temba.flows.models import Flow, FlowRun
@@ -33,6 +36,7 @@ from temba.msgs.models import INCOMING, Broadcast, BroadcastRecipient, Label, Ms
 from temba.orgs.models import Org
 from temba.schedules.models import Schedule
 from temba.tests import AnonymousOrg, ESMockWithScroll, TembaTest, TembaTestMixin
+from temba.tests.twilio import MockRequestValidator, MockTwilioClient
 from temba.triggers.models import Trigger
 from temba.utils.dates import datetime_to_ms, datetime_to_str, get_datetime_format
 from temba.utils.es import ES
@@ -65,7 +69,6 @@ from .templatetags.contacts import activity_icon, contact_field, history_class
 
 
 class ContactCRUDLTest(_CRUDLTest):
-
     def setUp(self):
         from temba.contacts.views import ContactCRUDL
 
@@ -227,7 +230,6 @@ class ContactCRUDLTest(_CRUDLTest):
 
 
 class ContactGroupTest(TembaTest):
-
     def setUp(self):
         super().setUp()
 
@@ -576,7 +578,6 @@ class ContactGroupTest(TembaTest):
 
 
 class ElasticSearchLagTest(TembaTest):
-
     def test_lag(self):
         mock_es_data = [
             {
@@ -618,7 +619,6 @@ class ElasticSearchLagTest(TembaTest):
 
 
 class ContactGroupCRUDLTest(TembaTest):
-
     def setUp(self):
         super().setUp()
 
@@ -796,7 +796,6 @@ class ContactGroupCRUDLTest(TembaTest):
 
 
 class ContactTest(TembaTest):
-
     def setUp(self):
         super().setUp()
 
@@ -1044,17 +1043,10 @@ class ContactTest(TembaTest):
         self.assertIsNotNone(out_msgs.filter(contact_urn__path="stephen").first())
         self.assertIsNotNone(out_msgs.filter(contact_urn__path="+12078778899").first())
 
+    @patch("temba.ivr.clients.TwilioClient", MockTwilioClient)
+    @patch("twilio.util.RequestValidator", MockRequestValidator)
     def test_release(self):
-        flow = self.get_flow("favorites")
-        contact = self.create_contact("Joe", "+12065552000", "tweettweet")
-        contact.fields = {"gender": "Male", "age": 40}
-        contact.save(update_fields=("fields",))
-
-        flow.start([], [contact])
-        broadcast = Broadcast.create(self.org, self.admin, "Test Broadcast", [contact])
-        broadcast.send()
-
-        def send(message):
+        def send(message, contact):
             msg = Msg.objects.create(
                 org=self.org,
                 direction=INCOMING,
@@ -1066,18 +1058,68 @@ class ContactTest(TembaTest):
             )
             Flow.find_and_handle(msg)
 
-        send("red")
-        send("primus")
+        flow = self.get_flow("favorites")
 
+        # create a contact with a message
+        old_contact = self.create_contact("Jose", "+12065552000")
+        send("hola mundo", old_contact)
+        urn = old_contact.get_urn()
+
+        # steal his urn into a new contact
+        contact = self.create_contact("Joe", "tweettweet")
+        urn.contact = contact
+        urn.save(update_fields=("contact",))
+
+        contact.fields = {"gender": "Male", "age": 40}
+        contact.save(update_fields=("fields",))
+
+        flow.start([], [contact])
+        broadcast = Broadcast.create(self.org, self.admin, "Test Broadcast", [contact])
+        broadcast.send()
+
+        send("red", contact)
+        send("primus", contact)
+
+        with override_settings(SEND_CALLS=True):
+            # simulate an ivr call to test session release
+            self.org.connect_twilio("TEST_SID", "TEST_TOKEN", self.admin)
+            self.org.save()
+
+            # twiml api config
+            config = {
+                Channel.CONFIG_SEND_URL: "https://api.twilio.com",
+                Channel.CONFIG_ACCOUNT_SID: "TEST_SID",
+                Channel.CONFIG_AUTH_TOKEN: "TEST_TOKEN",
+            }
+
+            Channel.create(self.org, self.org.get_user(), "BR", "TW", "+558299990000", "+558299990000", config, "AC")
+
+            flow = self.get_flow("call_me_maybe")
+            flow.start([], [contact])
+
+        self.assertEqual(1, contact.sessions.all().count())
         self.assertEqual(1, contact.addressed_broadcasts.all().count())
         self.assertEqual(2, contact.urns.all().count())
-        self.assertEqual(1, contact.runs.all().count())
+        self.assertEqual(2, contact.runs.all().count())
         self.assertEqual(6, contact.msgs.all().count())
         self.assertEqual(2, len(contact.fields))
 
-        contact.release(self.admin)
-        contact.refresh_from_db()
+        # first try a deactivate and check our urns are anonymized
+        contact.deactivate(self.admin)
+        self.assertEqual(2, contact.urns.all().count())
+        for urn in contact.urns.all():
+            uuid.UUID(urn.path, version=4)
+            self.assertEqual(DELETED_SCHEME, urn.scheme)
 
+        # a new contact arrives with those urns
+        new_contact = self.create_contact("URN Thief", "+12065552000", "tweettweet")
+        self.assertEqual(2, new_contact.urns.all().count())
+
+        # now lets go for a full release
+        contact.release(self.admin)
+
+        contact.refresh_from_db()
+        self.assertEqual(0, contact.sessions.all().count())
         self.assertEqual(0, contact.addressed_broadcasts.all().count())
         self.assertEqual(0, contact.urns.all().count())
         self.assertEqual(0, contact.runs.all().count())
@@ -5782,7 +5824,6 @@ class ContactTest(TembaTest):
 
 
 class ContactURNTest(TembaTest):
-
     def setUp(self):
         super().setUp()
 
@@ -5822,7 +5863,6 @@ class ContactURNTest(TembaTest):
 
 
 class ContactFieldTest(TembaTest):
-
     def setUp(self):
         super().setUp()
 
@@ -6685,7 +6725,6 @@ class ContactFieldTest(TembaTest):
 
 
 class URNTest(TembaTest):
-
     def test_line_urn(self):
         self.assertEqual("line:asdf", URN.from_line("asdf"))
 
@@ -6706,6 +6745,8 @@ class URNTest(TembaTest):
         self.assertFalse(URN.validate("whatsapp:+12065551212"))
 
     def test_from_parts(self):
+
+        self.assertEqual(URN.from_parts("deleted", "12345"), "deleted:12345")
         self.assertEqual(URN.from_parts("tel", "12345"), "tel:12345")
         self.assertEqual(URN.from_parts("tel", "+12345"), "tel:+12345")
         self.assertEqual(URN.from_parts("tel", "(917) 992-5253"), "tel:(917) 992-5253")
@@ -6728,6 +6769,7 @@ class URNTest(TembaTest):
         self.assertRaises(ValueError, URN.from_parts, "xxx", "12345")
 
     def test_to_parts(self):
+        self.assertEqual(URN.to_parts("deleted:12345"), ("deleted", "12345", None, None))
         self.assertEqual(URN.to_parts("tel:12345"), ("tel", "12345", None, None))
         self.assertEqual(URN.to_parts("tel:+12345"), ("tel", "+12345", None, None))
         self.assertEqual(URN.to_parts("twitter:abc_123"), ("twitter", "abc_123", None, None))
@@ -6816,7 +6858,6 @@ class URNTest(TembaTest):
 
 
 class PhoneNumberTest(TestCase):
-
     def test_is_phonenumber(self):
         # these should match as phone numbers
         self.assertEqual(is_phonenumber("+12345678901"), (True, "12345678901"))
@@ -6835,7 +6876,6 @@ class PhoneNumberTest(TestCase):
 
 
 class ESIntegrationTest(TembaTestMixin, SmartminTestMixin, TransactionTestCase):
-
     def test_ES_contacts_index(self):
         self.create_anonymous_user()
         self.admin = self.create_user("Administrator")

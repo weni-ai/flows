@@ -134,7 +134,6 @@ class AddFlowServerTestsMeta(type):
 
 
 class ESMockWithScroll:
-
     def __init__(self, data=None):
         self.mock_es = patch("temba.utils.es.ES")
 
@@ -165,7 +164,6 @@ class ESMockWithScroll:
 
 
 class TembaTestMixin(object):
-
     def clear_cache(self):
         """
         Clears the redis cache. We are extra paranoid here and check that redis host is 'localhost'
@@ -544,7 +542,6 @@ class TembaTestMixin(object):
 
 
 class TembaTest(TembaTestMixin, SmartminTest, metaclass=AddFlowServerTestsMeta):
-
     def setUp(self):
         self.maxDiff = 4096
         self.mock_server = mock_server
@@ -694,7 +691,6 @@ class TembaTest(TembaTestMixin, SmartminTest, metaclass=AddFlowServerTestsMeta):
 
 
 class FlowFileTest(TembaTest):
-
     def setUp(self):
         super().setUp()
         self.contact = self.create_contact("Ben Haggerty", number="+12065552020")
@@ -798,7 +794,6 @@ class FlowFileTest(TembaTest):
 
 
 class MLStripper(HTMLParser):  # pragma: no cover
-
     def __init__(self):
         self.reset()
         self.fed = []
@@ -811,7 +806,6 @@ class MLStripper(HTMLParser):  # pragma: no cover
 
 
 class BrowserTest(LiveServerTestCase):  # pragma: no cover
-
     @classmethod
     def setUpClass(cls):
         cls.driver = WebDriver()
@@ -951,7 +945,6 @@ class BrowserTest(LiveServerTestCase):  # pragma: no cover
 
 
 class MockResponse(object):
-
     def __init__(self, status_code, text, method="GET", url="http://foo.com/", headers=None):
         self.text = force_text(text)
         self.content = force_bytes(text)

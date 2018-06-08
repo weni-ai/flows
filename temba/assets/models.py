@@ -28,6 +28,7 @@ class AssetAccessDenied(AssetException):
     """
     User does not have permission to access the given asset
     """
+
     pass
 
 
@@ -35,6 +36,7 @@ class AssetEntityNotFound(AssetException):
     """
     Database entity associated with the asset could not be found
     """
+
     pass
 
 
@@ -42,6 +44,7 @@ class AssetFileNotFound(AssetException):
     """
     Asset file could not be found
     """
+
     pass
 
 

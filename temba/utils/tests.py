@@ -73,7 +73,6 @@ from .voicexml import VoiceXMLException
 
 
 class InitTest(TembaTest):
-
     def test_decode_base64(self):
 
         self.assertEqual("This test\nhas a newline", decode_base64("This test\nhas a newline"))
@@ -214,7 +213,6 @@ class InitTest(TembaTest):
 
 
 class DatesTest(TembaTest):
-
     def test_datetime_to_ms(self):
         d1 = datetime.datetime(2014, 1, 2, 3, 4, 5, tzinfo=pytz.utc)
         self.assertEqual(datetime_to_ms(d1), 1388631845000)  # from http://unixtimestamp.50x.eu
@@ -404,7 +402,6 @@ class DatesTest(TembaTest):
 
 
 class TimezonesTest(TembaTest):
-
     def test_field(self):
         field = TimeZoneFormField(help_text="Test field")
 
@@ -422,7 +419,6 @@ class TimezonesTest(TembaTest):
 
 
 class TemplateTagTest(TembaTest):
-
     def test_icon(self):
         from temba.campaigns.models import Campaign
         from temba.triggers.models import Trigger
@@ -497,7 +493,6 @@ class TemplateTagTest(TembaTest):
 
 
 class CacheTest(TembaTest):
-
     def test_get_cacheable_result(self):
         self.create_contact("Bob", number="1234")
 
@@ -522,7 +517,6 @@ class CacheTest(TembaTest):
             self.assertEqual(get_cacheable_result("test_contact_count", calculate), 2)  # from cache
 
     def test_get_cacheable_attr(self):
-
         def calculate():
             return "CALCULATED"
 
@@ -578,7 +572,6 @@ class CacheTest(TembaTest):
 
 
 class EmailTest(TembaTest):
-
     @override_settings(SEND_EMAILS=True)
     def test_send_simple_email(self):
         send_simple_email(["recipient@bar.com"], "Test Subject", "Test Body")
@@ -683,7 +676,6 @@ class EmailTest(TembaTest):
 
 
 class JsonTest(TembaTest):
-
     def test_encode_decode(self):
         # create a time that has a set millisecond
         now = timezone.now().replace(microsecond=1000)
@@ -712,7 +704,6 @@ class JsonTest(TembaTest):
 
 
 class QueueTest(TembaTest):
-
     def test_queueing(self):
         r = get_redis_connection()
 
@@ -874,7 +865,6 @@ class QueueTest(TembaTest):
 
 
 class ExpressionsTest(TembaTest):
-
     def setUp(self):
         super().setUp()
 
@@ -1161,7 +1151,6 @@ class ExpressionsTest(TembaTest):
 
 
 class GSM7Test(TembaTest):
-
     def test_is_gsm7(self):
         self.assertTrue(is_gsm7("Hello World! {} <>"))
         self.assertFalse(is_gsm7("No capital accented È!"))
@@ -1206,7 +1195,6 @@ class GSM7Test(TembaTest):
 
 
 class ModelsTest(TembaTest):
-
     def test_require_update_fields(self):
         contact = self.create_contact("Bob", twitter="bobby")
         flow = self.get_flow("color")
@@ -1239,7 +1227,6 @@ class ModelsTest(TembaTest):
 
 
 class ExportTest(TembaTest):
-
     def setUp(self):
         super().setUp()
 
@@ -1353,7 +1340,6 @@ class ExportTest(TembaTest):
 
 
 class CurrencyTest(TembaTest):
-
     def test_currencies(self):
 
         self.assertEqual(currency_for_country("US").alpha_3, "USD")
@@ -1371,7 +1357,6 @@ class CurrencyTest(TembaTest):
 
 
 class VoiceXMLTest(TembaTest):
-
     def test_context_managers(self):
         response = voicexml.VXMLResponse()
         self.assertEqual(response, response.__enter__())
@@ -1538,7 +1523,6 @@ class VoiceXMLTest(TembaTest):
 
 
 class NCCOTest(TembaTest):
-
     def test_context_managers(self):
         response = NCCOResponse()
         self.assertEqual(response, response.__enter__())
@@ -1780,7 +1764,6 @@ class NCCOTest(TembaTest):
 
 
 class MiddlewareTest(TembaTest):
-
     def test_org_header(self):
         response = self.client.get(reverse("public.public_index"))
         self.assertFalse(response.has_header("X-Temba-Org"))
@@ -1829,7 +1812,6 @@ class MiddlewareTest(TembaTest):
 
 
 class MakeTestDBTest(SmartminTestMixin, TransactionTestCase):
-
     def test_command(self):
         self.create_anonymous_user()
 
@@ -1883,9 +1865,7 @@ class JsonModelTestNull(models.Model):
 
 
 class TestJSONAsTextField(TestCase):
-
     def test_invalid_default(self):
-
         class InvalidJsonModel(models.Model):
             field = JSONAsTextField(default={})
 
@@ -1986,7 +1966,6 @@ class TestJSONAsTextField(TestCase):
 
 
 class MatchersTest(TembaTest):
-
     def test_string(self):
         self.assertEqual("abc", matchers.String())
         self.assertEqual("", matchers.String())
@@ -2015,7 +1994,6 @@ class MatchersTest(TembaTest):
 
 
 class NonBlockingLockTest(TestCase):
-
     def test_nonblockinglock(self):
         with NonBlockingLock(redis=get_redis_connection(), name="test_nonblockinglock", timeout=5) as lock:
             # we are able to get the initial lock

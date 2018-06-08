@@ -265,9 +265,7 @@ class Channel(TembaModel):
     CONFIG_SEND_URL = "send_url"
     CONFIG_SEND_METHOD = "method"
     CONFIG_SEND_BODY = "body"
-    CONFIG_DEFAULT_SEND_BODY = (
-        "id={{id}}&text={{text}}&to={{to}}&to_no_plus={{to_no_plus}}&from={{from}}&from_no_plus={{from_no_plus}}&channel={{channel}}"
-    )
+    CONFIG_DEFAULT_SEND_BODY = "id={{id}}&text={{text}}&to={{to}}&to_no_plus={{to_no_plus}}&from={{from}}&from_no_plus={{from_no_plus}}&channel={{channel}}"
     CONFIG_USERNAME = "username"
     CONFIG_PASSWORD = "password"
     CONFIG_KEY = "key"
@@ -1490,6 +1488,7 @@ class ChannelCount(SquashableModel):
     on each day. This allows for fast visualizations of activity on the channel read page as well as summaries
     of message usage over the course of time.
     """
+
     SQUASH_OVER = ("channel_id", "count_type", "day")
 
     INCOMING_MSG_TYPE = "IM"  # Incoming message
@@ -1567,6 +1566,7 @@ class ChannelEvent(models.Model):
     """
     An event other than a message that occurs between a channel and a contact. Can be used to trigger flows etc.
     """
+
     TYPE_UNKNOWN = "unknown"
     TYPE_CALL_OUT = "mt_call"
     TYPE_CALL_OUT_MISSED = "mt_miss"
@@ -1695,7 +1695,6 @@ class ChannelEvent(models.Model):
 
 
 class SendException(Exception):
-
     def __init__(self, description, event=None, events=None, fatal=False, start=None):
         super().__init__(description)
 
@@ -1945,6 +1944,11 @@ class SyncEvent(SmartModel):
 
         return sync_event
 
+    def release(self):
+        for alert in self.alert_set.all():
+            alert.release()
+        self.delete()
+
     def get_pending_messages(self):
         return getattr(self, "pending_messages", [])
 
@@ -1954,7 +1958,8 @@ class SyncEvent(SmartModel):
     @classmethod
     def trim(cls):
         month_ago = timezone.now() - timedelta(days=30)
-        cls.objects.filter(created_on__lte=month_ago).delete()
+        for event in cls.objects.filter(created_on__lte=month_ago):
+            event.release()
 
 
 @receiver(pre_save, sender=SyncEvent)
@@ -2179,6 +2184,9 @@ class Alert(SmartModel):
         context["subject"] = subject
 
         send_template_email(self.channel.alert_email, subject, template, context, self.channel.org.get_branding())
+
+    def release(self):
+        self.delete()
 
 
 def get_alert_user():

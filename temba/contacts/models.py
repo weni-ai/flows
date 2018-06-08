@@ -49,6 +49,7 @@ END_TEST_CONTACT_PATH = 12065550199
 # how many sequential contacts on import triggers suspension
 SEQUENTIAL_CONTACTS_THRESHOLD = 250
 
+DELETED_SCHEME = "deleted"
 EMAIL_SCHEME = "mailto"
 EXTERNAL_SCHEME = "ext"
 FACEBOOK_SCHEME = "facebook"
@@ -95,6 +96,7 @@ class URN(object):
         * Path component can be any non-blank unicode string
         * No hex escaping in URN path
     """
+
     VALID_SCHEMES = {s[0] for s in URN_SCHEME_CONFIG}
     IMPORT_HEADERS = {s[2] for s in URN_SCHEME_CONFIG}
 
@@ -106,7 +108,7 @@ class URN(object):
         """
         Formats a URN scheme and path as single URN string, e.g. tel:+250783835665
         """
-        if not scheme or scheme not in cls.VALID_SCHEMES:
+        if not scheme or (scheme not in cls.VALID_SCHEMES and scheme != DELETED_SCHEME):
             raise ValueError("Invalid scheme component: '%s'" % scheme)
 
         if not path:
@@ -124,7 +126,7 @@ class URN(object):
         except ValueError:
             raise ValueError("URN strings must contain scheme and path components")
 
-        if parsed.scheme not in cls.VALID_SCHEMES:
+        if parsed.scheme not in cls.VALID_SCHEMES and parsed.scheme != DELETED_SCHEME:
             raise ValueError("URN contains an invalid scheme component: '%s'" % parsed.scheme)
 
         return parsed.scheme, parsed.path, parsed.query or None, parsed.fragment or None
@@ -348,6 +350,7 @@ class ContactField(SmartModel):
     """
     Represents a type of field that can be put on Contacts.
     """
+
     MAX_KEY_LEN = 36
     MAX_LABEL_LEN = 36
     MAX_ORG_CONTACTFIELDS = 200
@@ -1433,7 +1436,6 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
 
         # this file isn't good enough, lets write it to local disk
         from django.conf import settings
-        from uuid import uuid4
 
         # make sure our tmp directory is present (throws if already present)
         try:
@@ -1442,7 +1444,7 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
             pass
 
         # write our file out
-        tmp_file = os.path.join(settings.MEDIA_ROOT, "tmp/%s" % str(uuid4()))
+        tmp_file = os.path.join(settings.MEDIA_ROOT, "tmp/%s" % str(uuid.uuid4()))
 
         out_file = open(tmp_file, "wb")
         out_file.write(csv_file.read())
@@ -1783,11 +1785,23 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
 
     def deactivate(self, user):
         if self.is_active:
-            self.is_active = False
-            self.name = None
-            self.fields = None
-            self.modified_by = user
-            self.save(update_fields=("name", "is_active", "fields", "modified_on", "modified_by"))
+            with transaction.atomic():
+
+                # prep our urns for deletion so our old path creates a new urn
+                for urn in self.urns.all():
+                    path = str(uuid.uuid4())
+                    urn.identity = f"{DELETED_SCHEME}:{path}"
+                    urn.path = path
+                    urn.scheme = DELETED_SCHEME
+                    urn.channel = None
+                    urn.save(update_fields=("identity", "path", "scheme", "channel"))
+
+                # now deactivate the contact itself
+                self.is_active = False
+                self.name = None
+                self.fields = None
+                self.modified_by = user
+                self.save(update_fields=("name", "is_active", "fields", "modified_on", "modified_by"))
 
     def release_async(self, user):
         """
@@ -1815,8 +1829,19 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
             for msg in self.msgs.all():
                 msg.release()
 
+            # release any calls or ussd sessions
+            for session in self.sessions.all():
+                session.release()
+
             # any urns currently owned by us
             for urn in self.urns.all():
+
+                # release any messages attached with each urn,
+                # these could include messages that began life
+                # on a different contact
+                for msg in urn.msgs.all():
+                    msg.release()
+
                 urn.release()
 
             # release our channel events
@@ -2242,6 +2267,7 @@ class ContactURN(models.Model):
     """
     A Universal Resource Name used to uniquely identify contacts, e.g. tel:+1234567890 or twitter:example
     """
+
     # schemes that we actually support
     SCHEME_CHOICES = tuple((c[0], c[1]) for c in URN_SCHEME_CONFIG)
     CONTEXT_KEYS_TO_SCHEME = {c[3]: c[0] for c in URN_SCHEME_CONFIG}
@@ -2460,13 +2486,11 @@ class ContactURN(models.Model):
 
 
 class SystemContactGroupManager(models.Manager):
-
     def get_queryset(self):
         return super().get_queryset().exclude(group_type=ContactGroup.TYPE_USER_DEFINED)
 
 
 class UserContactGroupManager(models.Manager):
-
     def get_queryset(self):
         return super().get_queryset().filter(group_type=ContactGroup.TYPE_USER_DEFINED, is_active=True)
 
@@ -2883,6 +2907,7 @@ class ContactGroupCount(SquashableModel):
     Maintains counts of contact groups. These are calculated via triggers on the database and squashed
     by a recurring task.
     """
+
     SQUASH_OVER = ("group_id",)
 
     group = models.ForeignKey(ContactGroup, related_name="counts", db_index=True)
