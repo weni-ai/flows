@@ -77,10 +77,11 @@ class BaseAssetStore(object):
             raise AssetFileNotFound()
 
         # create a more friendly download filename
+        content_encoding = "none"
         remainder, extension = path.rsplit(".", 1)
         if extension == "gz":
             remainder, extension = remainder.rsplit(".", 1)
-            extension += ".gz"
+            content_encoding = "gzip"
 
         filename = "%s_%s.%s" % (self.key, pk, extension)
 
@@ -96,6 +97,7 @@ class BaseAssetStore(object):
                 "Key": default_storage._encode_name(path),
                 # force browser to download
                 "ResponseContentDisposition": "attachment;filename=%s" % filename,
+                "ResponseContentEncoding": "%s" % content_encoding,
             }
 
             # generate a temporaly URL manually so that we can force the download name for the user
