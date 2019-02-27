@@ -334,7 +334,7 @@ PERMISSIONS = {
         "update_fields",
         "update_fields_input",
     ),
-    "contacts.contactfield": ("api", "json", "managefields", "create", "update", "updatepriority", "delete"),
+    "contacts.contactfield": ("api", "json", "managefields", "updatepriority"),
     "contacts.contactgroup": ("api",),
     "ivr.ivrcall": ("start",),
     "archives.archive": ("api", "run", "message"),
