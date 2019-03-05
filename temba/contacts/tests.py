@@ -7534,23 +7534,6 @@ class ContactFieldTest(TembaTest):
         cf_priority = [cf.priority for cf in ContactField.user_fields.filter(is_active=True).order_by("id")]
         self.assertListEqual(cf_priority, [0, 1, 2])
 
-    def test_view_updatepriority_invalid(self):
-        cf_priority = [cf.priority for cf in ContactField.user_fields.filter(is_active=True).order_by("id")]
-        self.assertListEqual(cf_priority, [10, 0, 20])
-
-        self.login(self.admin)
-        updatepriority_cf_url = reverse("contacts.contactfield_updatepriority")
-
-        # there are 3 CFs in db, we are trying to update 2
-        post_data = json.dumps({123_123: 1000, 123_124: 999})
-
-        response = self.client.post(updatepriority_cf_url, post_data, content_type="application/json")
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["status"], "ERROR")
-        self.assertEqual(
-            response.json()["err_detail"], "Priority could not be updated, expected 3 got 2 fields for update."
-        )
-
     def test_contactfield_priority(self):
 
         self.assertEqual(
