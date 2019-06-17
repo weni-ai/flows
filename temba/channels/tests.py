@@ -2612,6 +2612,184 @@ class ChannelLogTest(TembaTest):
             # customer_support has access
             self.assertTrue(response.status_code, 200)
 
+    def test_channellog_anonymous_org_telegram_channel(self):
+        telegram_urn = "telegram:3527065"
+
+        tg_contact = self.create_contact("Fred Jones", telegram_urn)
+        tg_channel = Channel.create(self.org, self.user, None, "TG", name="Test TG Channel")
+
+        incoming_msg = Msg.create_incoming(tg_channel, telegram_urn, "incoming msg", contact=tg_contact)
+
+        success_log = ChannelLog.objects.create(
+            channel=tg_channel,
+            msg=incoming_msg,
+            description="Successfully Sent",
+            is_error=False,
+            url=r"https://api.telegram.org/<redacted>>/sendMessage",
+            method="POST",
+            request=r"POST /<redacted>/sendMessage HTTP/1.1\r\nHost: api.telegram.org\r\nUser-Agent: Courier/1.2.159\r\nContent-Length: 231\r\nContent-Type: application/x-www-form-urlencoded\r\nAccept-Encoding: gzip\r\n\r\nchat_id=3527065&reply_markup=%7B%22resize_keyboard%22%3Atrue%2C%22one_time_keyboard%22%3Atrue%2C%22keyboard%22%3A%5B%5B%7B%22text%22%3A%22blackjack%22%7D%2C%7B%22text%22%3A%22balance%22%7D%5D%5D%7D&text=Your+balance+is+now+%246.00.",
+            response=r'HTTP/1.1 200 OK\r\nContent-Length: 298\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: Content-Length,Content-Type,Date,Server,Connection\r\nConnection: keep-alive\r\nContent-Type: application/json\r\nDate: Tue, 11 Jun 2019 15:33:06 GMT\r\nServer: nginx/1.12.2\r\nStrict-Transport-Security: max-age=31536000; includeSubDomains; preload\r\n\r\n{"ok":true,"result":{"message_id":1440,"from":{"id":678777066,"is_bot":true,"first_name":"textit_staging","username":"textit_staging_bot"},"chat":{"id":3527065,"first_name":"Nic","last_name":"Pottier","username":"Nicpottier","type":"private"},"date":1560267186,"text":"Your balance is now $6.00."}}',
+            response_status=200,
+        )
+
+        self.login(self.admin)
+
+        list_url = reverse("channels.channellog_list", args=[tg_channel.uuid])
+        response = self.client.get(list_url)
+
+        self.assertContains(response, "3527065", count=1)
+
+        with AnonymousOrg(self.org):
+            response = self.client.get(list_url)
+
+            self.assertContains(response, "3527065", count=0)
+
+            self.assertContains(response, ContactURN.ANON_MASK, count=1)
+
+        read_url = reverse("channels.channellog_read", args=[success_log.id])
+        response = self.client.get(read_url)
+
+        self.assertContains(response, "3527065", count=3)
+        self.assertContains(response, "Nic", count=2)
+        self.assertContains(response, "Pottier", count=1)
+
+        with AnonymousOrg(self.org):
+            response = self.client.get(read_url)
+
+            self.assertContains(response, "3527065", count=0)
+            self.assertContains(response, "Nic", count=0)
+            self.assertContains(response, "Pottier", count=0)
+
+            self.assertContains(response, ContactURN.ANON_MASK, count=9)
+
+        # login as customer support, must see URNs
+        self.customer_support.is_staff = True
+        self.customer_support.save()
+
+        self.login(self.customer_support)
+
+        read_url = reverse("channels.channellog_read", args=[success_log.id])
+        response = self.client.get(read_url)
+
+        self.assertContains(response, "3527065", count=3)
+
+        with AnonymousOrg(self.org):
+            response = self.client.get(read_url)
+            # contact_urn is still masked on the read page, it uses contacts.models.Contact.get_display
+            # Contact.get_display does not check if user has `contacts.contact_break_anon` permission
+            self.assertContains(response, "3527065", count=2)
+            self.assertContains(response, "Nic", count=2)
+            self.assertContains(response, "Pottier", count=1)
+
+            self.assertContains(response, ContactURN.ANON_MASK, count=1)
+
+    def test_channellog_anonymous_org_telegram_channel_parse_error(self):
+        telegram_urn = "telegram:3527065"
+
+        tg_contact = self.create_contact("Fred Jones", telegram_urn)
+        tg_channel = Channel.create(self.org, self.user, None, "TG", name="Test TG Channel")
+
+        incoming_msg = Msg.create_incoming(tg_channel, telegram_urn, "incoming msg", contact=tg_contact)
+
+        success_log = ChannelLog.objects.create(
+            channel=tg_channel,
+            msg=incoming_msg,
+            description="Successfully Sent",
+            is_error=False,
+            url=r"not important",
+            method="POST",
+            request=r"not important",
+            response=r'Content-Type: application/json\r\n\r\n{"bad_json":true, "first_name": "Nic"',
+            response_status=200,
+        )
+
+        self.login(self.admin)
+
+        read_url = reverse("channels.channellog_read", args=[success_log.id])
+        response = self.client.get(read_url)
+
+        self.assertContains(response, "3527065", count=1)
+
+        with AnonymousOrg(self.org):
+            response = self.client.get(read_url)
+
+            self.assertContains(response, "3527065", count=0)
+            self.assertContains(response, "Nic", count=0)
+            self.assertContains(response, "Pottier", count=0)
+
+            # everything is masked
+            self.assertContains(response, ContactURN.ANON_MASK, count=4)
+
+        # login as customer support, must see URNs
+        self.customer_support.is_staff = True
+        self.customer_support.save()
+
+        self.login(self.customer_support)
+
+        read_url = reverse("channels.channellog_read", args=[success_log.id])
+        response = self.client.get(read_url)
+
+        self.assertContains(response, "3527065", count=1)
+
+        with AnonymousOrg(self.org):
+            response = self.client.get(read_url)
+            self.assertContains(response, "Nic", count=1)
+
+            self.assertContains(response, ContactURN.ANON_MASK, count=1)
+
+    def test_channellog_anonymous_org_telegram_channel_apply_mask_cant_find_match(self):
+        telegram_urn = "telegram:3527065"
+
+        tg_contact = self.create_contact("Fred Jones", telegram_urn)
+        tg_channel = Channel.create(self.org, self.user, None, "TG", name="Test TG Channel")
+
+        incoming_msg = Msg.create_incoming(tg_channel, telegram_urn, "incoming msg", contact=tg_contact)
+
+        success_log = ChannelLog.objects.create(
+            channel=tg_channel,
+            msg=incoming_msg,
+            description="Successfully Sent",
+            is_error=False,
+            url="There is no contact identifying information",
+            method="POST",
+            request="""There is no contact identifying information""",
+            response=r"""There is no contact identifying information\r\n\r\n{"json": "ok"}""",
+            response_status=200,
+        )
+
+        self.login(self.admin)
+
+        read_url = reverse("channels.channellog_read", args=[success_log.id])
+        response = self.client.get(read_url)
+
+        self.assertContains(response, "3527065", count=1)
+        self.assertContains(response, "There is no contact identifying information", count=3)
+
+        with AnonymousOrg(self.org):
+            response = self.client.get(read_url)
+
+            # url/request/reponse are masked
+            self.assertContains(response, "There is no contact identifying information", count=0)
+
+            self.assertContains(response, "3527065", count=0)
+            self.assertContains(response, ContactURN.ANON_MASK, count=4)
+
+        # login as customer support, must see URNs
+        self.customer_support.is_staff = True
+        self.customer_support.save()
+
+        self.login(self.customer_support)
+
+        response = self.client.get(read_url)
+
+        self.assertContains(response, "3527065", count=1)
+
+        with AnonymousOrg(self.org):
+            response = self.client.get(read_url)
+            self.assertContains(response, "There is no contact identifying information", count=3)
+
+            self.assertContains(response, ContactURN.ANON_MASK, count=1)
+
     def test_channellog_anonymous_org(self):
         fb_urn = "facebook:2150393045080607"
 
@@ -2633,12 +2811,6 @@ Accept: */*
 Accept-Encoding: deflate, gzip
 Content-Length: 314
 Content-Type: application/json
-User-Agent: facebookexternalua
-X-Amzn-Trace-Id: Root=1-5cee039c-6489b45d859adb735973ed6f
-X-Forwarded-For: 173.252.95.32
-X-Forwarded-Port: 443
-X-Forwarded-Proto: https
-X-Hub-Signature: sha1=34faa3f332b2a42d0e0aec4eada1eaedda182e17
 
 {"object":"page","entry":[{"id":"311494332880244","time":1559102364444,"messaging":[{"sender":{"id":"2150393045080607"},"recipient":{"id":"311494332880244"},"timestamp":1559102363925,"message":{"mid":"ld5jgfQP8TLBX9FFc3AETshZgE6Zn5UjpY3vY00t3A_YYC2AYDM3quxaodTiHj7nK6lI_ds4WFUJlTmM2l5xoA","seq":0,"text":"hi"}}]}]}
 """,
@@ -2790,12 +2962,8 @@ Accept-Encoding: gzip;q=1.0,deflate;q=0.6,identity;q=0.3
 Content-Length: 343
 Content-Type: application/x-www-form-urlencoded
 User-Agent: SignalwireCallback/1.0
-X-Amzn-Trace-Id: Root=1-5ce48425-9b491180a8927360f6390fe0
-X-Forwarded-For: 35.232.172.41
-X-Forwarded-Port: 443
-X-Forwarded-Proto: https
 
-MessageSid=e1d12194-a643-4007-834a-5900db47e262&SmsSid=e1d12194-a643-4007-834a-5900db47e262&AccountSid=318dee7a-9e7c-49a1-b3ff-cc4c366b4c73&From=%2B15618981512&To=%2B15128505839&Body=Hi+Ben+Google+Voice%2C+Did+you+enjoy+your+stay+at+White+Bay+Villas%3F++Answer+with+Yes+or+No.+reply+STOP+to+opt-out.&NumMedia=0&NumSegments=1&MessageStatus=sent""",
+MessageSid=e1d12194-a643-4007-834a-5900db47e262&SmsSid=e1d12194-a643-4007-834a-5900db47e262&AccountSid=<redacted>&From=%2B15618981512&To=%2B15128505839&Body=Hi+Ben+Google+Voice%2C+Did+you+enjoy+your+stay+at+White+Bay+Villas%3F++Answer+with+Yes+or+No.+reply+STOP+to+opt-out.&NumMedia=0&NumSegments=1&MessageStatus=sent""",
             response="""
 HTTP/1.1 400 Bad Request
 Content-Encoding: gzip
