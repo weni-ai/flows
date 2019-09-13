@@ -25,7 +25,7 @@ coverage==4.5.3
 cryptography==2.3.1       # via pyjwt, python-telegram-bot
 dj-database-url==0.5.0
 django-appconf==1.0.2     # via django-compressor
-django-compressor==2.2
+django-compressor==2.3
 django-countries==5.3.3
 django-hamlpy==1.2
 django-mptt==0.8.7
@@ -94,7 +94,7 @@ requests-oauthlib==0.8.0  # via twython
 requests-toolbelt==0.8.0  # via pyfcm
 requests==2.21.0
 responses==0.10.5
-rjsmin==1.0.12            # via django-compressor
+rjsmin==1.1.0             # via django-compressor
 s3transfer==0.2.0         # via boto3
 simplejson==3.16.0
 six==1.10.0               # via analytics-python, cryptography, elasticsearch-dsl, librato-bg, librato-metrics, packaging, pip-tools, python-dateutil, python-intercom, responses, twilio
