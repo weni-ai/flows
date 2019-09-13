@@ -3,11 +3,11 @@ import socket
 import sys
 from datetime import timedelta
 
-import iptools
-
 from django.utils.translation import ugettext_lazy as _
 
 from celery.schedules import crontab
+
+import iptools
 
 # -----------------------------------------------------------------------------------
 # Default to debugging
@@ -939,6 +939,10 @@ else:
 
 COMPRESS_ENABLED = False
 COMPRESS_OFFLINE = False
+COMPRESS_FILTERS = {
+    'css': ['compressor.filters.css_default.CssAbsoluteFilter'],
+    'js': ['compressor.filters.jsmin.YUIJSFilter'],
+}
 
 # build up our offline compression context based on available brands
 COMPRESS_OFFLINE_CONTEXT = []
