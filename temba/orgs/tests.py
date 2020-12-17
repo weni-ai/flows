@@ -1375,12 +1375,21 @@ class OrgTest(TembaTest):
         response = self.client.get(editor_join_url)
         self.assertEqual(200, response.status_code)
 
+        # should be logged out to request login
+        self.assertEqual(0, len(self.client.session.keys()))
+
+        editor_join_accept_url = reverse("orgs.org_join_accept", args=[editor_invitation.secret])
+        self.login(self.invited_editor)
+
+        response = self.client.get(editor_join_accept_url)
+        self.assertEqual(200, response.status_code)
+
         self.assertEqual(self.org.pk, response.context["org"].pk)
         # we have a form without field except one 'loc'
         self.assertEqual(1, len(response.context["form"].fields))
 
         post_data = dict()
-        response = self.client.post(editor_join_url, post_data, follow=True)
+        response = self.client.post(editor_join_accept_url, post_data, follow=True)
         self.assertEqual(200, response.status_code)
 
         self.assertIn(self.invited_editor, self.org.editors.all())
@@ -1398,7 +1407,7 @@ class OrgTest(TembaTest):
             invite = create_invite(role[0])
             user = self.create_user("User%s" % role[0])
             self.login(user)
-            response = self.client.post(reverse("orgs.org_join", args=[invite.secret]), follow=True)
+            response = self.client.post(reverse("orgs.org_join_accept", args=[invite.secret]), follow=True)
             self.assertEqual(200, response.status_code)
             self.assertIsNotNone(role[1].filter(pk=user.pk).first())
 
@@ -1408,7 +1417,7 @@ class OrgTest(TembaTest):
         invite.save()
         expired_user = self.create_user("InvitedExpired")
         self.login(expired_user)
-        response = self.client.post(reverse("orgs.org_join", args=[invite.secret]), follow=True)
+        response = self.client.post(reverse("orgs.org_join_accept", args=[invite.secret]), follow=True)
         self.assertEqual(200, response.status_code)
         self.assertIsNone(self.org.surveyors.filter(pk=expired_user.pk).first())
 

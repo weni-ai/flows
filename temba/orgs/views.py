@@ -553,6 +553,7 @@ class OrgCRUDL(SmartCRUDL):
         "edit",
         "edit_sub_org",
         "join",
+        "join_accept",
         "grant",
         "accounts",
         "create_login",
@@ -1965,20 +1966,42 @@ class OrgCRUDL(SmartCRUDL):
 
             return context
 
-    class Join(SmartUpdateView):
-        class JoinForm(forms.ModelForm):
+    class Join(SmartTemplateView):
+
+        permission = False
+
+        def pre_process(self, request, *args, **kwargs):  # pragma: needs cover
+            secret = self.kwargs.get("secret")
+            if not request.user.is_authenticated:
+                return HttpResponseRedirect(reverse("orgs.org_create_login", args=[secret]))
+            logout(request)
+
+        def get_context_data(self, **kwargs):
+            context = super().get_context_data(**kwargs)
+
+            context["secret"] = self.kwargs.get("secret")
+
+            return context
+
+        @classmethod
+        def derive_url_pattern(cls, path, action):
+            return r"^%s/%s/(?P<secret>\w+)/$" % (path, action)
+
+    class JoinAccept(SmartUpdateView):
+        class JoinAcceptForm(forms.ModelForm):
             class Meta:
                 model = Org
                 fields = ()
 
         success_message = ""
-        form_class = JoinForm
+        form_class = JoinAcceptForm
         success_url = "@msgs.msg_inbox"
         submit_button_name = _("Join")
-        permission = False
+
+        def has_permission(self, request, *args, **kwargs):
+            return request.user.is_authenticated
 
         def pre_process(self, request, *args, **kwargs):  # pragma: needs cover
-            secret = self.kwargs.get("secret")
 
             org = self.get_object()
             if not org:
@@ -1987,8 +2010,6 @@ class OrgCRUDL(SmartCRUDL):
                 )
                 return HttpResponseRedirect(reverse("public.public_index"))
 
-            if not request.user.is_authenticated:
-                return HttpResponseRedirect(reverse("orgs.org_create_login", args=[secret]))
             return None
 
         def derive_title(self):  # pragma: needs cover

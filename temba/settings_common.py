@@ -394,6 +394,7 @@ PERMISSIONS = {
         "home",
         "import",
         "join",
+        "join_accept",
         "languages",
         "manage",
         "manage_accounts",
