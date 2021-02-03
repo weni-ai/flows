@@ -1966,7 +1966,7 @@ class OrgCRUDL(SmartCRUDL):
             return context
 
     class Join(SmartTemplateView):
-
+        title = _("Enter your credentials to join")
         permission = False
 
         def pre_process(self, request, *args, **kwargs):  # pragma: needs cover
@@ -1993,6 +1993,7 @@ class OrgCRUDL(SmartCRUDL):
                 fields = ()
 
         success_message = ""
+        title = ""
         form_class = JoinAcceptForm
         success_url = "@msgs.msg_inbox"
         submit_button_name = _("Join")

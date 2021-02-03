@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-01-28 16:13+0000\n"
+"POT-Creation-Date: 2021-02-03 19:24+0000\n"
 "PO-Revision-Date: 2019-05-13 20:14+0000\n"
 "Last-Translator: Hudson Brendon <hudson.brendon@ilhasoft.com.br>, 2020\n"
 "Language-Team: Russian (https://www.transifex.com/rapidpro/teams/226/ru/)\n"
@@ -4306,6 +4306,9 @@ msgstr "Ваша пригласительная ссылка недействи�
 #, python-format
 msgid "Join %(name)s"
 msgstr "Присоединиться к %(name)s"
+
+msgid "Enter your credentials to join"
+msgstr ""
 
 msgid "Join"
 msgstr "Присоединиться"
