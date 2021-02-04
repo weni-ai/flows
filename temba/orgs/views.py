@@ -2040,21 +2040,22 @@ class OrgCRUDL(SmartCRUDL):
         submit_button_name = _("Join")
 
         def has_permission(self, request, *args, **kwargs):
-            invite = self.get_invitation()
-            has_user = User.objects.filter(username=invite.email).exists()
-            return has_user and request.user.is_authenticated
+            return request.user.is_authenticated
 
         def pre_process(self, request, *args, **kwargs):  # pragma: needs cover
             org = self.get_object()
-            if not org:
+            invitation = self.get_invitation()
+            if not (invitation and org):
                 messages.info(
                     request, _("Your invitation link has expired. Please contact your workspace administrator.")
                 )
                 return HttpResponseRedirect(reverse("public.public_index"))
 
-            invite = self.get_invitation()
             secret = self.kwargs.get("secret")
-            if invite.email != request.user.username:
+
+            invitation_email = invitation.email
+            has_user = User.objects.filter(username=invitation_email).exists()
+            if has_user and invitation_email != request.user.username:
                 logout(request)
                 return HttpResponseRedirect(reverse("orgs.org_join", args=[secret]))
 

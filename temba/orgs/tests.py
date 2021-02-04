@@ -1354,16 +1354,22 @@ class OrgTest(TembaTest):
 
     @patch("temba.utils.email.send_temba_email")
     def test_join(self, mock_send_temba_email):
-        def create_invite(group):
+        def create_invite(group, username):
             return Invitation.objects.create(
                 org=self.org,
                 user_group=group,
-                email="norkans7@gmail.com",
+                email=f"{username}@nyaruka.com",
                 created_by=self.admin,
                 modified_by=self.admin,
             )
 
-        editor_invitation = create_invite("E")
+        def create_user(username):
+            user = User.objects.create_user(f"{username}@nyaruka.com", f"{username}@nyaruka.com")
+            user.set_password(f"{username}@nyaruka.com")
+            user.save()
+            return user
+
+        editor_invitation = create_invite("E", "invitededitor")
         editor_invitation.send()
         email_args = mock_send_temba_email.call_args[0]  # all positional args
 
@@ -1385,7 +1391,7 @@ class OrgTest(TembaTest):
         )
 
         # a user is already logged in
-        self.invited_editor = self.create_user("InvitedEditor")
+        self.invited_editor = create_user("invitededitor")
         self.login(self.invited_editor)
 
         response = self.client.get(editor_join_url)
@@ -1420,18 +1426,18 @@ class OrgTest(TembaTest):
 
         # test it for each role
         for role in roles:
-            invite = create_invite(role[0])
-            user = self.create_user("User%s" % role[0])
+            invite = create_invite(role[0], "User%s" % role[0])
+            user = create_user("User%s" % role[0])
             self.login(user)
             response = self.client.post(reverse("orgs.org_join_accept", args=[invite.secret]), follow=True)
             self.assertEqual(200, response.status_code)
             self.assertIsNotNone(role[1].filter(pk=user.pk).first())
 
         # try an expired invite
-        invite = create_invite("S")
+        invite = create_invite("S", "invitedexpired")
         invite.is_active = False
         invite.save()
-        expired_user = self.create_user("InvitedExpired")
+        expired_user = create_user("invitedexpired")
         self.login(expired_user)
         response = self.client.post(reverse("orgs.org_join_accept", args=[invite.secret]), follow=True)
         self.assertEqual(200, response.status_code)
