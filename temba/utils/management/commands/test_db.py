@@ -33,7 +33,7 @@ from temba.utils.dates import datetime_to_timestamp, timestamp_to_datetime
 CONTENT_AGE = 3 * 365
 
 # by default every user will have this password including the superuser
-USER_PASSWORD = "Qwerty123"
+USER_PASSWORD = "Qwerty123$&_"
 
 # database dump containing admin boundary records
 LOCATIONS_DUMP = "test-data/nigeria.bin"

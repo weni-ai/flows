@@ -17,7 +17,7 @@
           %form#login-form{method:"post", action:"{% url 'users.user_login' %}?next={% url 'orgs.org_join_accept' secret %}"}
             %fieldset
               .control-group
-                %temba-textinput#id_username(type="text" name="username" maxlenght="30" label="{% trans 'Email Address' %}")
+                %temba-textinput#id_username(type="text" name="username" maxlenght="30" label="{% trans 'Email Address' %}" value="{{email}}")
 
               .control-group
                 %temba-textinput#id_password(type="password" name="password" label="{% trans 'Password' %}" placeholder="{% trans 'Your password, at least eight letters please' %}" password)

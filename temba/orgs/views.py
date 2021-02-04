@@ -1891,7 +1891,7 @@ class OrgCRUDL(SmartCRUDL):
     class CreateLogin(SmartUpdateView):
         title = ""
         form_class = OrgSignupForm
-        fields = ("first_name", "last_name", "email", "password")
+        fields = ("email", "first_name", "last_name", "password")
         success_message = ""
         success_url = "@msgs.msg_inbox"
         submit_button_name = _("Create")
@@ -1904,7 +1904,28 @@ class OrgCRUDL(SmartCRUDL):
                     request, _("Your invitation link is invalid. Please contact your workspace administrator.")
                 )
                 return HttpResponseRedirect(reverse("public.public_index"))
+
+            invite = self.get_invitation()
+            secret = self.kwargs.get("secret")
+            has_user = User.objects.filter(username=invite.email).exists()
+            if has_user:
+                return HttpResponseRedirect(reverse("orgs.org_join_accept", args=[secret]))
+
             return None
+
+        def derive_initial(self):
+            initial = super().derive_initial()
+            invite = self.get_invitation()
+            initial["email"] = invite.email
+            return initial
+
+        def form_valid(self, form):
+            invite = self.get_invitation()
+            if self.form.cleaned_data["email"] != invite.email:
+                form._errors["email"] = form.error_class([_("Sorry, this email mismatch the invite email.")])
+                return self.form_invalid(form)
+
+            return super().form_valid(form)
 
         def pre_save(self, obj):
             obj = super().pre_save(obj)
@@ -1966,21 +1987,41 @@ class OrgCRUDL(SmartCRUDL):
             return context
 
     class Join(SmartTemplateView):
-        title = _("Enter your credentials to join")
+        title = _("Sign in with your account to accept the invitation")
         permission = False
 
         def pre_process(self, request, *args, **kwargs):  # pragma: needs cover
             secret = self.kwargs.get("secret")
-            if not request.user.is_authenticated:
-                return HttpResponseRedirect(reverse("orgs.org_create_login", args=[secret]))
-            logout(request)
+
+            invite = self.get_invitation()
+            if invite:
+                has_user = User.objects.filter(username=invite.email).exists()
+                logout(request)
+                if not has_user:
+                    return HttpResponseRedirect(reverse("orgs.org_create_login", args=[secret]))
+
+            else:
+                messages.info(
+                    request, _("Your invitation link has expired. Please contact your workspace administrator.")
+                )
+                return HttpResponseRedirect(reverse("users.user_login"))
 
         def get_context_data(self, **kwargs):
             context = super().get_context_data(**kwargs)
 
             context["secret"] = self.kwargs.get("secret")
+            invitation = self.get_invitation()
+            context["email"] = invitation.email
 
             return context
+
+        def get_invitation(self, **kwargs):  # pragma: needs cover
+            invitation = None
+            secret = self.kwargs.get("secret")
+            invitations = Invitation.objects.filter(secret=secret, is_active=True)
+            if invitations:
+                invitation = invitations[0]
+            return invitation
 
         @classmethod
         def derive_url_pattern(cls, path, action):
@@ -1999,16 +2040,23 @@ class OrgCRUDL(SmartCRUDL):
         submit_button_name = _("Join")
 
         def has_permission(self, request, *args, **kwargs):
-            return request.user.is_authenticated
+            invite = self.get_invitation()
+            has_user = User.objects.filter(username=invite.email).exists()
+            return has_user and request.user.is_authenticated
 
         def pre_process(self, request, *args, **kwargs):  # pragma: needs cover
-
             org = self.get_object()
             if not org:
                 messages.info(
                     request, _("Your invitation link has expired. Please contact your workspace administrator.")
                 )
                 return HttpResponseRedirect(reverse("public.public_index"))
+
+            invite = self.get_invitation()
+            secret = self.kwargs.get("secret")
+            if invite.email != request.user.username:
+                logout(request)
+                return HttpResponseRedirect(reverse("orgs.org_join", args=[secret]))
 
             return None
 
