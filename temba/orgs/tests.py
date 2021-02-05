@@ -1476,6 +1476,19 @@ class OrgTest(TembaTest):
         self.assertTrue(new_invited_user in self.org.administrators.all())
         self.assertFalse(Invitation.objects.get(pk=admin_invitation.pk).is_active)
 
+        invitation = Invitation.objects.create(
+            org=self.org, user_group="E", email="norkans7@gmail.com", created_by=self.admin, modified_by=self.admin
+        )
+        create_login_url = reverse("orgs.org_create_login", args=[invitation.secret])
+
+        # we have a matching user so we redirect with the user logged in
+        response = self.client.get(create_login_url)
+        self.assertEqual(302, response.status_code)
+
+        response = self.client.get(create_login_url, follow=True)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(response.request["PATH_INFO"], reverse("orgs.org_join_accept", args=[invitation.secret]))
+
     def test_create_login_invalid_form(self):
         admin_invitation = Invitation.objects.create(
             org=self.org, user_group="A", email="user@example.com", created_by=self.admin, modified_by=self.admin
@@ -1497,6 +1510,14 @@ class OrgTest(TembaTest):
         response = self.client.post(admin_create_login_url, post_data, follow=True)
 
         self.assertFormError(response, "form", "email", "Enter a valid email address.")
+
+        post_data = dict(
+            first_name="Matija", last_name="Vujica", email="user2@example.com", password="just-a-password"
+        )
+
+        response = self.client.post(admin_create_login_url, post_data, follow=True)
+
+        self.assertFormError(response, "form", "email", "Sorry, this email mismatch the invite email.")
 
         post_data = dict(
             first_name="Matija_first_name_longer_than_30_chars",
