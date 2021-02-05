@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: TextIt\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-02-04 21:23+0000\n"
+"POT-Creation-Date: 2021-02-05 17:42+0000\n"
 "PO-Revision-Date: 2014-04-14 20:37+0000\n"
 "Last-Translator: produtos <produtos.ti@takenet.com.br>\n"
 "Language-Team: Portuguese (Brazil) (http://www.transifex.com/projects/p/textit/language/pt_BR/)\n"
@@ -4654,9 +4654,6 @@ msgstr "O link do seu convite não é válido. Por favor, contate o administrado
 #| msgid "Your invitation link is invalid. Please contact your organization administrator."
 msgid "Your invitation link is invalid. Please contact your workspace administrator."
 msgstr "O link do seu convite não é válido. Por favor, contate o administrador da organização."
-
-msgid "Sorry, this email mismatch the invite email."
-msgstr ""
 
 #, python-format
 msgid "Join %(name)s"

@@ -1930,7 +1930,6 @@ class OrgCRUDL(SmartCRUDL):
             user.last_name = self.form.cleaned_data["last_name"]
             user.save()
 
-
             # log the user in
             user = authenticate(username=user.username, password=self.form.cleaned_data["password"])
             login(self.request, user)

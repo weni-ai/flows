@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-02-04 21:23+0000\n"
+"POT-Creation-Date: 2021-02-05 17:42+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -3441,9 +3441,6 @@ msgid "No organizations for this account, please contact your administrator."
 msgstr ""
 
 msgid "Your invitation link is invalid. Please contact your workspace administrator."
-msgstr ""
-
-msgid "Sorry, this email mismatch the invite email."
 msgstr ""
 
 #, python-format

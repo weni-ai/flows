@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-02-04 21:23+0000\n"
+"POT-Creation-Date: 2021-02-05 17:42+0000\n"
 "PO-Revision-Date: 2019-05-13 20:14+0000\n"
 "Last-Translator: Jesus EKIE <jesus@fehudigital.com>, 2020\n"
 "Language-Team: French (https://www.transifex.com/rapidpro/teams/226/fr/)\n"
@@ -3480,9 +3480,6 @@ msgstr "Aucune organisation pour ce compte, veuillez contacter votre administrat
 
 msgid "Your invitation link is invalid. Please contact your workspace administrator."
 msgstr "Votre lien d'invitation n'est pas valide. Veuillez contacter votre administrateur d'espace de travail."
-
-msgid "Sorry, this email mismatch the invite email."
-msgstr ""
 
 #, python-format
 msgid "Join %(name)s"
