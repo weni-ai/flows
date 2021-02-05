@@ -1891,7 +1891,7 @@ class OrgCRUDL(SmartCRUDL):
     class CreateLogin(SmartUpdateView):
         title = ""
         form_class = OrgSignupForm
-        fields = ("email", "first_name", "last_name", "password")
+        fields = ("first_name", "last_name", "password")
         success_message = ""
         success_url = "@msgs.msg_inbox"
         submit_button_name = _("Create")
@@ -1919,24 +1919,17 @@ class OrgCRUDL(SmartCRUDL):
             initial["email"] = invite.email
             return initial
 
-        def form_valid(self, form):
-            invite = self.get_invitation()
-            if self.form.cleaned_data["email"] != invite.email:
-                form._errors["email"] = form.error_class([_("Sorry, this email mismatch the invite email.")])
-                return self.form_invalid(form)
-
-            return super().form_valid(form)
-
         def pre_save(self, obj):
             obj = super().pre_save(obj)
 
-            user = Org.create_user(self.form.cleaned_data["email"], self.form.cleaned_data["password"])
+            self.invitation = self.get_invitation()
+
+            user = Org.create_user(self.invitation.email, self.form.cleaned_data["password"])
 
             user.first_name = self.form.cleaned_data["first_name"]
             user.last_name = self.form.cleaned_data["last_name"]
             user.save()
 
-            self.invitation = self.get_invitation()
 
             # log the user in
             user = authenticate(username=user.username, password=self.form.cleaned_data["password"])
