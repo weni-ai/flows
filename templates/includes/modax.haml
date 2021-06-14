@@ -9,6 +9,7 @@
       {{ errors }}  
 
   %form(method="POST")
+    {% csrf_token %}
     -block fields
       -for field in form.fields
         -render_field field
