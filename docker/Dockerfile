@@ -56,8 +56,8 @@ RUN pip install --no-cache-dir -r /tmp/dep/requirements.txt \
 RUN cp /tmp/nginx.site.conf /etc/nginx/sites-available/$PROJECT.conf \
  && ln -s /etc/nginx/sites-available/$PROJECT.conf /etc/nginx/sites-enabled/$PROJECT.conf
 
-COPY . $PROJECT_PATH
-RUN chown -R $PROJECT_USER:$PROJECT_GROUP $PROJECT_PATH
+COPY --chown=$PROJECT_USER:$PROJECT_GROUP . $PROJECT_PATH
+# RUN chown -R $PROJECT_USER:$PROJECT_GROUP $PROJECT_PATH
 
 WORKDIR $PROJECT_PATH
 
