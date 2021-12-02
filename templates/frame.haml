@@ -17,6 +17,14 @@
 
     :javascript
 
+      // Weni's addition to send a message to Connect about our current route
+      {% if use_weni_layout %}
+        window.parent.postMessage({
+          event: 'changePathname',
+          pathname: window.location.pathname,
+        }, "*")
+      {% endif %}
+
       window.supportEmail = '{{brand.support_email}}';
 
       function conditionalLoad(local, remote) {
@@ -38,6 +46,19 @@
 
     -# this view make it possible to process translations from javascript land
     <script src="{% url 'django.views.i18n.javascript_catalog' %}"></script>
+
+    <!-- Hotjar Tracking Code for https://new.push.al -->
+    <script>
+        (function(h,o,t,j,a,r){
+            h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
+            h._hjSettings={hjid:{{hotjar_id}},hjsv:6};
+            a=o.getElementsByTagName('head')[0];
+            r=o.createElement('script');r.async=1;
+            r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
+            a.appendChild(r);
+        })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+    </script>
+
     -compress js
       :javascript
         var static_url = '{{STATIC_URL}}';
@@ -69,7 +90,7 @@
     -compress js
       %script{src:"{{ STATIC_URL }}js/temba.js"}
       %script{src:"{{ STATIC_URL }}js/labels.js"}
-      %script{src:"{{ STATIC_URL }}js/formax.js"}
+      
     
     -include "includes/frame_top.html"
 
@@ -124,16 +145,78 @@
       -block extra-less
       -block extra-style
 
+      :css
+        {% if show_sidemenu and use_weni_layout %}
+          #unnnic-content {
+            margin-left: 200px;
+          }
+        {% endif %}
+
     -for incl in brand.head_includes
       -include incl
 
     <!--[if lt IE 9]>
       %script{src:"//html5shim.googlecode.com/svn/trunk/html5.js"}
     <![endif]-->
+-load macros
+-macro messages
+  -block messages
+    -if messages
+      -for msg in messages
+        %div{class:"alert alert-{{ message.tags }}"}
+          {{ msg }}
+
+-macro post-header
+  -block post-header
+
+-macro page-container
+  -block page-container
+    .flex-grow
+      .page-content
+        -block suspension
+          {% if user_org.is_suspended %}
+            .px-12.-mt-4
+              -include "org_suspended_include.haml"
+          {% endif %}
+
+        .px-12.py-4
+          -block page-top
+            .flex.items-start
+              .flex.flex-col.mr-5.leading-tight
+                .page-title
+                  -block title
+
+                .page-subtitle
+                  -block subtitle
+
+              .flex-grow
+                .flex.justify-end.w-full
+                  -block gear-menu
+                    -include "gear_links_include.haml"
+
+            -block post-title
+
+          .mt-6
+            -block content
+          
+          -block post-content
 
 {% block body %}
 
 %body#pageBody.bg-gradient
+
+  -if not use_weni_layout
+    .weni-announcement
+      .weni-announcement-container.flex.flex-row
+        .weni-left
+          {{ announcement_left }}
+        .weni-divider
+        .weni-right
+          {{ announcement_right }}
+        %a.weni-button(href="{{ announcement_link }}" target="_blank" rel="noopener noreferrer")
+          {{ announcement_button }}
+        %button.weni-announcement-collapse
+            .unnnic-icon-delete-1-1.unnnic-icon-large
 
   -if COMPONENTS_DEV_MODE
     <script type="module">
@@ -150,86 +233,74 @@
         fields="/api/v2/fields.json"
         globals="/api/v2/globals.json")
 
-  .flex.flex-col.h-full
+  -if use_weni_layout
+    -block weni-side
+      .flex.flex-col{style: "height: inherit"}
+        .flex.flex-row.h-full
+          <!-- Sidemenu -->
+          -if show_sidemenu
+            -block sidemenu
+              #unnnic-sidebar.flex-col.h-screen.bg-color-unnnic-snow.unnnic-right-menu-divider
+                -block info
+                
+                -block side
+                  -include 'includes/side.html'
 
-    -block header
-      <!-- Header -->
+                -if messages
+                  -usemacro messages
 
-      -if user_org
-        .org-header.self-end
-          -if user_orgs|length > 1
-            .pull-right.toggle
-              .icon-menu-2
+          #unnnic-content.flex.flex-col.w-full
+            -usemacro post-header
+            <!-- Content -->
+            -usemacro page-container
 
-          .org
-            {{ user_org.name }}
+  -else
+    .flex.flex-col.h-full
 
-          .other-orgs.hide
-            -for org in user_orgs
-              -if org != user_org
-                .org.text-primary
-                  %a.posterize{href:'{% url "orgs.org_choose"%}?organization={{org.pk}}'}
-                    {{ org.name }}
+      -block header
+        <!-- Header -->
 
+        -if user_org
+          .org-header.self-end
+            -if user_orgs|length > 1
+              .pull-right.toggle
+                .icon-menu-2
 
+            .org
+              {{ user_org.name }}
 
-      #header
-        &nbsp;
-
-
-      %a#big-logo.logo.icon-logo{href:"{% if user.is_authenticated %}{% url 'msgs.msg_inbox' %}{% else %}/{% endif %}", title:"{{brand.name}}", class:"hover:no-underline"}
-        .name
-          {{brand.name}}
-
-      -block nav
-        -include 'includes/nav.html'
-
-
-    -if messages
-      -block messages
-        -if messages
-          -for msg in messages
-            %div{class:"alert alert-{{ message.tags }}"}
-              {{ msg }}
-
-
-    -block post-header
-    <!-- Content -->
-    -block page-container
-      .flex-grow
-        .page-content
-          -block suspension
-            {% if user_org.is_suspended %}
-              .px-12.-mt-4
-                -include "org_suspended_include.haml"
-            {% endif %}
-
-          .px-12.py-4
-            -block page-top
-              .flex.items-start
-                .flex.flex-col.mr-5.leading-tight
-                  .page-title
-                    -block title
-                      
-                  .page-subtitle
-                    -block subtitle
-
-                .flex-grow
-                  .flex.justify-end.w-full
-                    -block gear-menu
-                      -include "gear_links_include.haml"
-
-              -block post-title
+            .other-orgs.hide
+              -for org in user_orgs
+                -if org != user_org
+                  .org.text-primary
+                    %a.posterize{href:'{% url "orgs.org_choose"%}?organization={{org.pk}}'}
+                      {{ org.name }}
 
 
-            .mt-6
-              -block content
-            
-            -block post-content
 
-    -block footer
-      .footer.text-center.py-12.bg-gray-200.text-gray-500
-        {{ request.branding.credits|safe }}
+        #header
+          &nbsp;
+
+
+        %a#big-logo.logo.icon-logo{href:"{% if user.is_authenticated %}{% url 'msgs.msg_inbox' %}{% else %}/{% endif %}", title:"{{brand.name}}", class:"hover:no-underline"}
+          .name
+            {{brand.name}}
+
+        -block nav
+          -include 'includes/nav.html'
+
+
+      -if messages
+        -usemacro messages
+
+
+      -usemacro post-header
+      <!-- Content -->
+      -usemacro page-container
+
+      -block footer
+        .footer.text-center.py-12.bg-gray-200.text-gray-500
+          {{ request.branding.credits|safe }}
 
   -trans 'Delete' as title
   %temba-dialog#general-delete-confirmation.hidden{header:"{{title|escapejs}}", primaryButtonName:"{{title|escapejs}}", destructive: "true"}
@@ -252,6 +323,70 @@
           var anon_org = false;
         {% endif %}
       {% endif %}
+
+      function inIframe () {
+        try {
+          if (window.self !== window.top) {
+            $(".org-header").hide();
+          } else {
+            $(".org-header").show();
+          }
+        } catch (e) {
+          $(".org-header").hide();
+        }
+      }
+
+      function enableLinkTranslations() {
+        let connectBaseURL = '';
+
+        function translateAllLinks() {
+          if (!connectBaseURL) {
+            return;
+          }
+          const url = new URL(connectBaseURL);
+          const debug = url.host && url.host.includes('develop');
+          document.querySelectorAll('a[href]').forEach((link) => {
+            const internalHref = link.getAttribute('internal-href') || link.getAttribute('href');
+            if (['http://', 'https://'].some((initial) => internalHref.startsWith(initial))) {
+              return;
+            }
+            const dashHref = connectBaseURL + internalHref;
+            if (link.translateLinkConnect) {
+              if (link.getAttribute('href') === dashHref) {
+                return;
+              }
+              link.removeEventListener('click', link.translateLinkConnect);
+            }
+            link.setAttribute('internal-href', internalHref);
+            link.setAttribute('href', dashHref);
+            const randomId = Math.floor(Math.random() * 100);
+            link.addEventListener(
+              'click',
+              (link.translateLinkConnect = () => {
+                if (debug) {
+                  console.log(`TranslateLinkConnectId ${randomId}`);
+                }
+                link.setAttribute('href', internalHref);
+                setTimeout(() => {
+                  link.setAttribute('href', dashHref);
+                }, 0);
+              }),
+            );
+          });
+        };
+
+        window.addEventListener('message', (event) => {
+          const eventName = event.data && event.data.event;
+          if (eventName === 'setConnectBaseURL') {
+            connectBaseURL = event.data.connectBaseURL;
+            translateAllLinks();
+          }
+        });
+
+        window.parent.postMessage({ 
+          event: 'getConnectBaseURL'
+        }, '*');
+      }
 
       function posterize(href) {
         var url = $.url(href);
@@ -313,6 +448,49 @@
 
     -block extra-script
 
+    -block refresh-fn
+      :javascript
+        function refresh(onSuccess, forceReload){  
+          var url = params;
+          {% if page_obj %}
+            url += "page={{page_obj.number}}";
+          {% endif %}
+
+          if (url == '') {
+            url = '?';
+          }
+
+          url += '&ts=' + new Date().getTime() + "&refresh=" + refreshTimeout;
+
+          document.dispatchEvent(new Event("temba-refresh-begin"));  
+          fetchPJAXContent(url, '#pjax', {
+              onSuccess: function() {
+                if (onSuccess) {
+                  onSuccess();
+                }
+                document.dispatchEvent(new Event("temba-refresh-complete"));
+                refreshTimeout = Math.floor(refreshTimeout * 1.1)
+                scheduleRefresh();
+              },
+              shouldIgnore: function() {
+                if (forceReload) {
+                  return false;
+                }
+                var pjax = document.querySelector("#pjax");
+                if (pjax) {
+                  return eval(document.querySelector("#pjax").dataset.noPjax);
+                }
+                return true;
+              },
+              onIgnore: function() {
+                var pjax = document.querySelector("#pjax");
+                if (pjax) {
+                  scheduleRefresh();
+                }
+              }
+          });
+        }
+
     -block full-page-script
       :javascript
         document.addEventListener("temba-redirected", function(event){
@@ -335,6 +513,30 @@
       });
 
       $(document).ready(function() {
+
+        {% if use_weni_layout %}
+          inIframe();
+
+          enableLinkTranslations();
+
+        {% endif %}
+
+        function announcementCollapse() {
+          $('.weni-announcement').hide();
+          $('#menu').addClass('collapsed')
+          $('.org-header').addClass('collapsed')
+        }
+
+        const announcementState = sessionStorage.getItem('weni-announcement-state');
+        if (announcementState === "false") {
+          announcementCollapse()
+        }
+
+        $(".weni-announcement-collapse").live('click', (event) => {
+          sessionStorage.setItem('weni-announcement-state', false);
+          announcementCollapse()
+        })
+
         if (navigator.appVersion.indexOf("Win")!=-1) {
           $("html").addClass("windows");
         }
@@ -392,6 +594,5 @@
 
       });
 {% endblock body %}
-
 
 </html>

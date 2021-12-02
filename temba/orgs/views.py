@@ -1054,12 +1054,13 @@ class OrgCRUDL(SmartCRUDL):
     class Menu(MenuMixin, InferOrgMixin, SmartTemplateView):
         def render_to_response(self, context, **response_kwargs):
             menu = []
-            # self.add_menu(menu, "Messages", "messages", "msgs.msg_menu")
-            self.add_menu(menu, "Contacts", "contact-cal", "contacts.contact_menu")
+            self.add_menu(menu, "Messages", "message-square", "msgs.msg_menu")
+            self.add_menu(menu, "Contacts", "contact", "contacts.contact_menu")
             # self.add_menu(menu, "Flows", "flow", "flows.flow_menu")
-            # self.add_menu(menu, "Campaigns", "campaign", "campaigns.campaigns_menu")
+            self.add_menu(menu, "Campaigns", "campaign", "campaigns.campaigns_menu")
             self.add_menu(menu, "Tickets", "agent", "tickets.ticket_menu", "tickets.ticket_list")
             self.add_menu(menu, "Triggers", "radio", "triggers.trigger_menu")
+            self.add_menu(menu, "Channels", "zap", "channels.channel_menu")
 
             # menu.append(
             #    {
@@ -2899,6 +2900,7 @@ class OrgCRUDL(SmartCRUDL):
 
                 links.append(dict(title=_("Help"), href=settings.HELP_URL))
 
+            """
             if len(links) > 1:
                 links.append(dict(divider=True))
 
@@ -2909,6 +2911,7 @@ class OrgCRUDL(SmartCRUDL):
                     href=f"{reverse('users.user_logout')}?next={reverse('users.user_login')}",
                 )
             )
+            """
 
             return links
 
@@ -2941,6 +2944,9 @@ class OrgCRUDL(SmartCRUDL):
             # add the channel option if we have one
             user = self.request.user
             org = user.get_org()
+
+            if self.has_org_perm("orgs.org_edit"):
+                formax.add_section("org", reverse("orgs.org_edit"), icon="icon-office")
 
             # if we are on the topups plan, show our usual credits view
             if org.plan == settings.TOPUP_PLAN:
@@ -2997,9 +3003,6 @@ class OrgCRUDL(SmartCRUDL):
                     formax.add_section(
                         "two_factor", reverse("orgs.user_two_factor_enable"), icon="icon-two-factor", action="link"
                     )
-
-            if self.has_org_perm("orgs.org_edit"):
-                formax.add_section("org", reverse("orgs.org_edit"), icon="icon-office")
 
             # only pro orgs get multiple users
             if self.has_org_perm("orgs.org_manage_accounts") and org.is_multi_user:

@@ -1,7 +1,10 @@
-# RapidPro 
+![photo](https://i.imgur.com/PKrSNGY.png)
+## BLACK LIVES MATTER
 
-[![Build Status](https://github.com/rapidpro/rapidpro/workflows/CI/badge.svg)](https://github.com/rapidpro/rapidpro/actions?query=workflow%3ACI) 
-[![codecov](https://codecov.io/gh/rapidpro/rapidpro/branch/main/graph/badge.svg)](https://codecov.io/gh/rapidpro/rapidpro)
+- [Black Lives Matter](https://blacklivesmatter.com/)
+- [Supporting the cause](https://act.unicefusa.org/blm)
+
+# RapidPro [![Build Status](https://github.com/Ilhasoft/rapidpro/workflows/CI/badge.svg)](https://github.com/Ilhasoft/rapidpro/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/rapidpro/rapidpro/branch/master/graph/badge.svg)](https://codecov.io/gh/rapidpro/rapidpro)
 
 RapidPro is a hosted service for visually building interactive messaging applications.
 To learn more, please visit the project site at http://rapidpro.github.io/rapidpro.
@@ -10,7 +13,7 @@ To learn more, please visit the project site at http://rapidpro.github.io/rapidp
 
 The set of versions that make up the latest stable release are:
 
- * [RapidPro v6.4.7](https://github.com/rapidpro/rapidpro/releases/tag/v6.4.7)
+ * [RapidPro v6.4.8](https://github.com/rapidpro/rapidpro/releases/tag/v6.4.8)
  * [Mailroom v6.4.3](https://github.com/nyaruka/mailroom/releases/tag/v6.4.3)
  * [Courier v6.4.0](https://github.com/nyaruka/courier/releases/tag/v6.4.0)
  * [Archiver v6.4.0](https://github.com/nyaruka/rp-archiver/releases/tag/v6.4.0)
