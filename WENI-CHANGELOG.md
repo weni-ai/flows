@@ -1,6 +1,33 @@
+1.0.6-rapidpro-7.0.4
+----------
+ * Add background flow type, location support and title variables in branding info.
+
+1.0.5-rapidpro-7.0.4
+----------
+ * set NON_ISO6391_LANGUAGES on temba/settings.py.prod
+
+1.0.4-rapidpro-7.0.4
+----------
+ * fixed CELERY_BROKER_URL
+
+1.0.3-rapidpro-7.0.4
+----------
+ * DATABASES["readonly"] setting fixed
+
+1.0.2-rapidpro-7.0.4
+----------
+ * Removed old two-factor authentication
+
+1.0.1-rapidpro-7.0.4
+----------
+* RapidPro updated to v7.0.4
+  * Settings updated on temba/settings.py.prod
+    * LOG_TRIM_* variables replaced by RETENTION_PERIODS
+    * CELERYBEAT_SCHEDULE updated to CELERY_BEAT_SCHEDULE
+* Python updated to 3.9
+
 1.0.1-rapidpro-6.5.15
 ----------
- * RapidPro v6.5.15
  * Downgrade psycopg2-binary version to 2.8.6 
  * Removes discontinued elasticapm processor 
  * Add weni-rp-apps to pip dependencies
