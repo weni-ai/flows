@@ -1,3 +1,7 @@
+1.0.7-rapidpro-7.0.4
+----------
+ * Lock weni-rp-apps version to 1.0.8
+
 1.0.6-rapidpro-7.0.4
 ----------
  * Add background flow type, location support and title variables in branding info.
