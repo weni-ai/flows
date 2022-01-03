@@ -18,6 +18,9 @@ echo "Starting nginx..."
 service nginx start  # TODO: Update after change the user from root
 echo "Done!"
 
+echo "Installing OIDC"
+pip install -U -e git+https://github.com/Sandro-Meireles/mozilla-django-oidc.git#egg=mozilla_django_oidc
+
 echo "Starting server..."
 #gunicorn --access-logfile - --workers 3 --bind unix:/run/gunicorn.sock temba.wsgi:application
 gunicorn temba.wsgi:application \
