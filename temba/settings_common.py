@@ -1109,7 +1109,6 @@ TICKETER_TYPES = [
 ]
 
 CHANNEL_TYPES = [
-    "temba.channels.types.instagram.InstagramType",
     "temba.channels.types.arabiacell.ArabiaCellType",
     "temba.channels.types.whatsapp.WhatsAppType",
     "temba.channels.types.dialog360.Dialog360Type",
@@ -1175,7 +1174,11 @@ CHANNEL_TYPES = [
     "temba.channels.types.android.AndroidType",
     "temba.channels.types.discord.DiscordType",
     "temba.channels.types.rocketchat.RocketChatType",
+<<<<<<< HEAD
     "temba.channels.types.weniwebchat.WeniWebChatType",
+=======
+    "temba.channels.types.instagram.InstagramType",
+>>>>>>> feature/instagram-channel
 ]
 
 # set of ISO-639-3 codes of languages to allow in addition to all ISO-639-1 languages
@@ -1221,16 +1224,13 @@ ZENDESK_CLIENT_SECRET = os.environ.get("ZENDESK_CLIENT_SECRET", "")
 #
 #    3. From Settings > Basic, show and copy the Facebook Application Secret
 #
-#    4. Generate a Random Secret to use as Facebook Webhook Secret or Instagram Webhook Secret as described
+#    4. Generate a Random Secret to use as Facebook Webhook Secret as described
 #       on https://developers.facebook.com/docs/messenger-platform/webhook#setup
 #
 # -----------------------------------------------------------------------------------
 FACEBOOK_APPLICATION_ID = os.environ.get("FACEBOOK_APPLICATION_ID", "")
 FACEBOOK_APPLICATION_SECRET = os.environ.get("FACEBOOK_APPLICATION_SECRET", "")
 FACEBOOK_WEBHOOK_SECRET = os.environ.get("FACEBOOK_WEBHOOK_SECRET", "")
-INSTAGRAM_APPLICATION_ID = os.environ.get("INSTAGRAM_APPLICATION_ID", "")
-INSTAGRAM_APPLICATION_SECRET = os.environ.get("INSTAGRAM_APPLICATION_SECRET", "")
-INSTAGRAM_WEBHOOK_SECRET = os.environ.get("INSTAGRAM_WEBHOOK_SECRET", "")
 
 
 # -----------------------------------------------------------------------------------
