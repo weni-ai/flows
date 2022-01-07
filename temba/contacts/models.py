@@ -70,11 +70,8 @@ class URN:
     FRESHCHAT_SCHEME = "freshchat"
     ROCKETCHAT_SCHEME = "rocketchat"
     DISCORD_SCHEME = "discord"
-<<<<<<< HEAD
     WENIWEBCHAT_SCHEME = "weniwebchat"
-=======
     INSTAGRAM_SCHEME = "instagram"
->>>>>>> feature/instagram-channel
 
     SCHEME_CHOICES = (
         (TEL_SCHEME, _("Phone number")),

@@ -1174,11 +1174,8 @@ CHANNEL_TYPES = [
     "temba.channels.types.android.AndroidType",
     "temba.channels.types.discord.DiscordType",
     "temba.channels.types.rocketchat.RocketChatType",
-<<<<<<< HEAD
     "temba.channels.types.weniwebchat.WeniWebChatType",
-=======
     "temba.channels.types.instagram.InstagramType",
->>>>>>> feature/instagram-channel
 ]
 
 # set of ISO-639-3 codes of languages to allow in addition to all ISO-639-1 languages
