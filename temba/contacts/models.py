@@ -32,7 +32,12 @@ from temba.mailroom import ContactSpec, modifiers, queue_populate_dynamic_group
 from temba.orgs.models import DependencyMixin, Org, OrgLock
 from temba.utils import chunk_list, format_number, on_transaction_commit
 from temba.utils.export import BaseExportAssetStore, BaseExportTask, TableExporter
-from temba.utils.models import JSONField, RequireUpdateFieldsMixin, SquashableModel, TembaModel
+from temba.utils.models import (
+    JSONField,
+    RequireUpdateFieldsMixin,
+    SquashableModel,
+    TembaModel,
+)
 from temba.utils.text import decode_stream, unsnakify
 from temba.utils.urns import ParsedURN, parse_number, parse_urn
 from temba.utils.uuid import uuid4
@@ -317,13 +322,25 @@ class UserContactFieldsQuerySet(models.QuerySet):
     def collect_usage(self):
         return (
             self.annotate(
-                flow_count=Count("dependent_flows", distinct=True, filter=Q(dependent_flows__is_active=True))
+                flow_count=Count(
+                    "dependent_flows",
+                    distinct=True,
+                    filter=Q(dependent_flows__is_active=True),
+                )
             )
             .annotate(
-                campaign_count=Count("campaign_events", distinct=True, filter=Q(campaign_events__is_active=True))
+                campaign_count=Count(
+                    "campaign_events",
+                    distinct=True,
+                    filter=Q(campaign_events__is_active=True),
+                )
             )
             .annotate(
-                contactgroup_count=Count("dependent_groups", distinct=True, filter=Q(dependent_groups__is_active=True))
+                contactgroup_count=Count(
+                    "dependent_groups",
+                    distinct=True,
+                    filter=Q(dependent_groups__is_active=True),
+                )
             )
         )
 
@@ -476,7 +493,16 @@ class ContactField(SmartModel, DependencyMixin):
         return regex.match(r"^[A-Za-z0-9\- ]+$", label, regex.V0) and len(label) <= cls.MAX_LABEL_LEN
 
     @classmethod
-    def get_or_create(cls, org, user, key, label=None, show_in_table=None, value_type=None, priority=None):
+    def get_or_create(
+        cls,
+        org,
+        user,
+        key,
+        label=None,
+        show_in_table=None,
+        value_type=None,
+        priority=None,
+    ):
         """
         Gets the existing contact field or creates a new field if it doesn't exist
 
@@ -606,7 +632,13 @@ class ContactField(SmartModel, DependencyMixin):
             field_key = field_def.get(ContactField.EXPORT_KEY)
             field_name = field_def.get(ContactField.EXPORT_NAME)
             field_type = field_def.get(ContactField.EXPORT_TYPE)
-            ContactField.get_or_create(org, user, key=field_key, label=field_name, value_type=db_types[field_type])
+            ContactField.get_or_create(
+                org,
+                user,
+                key=field_key,
+                label=field_name,
+                value_type=db_types[field_type],
+            )
 
     def as_export_def(self):
         return {
@@ -654,7 +686,11 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
     org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="contacts")
 
     name = models.CharField(
-        verbose_name=_("Name"), max_length=128, blank=True, null=True, help_text=_("The name of this contact")
+        verbose_name=_("Name"),
+        max_length=128,
+        blank=True,
+        null=True,
+        help_text=_("The name of this contact"),
     )
 
     language = models.CharField(
@@ -682,7 +718,10 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
 
     # user that created this contact
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="%(app_label)s_%(class)s_creations", null=True
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="%(app_label)s_%(class)s_creations",
+        null=True,
     )
 
     last_seen_on = models.DateTimeField(null=True)
@@ -717,7 +756,14 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
 
     @classmethod
     def create(
-        cls, org, user, name: str, language: str, urns: List[str], fields: Dict[ContactField, str], groups: List
+        cls,
+        org,
+        user,
+        name: str,
+        language: str,
+        urns: List[str],
+        fields: Dict[ContactField, str],
+        groups: List,
     ):
         fields_by_key = {f.key: v for f, v in fields.items()}
         group_uuids = [g.uuid for g in groups]
@@ -725,7 +771,13 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
         response = mailroom.get_client().contact_create(
             org.id,
             user.id,
-            ContactSpec(name=name, language=language, urns=urns, fields=fields_by_key, groups=group_uuids),
+            ContactSpec(
+                name=name,
+                language=language,
+                urns=urns,
+                fields=fields_by_key,
+                groups=group_uuids,
+            ),
         )
         return Contact.objects.get(id=response["contact"]["id"])
 
@@ -769,7 +821,14 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
 
         return scheduled_broadcasts.select_related("org").order_by("schedule__next_fire")
 
-    def get_history(self, after: datetime, before: datetime, include_event_types: set, ticket, limit: int) -> list:
+    def get_history(
+        self,
+        after: datetime,
+        before: datetime,
+        include_event_types: set,
+        ticket,
+        limit: int,
+    ) -> list:
         """
         Gets this contact's history of messages, calls, runs etc in the given time window
         """
@@ -832,7 +891,11 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
         else:
             # if not then this for the contact read page so only show ticket opened/closed/reopened events
             ticket_events = ticket_events.filter(
-                event_type__in=[TicketEvent.TYPE_OPENED, TicketEvent.TYPE_CLOSED, TicketEvent.TYPE_REOPENED]
+                event_type__in=[
+                    TicketEvent.TYPE_OPENED,
+                    TicketEvent.TYPE_CLOSED,
+                    TicketEvent.TYPE_REOPENED,
+                ]
             )
 
         ticket_events = ticket_events[:limit]
@@ -917,7 +980,11 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
                 return iso8601.parse_date(string_value)
             elif field.value_type == ContactField.TYPE_NUMBER:
                 return Decimal(string_value)
-            elif field.value_type in [ContactField.TYPE_STATE, ContactField.TYPE_DISTRICT, ContactField.TYPE_WARD]:
+            elif field.value_type in [
+                ContactField.TYPE_STATE,
+                ContactField.TYPE_DISTRICT,
+                ContactField.TYPE_WARD,
+            ]:
                 return AdminBoundary.get_by_path(self.org, string_value)
 
         elif field.field_type == ContactField.FIELD_TYPE_SYSTEM:
@@ -948,7 +1015,13 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
         elif field.value_type == ContactField.TYPE_NUMBER:
             return format_number(value)
         elif (
-            field.value_type in [ContactField.TYPE_STATE, ContactField.TYPE_DISTRICT, ContactField.TYPE_WARD] and value
+            field.value_type
+            in [
+                ContactField.TYPE_STATE,
+                ContactField.TYPE_DISTRICT,
+                ContactField.TYPE_WARD,
+            ]
+            and value
         ):
             return value.name
         else:
@@ -1051,7 +1124,8 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
     @classmethod
     def bulk_change_group(cls, user, contacts, group, add: bool):
         mod = modifiers.Groups(
-            groups=[modifiers.GroupRef(uuid=str(group.uuid), name=group.name)], modification="add" if add else "remove"
+            groups=[modifiers.GroupRef(uuid=str(group.uuid), name=group.name)],
+            modification="add" if add else "remove",
         )
         cls.bulk_modify(user, contacts, mods=[mod])
 
@@ -1147,7 +1221,15 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
             self.name = None
             self.fields = None
             self.modified_by = user
-            self.save(update_fields=("name", "is_active", "fields", "modified_by", "modified_on"))
+            self.save(
+                update_fields=(
+                    "name",
+                    "is_active",
+                    "fields",
+                    "modified_by",
+                    "modified_on",
+                )
+            )
 
         # if we are removing everything do so
         if full:
@@ -1341,21 +1423,44 @@ class ContactURN(models.Model):
     auth = models.TextField(null=True)
 
     @classmethod
-    def get_or_create(cls, org, contact, urn_as_string, channel=None, auth=None, priority=PRIORITY_HIGHEST):
+    def get_or_create(
+        cls,
+        org,
+        contact,
+        urn_as_string,
+        channel=None,
+        auth=None,
+        priority=PRIORITY_HIGHEST,
+    ):
         urn = cls.lookup(org, urn_as_string)
 
         # not found? create it
         if not urn:
             try:
                 with transaction.atomic():
-                    urn = cls.create(org, contact, urn_as_string, channel=channel, priority=priority, auth=auth)
+                    urn = cls.create(
+                        org,
+                        contact,
+                        urn_as_string,
+                        channel=channel,
+                        priority=priority,
+                        auth=auth,
+                    )
             except IntegrityError:
                 urn = cls.lookup(org, urn_as_string)
 
         return urn
 
     @classmethod
-    def create(cls, org, contact, urn_as_string, channel=None, priority=PRIORITY_HIGHEST, auth=None):
+    def create(
+        cls,
+        org,
+        contact,
+        urn_as_string,
+        channel=None,
+        priority=PRIORITY_HIGHEST,
+        auth=None,
+    ):
         scheme, path, query, display = URN.to_parts(urn_as_string)
         urn_as_string = URN.from_parts(scheme, path)
 
@@ -1454,7 +1559,8 @@ class ContactURN(models.Model):
         constraints = [
             models.CheckConstraint(check=~(Q(scheme="") | Q(path="")), name="non_empty_scheme_and_path"),
             models.CheckConstraint(
-                check=Q(identity=Concat(F("scheme"), Value(":"), F("path"))), name="identity_matches_scheme_and_path"
+                check=Q(identity=Concat(F("scheme"), Value(":"), F("path"))),
+                name="identity_matches_scheme_and_path",
             ),
         ]
 
@@ -1633,7 +1739,12 @@ class ContactGroup(TembaModel, DependencyMixin):
         name = cls.get_unique_name(org, base_name=name)
 
         return cls.user_groups.create(
-            org=org, name=name, query=query, status=status, created_by=user, modified_by=user
+            org=org,
+            name=name,
+            query=query,
+            status=status,
+            created_by=user,
+            modified_by=user,
         )
 
     @classmethod
@@ -1818,13 +1929,21 @@ class ContactGroup(TembaModel, DependencyMixin):
                     ContactField.get_or_create(org, user, key=field_ref["key"])
 
             group = ContactGroup.get_or_create(
-                org, user, group_name, group_query, uuid=group_uuid, parsed_query=parsed_query
+                org,
+                user,
+                group_name,
+                group_query,
+                uuid=group_uuid,
+                parsed_query=parsed_query,
             )
 
             dependency_mapping[group_uuid] = str(group.uuid)
 
     def as_export_ref(self):
-        return {ContactGroup.EXPORT_UUID: str(self.uuid), ContactGroup.EXPORT_NAME: self.name}
+        return {
+            ContactGroup.EXPORT_UUID: str(self.uuid),
+            ContactGroup.EXPORT_NAME: self.name,
+        }
 
     def as_export_def(self):
         return {
@@ -1931,9 +2050,24 @@ class ExportContactsTask(BaseExportTask):
         fields = [
             dict(label="Contact UUID", key=Contact.UUID, field=None, urn_scheme=None),
             dict(label="Name", key=ContactField.KEY_NAME, field=None, urn_scheme=None),
-            dict(label="Language", key=ContactField.KEY_LANGUAGE, field=None, urn_scheme=None),
-            dict(label="Created On", key=ContactField.KEY_CREATED_ON, field=None, urn_scheme=None),
-            dict(label="Last Seen On", key=ContactField.KEY_LAST_SEEN_ON, field=None, urn_scheme=None),
+            dict(
+                label="Language",
+                key=ContactField.KEY_LANGUAGE,
+                field=None,
+                urn_scheme=None,
+            ),
+            dict(
+                label="Created On",
+                key=ContactField.KEY_CREATED_ON,
+                field=None,
+                urn_scheme=None,
+            ),
+            dict(
+                label="Last Seen On",
+                key=ContactField.KEY_LAST_SEEN_ON,
+                field=None,
+                urn_scheme=None,
+            ),
         ]
 
         # anon orgs also get an ID column that is just the PK
@@ -1987,7 +2121,14 @@ class ExportContactsTask(BaseExportTask):
 
         group_fields = []
         for group in self.group_memberships.all():
-            group_fields.append(dict(label="Group:%s" % group.name, key=None, group_id=group.id, group=group))
+            group_fields.append(
+                dict(
+                    label="Group:%s" % group.name,
+                    key=None,
+                    group_id=group.id,
+                    group=group,
+                )
+            )
 
         return fields, scheme_counts, group_fields
 
@@ -2003,7 +2144,11 @@ class ExportContactsTask(BaseExportTask):
             contact_ids = group.contacts.order_by("name", "id").values_list("id", flat=True)
 
         # create our exporter
-        exporter = TableExporter(self, "Contact", [f["label"] for f in fields] + [g["label"] for g in group_fields])
+        exporter = TableExporter(
+            self,
+            "Contact",
+            [f["label"] for f in fields] + [g["label"] for g in group_fields],
+        )
 
         total_exported_contacts = 0
         start = time.time()
@@ -2161,13 +2306,15 @@ class ContactImport(SmartModel):
             if uuid:
                 if uuid in seen_uuids:
                     raise ValidationError(
-                        _("Import file contains duplicated contact UUID '%(uuid)s'."), params={"uuid": uuid}
+                        _("Import file contains duplicated contact UUID '%(uuid)s'."),
+                        params={"uuid": uuid},
                     )
                 seen_uuids.add(uuid)
             for urn in urns:
                 if urn in seen_urns:
                     raise ValidationError(
-                        _("Import file contains duplicated contact URN '%(urn)s'."), params={"urn": urn}
+                        _("Import file contains duplicated contact URN '%(urn)s'."),
+                        params={"urn": urn},
                     )
                 seen_urns.add(urn)
 
@@ -2245,7 +2392,12 @@ class ContactImport(SmartModel):
                     mapping = {"type": "field", "key": field.key, "name": field.label}
                 else:
                     # can be created or selected in next step
-                    mapping = {"type": "new_field", "key": field_key, "name": header_name, "value_type": "T"}
+                    mapping = {
+                        "type": "new_field",
+                        "key": field_key,
+                        "name": header_name,
+                        "value_type": "T",
+                    }
 
             mappings.append({"header": header, "mapping": mapping})
 
@@ -2265,11 +2417,15 @@ class ContactImport(SmartModel):
             elif mapping["type"] == "scheme":
                 has_urn = True
                 if mapping["scheme"] not in URN.VALID_SCHEMES:
-                    raise ValidationError(_("Header '%(header)s' is not a valid URN type."), params={"header": header})
+                    raise ValidationError(
+                        _("Header '%(header)s' is not a valid URN type."),
+                        params={"header": header},
+                    )
             elif mapping["type"] == "new_field":
                 if not ContactField.is_valid_key(mapping["key"]):
                     raise ValidationError(
-                        _("Header '%(header)s' is not a valid field name."), params={"header": header}
+                        _("Header '%(header)s' is not a valid field name."),
+                        params={"header": header},
                     )
 
             if mapping != ContactImport.MAPPING_IGNORE:
@@ -2316,7 +2472,11 @@ class ContactImport(SmartModel):
             mapping = item["mapping"]
             if mapping["type"] == "new_field":
                 ContactField.get_or_create(
-                    self.org, self.created_by, mapping["key"], label=mapping["name"], value_type=mapping["value_type"]
+                    self.org,
+                    self.created_by,
+                    mapping["key"],
+                    label=mapping["name"],
+                    value_type=mapping["value_type"],
                 )
 
         # if user wants contacts added to a new group, create it
