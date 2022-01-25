@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from itertools import chain
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import iso8601
 import phonenumbers
@@ -22,7 +22,7 @@ from django.db.models import Count, F, Max, Q, Sum, Value
 from django.db.models.functions import Concat
 from django.db.models.functions.text import Upper
 from django.utils import timezone
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from temba import mailroom
 from temba.assets.models import register_asset_store
@@ -71,10 +71,12 @@ class URN:
     ROCKETCHAT_SCHEME = "rocketchat"
     DISCORD_SCHEME = "discord"
     WENIWEBCHAT_SCHEME = "weniwebchat"
+    INSTAGRAM_SCHEME = "instagram"
 
     SCHEME_CHOICES = (
         (TEL_SCHEME, _("Phone number")),
         (FACEBOOK_SCHEME, _("Facebook identifier")),
+        (INSTAGRAM_SCHEME, _("Instagram identifier")),
         (TWITTER_SCHEME, _("Twitter handle")),
         (TWITTERID_SCHEME, _("Twitter ID")),
         (VIBER_SCHEME, _("Viber identifier")),
@@ -189,8 +191,8 @@ class URN:
             except ValidationError:
                 return False
 
-        # facebook uses integer ids or temp ref ids
-        elif scheme == cls.FACEBOOK_SCHEME:
+        # facebook use integer ids or temp ref ids
+        elif scheme in [cls.FACEBOOK_SCHEME]:
             # we don't validate facebook refs since they come from the outside
             if URN.is_path_fb_ref(path):
                 return True
@@ -203,8 +205,8 @@ class URN:
                 except ValueError:
                     return False
 
-        # telegram and whatsapp use integer ids
-        elif scheme in [cls.TELEGRAM_SCHEME, cls.WHATSAPP_SCHEME]:
+        # telegram, whatsapp and instagram use integer ids
+        elif scheme in [cls.TELEGRAM_SCHEME, cls.WHATSAPP_SCHEME, cls.INSTAGRAM_SCHEME]:
             return regex.match(r"^[0-9]+$", path, regex.V0)
 
         # validate Viber URNS look right (this is a guess)
@@ -692,6 +694,7 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
     UUID = "uuid"
     GROUPS = "groups"
     ID = "id"
+    SCHEME = "scheme"
 
     RESERVED_ATTRIBUTES = {
         ID,
@@ -700,6 +703,7 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
         LANGUAGE,
         GROUPS,
         UUID,
+        SCHEME,
         CREATED_ON,
         "created_by",
         "modified_by",
@@ -715,7 +719,7 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
 
     @classmethod
     def create(
-        cls, org, user, name: str, language: str, urns: List[str], fields: Dict[ContactField, str], groups: List
+        cls, org, user, name: str, language: str, urns: list[str], fields: dict[ContactField, str], groups: list
     ):
         fields_by_key = {f.key: v for f, v in fields.items()}
         group_uuids = [g.uuid for g in groups]
@@ -952,7 +956,7 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
         else:
             return str(value)
 
-    def update(self, name: str, language: str) -> List[modifiers.Modifier]:
+    def update(self, name: str, language: str) -> list[modifiers.Modifier]:
         """
         Updates attributes of this contact
         """
@@ -965,7 +969,7 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
 
         return mods
 
-    def update_fields(self, values: Dict[ContactField, str]) -> List[modifiers.Modifier]:
+    def update_fields(self, values: dict[ContactField, str]) -> list[modifiers.Modifier]:
         """
         Updates custom field values of this contact
         """
@@ -977,7 +981,7 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
 
         return mods
 
-    def update_static_groups(self, groups) -> List[modifiers.Modifier]:
+    def update_static_groups(self, groups) -> list[modifiers.Modifier]:
         """
         Updates the static groups for this contact to match the provided list
         """
@@ -1001,16 +1005,16 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
 
         return mods
 
-    def update_urns(self, urns: List[str]) -> List[modifiers.Modifier]:
+    def update_urns(self, urns: list[str]) -> list[modifiers.Modifier]:
         return [modifiers.URNs(urns=urns, modification="set")]
 
-    def modify(self, user, mods: List[modifiers.Modifier], refresh=True):
+    def modify(self, user, mods: list[modifiers.Modifier], refresh=True):
         self.bulk_modify(user, [self], mods)
         if refresh:
             self.refresh_from_db()
 
     @classmethod
-    def bulk_modify(cls, user, contacts, mods: List[modifiers.Modifier]):
+    def bulk_modify(cls, user, contacts, mods: list[modifiers.Modifier]):
         if not contacts:
             return
 
@@ -1305,7 +1309,12 @@ class ContactURN(models.Model):
     """
 
     # schemes that support "new conversation" triggers
-    SCHEMES_SUPPORTING_NEW_CONVERSATION = {URN.FACEBOOK_SCHEME, URN.VIBER_SCHEME, URN.TELEGRAM_SCHEME}
+    SCHEMES_SUPPORTING_NEW_CONVERSATION = {
+        URN.FACEBOOK_SCHEME,
+        URN.VIBER_SCHEME,
+        URN.TELEGRAM_SCHEME,
+        URN.INSTAGRAM_SCHEME,
+    }
     SCHEMES_SUPPORTING_REFERRALS = {URN.FACEBOOK_SCHEME}  # schemes that support "referral" triggers
 
     # mailroom sets priorites like 1000, 999, ...
@@ -1931,7 +1940,10 @@ class ExportContactsTask(BaseExportTask):
 
         # anon orgs also get an ID column that is just the PK
         if self.org.is_anon:
-            fields = [dict(label="ID", key=ContactField.KEY_ID, field=None, urn_scheme=None)] + fields
+            fields = [
+                dict(label="ID", key=ContactField.KEY_ID, field=None, urn_scheme=None),
+                dict(label="Scheme", key=Contact.SCHEME, field=None, urn_scheme=None),
+            ] + fields
 
         scheme_counts = dict()
         if not self.org.is_anon:
@@ -2067,6 +2079,9 @@ class ExportContactsTask(BaseExportTask):
             return contact.last_seen_on
         elif field["key"] == ContactField.KEY_ID:
             return str(contact.id)
+        elif field["key"] == Contact.SCHEME:
+            contact_urns = contact.get_urns()
+            return contact_urns[0].scheme if contact_urns else ""
         elif field["urn_scheme"] is not None:
             contact_urns = contact.get_urns()
             scheme_urns = []
@@ -2121,7 +2136,7 @@ class ContactImport(SmartModel):
     finished_on = models.DateTimeField(null=True)
 
     @classmethod
-    def try_to_parse(cls, org: Org, file, filename: str) -> Tuple[List, int]:
+    def try_to_parse(cls, org: Org, file, filename: str) -> tuple[list, int]:
         """
         Tries to parse the given file stream as an import. If successful it returns the automatic column mappings and
         total number of records. Otherwise raises a ValidationError.
@@ -2180,7 +2195,7 @@ class ContactImport(SmartModel):
         return mappings, num_records
 
     @staticmethod
-    def _extract_uuid_and_urns(row, mappings) -> Tuple[str, List[str]]:
+    def _extract_uuid_and_urns(row, mappings) -> tuple[str, list[str]]:
         """
         Extracts any UUIDs and URNs from the given row so they can be checked for uniqueness
         """
@@ -2200,7 +2215,7 @@ class ContactImport(SmartModel):
         return uuid, urns
 
     @classmethod
-    def _auto_mappings(cls, org: Org, headers: List[str]) -> List:
+    def _auto_mappings(cls, org: Org, headers: list[str]) -> list:
         """
         Automatic mappings for the given list of headers - users can customize these later
         """
@@ -2219,8 +2234,7 @@ class ContactImport(SmartModel):
 
             if header_prefix == "":
                 attribute = header_name.lower()
-                if attribute.startswith("contact "):  # header "Contact UUID" -> uuid etc
-                    attribute = attribute[8:]
+                attribute = attribute.removeprefix("contact ")  # header "Contact UUID" -> uuid etc
 
                 if attribute in ("uuid", "name", "language"):
                     mapping = {"type": "attribute", "name": attribute}
@@ -2246,7 +2260,7 @@ class ContactImport(SmartModel):
         return mappings
 
     @staticmethod
-    def _validate_mappings(mappings: List):
+    def _validate_mappings(mappings: list):
         non_ignored_mappings = []
 
         has_uuid, has_urn = False, False
@@ -2396,7 +2410,7 @@ class ContactImport(SmartModel):
         return Path(self.file.name).suffix[1:].lower()
 
     @staticmethod
-    def _parse_header(header: str) -> Tuple[str, str]:
+    def _parse_header(header: str) -> tuple[str, str]:
         """
         Parses a header like "Field: Foo" into ("field", "Foo")
         """
@@ -2405,7 +2419,7 @@ class ContactImport(SmartModel):
         prefix, name = (parts[0], parts[1]) if len(parts) >= 2 else ("", parts[0])
         return prefix.lower(), name
 
-    def _row_to_spec(self, row: List[str]) -> Dict:
+    def _row_to_spec(self, row: list[str]) -> dict:
         """
         Convert a record (dict of headers to values) to a contact spec
         """
@@ -2448,7 +2462,7 @@ class ContactImport(SmartModel):
         return spec
 
     @classmethod
-    def _parse_row(cls, row: List[str], size: int, tz=None) -> List[str]:
+    def _parse_row(cls, row: list[str], size: int, tz=None) -> list[str]:
         """
         Parses the raw values in the given row, returning a new list with the given size
         """
@@ -2475,7 +2489,7 @@ class ContactImport(SmartModel):
             return str(value).strip()
 
     @classmethod
-    def _detect_spamminess(cls, urns: List[str]) -> bool:
+    def _detect_spamminess(cls, urns: list[str]) -> bool:
         """
         Takes the list of URNs that have been imported and tries to detect spamming
         """
