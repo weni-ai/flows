@@ -167,6 +167,11 @@ CACHES = {
     }
 }
 
+# SESSION
+# ------------------------------------------------------------------------------
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+
+
 # AWS BUCKET AND MEDIA STORAGE
 # ------------------------------------------------------------------------------
 AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default=None)
