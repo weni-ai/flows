@@ -52,7 +52,7 @@ def refresh_whatsapp_tokens():
                 channel.config["auth_token"] = resp.json()["users"][0]["token"]
                 channel.save(update_fields=["config"])
 
-                updated_channel = channel.objects.get(id=channel.id)
+                updated_channel = Channel.objects.get(id=channel.id)
 
                 logger.info(f"LOG::refresh_whatsapp_tokens - {channel.id} - auth_token: {resp.json()["users"][0]["token"] == updated_channel.config["auth_token"]}")
 
