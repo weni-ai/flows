@@ -23,22 +23,40 @@ def refresh_whatsapp_tokens():
         # iterate across each of our whatsapp channels and get a new token
         for channel in Channel.objects.filter(is_active=True, channel_type="WA").order_by("id"):
             try:
+                logger.info(f"=================={channel.id}==================")
+
                 url = channel.config["base_url"] + "/v1/users/login"
+
+                logger.info(f"LOG::refresh_whatsapp_tokens - {channel.id} - url: {url}")
 
                 start = timezone.now()
                 resp = requests.post(
                     url, auth=(channel.config[Channel.CONFIG_USERNAME], channel.config[Channel.CONFIG_PASSWORD])
                 )
+                logger.info(f"LOG::refresh_whatsapp_tokens - {channel.id} - status_code: {resp.status_code}")
+
                 elapsed = (timezone.now() - start).total_seconds() * 1000
 
                 HTTPLog.create_from_response(
                     HTTPLog.WHATSAPP_TOKENS_SYNCED, url, resp, channel=channel, request_time=elapsed
                 )
 
+                logger.info(f"LOG::refresh_whatsapp_tokens - {channel.id} - status_code: {resp.status_code}")
+
                 if resp.status_code != 200:
+                    logger.info(f"LOG::refresh_whatsapp_tokens - {channel.id} - Status code != 200")
                     continue
+
+                logger.info(f"LOG::refresh_whatsapp_tokens - {channel.id} - Going to Save")
 
                 channel.config["auth_token"] = resp.json()["users"][0]["token"]
                 channel.save(update_fields=["config"])
+
+                updated_channel = channel.objects.get(id=channel.id)
+
+                logger.info(f"LOG::refresh_whatsapp_tokens - {channel.id} - auth_token: {resp.json()["users"][0]["token"] == updated_channel.config["auth_token"]}")
+
+                logger.info("\n\n")
+
             except Exception as e:
                 logger.error(f"Error refreshing whatsapp tokens: {str(e)}", exc_info=True)
