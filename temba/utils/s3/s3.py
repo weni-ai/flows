@@ -1,4 +1,4 @@
-from typing import Dict, Iterable
+from typing import Iterable
 from urllib.parse import urlparse
 
 import boto3
@@ -15,6 +15,7 @@ class PublicFileStorage(DefaultStorage):
 
 public_file_storage = PublicFileStorage()
 public_file_storage.default_acl = "public-read"
+public_file_storage.querystring_auth = False  # don't include access token in attachment URLs
 
 _s3_client = None
 
@@ -65,7 +66,7 @@ class EventStreamReader:
         self.event_stream = event_stream
         self.buffer = bytearray()
 
-    def __iter__(self) -> Iterable[Dict]:
+    def __iter__(self) -> Iterable[dict]:
         for event in self.event_stream:
             if "Records" in event:
                 self.buffer.extend(event["Records"]["Payload"])

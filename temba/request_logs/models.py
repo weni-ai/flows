@@ -2,18 +2,21 @@ import logging
 
 from requests_toolbelt.utils import dump
 
+from django.conf import settings
 from django.db import models
 from django.db.models import Index, Q
 from django.utils import timezone
 from django.utils.functional import cached_property
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from temba.airtime.models import AirtimeTransfer
 from temba.channels.models import Channel
 from temba.classifiers.models import Classifier
+from temba.contacts.models import ContactURN
 from temba.flows.models import Flow
 from temba.orgs.models import Org
 from temba.tickets.models import Ticketer
+from temba.utils import redact
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +25,8 @@ class HTTPLog(models.Model):
     """
     HTTPLog is used to log HTTP requests and responses.
     """
+
+    HEALTHY_TIME_LIMIT = 10_000  # a call that takes longer than 10 seconds is considered unhealthy
 
     # used for dumping traces
     REQUEST_DELIM = ">!>!>! "
@@ -147,6 +152,37 @@ class HTTPLog(models.Model):
             classifier=classifier,
             ticketer=ticketer,
         )
+
+    def get_url_display(self):
+        """
+        Gets the URL as it should be displayed to users
+        """
+        return self._get_display_value(self.url, ContactURN.ANON_MASK)
+
+    def get_request_display(self):
+        """
+        Gets the request trace as it should be displayed to users
+        """
+        return self._get_display_value(self.request, ContactURN.ANON_MASK)
+
+    def get_response_display(self):
+        """
+        Gets the response trace as it should be displayed to users
+        """
+        return self._get_display_value(self.response, ContactURN.ANON_MASK)
+
+    def _get_display_value(self, original, mask):
+
+        secrets = [settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN]
+
+        for secret in secrets:
+            if secret and original:
+                original = redact.text(original, secret, mask)
+        return original
+
+    @property
+    def is_healthy(self):
+        return self.request_time <= self.HEALTHY_TIME_LIMIT
 
     class Meta:
         indexes = (

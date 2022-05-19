@@ -18,7 +18,7 @@ from django.utils import timezone
 
 from temba.archives.models import Archive
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
-from temba.contacts.models import URN, ContactField, ContactGroup, ContactImport, ContactURN
+from temba.contacts.models import URN, Contact, ContactField, ContactGroup, ContactImport, ContactURN
 from temba.flows.models import Flow, FlowRun, FlowSession, clear_flow_users
 from temba.ivr.models import IVRCall
 from temba.locations.models import AdminBoundary, BoundaryAlias
@@ -203,7 +203,17 @@ class TembaTestMixin:
         return data["flows"][0]
 
     def create_contact(
-        self, name=None, *, language=None, phone=None, urns=None, fields=None, org=None, user=None, last_seen_on=None
+        self,
+        name=None,
+        *,
+        language=None,
+        phone=None,
+        urns=None,
+        fields=None,
+        org=None,
+        user=None,
+        status=Contact.STATUS_ACTIVE,
+        last_seen_on=None,
     ):
         """
         Create a new contact
@@ -214,29 +224,48 @@ class TembaTestMixin:
         urns = [URN.from_tel(phone)] if phone else urns
 
         return create_contact_locally(
-            org, user, name, language, urns or [], fields or {}, group_uuids=[], last_seen_on=last_seen_on
+            org,
+            user,
+            name,
+            language,
+            urns or [],
+            fields or {},
+            group_uuids=[],
+            status=status,
+            last_seen_on=last_seen_on,
         )
 
     def create_group(self, name, contacts=(), query=None, org=None):
         assert not (contacts and query), "can't provide contact list for a smart group"
 
         if query:
-            return ContactGroup.create_dynamic(org or self.org, self.user, name, query=query)
+            return ContactGroup.create_smart(org or self.org, self.user, name, query=query)
         else:
-            group = ContactGroup.create_static(org or self.org, self.user, name)
+            group = ContactGroup.create_manual(org or self.org, self.user, name)
             if contacts:
                 group.contacts.add(*contacts)
             return group
 
-    def create_label(self, name, org=None):
-        return Label.get_or_create(org or self.org, self.user, name)
+    def create_label(self, name, *, folder=None, org=None):
+        label = Label.create(org or self.org, self.admin, name)
+        if folder:
+            label.folder = folder
+            label.save(update_fields=("folder",))
+        return label
 
-    def create_field(self, key, label, value_type=ContactField.TYPE_TEXT, org=None):
-        return ContactField.user_fields.create(
-            org=org or self.org,
+    def create_field(self, key, name, value_type=ContactField.TYPE_TEXT, priority=0, show_in_table=False, org=None):
+        org = org or self.org
+
+        assert not org.fields.filter(key=key, is_active=True).exists(), f"field with key {key} already exists"
+
+        return ContactField.objects.create(
+            org=org,
             key=key,
-            label=label,
+            name=name,
+            is_system=False,
             value_type=value_type,
+            priority=priority,
+            show_in_table=show_in_table,
             created_by=self.admin,
             modified_by=self.admin,
         )
@@ -253,6 +282,7 @@ class TembaTestMixin:
         created_on=None,
         external_id=None,
         surveyor=False,
+        flow=None,
     ):
         assert not msg_type or status != Msg.STATUS_PENDING, "pending messages don't have a msg type"
 
@@ -271,6 +301,7 @@ class TembaTestMixin:
             visibility=visibility,
             external_id=external_id,
             surveyor=surveyor,
+            flow=flow,
         )
 
     def create_incoming_msgs(self, contact, count):
@@ -289,9 +320,9 @@ class TembaTestMixin:
         created_on=None,
         sent_on=None,
         high_priority=False,
-        response_to=None,
         surveyor=False,
         next_attempt=None,
+        flow=None,
     ):
         if status in (Msg.STATUS_WIRED, Msg.STATUS_SENT, Msg.STATUS_DELIVERED) and not sent_on:
             sent_on = timezone.now()
@@ -311,8 +342,8 @@ class TembaTestMixin:
             created_on,
             sent_on,
             high_priority=high_priority,
-            response_to=response_to,
             surveyor=surveyor,
+            flow=flow,
             metadata=metadata,
             next_attempt=next_attempt,
         )
@@ -331,8 +362,8 @@ class TembaTestMixin:
         visibility=Msg.VISIBILITY_VISIBLE,
         external_id=None,
         high_priority=False,
-        response_to=None,
         surveyor=False,
+        flow=None,
         broadcast=None,
         metadata=None,
         next_attempt=None,
@@ -371,10 +402,10 @@ class TembaTestMixin:
             visibility=visibility,
             external_id=external_id,
             high_priority=high_priority,
-            response_to=response_to,
             created_on=created_on or timezone.now(),
             sent_on=sent_on,
             broadcast=broadcast,
+            flow=flow,
             metadata=metadata,
             next_attempt=next_attempt,
         )
@@ -385,10 +416,11 @@ class TembaTestMixin:
         text,
         contacts=(),
         groups=(),
-        response_to=None,
         msg_status=Msg.STATUS_SENT,
         parent=None,
         schedule=None,
+        ticket=None,
+        created_on=None,
     ):
         bcast = Broadcast.create(
             self.org,
@@ -399,6 +431,8 @@ class TembaTestMixin:
             status=Msg.STATUS_SENT,
             parent=parent,
             schedule=schedule,
+            ticket=ticket,
+            created_on=created_on or timezone.now(),
         )
 
         contacts = set(bcast.contacts.all())
@@ -417,13 +451,12 @@ class TembaTestMixin:
                     status=msg_status,
                     created_on=timezone.now(),
                     sent_on=timezone.now(),
-                    response_to=response_to,
                     broadcast=bcast,
                 )
 
         return bcast
 
-    def create_flow(self, name="Test Flow", *, flow_type=Flow.TYPE_MESSAGE, nodes=None, is_system=False, org=None):
+    def create_flow(self, name: str, *, flow_type=Flow.TYPE_MESSAGE, nodes=None, is_system=False, org=None):
         org = org or self.org
         flow = Flow.create(org, self.admin, name, flow_type=flow_type, is_system=is_system)
         if not nodes:
@@ -442,7 +475,7 @@ class TembaTestMixin:
             "type": Flow.GOFLOW_TYPES[flow_type],
             "revision": 1,
             "spec_version": "13.1.0",
-            "expire_after_minutes": Flow.DEFAULT_EXPIRES_AFTER,
+            "expire_after_minutes": Flow.EXPIRES_DEFAULTS[flow_type],
             "language": "eng",
             "nodes": nodes,
         }
@@ -468,12 +501,13 @@ class TembaTestMixin:
             status=status,
             duration=15,
         )
-        session = FlowSession.objects.create(uuid=uuid4(), org=contact.org, contact=contact, connection=call)
-        FlowRun.objects.create(org=self.org, flow=flow, contact=contact, connection=call, session=session)
+        session = FlowSession.objects.create(
+            uuid=uuid4(), org=contact.org, contact=contact, connection=call, wait_resume_on_expire=False
+        )
+        FlowRun.objects.create(org=self.org, flow=flow, contact=contact, session=session)
         Msg.objects.create(
             org=self.org,
             channel=self.channel,
-            connection=call,
             direction="O",
             contact=contact,
             contact_urn=contact.get_urn(),
@@ -611,16 +645,14 @@ class TembaTestMixin:
             closed_on=closed_on,
         )
         TicketEvent.objects.create(
-            org=ticket.org, contact=contact, ticket=ticket, event_type=TicketEvent.TYPE_OPENED, created_by=opened_by
+            org=ticket.org,
+            contact=contact,
+            ticket=ticket,
+            event_type=TicketEvent.TYPE_OPENED,
+            assignee=assignee,
+            created_by=opened_by,
+            created_on=opened_on,
         )
-        if assignee:
-            TicketEvent.objects.create(
-                org=ticket.org,
-                contact=contact,
-                ticket=ticket,
-                event_type=TicketEvent.TYPE_ASSIGNED,
-                created_by=opened_by,
-            )
         if closed_on:
             TicketEvent.objects.create(
                 org=ticket.org,
@@ -628,6 +660,7 @@ class TembaTestMixin:
                 ticket=ticket,
                 event_type=TicketEvent.TYPE_CLOSED,
                 created_by=closed_by,
+                created_on=closed_on,
             )
 
         return ticket
@@ -648,21 +681,25 @@ class TembaTestMixin:
         Asserts the cell values in the given worksheet row. Date values are converted using the provided timezone.
         """
 
-        row = tuple(sheet.rows)[row_num]
-
-        for index, expected in enumerate(values):
-            actual = row[index].value if index < len(row) else None
-            if actual is None:
-                actual = ""
-
+        expected = []
+        for val in values:
             # if expected value is datetime, localize and remove microseconds since Excel doesn't have that accuracy
-            if tz and isinstance(expected, datetime):
-                expected = expected.astimezone(tz).replace(microsecond=0, tzinfo=None)
+            if tz and isinstance(val, datetime):
+                val = val.astimezone(tz).replace(microsecond=0, tzinfo=None)
+            elif isinstance(val, UUID):
+                val = str(val)
 
-            if isinstance(expected, UUID):
-                expected = str(expected)
+            expected.append(val)
 
-            self.assertEqual(expected, actual, f"mismatch in cell {chr(index+65)}{row_num+1}")
+        actual = []
+        for val in list(list(sheet.rows)[row_num]):
+            val = val.value
+            if val is None:
+                val = ""
+
+            actual.append(val)
+
+        self.assertEqual(expected, actual, f"mismatch in row {row_num+1}")
 
     def assertExcelSheet(self, sheet, rows, tz=None):
         """

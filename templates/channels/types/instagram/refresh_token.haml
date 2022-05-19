@@ -52,6 +52,11 @@
     $(document).ready(function(){
       $(".connect-facebook").click(function(evt){
         $("#throbber").show();
+  <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
+
+  :javascript
+    $(document).ready(function(){
+      $(".connect-facebook").click(function(evt){
         FB.login(function(response) {
           if (response.status === 'connected') {
             $("#fb-user-id").val(response.authResponse.userID);

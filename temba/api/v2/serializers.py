@@ -27,6 +27,7 @@ from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.utils import extract_constants, json, on_transaction_commit
+from temba.utils.fields import NameValidator
 
 from . import fields
 from .validators import UniqueForOrgValidator
@@ -278,7 +279,10 @@ class CampaignWriteSerializer(WriteSerializer):
     name = serializers.CharField(
         required=True,
         max_length=Campaign.MAX_NAME_LEN,
-        validators=[UniqueForOrgValidator(queryset=Campaign.objects.filter(is_active=True))],
+        validators=[
+            NameValidator(Campaign.MAX_NAME_LEN),
+            UniqueForOrgValidator(queryset=Campaign.objects.filter(is_active=True)),
+        ],
     )
     group = fields.ContactGroupField(required=True)
 
@@ -300,7 +304,12 @@ class CampaignWriteSerializer(WriteSerializer):
 
 
 class CampaignEventReadSerializer(ReadSerializer):
-    UNITS = extract_constants(CampaignEvent.UNIT_CONFIG)
+    UNITS = {
+        CampaignEvent.UNIT_MINUTES: "minutes",
+        CampaignEvent.UNIT_HOURS: "hours",
+        CampaignEvent.UNIT_DAYS: "days",
+        CampaignEvent.UNIT_WEEKS: "weeks",
+    }
 
     campaign = fields.CampaignField()
     flow = serializers.SerializerMethodField()
@@ -315,7 +324,7 @@ class CampaignEventReadSerializer(ReadSerializer):
             return None
 
     def get_unit(self, obj):
-        return self.UNITS.get(obj.unit)
+        return self.UNITS[obj.unit]
 
     class Meta:
         model = CampaignEvent
@@ -333,7 +342,7 @@ class CampaignEventReadSerializer(ReadSerializer):
 
 
 class CampaignEventWriteSerializer(WriteSerializer):
-    UNITS = extract_constants(CampaignEvent.UNIT_CONFIG, reverse=True)
+    UNITS = {v: k for k, v in CampaignEventReadSerializer.UNITS.items()}
 
     campaign = fields.CampaignField(required=True)
     offset = serializers.IntegerField(required=True)
@@ -487,6 +496,7 @@ class ClassifierReadSerializer(ReadSerializer):
 class ContactReadSerializer(ReadSerializer):
     name = serializers.SerializerMethodField()
     language = serializers.SerializerMethodField()
+    flow = fields.FlowField(source="current_flow")
     urns = serializers.SerializerMethodField()
     groups = serializers.SerializerMethodField()
     fields = serializers.SerializerMethodField("get_contact_fields")
@@ -512,7 +522,7 @@ class ContactReadSerializer(ReadSerializer):
         if not obj.is_active:
             return []
 
-        groups = obj.prefetched_user_groups if hasattr(obj, "prefetched_user_groups") else obj.user_groups.all()
+        groups = obj.prefetched_groups if hasattr(obj, "prefetched_groups") else obj.get_groups()
         return [{"uuid": g.uuid, "name": g.name} for g in groups]
 
     def get_contact_fields(self, obj):
@@ -539,6 +549,7 @@ class ContactReadSerializer(ReadSerializer):
             "urns",
             "groups",
             "fields",
+            "flow",
             "blocked",
             "stopped",
             "created_on",
@@ -673,8 +684,12 @@ class ContactFieldReadSerializer(ReadSerializer):
         ContactField.TYPE_WARD: "ward",
     }
 
+    label = serializers.SerializerMethodField()
     value_type = serializers.SerializerMethodField()
     pinned = serializers.SerializerMethodField()
+
+    def get_label(self, obj):
+        return obj.name
 
     def get_value_type(self, obj):
         return self.VALUE_TYPES[obj.value_type]
@@ -692,13 +707,15 @@ class ContactFieldWriteSerializer(WriteSerializer):
 
     label = serializers.CharField(
         required=True,
-        max_length=ContactField.MAX_LABEL_LEN,
-        validators=[UniqueForOrgValidator(ContactField.user_fields.filter(is_active=True), ignore_case=True)],
+        max_length=ContactField.MAX_NAME_LEN,
+        validators=[
+            UniqueForOrgValidator(ContactField.objects.filter(is_active=True), ignore_case=True, model_field="name")
+        ],
     )
     value_type = serializers.ChoiceField(required=True, choices=list(VALUE_TYPES.keys()))
 
     def validate_label(self, value):
-        if not ContactField.is_valid_label(value):
+        if not ContactField.is_valid_name(value):
             raise serializers.ValidationError("Can only contain letters, numbers and hypens.")
 
         key = ContactField.make_key(value)
@@ -708,39 +725,36 @@ class ContactFieldWriteSerializer(WriteSerializer):
         return value
 
     def validate_value_type(self, value):
+        if self.instance and self.instance.campaign_events.filter(is_active=True).exists() and value != "datetime":
+            raise serializers.ValidationError("Can't change type of date field being used by campaign events.")
+
         return self.VALUE_TYPES[value]
 
-    def validate(self, data):
-        org = self.context["org"]
-        org_active_fields_limit = org.get_limit(Org.LIMIT_FIELDS)
-
-        field_count = ContactField.user_fields.count_active_for_org(org=org)
-        if not self.instance and field_count >= org_active_fields_limit:
-            raise serializers.ValidationError(
-                "This org has %s contact fields and the limit is %s. "
-                "You must delete existing ones before you can "
-                "create new ones." % (field_count, org_active_fields_limit)
-            )
-
-        return data
-
     def save(self):
-        label = self.validated_data.get("label")
-        value_type = self.validated_data.get("value_type")
+        org = self.context["org"]
+        user = self.context["user"]
+        name = self.validated_data["label"]
+        value_type = self.validated_data["value_type"]
 
         if self.instance:
-            key = self.instance.key
+            self.instance.name = name
+            self.instance.value_type = value_type
+            self.instance.save(update_fields=("name", "value_type"))
+            return self.instance
         else:
-            key = ContactField.make_key(label)
-
-        return ContactField.get_or_create(self.context["org"], self.context["user"], key, label, value_type=value_type)
+            return ContactField.create(org, user, name, value_type=value_type)
 
 
 class ContactGroupReadSerializer(ReadSerializer):
     status = serializers.SerializerMethodField()
+    system = serializers.ReadOnlyField(source="is_system")
     count = serializers.SerializerMethodField()
 
-    STATUSES = extract_constants(ContactGroup.STATUS_CONFIG)
+    STATUSES = {
+        ContactGroup.STATUS_INITIALIZING: "initializing",
+        ContactGroup.STATUS_EVALUATING: "evaluating",
+        ContactGroup.STATUS_READY: "ready",
+    }
 
     def get_status(self, obj):
         return self.STATUSES[obj.status]
@@ -751,33 +765,18 @@ class ContactGroupReadSerializer(ReadSerializer):
 
     class Meta:
         model = ContactGroup
-        fields = ("uuid", "name", "query", "status", "count")
+        fields = ("uuid", "name", "query", "status", "system", "count")
 
 
 class ContactGroupWriteSerializer(WriteSerializer):
     name = serializers.CharField(
         required=True,
         max_length=ContactGroup.MAX_NAME_LEN,
-        validators=[UniqueForOrgValidator(queryset=ContactGroup.user_groups.filter(is_active=True), ignore_case=True)],
+        validators=[
+            NameValidator(ContactGroup.MAX_NAME_LEN),
+            UniqueForOrgValidator(queryset=ContactGroup.objects.filter(is_active=True), ignore_case=True),
+        ],
     )
-
-    def validate_name(self, value):
-        if not ContactGroup.is_valid_name(value):
-            raise serializers.ValidationError("Name contains illegal characters.")
-        return value
-
-    def validate(self, data):
-        org = self.context["org"]
-        org_active_groups_limit = org.get_limit(Org.LIMIT_GROUPS)
-
-        group_count = ContactGroup.user_groups.filter(org=self.context["org"]).count()
-        if group_count >= org_active_groups_limit:
-            raise serializers.ValidationError(
-                "This org has %s groups and the limit is %s. "
-                "You must delete existing ones before you can "
-                "create new ones." % (group_count, org_active_groups_limit)
-            )
-        return data
 
     def save(self):
         name = self.validated_data.get("name")
@@ -877,7 +876,7 @@ class FlowReadSerializer(ReadSerializer):
         return self.FLOW_TYPES.get(obj.flow_type)
 
     def get_labels(self, obj):
-        return [{"uuid": l.uuid, "name": l.name} for l in obj.labels.all()]
+        return [{"uuid": lb.uuid, "name": lb.name} for lb in obj.labels.all()]
 
     def get_runs(self, obj):
         stats = obj.get_run_stats()
@@ -933,6 +932,9 @@ class FlowRunReadSerializer(ReadSerializer):
         return {"uuid": str(obj.start.uuid)} if obj.start else None
 
     def get_path(self, obj):
+        if not self.context["include_paths"]:
+            return None
+
         def convert_step(step):
             arrived_on = iso8601.parse_date(step[FlowRun.PATH_ARRIVED_ON])
             return {"node": step[FlowRun.PATH_NODE_UUID], "time": format_datetime(arrived_on)}
@@ -993,7 +995,7 @@ class FlowStartReadSerializer(ReadSerializer):
     modified_on = serializers.DateTimeField(default_timezone=pytz.UTC)
 
     def get_status(self, obj):
-        return FlowStartReadSerializer.STATUSES.get(obj.status)
+        return self.STATUSES.get(obj.status)
 
     def get_exclude_active(self, obj):
         return not obj.include_active
@@ -1099,15 +1101,6 @@ class GlobalWriteSerializer(WriteSerializer):
         if not self.instance and not data.get("name"):
             raise serializers.ValidationError("Name is required when creating new global.")
 
-        org = self.context["org"]
-        globals_count = Global.objects.filter(org=org, is_active=True).count()
-        org_active_globals_limit = org.get_limit(Org.LIMIT_GLOBALS)
-
-        if globals_count >= org_active_globals_limit:
-            raise serializers.ValidationError(
-                "This org has %s globals and the limit is %s. You must delete existing ones before you can "
-                "create new ones." % (globals_count, org_active_globals_limit)
-            )
         return data
 
     def save(self):
@@ -1138,25 +1131,11 @@ class LabelWriteSerializer(WriteSerializer):
     name = serializers.CharField(
         required=True,
         max_length=Label.MAX_NAME_LEN,
-        validators=[UniqueForOrgValidator(queryset=Label.label_objects.filter(is_active=True), ignore_case=True)],
+        validators=[
+            NameValidator(Label.MAX_NAME_LEN),
+            UniqueForOrgValidator(queryset=Label.objects.filter(is_active=True), ignore_case=True),
+        ],
     )
-
-    def validate_name(self, value):
-        if not Label.is_valid_name(value):
-            raise serializers.ValidationError("Name contains illegal characters.")
-        return value
-
-    def validate(self, data):
-        org = self.context["org"]
-
-        count = Label.label_objects.filter(org=org, is_active=True).count()
-        if count >= org.get_limit(Org.LIMIT_LABELS):
-            raise serializers.ValidationError(
-                "This workspace has %d labels and the limit is %d. You must delete existing ones before you can "
-                "create new ones." % (count, org.get_limit(Org.LIMIT_LABELS))
-            )
-
-        return data
 
     def save(self):
         name = self.validated_data.get("name")
@@ -1166,7 +1145,7 @@ class LabelWriteSerializer(WriteSerializer):
             self.instance.save(update_fields=("name",))
             return self.instance
         else:
-            return Label.get_or_create(self.context["org"], self.context["user"], name)
+            return Label.create(self.context["org"], self.context["user"], name)
 
 
 class MsgReadSerializer(ReadSerializer):
@@ -1183,10 +1162,9 @@ class MsgReadSerializer(ReadSerializer):
         Msg.STATUS_RESENT: "resent",
     }
     TYPES = {Msg.TYPE_INBOX: "inbox", Msg.TYPE_FLOW: "flow", Msg.TYPE_IVR: "ivr"}
-    VISIBILITIES = {
+    VISIBILITIES = {  # deleted messages should never be exposed over API
         Msg.VISIBILITY_VISIBLE: "visible",
         Msg.VISIBILITY_ARCHIVED: "archived",
-        Msg.VISIBILITY_DELETED: "deleted",
     }
 
     broadcast = serializers.SerializerMethodField()
@@ -1265,18 +1243,15 @@ class MsgBulkActionSerializer(WriteSerializer):
     messages = fields.MessageField(many=True)
     action = serializers.ChoiceField(required=True, choices=ACTIONS)
     label = fields.LabelField(required=False)
-    label_name = serializers.CharField(required=False, max_length=Label.MAX_NAME_LEN)
+    label_name = serializers.CharField(
+        required=False, max_length=Label.MAX_NAME_LEN, validators=[NameValidator(max_length=Label.MAX_NAME_LEN)]
+    )
 
     def validate_messages(self, value):
         for msg in value:
             if msg and msg.direction != "I":
                 raise serializers.ValidationError("Not an incoming message: %d" % msg.id)
 
-        return value
-
-    def validate_label_name(self, value):
-        if not Label.is_valid_name(value):
-            raise serializers.ValidationError("Name contains illegal characters.")
         return value
 
     def validate(self, data):
@@ -1313,23 +1288,23 @@ class MsgBulkActionSerializer(WriteSerializer):
 
         if action == self.LABEL:
             if not label:
-                label = Label.get_or_create(self.context["org"], self.context["user"], label_name)
-
-            label.toggle_label(messages, add=True)
+                label, _ = Label.import_def(self.context["org"], self.context["user"], {"name": label_name})
+            if label:
+                label.toggle_label(messages, add=True)
         elif action == self.UNLABEL:
             if not label:
-                label = Label.label_objects.filter(org=self.context["org"], is_active=True, name=label_name).first()
+                label = Label.get_active_for_org(self.context["org"]).filter(name=label_name).first()
 
             if label:
                 label.toggle_label(messages, add=False)
         else:
             for msg in messages:
-                if action == self.ARCHIVE:
+                if action == self.ARCHIVE and msg.visibility == Msg.VISIBILITY_VISIBLE:
                     msg.archive()
-                elif action == self.RESTORE:
+                elif action == self.RESTORE and msg.visibility == Msg.VISIBILITY_ARCHIVED:
                     msg.restore()
-                elif action == self.DELETE:
-                    msg.release()
+                elif action == self.DELETE and msg.visibility in (Msg.VISIBILITY_VISIBLE, Msg.VISIBILITY_ARCHIVED):
+                    msg.delete(soft=True)
 
         return BulkActionFailure(missing_message_ids) if missing_message_ids else None
 
@@ -1513,37 +1488,25 @@ class TicketBulkActionSerializer(WriteSerializer):
 
 class TopicReadSerializer(ReadSerializer):
     created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    system = serializers.SerializerMethodField()
+
+    def get_system(self, obj):
+        return obj.is_default
 
     class Meta:
         model = Topic
-        fields = ("uuid", "name", "created_on")
+        fields = ("uuid", "name", "system", "created_on")
 
 
 class TopicWriteSerializer(WriteSerializer):
     name = serializers.CharField(
         required=True,
         max_length=Topic.MAX_NAME_LEN,
-        validators=[UniqueForOrgValidator(queryset=Topic.objects.filter(is_active=True), ignore_case=True)],
+        validators=[
+            NameValidator(Topic.MAX_NAME_LEN),
+            UniqueForOrgValidator(queryset=Topic.objects.filter(is_active=True), ignore_case=True),
+        ],
     )
-
-    def validate_name(self, value):
-        if not Topic.is_valid_name(value):
-            raise serializers.ValidationError("Contains illegal characters.")
-        return value
-
-    def validate(self, data):
-        org = self.context["org"]
-
-        if self.instance and self.instance == org.default_ticket_topic:
-            raise serializers.ValidationError("Can't modify default topic for a workspace.")
-
-        count = org.topics.filter(is_active=True).count()
-        if count >= org.get_limit(Org.LIMIT_TOPICS):
-            raise serializers.ValidationError(
-                "This workspace has %s topics and the limit is %s. You must delete existing ones before you can "
-                "create new ones." % (count, org.get_limit(Org.LIMIT_TOPICS))
-            )
-        return data
 
     def save(self):
         name = self.validated_data["name"]
@@ -1553,7 +1516,7 @@ class TopicWriteSerializer(WriteSerializer):
             self.instance.save(update_fields=("name",))
             return self.instance
         else:
-            return Topic.get_or_create(self.context["org"], self.context["user"], name)
+            return Topic.create(self.context["org"], self.context["user"], name)
 
 
 class UserReadSerializer(ReadSerializer):
