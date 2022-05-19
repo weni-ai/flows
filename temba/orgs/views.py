@@ -3297,22 +3297,12 @@ class OrgCRUDL(SmartCRUDL):
             user = self.request.user
             org = user.get_org()
 
-<<<<<<< HEAD
-            if self.has_org_perm("orgs.org_edit"):
-                formax.add_section("org", reverse("orgs.org_edit"), icon="icon-office")
-
-            # if we are on the topups plan, show our usual credits view
-            if org.plan == settings.TOPUP_PLAN:
-                if self.has_org_perm("orgs.topup_list"):
-                    formax.add_section("topups", reverse("orgs.topup_list"), icon="icon-coins", action="link")
-=======
             shared_usage = org.parent and org.parent.has_shared_usage()
             if not shared_usage:
                 # if we are on the topups plan, show our usual credits view
                 if org.plan == settings.TOPUP_PLAN:
                     if self.has_org_perm("orgs.topup_list"):
                         formax.add_section("topups", reverse("orgs.topup_list"), icon="icon-coins", action="link")
->>>>>>> origin/WAC-channel
 
                 else:
                     if self.has_org_perm("orgs.org_plan"):  # pragma: needs cover

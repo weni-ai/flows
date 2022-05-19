@@ -74,6 +74,7 @@ class URN:
     DISCORD_SCHEME = "discord"
     WENIWEBCHAT_SCHEME = "weniwebchat"
     INSTAGRAM_SCHEME = "instagram"
+    WHATSAPP_SCHEME = "whatsapp"
 
     SCHEME_CHOICES = (
         (TEL_SCHEME, _("Phone number")),
