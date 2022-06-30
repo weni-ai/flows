@@ -189,7 +189,7 @@ class HTTPLogCRUDLTest(TembaTest, CRUDLTestMixin):
 
         log1 = HTTPLog.create_from_exception(
             HTTPLog.WHATSAPP_TEMPLATES_SYNCED,
-            "https://graph.facebook.com/v3.3/1234/message_templates",
+            "https://graph.facebook.com/v14.0/1234/message_templates",
             exception,
             start,
             channel=channel,
@@ -200,8 +200,26 @@ class HTTPLogCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.client.get(log_url)
         self.assertContains(response, "200")
         self.assertContains(response, "Connection Error")
-        self.assertContains(response, "https://graph.facebook.com/v3.3/1234/message_templates")
+        self.assertContains(response, "https://graph.facebook.com/v14.0/1234/message_templates")
 
+<<<<<<< HEAD
+=======
+        log2 = HTTPLog.create_from_exception(
+            HTTPLog.WHATSAPP_TEMPLATES_SYNCED,
+            f"https://graph.facebook.com/v14.0/1234/message_templates?access_token={settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}",
+            exception,
+            start,
+            channel=channel,
+        )
+        log2_url = reverse("request_logs.httplog_read", args=[log2.id])
+        response = self.client.get(log2_url)
+        self.assertContains(response, "200")
+        self.assertContains(response, "Connection Error")
+        self.assertContains(
+            response, f"https://graph.facebook.com/v14.0/1234/message_templates?access_token={ContactURN.ANON_MASK}"
+        )
+
+>>>>>>> 7388d9ec9... Fix message templates syncing for new categories (#321)
         # and can't be from other org
         self.login(self.admin2)
         response = self.client.get(log_url)
