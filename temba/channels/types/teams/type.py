@@ -24,6 +24,8 @@ class TeamsType(ChannelType):
     schemes = [URN.TEAMS_SCHEME]
     attachment_support = True
 
+    show_config_page = False
+
     courier_url = r"^tm/(?P<uuid>[a-z0-9\-]+)/receive$"
 
     claim_blurb = _("Add a %(link)s bot to send and receive messages to Microsoft Teams users.") % {
