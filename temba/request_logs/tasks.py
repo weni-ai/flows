@@ -18,15 +18,17 @@ def trim_http_logs_task():
 
     logger.info(f"[ Trim HTTPLogs ] Clearing all HTTPLogs before: {trim_before}")
 
-    ids = HTTPLog.objects.filter(created_on__lte=trim_before).values_list("id", flat=True)
+    deleted_count = 0
 
-    logger.info("[ Trim HTTPLogs ] All IDs were returned!")
+    while True:
+        http_logs = HTTPLog.objects.filter(created_on__lte=trim_before)[:1000]
 
-    chunk_count = 1000
+        if not http_logs:
+            break
 
-    for chunk in chunk_list(ids, 1000):
-        logger.info(f"[ Trim HTTPLogs ] Chunk count: {chunk_count}")
-        HTTPLog.objects.filter(id__in=chunk).delete()
-        chunk_count += 1000
+        http_logs.delete()
+        deleted_count += 1000
 
-    logger.info("[ Trim HTTPLogs ] The task was successfully completed!")
+        logger.info(f"[ Trim HTTPLogs ] Deleted {deleted_count} HTTPLogs")
+
+    logger.info(f"[ Trim HTTPLogs ] The task was successfully completed! {deleted_count} HTTPLog were deleted!")
