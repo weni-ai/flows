@@ -21,13 +21,15 @@ def trim_http_logs_task():
     deleted_count = 0
 
     while True:
-        http_logs = HTTPLog.objects.filter(created_on__lte=trim_before)[:1000]
+        http_logs = HTTPLog.objects.filter(created_on__lte=trim_before)[:10]
+
+        logger.info(f"[ Trim HTTPLogs ] 10 logs were filtered and will be deleted")
 
         if not http_logs:
             break
 
         http_logs.delete()
-        deleted_count += 1000
+        deleted_count += 10
 
         logger.info(f"[ Trim HTTPLogs ] Deleted {deleted_count} HTTPLogs")
 
