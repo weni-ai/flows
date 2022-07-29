@@ -22,7 +22,11 @@ def trim_http_logs_task():
 
     logger.info("[ Trim HTTPLogs ] All IDs were returned!")
 
+    chunk_count = 1000
+
     for chunk in chunk_list(ids, 1000):
+        logger.info(f"[ Trim HTTPLogs ] Chunk count: {chunk_count}")
         HTTPLog.objects.filter(id__in=chunk).delete()
+        chunk_count += 1000
 
     logger.info("[ Trim HTTPLogs ] The task was successfully completed!")

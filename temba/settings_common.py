@@ -1001,7 +1001,7 @@ CACHES = {
 # -----------------------------------------------------------------------------------
 # Async tasks using Celery
 # -----------------------------------------------------------------------------------
-CELERY_RESULT_BACKEND = None
+CELERY_RESULT_BACKEND = "redis://%s:%d/%d" % (REDIS_HOST, REDIS_PORT, REDIS_DB)
 CELERY_BROKER_URL = "redis://%s:%d/%d" % (REDIS_HOST, REDIS_PORT, REDIS_DB)
 
 # by default, celery doesn't have any timeout on our redis connections, this fixes that
@@ -1035,7 +1035,7 @@ CELERY_BEAT_SCHEDULE = {
     "trim-event-fires": {"task": "trim_event_fires_task", "schedule": timedelta(seconds=900)},
     "trim-flow-revisions": {"task": "trim_flow_revisions", "schedule": crontab(hour=0, minute=0)},
     "trim-flow-sessions-and-starts": {"task": "trim_flow_sessions_and_starts", "schedule": crontab(hour=0, minute=0)},
-    "trim-http-logs": {"task": "trim_http_logs_task", "schedule": crontab(hour=6, minute=20)},
+    "trim-http-logs": {"task": "trim_http_logs_task", "schedule": crontab(hour=6, minute=50)},
     "trim-sync-events": {"task": "trim_sync_events_task", "schedule": crontab(hour=3, minute=0)},
     "trim-webhook-event": {"task": "trim_webhook_event_task", "schedule": crontab(hour=3, minute=0)},
     "update-org-activity": {"task": "update_org_activity_task", "schedule": crontab(hour=3, minute=5)},
