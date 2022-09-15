@@ -9,14 +9,13 @@ class WeniChatsType(TicketerType):
   Type for using Weni Chats as a ticketer.
   """
 
-  CONFIG_AUTH_TOKEN = "auth_token"
-  CONFIG_PROJECT_FLOWS_UUID = "project_flows_uuid"
+  CONFIG_PROJECT_AUTH = "project_auth"
   CONFIG_SECTOR_UUID = "sector_uuid"
 
   name = "Weni Chats"
   slug = "wenichats"
   icon = "icon-power-cord"
-  base_url = "https://chats.weni.ai/v1/external"
+  base_url = "https://chats-engine.dev.cloud.weni.ai/v1/external"
 
   connect_view = ConnectView
   # TODO: improve descriptiton

@@ -18,25 +18,13 @@ class WeniChatsMixin(TembaTest):
   
 class WeniChatsViewTest(WeniChatsMixin):
   @patch("requests.get")
-  @patch("requests.post")
-  def test_connect(self, mock_post, mock_get):
+  def test_connect(self, mock_get):
     self.client.force_login(self.admin)
 
     data = {
-      "sector_uuid": "d3cae43d-cf25-4892-bfa6-0f24a856cfb8"
+      "sector_uuid": "d3cae43d-cf25-4892-bfa6-0f24a856cfb8",
+      "project_auth": "bb0682cd-5ed6-4c3d-851f-b2f0c1952f81"
     }
-
-    mock_post.return_value = MockResponse(
-      201,
-      json.dumps(
-        {
-          "uuid":"690f19c1-58f1-4f11-8e08-5e764bfcda97",
-          "project": "84ec032d-a145-42d4-b9d8-488fd5d1d8c8",
-          "project_flows_uuid": f"{self.org.uuid}"
-        }
-      ),
-      method="POST",
-    )
 
     mock_get.return_value = MockResponse(
       200,
