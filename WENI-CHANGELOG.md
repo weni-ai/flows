@@ -1,3 +1,5 @@
+s
+
 1.6.3-rapidpro-7.1.27
 ----------
 * Bump weni-rp-apps from 1.0.28 to 1.0.29
