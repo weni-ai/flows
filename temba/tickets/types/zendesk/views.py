@@ -307,6 +307,6 @@ class FileCallbackView(View):
         return super().dispatch(*args, **kwargs)
 
     def post(self, request, *args, **kwargs):
-        path = "attachments/" + kwargs["path"]
+        path = "media/" + kwargs["path"]
         assert ".." not in kwargs["path"]
         return FileResponse(public_file_storage.open(path))
