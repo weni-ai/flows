@@ -117,3 +117,48 @@ def check_elasticsearch_lag():
                 return False
 
     return True
+
+
+@shared_task(name="populate_fb_contact_names")
+def populate_fb_contact_names():
+    """
+    Temporary task will be deleted after data migration
+    """
+
+    import requests
+
+    from temba.orgs.models import Org
+    from temba.contacts.models import ContactURN
+
+
+    org_ids = Org.objects.filter(is_active=True, is_anon=False).values_list("pk", flat=True)
+
+    num_updated = 0
+
+    fb_urns = (
+        ContactURN.objects.filter(contact__is_active=True, contact__name=None, org_id__in=org_ids, scheme="facebook")
+        .exclude(channel=None)
+        .exclude(channel__is_active=False)
+        .select_related("channel", "contact")[:settings.CONTACT_NAME_MIGRATION_QUERY_LIMIT]
+    )
+
+    for fb_urn in fb_urns:
+        fb_path = fb_urn.path
+
+        access_token = fb_urn.channel.config["auth_token"]
+        urn_url = f"https://graph.facebook.com/v12.0/{fb_path}?access_token={access_token}"
+
+        response = requests.get(urn_url)
+
+        if response.status_code == 200:
+            resp_json = response.json()
+            name = f"{resp_json.get('first_name')} {resp_json.get('last_name')}"
+
+            if name:
+                contact = fb_urn.contact
+                contact.name = name
+                contact.save(update_fields=("name", "modified_on"))
+
+                num_updated += 1
+
+    logger.info(f"Updated {num_updated} contacts!")
