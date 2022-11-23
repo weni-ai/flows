@@ -45,7 +45,7 @@ def analyze(source):
 				continue
 			# Safety check
 			if length == 10:
-				print 'Character range starts in BMP but ends outside BMP: %s' % charRange
+				print ('Character range starts in BMP but ends outside BMP: %s' % charRange)
 				sys.exit(1)
 			script = data[1].split('#')[0].strip()
 			rangeParts = charRange.split('-')
@@ -58,7 +58,7 @@ def analyze(source):
 def main(source):
 	dictionary = analyze(source)
 	for item in sorted(dictionary.items()):
-		print item[0] + ': "' + item[1] + '",'
+		print (item[0] + ': "' + item[1] + '",')
 
 if __name__ == '__main__':
 	main(sys.argv[1])
