@@ -53,7 +53,7 @@ class HTTPLogTest(TembaTest):
 
 class HTTPLogCRUDLTest(TembaTest, CRUDLTestMixin):
     def test_webhooks(self):
-        flow = self.create_flow()
+        flow = self.create_flow("Test")
         l1 = HTTPLog.objects.create(
             org=self.org,
             log_type="webhook_called",
@@ -184,9 +184,8 @@ class HTTPLogCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.requestView(reverse("request_logs.httplog_ticketer", args=[t2.uuid]), self.admin)
         self.assertEqual(404, response.status_code)
 
-    @override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="WA_ADMIN_TOKEN")
     def test_http_log(self):
-        channel = self.create_channel("WA", "WhatsApp: 1234", "1234")
+        channel = self.create_channel("WAC", "WhatsApp: 1234", "1234")
 
         exception = RequestException("Network is unreachable", response=MockResponse(100, ""))
         start = timezone.now()
@@ -208,7 +207,7 @@ class HTTPLogCRUDLTest(TembaTest, CRUDLTestMixin):
 
         log2 = HTTPLog.create_from_exception(
             HTTPLog.WHATSAPP_TEMPLATES_SYNCED,
-            f"https://graph.facebook.com/v14.0/1234/message_templates?access_token={settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}",
+            "https://graph.facebook.com/v14.0/1234/message_templates?access_token=MISSING_WHATSAPP_ADMIN_SYSTEM_USER_TOKEN",
             exception,
             start,
             channel=channel,
@@ -217,9 +216,7 @@ class HTTPLogCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.client.get(log2_url)
         self.assertContains(response, "200")
         self.assertContains(response, "Connection Error")
-        self.assertContains(
-            response, f"https://graph.facebook.com/v14.0/1234/message_templates?access_token={ContactURN.ANON_MASK}"
-        )
+        self.assertContains(response, "https://graph.facebook.com/v14.0/1234/message_templates?access_token=********")
 
         # and can't be from other org
         self.login(self.admin2)

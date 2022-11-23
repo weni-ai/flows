@@ -23,18 +23,12 @@ class ConnectView(BaseConnectView):
             label=_("Authentication Password"),
             help_text=_("Auth token or API Key Secret of a twilio account."),
         )
-        chat_service_sid = forms.CharField(
-            label=_("Chat Service SID"), help_text=_("SID of a Chat service instance.")
-        )
+        chat_service_sid = forms.CharField(label=_("Chat Service SID"), help_text=_("SID of a Chat service instance."))
         flex_flow_sid = forms.CharField(
             label=_("Flex Flow"),
-            help_text=_(
-                "a Flex Flow (also called Flex Address) that is of the task type."
-            ),
+            help_text=_("a Flex Flow (also called Flex Address) that is of the task type."),
         )
-        workspace_sid = forms.CharField(
-            label=_("Workspace SID"), help_text=_("SID of a Workspace.")
-        )
+        workspace_sid = forms.CharField(label=_("Workspace SID"), help_text=_("SID of a Workspace."))
 
         def clean(self):
             account_sid = self.cleaned_data["account_sid"]
@@ -51,9 +45,7 @@ class ConnectView(BaseConnectView):
 
             except Exception:
                 raise ValidationError(
-                    _(
-                        "Unable to connect with twilio chat service, please check input fields and try again."
-                    )
+                    _("Unable to connect with twilio chat service, please check input fields and try again.")
                 )
             return self.cleaned_data
 

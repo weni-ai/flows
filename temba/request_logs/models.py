@@ -155,6 +155,11 @@ class HTTPLog(models.Model):
             ticketer=ticketer,
         )
 
+    def get_redact_secrets(self) -> tuple:
+        if self.channel:
+            return self.channel.type.redact_values
+        return ()
+
     def get_url_display(self):
         """
         Gets the URL as it should be displayed to users
@@ -174,12 +179,10 @@ class HTTPLog(models.Model):
         return self._get_display_value(self.response, ContactURN.ANON_MASK)
 
     def _get_display_value(self, original, mask):
+        redact_secrets = self.get_redact_secrets()
 
-        secrets = [settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN]
-
-        for secret in secrets:
-            if secret and original:
-                original = redact.text(original, secret, mask)
+        for secret in redact_secrets:
+            original = redact.text(original, secret, mask)
         return original
 
     @property

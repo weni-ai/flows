@@ -42,7 +42,7 @@ urlpatterns = [
     re_path(r"^imports/", include("smartmin.csv_imports.urls")),
     re_path(r"^assets/", include("temba.assets.urls")),
     re_path(r"^jsi18n/$", JavaScriptCatalog.as_view(), js_info_dict, name="django.views.i18n.javascript_catalog"),
-    re_path(r"^redirect/", WeniRedirect.as_view(), {}, "weni.redirect")
+    re_path(r"^redirect/", WeniRedirect.as_view(), {}, "weni.redirect"),
 ]
 
 if settings.DEBUG:
@@ -74,6 +74,11 @@ def handler500(request):
     t = loader.get_template("500.html")
     return HttpResponseServerError(
         t.render(
-            {"request": request, "brand": BRANDING[DEFAULT_BRAND], "use_weni_layout": weni_layout["use_weni_layout"], "sentry_id": last_event_id()}
+            {
+                "request": request,
+                "brand": BRANDING[DEFAULT_BRAND],
+                "use_weni_layout": weni_layout["use_weni_layout"],
+                "sentry_id": last_event_id(),
+            }
         )
     )
