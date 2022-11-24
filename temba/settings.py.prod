@@ -230,7 +230,6 @@ INSTALLED_APPS += (
     "weni.grpc.flow",
     "weni.grpc.billing",
     "weni.grpc.statistic",
-    "weni.internal",
     "weni.ticketer_queues",
     "weni.orgs_api",
     # OIDC authentication
@@ -240,6 +239,9 @@ INSTALLED_APPS += (
     "macros",
     "corsheaders",
 )
+
+if env("USE_INTERNAL_APP", default=True):
+    INSTALLED_APPS += ("weni.internal")
 
 # SENTRY
 # ------------------------------------------------------------------------------
