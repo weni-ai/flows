@@ -230,7 +230,6 @@ INSTALLED_APPS += (
     "weni.grpc.flow",
     "weni.grpc.billing",
     "weni.grpc.statistic",
-    "weni.ticketer_queues",
     "weni.orgs_api",
     # OIDC authentication
     "mozilla_django_oidc",
@@ -241,7 +240,10 @@ INSTALLED_APPS += (
 )
 
 if env("USE_INTERNAL_APP", default=True):
-    INSTALLED_APPS += ("weni.internal")
+    INSTALLED_APPS += (
+        "weni.internal",
+        "weni.ticketer_queues",
+    )
 
 # SENTRY
 # ------------------------------------------------------------------------------
