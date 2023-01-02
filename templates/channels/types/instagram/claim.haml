@@ -37,6 +37,9 @@
       .button-primary.connect-facebook
         -trans "Add Instagram Business Account"
 
+    #throbber(style="display:none;")
+      %temba-loading
+
     %form#claim-form(style="display:none;" method="POST" action="{{ claim_url }}")
       {% csrf_token %}
       %input#user-access-token(type="text" name="user_access_token")
@@ -102,6 +105,7 @@
 
     $(document).ready(function(){
       $(".connect-facebook").click(function(evt){
+        $("#throbber").show();
         FB.login(function(response) {
           if (response.status === 'connected') {
             $("#fb-user-id").val(response.authResponse.userID);
@@ -126,6 +130,7 @@
           }
           $("#fb-channel-options").show();
           $("#fb-app-connect").hide();
+          $("#throbber").hide();
         },
         failure: function(req){
         }
