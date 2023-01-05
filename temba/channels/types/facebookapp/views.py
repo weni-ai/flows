@@ -60,13 +60,8 @@ class ClaimView(ClaimViewMixin, SmartFormView):
 
                     auth_token = long_lived_auth_token
 
-<<<<<<< HEAD
-                url = f"https://graph.facebook.com/v12.0/{fb_user_id}/accounts"
-                params = {"access_token": auth_token}
-=======
                 url = f"https://graph.facebook.com/v7.0/{fb_user_id}/accounts"
-                params = {"access_token": long_lived_auth_token}
->>>>>>> a5ec5a09a (change version fb api version from 12 to 7)
+                params = {"access_token": auth_token}
 
                 response = requests.get(url, params=params)
 
