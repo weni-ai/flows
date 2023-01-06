@@ -80,10 +80,11 @@
     window.fbAsyncInit = function() {
       FB.init({
         appId      : '{{ facebook_app_id }}',
+        cookies    : true
         xfbml      : true,
         version    : 'v9.0'
       });
-
+    };
 
     (function(d, s, id) {
       var js, fjs = d.getElementsByTagName(s)[0];
@@ -97,7 +98,7 @@
       $(".connect-facebook").click(function(evt){
         FB.login(function(response) {
           if (response.status === 'connected') {
-            $("#fb-user-id").val(response.authResponse.userID);
+            console.log("getFBPages")
             getFBPages(response.authResponse.accessToken);
           }
         }, 
@@ -114,6 +115,7 @@
         success: function(response, status, xhr){
           data = response.data;
           if (data.length > 0) {
+            console.log("#fb-channel-options")
             for (var i=0; i < data.length; i++){
               $("#fb-channel-options").append("<div class='fb-page-channel-option lbl mt-3 mr-2 p-2 linked' data-fb-id='" + data[i].id + "' data-fb-name='" + data[i].name + "' data-fb-access-token='" + data[i].access_token +"' >" + data[i].name + " </div>");
             }
@@ -123,6 +125,7 @@
 
         },
         failure: function(req){
+          console.log("getFBPages fails")
         }
       });
     }
