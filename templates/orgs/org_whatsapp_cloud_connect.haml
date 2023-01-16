@@ -27,11 +27,7 @@
           -trans "Approve the permissions, these are required for us to access the API on your behalf."
 
     #fb-app-connect.flex.mt-4
-<<<<<<< HEAD
-      .button-primary.connect-facebook
-=======
       .button-primary(onclick="launchWhatsAppSignup()")
->>>>>>> v7.4.2
         -trans "Add Facebook Business"
 
     %form#claim-form(style="display:none;" method="POST" action="{{ connect_url }}")
@@ -40,19 +36,8 @@
 
 -block extra-script
   {{ block.super }}
-<<<<<<< HEAD
-
   :javascript
     $(document).ready(function(){
-      $(".connect-facebook").click(function(evt){
-        location.replace("https://www.facebook.com/v13.0/dialog/oauth?client_id={{ facebook_app_id }}&redirect_uri=" + window.location.origin + window.location.pathname + "&scope=business_management,whatsapp_business_management,whatsapp_business_messaging&response_type=token")
-
-      });
-
-=======
-  :javascript
-    $(document).ready(function(){
->>>>>>> v7.4.2
       var hash = window.location.hash.substring(1)
       var result = hash.split('&').reduce(function (res, item) {
         var parts = item.split('=');
@@ -65,9 +50,6 @@
         $("#user-access-token").val(accessToken);
         $("#claim-form").submit();
       }
-<<<<<<< HEAD
-    });
-=======
     });
 
 
@@ -113,4 +95,3 @@
         }
       });
     }
->>>>>>> v7.4.2
