@@ -1,4 +1,5 @@
-from abc import ABCMeta
+from abc import ABCMeta, abstractproperty
+
 from django.db import models
 from smartmin.models import SmartModel
 from django.template import Engine
@@ -15,6 +16,10 @@ class ExternalServiceType(metaclass=ABCMeta):
     slug = None
     connect_blurb = None
     connect_view = None
+
+    @abstractproperty
+    def serializer_class(self):
+        pass
 
     def is_available_to(self, user):
         return True
@@ -58,6 +63,15 @@ class ExternalService(SmartModel, DependencyMixin):
         from temba.externals.types import TYPES
 
         return TYPES.values()
+
+    @classmethod
+    def get_type_from_code(cls, code) -> ExternalServiceType:
+        from .types import TYPES
+
+        try:
+            return TYPES[code]
+        except KeyError:  # pragma: no cover
+            raise KeyError("Unrecognized external service type code: %s" % code)
 
     @property
     def type(self):
