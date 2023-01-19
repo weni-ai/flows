@@ -5,6 +5,7 @@ from django.utils.module_loading import import_string
 
 TYPES = OrderedDict({})
 
+
 def register_external_service_type(type_class):
     """
     Registers a external_service type

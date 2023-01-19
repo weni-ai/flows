@@ -9,22 +9,15 @@ from temba.externals.models import ExternalService
 
 class ConnectView(BaseConnectView):
     class Form(BaseConnectView.Form):
-        name = forms.CharField(
-            max_length=256,
-            label=_("Name"), help_text=_("Name")
-        )
-        app_key = forms.CharField(
-            label=_("Omie App Key"), help_text=_("Omie App Key")
-        )
-        app_secret = forms.CharField(
-            label=_("Omie App Secret"), help_text=_("Omie App Secret")
-        )
+        name = forms.CharField(max_length=256, label=_("Name"), help_text=_("Name"))
+        app_key = forms.CharField(label=_("Omie App Key"), help_text=_("Omie App Key"))
+        app_secret = forms.CharField(label=_("Omie App Secret"), help_text=_("Omie App Secret"))
 
         def clean(self):
             app_key = self.cleaned_data.get("app_key")
             if not app_key:
                 raise forms.ValidationError(_("Invalid App Key"))
-            
+
             app_secret = self.cleaned_data.get("app_secret")
             if not app_secret:
                 raise forms.ValidationError(_("Invalid App Secret"))
@@ -36,10 +29,7 @@ class ConnectView(BaseConnectView):
         app_key = form.cleaned_data["app_key"]
         app_secret = form.cleaned_data["app_secret"]
 
-        config = {
-            OmieType.CONFIG_APP_KEY: app_key,
-            OmieType.CONFIG_APP_SECRET: app_secret
-        }
+        config = {OmieType.CONFIG_APP_KEY: app_key, OmieType.CONFIG_APP_SECRET: app_secret}
 
         self.object = ExternalService(
             uuid=uuid4(),
@@ -53,6 +43,6 @@ class ConnectView(BaseConnectView):
 
         self.object.save()
         return super().form_valid(form)
-    
+
     form_class = Form
     template_name = "external_services/types/omie/connect.haml"
