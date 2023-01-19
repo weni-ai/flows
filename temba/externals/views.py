@@ -11,10 +11,11 @@ from temba.orgs.views import DependencyDeleteModal, OrgObjPermsMixin, OrgPermsMi
 
 from .models import ExternalService
 
+
 class BaseConnectView(ComponentFormMixin, OrgPermsMixin, SmartFormView):
     class Form(forms.Form):
         def __init__(self, **kwargs):
-            self.request  =kwargs.pop("request")
+            self.request = kwargs.pop("request")
             self.external_service_type = kwargs.pop("external_service_type")
 
             super().__init__(**kwargs)
@@ -29,25 +30,29 @@ class BaseConnectView(ComponentFormMixin, OrgPermsMixin, SmartFormView):
         self.external_service_type = external_service_type
 
         super().__init__()
-    
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["request"] = self.request
         kwargs["external_service_type"] = self.external_service_type
         return kwargs
-    
+
     def get_template_names(self):
-        return ("externals/types/%s/connect.html" % self.external_service_type.slug, "external_services/external_service_connect_form.html")
-    
+        return (
+            "externals/types/%s/connect.html" % self.external_service_type.slug,
+            "external_services/external_service_connect_form.html",
+        )
+
     def derive_title(self):
         return _("Connect %(external_service)s") % {"external_service": self.external_service_type.name}
-    
+
     def get_form_blurb(self):
         return self.form_blurb
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["form_blurb"] = mark_safe(self.get_form_blurb())
+
 
 class ExternalServiceCRUDL(SmartCRUDL):
     model = ExternalService
@@ -56,13 +61,15 @@ class ExternalServiceCRUDL(SmartCRUDL):
     class Connect(OrgPermsMixin, SmartTemplateView):
         def get_gear_links(self):
             return [dict(title=_("Home"), style="button-light", href=reverse("orgs.org_home"))]
-        
+
         def get_context_data(self, **kwargs):
             context = super().get_context_data(**kwargs)
-            context["external_service_types"] = [est for est in ExternalService.get_types() if est.is_available_to(self.get_user())]
+            context["external_service_types"] = [
+                est for est in ExternalService.get_types() if est.is_available_to(self.get_user())
+            ]
             print(context)
             return context
-    
+
     class Read(OrgObjPermsMixin, SmartReadView):
         slug_url_kwarg = "uuid"
 

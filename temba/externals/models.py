@@ -8,10 +8,12 @@ from django.conf.urls import url
 from temba.orgs.models import DependencyMixin, Org
 from temba.utils.uuid import uuid4
 
+
 class ExternalServiceType(metaclass=ABCMeta):
     """
     ExternalServiceType is our abstraction base type for external services.
     """
+
     name = None
     slug = None
     connect_blurb = None
@@ -23,7 +25,7 @@ class ExternalServiceType(metaclass=ABCMeta):
 
     def is_available_to(self, user):
         return True
-    
+
     def get_connect_blurb(self):
         return Engine.get_default().from_string(str(self.connect_blurb))
 
@@ -33,10 +35,12 @@ class ExternalServiceType(metaclass=ABCMeta):
     def get_connect_url(self):
         return url(r"^connect", self.connect_view.as_view(external_service_type=self), name="connect")
 
+
 class ExternalService(SmartModel, DependencyMixin):
     """
-    A external service that can perform actions 
+    A external service that can perform actions
     """
+
     uuid = models.UUIDField(default=uuid4)
     external_service_type = models.CharField(max_length=16)
     org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="external_services")
@@ -54,7 +58,7 @@ class ExternalService(SmartModel, DependencyMixin):
             created_by=user,
             modified_by=user,
         )
-    
+
     @classmethod
     def get_types(cls):
         """
