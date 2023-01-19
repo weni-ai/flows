@@ -1,7 +1,8 @@
 from django.utils.translation import ugettext_lazy as _
 
 from temba.externals.models import ExternalServiceType
-from temba.externals.types.omie.views import ConnectView
+from .views import ConnectView
+from .serializers import OmieSerializer
 
 class OmieType(ExternalServiceType):
     """
@@ -11,6 +12,8 @@ class OmieType(ExternalServiceType):
     CONFIG_APP_KEY = "app_key"
     CONFIG_APP_SECRET = "app_secret"
     
+    serializer_class = OmieSerializer
+
     name = "Omie"
     slug = "omie"
     icon = "icon-power-cord"
