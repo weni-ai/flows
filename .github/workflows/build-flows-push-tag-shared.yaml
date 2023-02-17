@@ -45,7 +45,8 @@ jobs:
             FLOWEDITOR_VERSION=$(jq -r '.dependencies["@nyaruka/flow-editor"]' < package.json)
             echo "FLOWEDITOR_VERSION=${FLOWEDITOR_VERSION}" | tee -a "${GITHUB_ENV}"
             echo "FLOWEDITOR_REPO=https://github.com/ilhasoft/floweditor" | tee -a "${GITHUB_ENV}"
-            echo "FLOWEDITOR_BRANCH=main" | tee -a "${GITHUB_ENV}"
+            FLOWEDITOR_BRANCH=$(jq -r '.weni["floweditor-branch"]' < package.json)
+            echo "FLOWEDITOR_BRANCH=$FLOWEDITOR_BRANCH" | tee -a "${GITHUB_ENV}"
 
 
       - name: Set up QEMU
