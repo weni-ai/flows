@@ -49,6 +49,7 @@ class ExternalServiceType(metaclass=ABCMeta):
         except Exception as e:
             return str(e)
 
+
 class ExternalService(SmartModel, DependencyMixin):
     """
     A external service that can perform actions

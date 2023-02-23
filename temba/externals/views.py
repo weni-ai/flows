@@ -12,7 +12,8 @@ from rest_framework.renderers import JSONRenderer
 
 from temba.utils.views import ComponentFormMixin
 from temba.orgs.views import DependencyDeleteModal, OrgObjPermsMixin, OrgPermsMixin
-#from temba.externals.types import TYPES
+
+# from temba.externals.types import TYPES
 
 
 from .models import ExternalService
@@ -95,7 +96,7 @@ class GetExternalTypes(APIView):
     @action(methods=["get"], detail=False)
     def get(self, request, type=None):
         from temba.externals.types import TYPES
-        
+
         try:
             action = TYPES.get(type).get_actions()
             return Response(action, status=status.HTTP_200_OK)
