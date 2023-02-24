@@ -13,9 +13,6 @@ from rest_framework.renderers import JSONRenderer
 from temba.utils.views import ComponentFormMixin
 from temba.orgs.views import DependencyDeleteModal, OrgObjPermsMixin, OrgPermsMixin
 
-# from temba.externals.types import TYPES
-
-
 from .models import ExternalService
 
 
@@ -102,4 +99,4 @@ class GetExternalTypes(APIView):
             return Response(action, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response(str(e))
+            return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
