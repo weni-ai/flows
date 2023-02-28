@@ -15,5 +15,5 @@ for external_service_type in ExternalService.get_types():
 urlpatterns = [
     url(r"^externalservices/types/", include(service_urls)),
     url(r"^", include(ExternalServiceCRUDL().as_urlpatterns())),
-    url(r"^externals/(?P<type>[^/.]+)/actions", GetExternalTypes.as_view()),
+    url(r"^externals/(?P<slug>[^/.]+)/actions", GetExternalTypes.as_view(), name="actions"),
 ]

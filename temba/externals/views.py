@@ -91,12 +91,13 @@ class GetExternalTypes(APIView):
     throttle_classes = []
 
     @action(methods=["get"], detail=False)
-    def get(self, request, type=None):
+    def get(self, request, slug=None):
         from temba.externals.types import TYPES
 
-        try:
-            action = TYPES.get(type).get_actions()
-            return Response(action, status=status.HTTP_200_OK)
+        external_type = TYPES.get(slug)
+        
+        if external_type is None:
+            return Response (status=status.HTTP_404_NOT_FOUND)
 
-        except Exception as e:
-            return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
+        action = external_type.get_actions()
+        return Response(action, status=status.HTTP_200_OK)
