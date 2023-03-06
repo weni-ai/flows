@@ -1,9 +1,8 @@
-name: Build Flows in SP (Push Tag)
+name: Build Flows in SP, India and Ireland (Push Tag)
 
 on:
   push:
     tags:
-      - '*.*.*-develop'
       - '*.*.*-staging'
       - '*.*.*'
 
@@ -22,7 +21,7 @@ jobs:
             if grep -qs -e '^.*.*-develop' <<< "${TAG}" ; then
               echo "Found environment: DEVELOP - ${TAG}"
               echo "ENVIRONMENT=develop" | tee -a "${GITHUB_ENV}"
-              exit 1 # stop action
+              exit 1
             elif grep -qs -e '^.*.*-staging' <<< "${TAG}" ; then
               echo "Found environment: STAGING - ${TAG}"
               echo "ENVIRONMENT=staging" | tee -a "${GITHUB_ENV}"
@@ -37,7 +36,15 @@ jobs:
             VERSION="${TAG}"
             echo "VERSION=${VERSION}" | tee -a "${GITHUB_ENV}"
             echo "COMMIT_SHA=$GITHUB_SHA" | tee -a "${GITHUB_ENV}"
-            echo "IMAGE_TAG=${{ secrets.ECR_SP }}/push-backend:$TAG" | tee -a "${GITHUB_ENV}"
+            
+            if [[ "${TAG}" == *"-india"* ]]; then
+              echo "IMAGE_TAG=${{ secrets.ECR_INDIA }}/rapidpro:${TAG}" | tee -a "${GITHUB_ENV}"
+            elif [[ "${TAG}" == *"-ire"* ]]; then
+              echo "IMAGE_TAG=${{ secrets.ECR_IRE }}/rapidpro:${TAG}" | tee -a "${GITHUB_ENV}"
+            else
+              echo "IMAGE_TAG=${{ secrets.ECR_SP }}/push-backend:$TAG" | tee -a "${GITHUB_ENV}"
+            fi
+            
             echo "IMAGE_SOURCE_URL=https://github.com/weni-ai/flows" | tee -a "${GITHUB_ENV}"
 
             FLOWEDITOR_VERSION=$(jq -r '.dependencies["@nyaruka/flow-editor"]' < package.json)
@@ -56,14 +63,31 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Login to ECR
+      - name: Login to Registry India
+        if: ${{ contains(env.TAG, '-india') }}
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.ECR_INDIA }}
+          username: ${{ secrets.AWS_ACCESS_KEY_ID_INDIA }}      
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY_INDIA }}
+
+      - name: Login to Registry Ireland
+        if: ${{ contains(env.TAG, '-ire') }}
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.ECR_IRE }}
+          username: ${{ secrets.AWS_ACCESS_KEY_ID_IRE }}      
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY_IRE }}
+
+      - name: Login to Registry SP
+        if: ${{ !contains(env.TAG, '-india') && !contains(env.TAG, '-ire') }}
         uses: docker/login-action@v2
         with:
           registry: ${{ secrets.ECR_SP }}
           username: ${{ secrets.AWS_ACCESS_KEY_ID_SP }}      
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY_SP }}
 
-      - name: Build and push - Rapidpro Image
+      - name: Build and push - Flows Image
         uses: docker/build-push-action@v3
         with:
           context: .
@@ -116,7 +140,7 @@ jobs:
       - name: Commit & Push changes in repository
         uses: actions-js/push@master
         with:
-          github_token: "${{ secrets.GH_TOKEN }}"
+          github_token: "${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}"
           repository: ${{ github.repository }}
           directory: .
           branch: main
