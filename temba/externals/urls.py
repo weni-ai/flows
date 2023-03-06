@@ -1,7 +1,7 @@
 from django.conf.urls import include, url
 
 from .models import ExternalService
-from .views import ExternalServiceCRUDL
+from .views import ExternalServiceCRUDL, GetExternalTypes
 
 service_urls = []
 for external_service_type in ExternalService.get_types():
@@ -15,4 +15,5 @@ for external_service_type in ExternalService.get_types():
 urlpatterns = [
     url(r"^externalservices/types/", include(service_urls)),
     url(r"^", include(ExternalServiceCRUDL().as_urlpatterns())),
+    url(r"^externals/(?P<slug>[^/.]+)/actions", GetExternalTypes.as_view(), name="actions"),
 ]

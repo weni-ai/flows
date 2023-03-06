@@ -1,4 +1,7 @@
 from abc import ABCMeta, abstractproperty
+from pathlib import Path
+import json
+import os, sys
 
 from django.db import models
 from smartmin.models import SmartModel
@@ -34,6 +37,17 @@ class ExternalServiceType(metaclass=ABCMeta):
 
     def get_connect_url(self):
         return url(r"^connect", self.connect_view.as_view(external_service_type=self), name="connect")
+
+    def get_actions(self):
+        try:
+            path = os.path.dirname(os.path.abspath(sys.modules[self.__class__.__module__].__file__))
+
+            with open(path + "/actions.json", encoding="utf-8") as actions:
+                data = json.load(actions)
+            return data
+
+        except Exception as e:
+            return str(e)
 
 
 class ExternalService(SmartModel, DependencyMixin):
