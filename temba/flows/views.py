@@ -1082,6 +1082,8 @@ class FlowCRUDL(SmartCRUDL):
                 features.append("resthook")
             if org.country_id:
                 features.append("locations")
+            if org.external_services.filter(is_active=True).exists():
+                features.append("external_service")
 
             return features
 
