@@ -155,7 +155,13 @@ if env.bool("DATABASE_USE_SSL", default=True):
     DATABASES["default"]["OPTIONS"]["sslmode"] = "verify-ca"
     DATABASES["default"]["OPTIONS"]["sslrootcert"] = "/etc/ssl/certs/rds.pem"
 
-DATABASES["readonly"] = DATABASES["default"].copy()
+# READ DATABASE
+# ------------------------------------------------------------------------------
+DATABASES["readonly"] = env("DATABASE_READ_URL", default=env.db("DATABASE_URL"))
+
+# DATABASES ROUTERS 
+# ------------------------------------------------------------------------------
+DATABASE_ROUTERS = ["temba.routers.ReadWriteRouter"]
 
 # BROKER
 # ------------------------------------------------------------------------------

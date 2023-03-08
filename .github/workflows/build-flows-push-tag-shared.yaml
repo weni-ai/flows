@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - '*.*.*-develop'
-      - '*.*.*-staging'
 
 jobs:
   docker:
