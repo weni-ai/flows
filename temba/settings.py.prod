@@ -155,7 +155,26 @@ if env.bool("DATABASE_USE_SSL", default=True):
     DATABASES["default"]["OPTIONS"]["sslmode"] = "verify-ca"
     DATABASES["default"]["OPTIONS"]["sslrootcert"] = "/etc/ssl/certs/rds.pem"
 
-DATABASES["readonly"] = DATABASES["default"].copy()
+# READ DATABASE
+# ------------------------------------------------------------------------------
+read_only_database_config = {
+    "ENGINE": "django.contrib.gis.db.backends.postgis",
+    "NAME": env("DB_READ_NAME", DATABASES["NAME"]),
+    "USER": env("DB_READ_USER", DATABASES["USER"]),
+    "PASSWORD": env("DB_READ_PASSWORD", DATABASES["PASSWORD"]),
+    "HOST": env("DB_READ_HOST", DATABASES["HOST"]),
+    "PORT": env("DB_READ_PORT", DATABASES["PORT"]),
+    "ATOMIC_REQUESTS": DATABASES["ATOMIC_REQUESTS"],
+    "CONN_MAX_AGE": DATABASES["CONN_MAX_AGE"],
+    "OPTIONS": DATABASES["OPTIONS"],
+    "DISABLE_SERVER_SIDE_CURSORS": DATABASES["DISABLE_SERVER_SIDE_CURSORS"],
+}
+
+DATABASES["readonly"] = read_only_database_config
+
+# DATABASES ROUTERS 
+# ------------------------------------------------------------------------------
+DATABASE_ROUTERS = ["temba.routers.ReadWriteRouter"]
 
 # BROKER
 # ------------------------------------------------------------------------------
