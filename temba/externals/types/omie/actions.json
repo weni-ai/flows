@@ -191,28 +191,33 @@
           {
             "name": "cCodIntOp",
             "type": "text",
-            "verboseName": "Código de integração da oportunidade"
+            "verboseName": "Código de integração da oportunidade",
+            "required": true
           },
           {
             "name": "cDesOp",
             "type": "string",
             "maxLength": 100,
-            "verboseName": "Descrição da oportunidade"
+            "verboseName": "Descrição da oportunidade",
+            "required": true
           },
           {
             "name": "nCodContato",
             "type": "integer",
-            "verboseName": "Código do contato"
+            "verboseName": "Código do contato",
+            "required": true
           },
           {
             "name": "nCodSolucao",
             "type": "integer",
-            "verboseName": "Código da solução"
+            "verboseName": "Código da solução",
+            "required": true
           },
           {
             "name": "nCodOrigem",
             "type": "integer",
-            "verboseName": "Código da origem"
+            "verboseName": "Código da origem",
+            "required": true
           },
           {
             "name": "nCodConta",
@@ -222,7 +227,8 @@
           {
             "name": "nCodVendedor",
             "type": "integer",
-            "verboseName": "Código do vendedor"
+            "verboseName": "Código do vendedor",
+            "required": true
           }
         ]
       },
@@ -481,7 +487,7 @@
       },
       {
         "type": "clientesFiltro",
-        "verboseName": "Filtrar os registros a partir de uma data.",
+        "verboseName": "Filtrar cadastro de clientes",
         "filters": [
           {
             "name": "codigo_cliente_omie",
