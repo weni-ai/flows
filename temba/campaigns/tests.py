@@ -41,7 +41,6 @@ class CampaignTest(TembaTest):
 
     @mock_mailroom
     def test_model(self, mr_mocks):
-
         campaign = Campaign.create(self.org, self.admin, Campaign.get_unique_name(self.org, "Reminders"), self.farmers)
 
         flow = self.create_flow()
@@ -273,8 +272,8 @@ class CampaignTest(TembaTest):
 
     @mock_mailroom
     def test_views(self, mr_mocks):
-
         current_year = timezone.now().year
+
         # update the planting date for our contacts
         self.set_contact_field(self.farmer1, "planting_date", "1/10/2020")
 
