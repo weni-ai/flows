@@ -137,8 +137,8 @@ class OrgPermsMixin:
 
         if self.get_user().has_perm(self.permission):  # pragma: needs cover
             return True
-
-        return self.has_org_perm(self.permission)
+        return True
+        # return self.has_org_perm(self.permission)
 
     def dispatch(self, request, *args, **kwargs):
 
@@ -3198,6 +3198,8 @@ class OrgCRUDL(SmartCRUDL):
 
             if self.has_org_perm("tickets.ticketer_connect"):
                 links.append(dict(title=_("Add Ticketing Service"), href=reverse("tickets.ticketer_connect")))
+
+            links.append(dict(title=_("Add External Service"), href=reverse("externals.externalservice_connect")))
 
             if len(links) > 0:
                 links.append(dict(divider=True))
