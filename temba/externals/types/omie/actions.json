@@ -617,8 +617,8 @@
     ]
   },
   {
-    "name": "PesquisarLancamentosRequest",
-    "value": "PesquisarLancamentosRequest",
+    "name": "PesquisarLancamentos",
+    "value": "PesquisarLancamentos",
     "verboseName": "Pesquisar Títulos/Lançamentos",
     "params": [
       {
