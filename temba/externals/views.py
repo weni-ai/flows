@@ -90,7 +90,6 @@ class GetExternalTypes(APIView):
     renderer_classes = [JSONRenderer]
     throttle_classes = []
 
-    @action(methods=["get"], detail=False)
     def get(self, request, slug=None):
         from temba.externals.types import TYPES
 
@@ -99,5 +98,5 @@ class GetExternalTypes(APIView):
         if external_type is None:
             return Response (status=status.HTTP_404_NOT_FOUND)
 
-        action = external_type.get_actions()
-        return Response(action, status=status.HTTP_200_OK)
+        actions = external_type.get_actions()
+        return Response(actions, status=status.HTTP_200_OK)
