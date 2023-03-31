@@ -100,3 +100,4 @@ class GetExternalTypes(APIView):
 
         actions = external_type.get_actions()
         return Response(actions, status=status.HTTP_200_OK)
+

@@ -26,6 +26,7 @@ from temba.msgs.models import Broadcast, Label, Msg
 from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
+from temba.externals.models import ExternalService
 from temba.utils import extract_constants, json, on_transaction_commit
 
 from . import fields
@@ -1443,6 +1444,17 @@ class TicketerReadSerializer(ReadSerializer):
     class Meta:
         model = Ticketer
         fields = ("uuid", "name", "type", "created_on")
+
+class ExternalServicesReadSerializer(ReadSerializer):
+    external_service_type = serializers.SerializerMethodField()
+    created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+
+    def get_external_service_type(self, obj):
+        return obj.external_service_type
+
+    class Meta:
+        model = ExternalService
+        fields = ("uuid", "name", "external_service_type", "created_on")
 
 
 class TicketReadSerializer(ReadSerializer):
