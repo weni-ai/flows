@@ -1,10 +1,13 @@
 1.6.23-rapidpro-7.1.27
+----------
 * Update weni-rp-apps from 2.1.3 to 2.2.0
 
 1.6.22-rapidpro-7.1.27
+----------
 * Adds read status in status choices
 
 1.6.21-rapidpro-7.1.27
+----------
 * Update weni-rp-apps from 2.1.2 to 2.1.3
 
 1.6.20-rapidpro-7.1.27
