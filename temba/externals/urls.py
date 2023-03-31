@@ -3,6 +3,7 @@ from django.conf.urls import include, url
 from .models import ExternalService
 from .views import ExternalServiceCRUDL, GetExternalTypes
 
+
 service_urls = []
 for external_service_type in ExternalService.get_types():
     urls = external_service_type.get_urls()

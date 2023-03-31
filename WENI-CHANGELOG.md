@@ -1,3 +1,53 @@
+1.6.23-rapidpro-7.1.27
+----------
+* Update weni-rp-apps from 2.1.3 to 2.2.0
+
+1.6.22-rapidpro-7.1.27
+----------
+* Adds read status in status choices
+
+1.6.21-rapidpro-7.1.27
+----------
+* Update weni-rp-apps from 2.1.2 to 2.1.3
+
+1.6.20-rapidpro-7.1.27
+----------
+* Transforms ContactImport model constants into environment variables
+
+1.6.19-rapidpro-7.1.27
+----------
+* Update gunicorn start
+
+1.6.18-rapidpro-7.1.27
+----------
+* fix: case removal and reorder on expression and field routers [flow-editor #19](https://github.com/Ilhasoft/floweditor/pull/19)
+* fix: change the has_issues field to False, when create flow
+
+1.6.17-rapidpro-7.1.27
+----------
+* Fix: add weni.s3 to installed_apps
+
+1.6.16-rapidpro-7.1.27
+----------
+* Revert "fix: add weni.s3 to installed_apps"
+
+1.6.15-rapidpro-7.1.27
+----------
+* Update weni-rp-apps from 2.0.1 to 2.1.0
+* Add activities app on INSTALLED_APPS
+* fix: add weni.s3 to installed_apps
+* feat: Adjustment in welcome flow
+
+1.6.14-rapidpro-7.1.27
+----------
+* Add Courier S3 endpoint env key
+* Update weni-rp-apps to 2.0.1
+
+1.6.13-rapidpro-7.1.27
+----------
+* Adds exclusion list of channels that go to integrations
+* Update rp-apps to 2.0.0
+
 1.6.12-rapidpro-7.1.27
 ----------
 * Create endpoint that returns success orgs

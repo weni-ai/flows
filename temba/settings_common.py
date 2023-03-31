@@ -709,6 +709,7 @@ GROUP_PERMISSIONS = {
         "tickets.ticketer.*",
         "tickets.topic.*",
         "triggers.trigger.*",
+        "externals.external_services_api",
     ),
     "Editors": (
         "api.apitoken_refresh",
@@ -819,6 +820,7 @@ GROUP_PERMISSIONS = {
         "tickets.ticketer_api",
         "tickets.topic_api",
         "triggers.trigger.*",
+        "externals.external_services_api",
     ),
     "Viewers": (
         "campaigns.campaign_archived",
@@ -907,6 +909,7 @@ GROUP_PERMISSIONS = {
         "triggers.trigger_archived",
         "triggers.trigger_list",
         "triggers.trigger_type",
+        "externals.external_services_api",
     ),
     "Agents": (
         "contacts.contact_api",
@@ -1195,6 +1198,10 @@ CHANNEL_TYPES = [
     "temba.channels.types.instagram.InstagramType",
     "temba.channels.types.slack.SlackType",
     "temba.channels.types.teams.TeamsType",
+]
+
+EXTERNALSERVICE_TYPES = [
+    "temba.externals.types.omie.OmieType"
 ]
 
 # set of ISO-639-3 codes of languages to allow in addition to all ISO-639-1 languages

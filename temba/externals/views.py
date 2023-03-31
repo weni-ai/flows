@@ -1,5 +1,4 @@
 from smartmin.views import SmartCRUDL, SmartFormView, SmartReadView, SmartTemplateView
-
 from django import forms
 from django.utils.html import mark_safe
 from django.utils.translation import ugettext_lazy as _
@@ -12,7 +11,6 @@ from rest_framework.renderers import JSONRenderer
 
 from temba.utils.views import ComponentFormMixin
 from temba.orgs.views import DependencyDeleteModal, OrgObjPermsMixin, OrgPermsMixin
-
 from .models import ExternalService
 
 
