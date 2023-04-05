@@ -10,7 +10,7 @@ jobs:
       node-version: '10'
       elastic-version: '7.10.1'
       rpindexer-version: '6.4.0'
-      mailroom-version: '6.5.36'
+      mailroom-version: '1.4.15-mailroom-7.1.22'
       DJANGO_SETTINGS_MODULE: temba.settings_ci
     strategy:
       matrix:
@@ -62,7 +62,7 @@ jobs:
 
     - name: Initialize environment
       run: |
-        poetry add -n --lock (cat ${{ github.workspace }}/docker/pip-requires.txt)
+        poetry add -n --lock cat (${{ github.workspace }}/docker/pip-requires.txt)
         poetry install
         npm install
         sudo npm install -g less
