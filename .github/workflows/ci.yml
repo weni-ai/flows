@@ -62,7 +62,7 @@ jobs:
 
     - name: Initialize environment
       run: |
-        #poetry add -n --lock cat ${{ github.workspace }}/docker/pip-requires.txt
+        poetry add -n --lock ${{ github.workspace }}/docker/cat pip-requires.txt
         poetry install
         npm install
         sudo npm install -g less
