@@ -41,5 +41,8 @@
   },
   "vaadin": {
     "disableUsageStatistics": true
+  },
+  "weni":{
+    "floweditor-branch": "external-services"
   }
 }
