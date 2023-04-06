@@ -435,7 +435,7 @@
         "type": "apenas_importado_api",
         "paramType": "string",
         "maxLength": 1,
-        "verboseName": "Número da página retornada"
+        "verboseName": "Exibir apenas os registros gerados pela API"
       },
       {
         "type": "ordenar_por",
@@ -856,6 +856,41 @@
         "paramType": "string",
         "maxLength": 44,
         "verboseName": "Chave da NF-e, CT-e, NFC-e de origem"
+      }
+    ]
+  },
+  {
+    "name": "VerificarContato",
+    "value": "VerificarContato",
+    "verboseName": "Verificar Contato",
+    "params": [
+      {
+        "type": "cNome",
+        "paramType": "string",
+        "verboseName": "Nome do contato"
+      },
+      {
+        "type": "cEmail",
+        "paramType": "string",
+        "verboseName": "Email do contato"
+      }
+    ]
+  },
+  {
+    "name": "ObterBoleto",
+    "value": "ObterBoleto",
+    "verboseName": "Obter Boleto",
+    "params": [
+      {
+        "type": "nCodTitulo",
+        "paramType": "integer",
+        "verboseName": "Código do Título",
+        "required": true
+      },
+      {
+        "type": "cCodIntTitulo",
+        "paramType": "string",
+        "verboseName": "Código de Integração do Título"
       }
     ]
   }
