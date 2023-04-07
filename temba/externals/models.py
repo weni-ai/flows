@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractproperty
-from pathlib import Path
 import json
-import os, sys
+import os
+import sys
 
 from django.db import models
 from smartmin.models import SmartModel
