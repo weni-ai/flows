@@ -137,8 +137,8 @@ class OrgPermsMixin:
 
         if self.get_user().has_perm(self.permission):  # pragma: needs cover
             return True
-        return True
-        # return self.has_org_perm(self.permission)
+
+        return self.has_org_perm(self.permission)
 
     def dispatch(self, request, *args, **kwargs):
 
