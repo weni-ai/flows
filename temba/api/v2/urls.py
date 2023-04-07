@@ -37,6 +37,7 @@ from .views import (
     TopicsEndpoint,
     UsersEndpoint,
     WorkspaceEndpoint,
+    ExternalServicesEndpoint,
 )
 
 urlpatterns = [
@@ -71,6 +72,7 @@ urlpatterns = [
     url(r"^runs$", RunsEndpoint.as_view(), name="api.v2.runs"),
     url(r"^templates$", TemplatesEndpoint.as_view(), name="api.v2.templates"),
     url(r"^ticketers$", TicketersEndpoint.as_view(), name="api.v2.ticketers"),
+    url(r"^external_services$", ExternalServicesEndpoint.as_view(), name="api.v2.external_services"),
     url(r"^tickets$", TicketsEndpoint.as_view(), name="api.v2.tickets"),
     url(r"^ticket_actions$", TicketActionsEndpoint.as_view(), name="api.v2.ticket_actions"),
     url(r"^topics$", TopicsEndpoint.as_view(), name="api.v2.topics"),
