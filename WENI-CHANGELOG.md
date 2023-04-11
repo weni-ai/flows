@@ -1,3 +1,7 @@
+1.7.1-rapidpro-7.1.27
+----------
+* Add teams app in temba celery autodiscovery list
+
 1.7.0-rapidpro-7.1.27
 ----------
 * Update weni-rp-apps from 2.2.0 to 2.3.0
