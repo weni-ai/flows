@@ -80,9 +80,6 @@ INTERNAL_IPS = ("127.0.0.1",)
 # Enable Weni Templates
 TEMPLATES[0]["OPTIONS"]["context_processors"] += [
     "temba.context_processors_weni.use_weni_layout",
-    "temba.context_processors_weni.weni_announcement",
-    "temba.context_processors_weni.logrocket",
-    "temba.context_processors_weni.show_sidemenu",
     "temba.context_processors_weni.old_design_excluded_channels_codes",
 ]
 
