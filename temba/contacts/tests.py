@@ -31,7 +31,7 @@ from temba.ivr.models import IVRCall
 from temba.locations.models import AdminBoundary
 from temba.mailroom import MailroomException, modifiers
 from temba.msgs.models import Broadcast, Label, Msg, SystemLabel
-from temba.orgs.models import Org, OrgRole
+from temba.orgs.models import Org
 from temba.schedules.models import Schedule
 from temba.tests import (
     AnonymousOrg,
