@@ -1182,6 +1182,7 @@ class MsgReadSerializer(ReadSerializer):
         Msg.STATUS_ERRORED: "errored",
         Msg.STATUS_FAILED: "failed",
         Msg.STATUS_RESENT: "resent",
+        Msg.STATUS_READ: "read",
     }
     TYPES = {Msg.TYPE_INBOX: "inbox", Msg.TYPE_FLOW: "flow", Msg.TYPE_IVR: "ivr"}
     VISIBILITIES = {
