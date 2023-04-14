@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("request_logs", "0012_alter_httplog_log_type"),
     ]

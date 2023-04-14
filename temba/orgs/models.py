@@ -1144,13 +1144,10 @@ class Org(SmartModel):
         """
         if org.parent == self or self.parent == org.parent or self.parent == org:
             if self.get_credits_remaining() >= amount:
-
                 with self.lock_on(OrgLock.credits):
-
                     # now debit our account
                     debited = None
                     while amount or debited == 0:
-
                         # remove the credits from ourselves
                         (topup_id, debited) = self.select_most_recent_topup(amount)
 
@@ -1360,7 +1357,6 @@ class Org(SmartModel):
 
         # for our purposes, #1 and #2 are treated the same, we just always update the default card
         try:
-
             if not customer or customer.email != user.email:
                 # then go create a customer object for this user
                 customer = stripe.Customer.create(card=token, email=user.email, description="{ org: %d }" % self.pk)
@@ -2189,7 +2185,6 @@ class TopUp(SmartModel):
         return topup
 
     def release(self):
-
         # clear us off any debits we are connected to
         Debit.objects.filter(topup=self).update(topup=None)
 

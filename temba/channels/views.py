@@ -92,7 +92,6 @@ def channel_status_processor(request):
 
         channels = org.channels.filter(is_active=True)
         for channel in channels:
-
             if channel.created_on > cutoff:
                 continue
 
@@ -210,7 +209,6 @@ def sync(request, channel_id):
 
             # catchall for commands that deal with a single message
             if "msg_id" in cmd:
-
                 # make sure the negative ids are converted to long
                 msg_id = cmd["msg_id"]
                 if msg_id < 0:
@@ -580,7 +578,6 @@ class BaseClaimNumberMixin(ClaimViewMixin):
         pass
 
     def form_valid(self, form, *args, **kwargs):
-
         # must have an org
         org = self.request.user.get_org()
         if not org:  # pragma: needs cover
@@ -827,7 +824,6 @@ class ChannelCRUDL(SmartCRUDL):
                 )
 
                 if self.object.is_android() or (self.object.parent and self.object.parent.is_android()):
-
                     sender = self.object.get_sender()
                     if sender and sender.is_delegate_sender():
                         links.append(

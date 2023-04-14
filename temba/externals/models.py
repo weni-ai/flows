@@ -1,12 +1,13 @@
-from abc import ABCMeta, abstractproperty
 import json
 import os
 import sys
+from abc import ABCMeta, abstractproperty
 
-from django.db import models
 from smartmin.models import SmartModel
-from django.template import Engine
+
 from django.conf.urls import url
+from django.db import models
+from django.template import Engine
 
 from temba.orgs.models import DependencyMixin, Org
 from temba.utils.uuid import uuid4

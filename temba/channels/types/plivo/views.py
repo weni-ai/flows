@@ -120,7 +120,6 @@ class ClaimView(BaseClaimNumberMixin, SmartFormView):
         return account_numbers
 
     def claim_number(self, user, phone_number, country, role):
-
         auth_id = self.request.session.get(Channel.CONFIG_PLIVO_AUTH_ID, None)
         auth_token = self.request.session.get(Channel.CONFIG_PLIVO_AUTH_TOKEN, None)
 

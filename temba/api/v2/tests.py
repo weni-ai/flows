@@ -3428,7 +3428,6 @@ class APITest(TembaTest):
 
         def assert_media_upload(filename, ext):
             with open(filename, "rb") as data:
-
                 post_data = dict(media_file=data, extension=ext, HTTP_X_FORWARDED_HTTPS="https")
                 response = self.client.post(url, post_data)
 

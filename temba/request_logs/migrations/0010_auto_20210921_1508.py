@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("flows", "0259_auto_20210825_1438"),
         ("request_logs", "0009_resize_url_field"),

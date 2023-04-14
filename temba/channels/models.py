@@ -515,7 +515,6 @@ class Channel(TembaModel, DependencyMixin):
         role=DEFAULT_ROLE,
         extra_config=None,
     ):
-
         try:
             parsed = phonenumbers.parse(phone_number, None)
             phone = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
@@ -1449,7 +1448,6 @@ class Alert(SmartModel):
             in (SyncEvent.STATUS_DISCHARGING, SyncEvent.STATUS_UNKNOWN, SyncEvent.STATUS_NOT_CHARGING)
             and int(sync.power_level) < 25
         ):
-
             alerts = Alert.objects.filter(sync_event__channel=sync.channel, alert_type=cls.TYPE_POWER, ended_on=None)
 
             if not alerts:
@@ -1537,7 +1535,7 @@ class Alert(SmartModel):
             existing = channels.get(sent["channel"], dict(queued=None))
             existing["sent"] = sent["latest_sent"]
 
-        for (channel_id, value) in channels.items():
+        for channel_id, value in channels.items():
             # we haven't sent any messages in the past six hours
             if not value["sent"] or value["sent"] < six_hours_ago:
                 channel = Channel.objects.get(pk=channel_id)
