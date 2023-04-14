@@ -1,3 +1,13 @@
+1.7.1-rapidpro-7.1.27
+----------
+* Add teams app in temba celery autodiscovery list
+
+1.7.0-rapidpro-7.1.27
+----------
+* Update weni-rp-apps from 2.2.0 to 2.3.0
+* External services support on Weni Flows
+* Add endpoint to list type action
+
 1.6.23-rapidpro-7.1.27
 ----------
 * Update weni-rp-apps from 2.1.3 to 2.2.0

@@ -17,6 +17,7 @@ app.autodiscover_tasks(
         "temba.channels.types.twitter",
         "temba.channels.types.wechat",
         "temba.channels.types.whatsapp",
+        "temba.channels.types.teams",
     )
 )
 

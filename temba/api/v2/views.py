@@ -40,6 +40,7 @@ from temba.msgs.models import Broadcast, Label, LabelCount, Msg, SystemLabel
 from temba.orgs.models import OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
+from temba.externals.models import ExternalService
 from temba.utils import splitting_getlist, str_to_bool
 
 from ..models import SSLPermission
@@ -85,6 +86,7 @@ from .serializers import (
     UserReadSerializer,
     WebHookEventReadSerializer,
     WorkspaceReadSerializer,
+    ExternalServicesReadSerializer,
 )
 
 
@@ -292,6 +294,7 @@ class ExplorerView(SmartTemplateView):
             TopicsEndpoint.get_write_explorer(),
             UsersEndpoint.get_read_explorer(),
             WorkspaceEndpoint.get_read_explorer(),
+            ExternalServicesEndpoint.get_read_explorer(),
         ]
         return context
 
@@ -3467,6 +3470,82 @@ class TicketersEndpoint(ListAPIMixin, BaseAPIView):
                     "name": "after",
                     "required": False,
                     "help": "Only return ticketers created after this date, ex: 2015-01-28T18:00:00.000",
+                },
+            ],
+        }
+
+
+class ExternalServicesEndpoint(ListAPIMixin, BaseAPIView):
+    """
+    This endpoint allows you to list the active external services on your account.
+
+    ## Listing External Services
+
+    A **GET** returns the external services for your organization, most recent first.
+
+     * **uuid** - the UUID of the service, filterable as `uuid`.
+     * **name** - the name of the service.
+     * **type** - the type of the service, e.g. 'omie'.
+     * **created_on** - when this service was created.
+
+    Example:
+
+        GET /api/v2/external_services.json
+
+    Response:
+
+        {
+            "next": null,
+            "previous": null,
+            "results": [
+            {
+                "uuid": "9a8b001e-a913-486c-80f4-1356e23f582e",
+                "name": "Bob's Omie Project",
+                "type": "omie",
+                "created_on": "2023-02-27T09:06:15.456"
+            },
+            ...
+    """
+
+    # permission = "externals.external_services_api"
+    model = ExternalService
+    serializer_class = ExternalServicesReadSerializer
+    pagination_class = CreatedOnCursorPagination
+
+    def filter_queryset(self, queryset):
+        params = self.request.query_params
+        org = self.request.user.get_org()
+
+        queryset = queryset.filter(org=org, is_active=True)
+        # filter by uuid (optional)
+        uuid = params.get("uuid")
+        if uuid:
+            queryset = queryset.filter(uuid=uuid)
+
+        return self.filter_before_after(queryset, "created_on")
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List External Services",
+            "url": reverse("api.v2.external_services"),
+            "slug": "external_services-list",
+            "params": [
+                {
+                    "name": "uuid",
+                    "required": False,
+                    "help": "An external serice UUID to filter by. ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                },
+                {
+                    "name": "before",
+                    "required": False,
+                    "help": "Only return external services created before this date, ex: 2023-01-28T18:00:00.000",
+                },
+                {
+                    "name": "after",
+                    "required": False,
+                    "help": "Only return external services created after this date, ex: 2023-01-28T18:00:00.000",
                 },
             ],
         }

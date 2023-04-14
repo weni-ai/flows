@@ -1,0 +1,38 @@
+-extends "smartmin/base.html"
+-load i18n compress temba
+
+-block title
+  -trans "Connect a External Service"
+
+-block content
+
+  -blocktrans trimmed
+    External Services Culpa ea ullamco laborum magna deserunt amet eiusmod exercitation ut. Eu nulla qui quis officia sit. Proident laborum aliqua excepteur esse et cupidatat ut est adipisicing deserunt culpa. Exercitation elit commodo excepteur consectetur tempor in. Laborum excepteur eiusmod fugiat ut proident cupidatat. Ea officia deserunt laborum quis elit adipisicing magna proident consectetur duis irure ad ex.
+
+  .my-6
+    -blocktrans trimmed
+      Select the external service you want to connect below to get started.
+
+  .external_service-options
+    -for external_service_type in external_service_types
+      .card.link(onclick="goto(event, this)" href="{% url 'external_service.types.'|add:external_service_type.slug|add:'.connect' %}")
+        .relative
+          .text-base.absolute.text-gray-100.bg-icon(class="{{ external_service_type.icon }}")
+        
+        .flex.flex-col.mx-20.relative
+          .title
+            {{ external_service_type.name }}
+          
+          .mt-2
+            {% include external_service_type.get_connect_blurb with brand=brand %}
+
+    -empty
+      .alert-warning
+        -trans "No external services are available."
+
+-block extra-style
+  :css
+    .bg-icon {
+      font-size:90px;
+      transform: translate(-45px, 10px) rotate(-15deg);
+    }
