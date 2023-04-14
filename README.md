@@ -4,7 +4,7 @@
 - [Black Lives Matter](https://blacklivesmatter.com/)
 - [Supporting the cause](https://act.unicefusa.org/blm)
 
-# RapidPro [![Build Status](https://github.com/Ilhasoft/rapidpro/workflows/CI/badge.svg)](https://github.com/Ilhasoft/rapidpro/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/rapidpro/rapidpro/branch/master/graph/badge.svg)](https://codecov.io/gh/rapidpro/rapidpro)
+# RapidPro [![Build Status](https://github.com/Ilhasoft/rapidpro/workflows/CI/badge.svg)](https://github.com/Ilhasoft/rapidpro/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/weni-ai/flows/branch/master/graph/badge.svg)](https://codecov.io/gh/weni-ai/flows)
 
 RapidPro is a hosted service for visually building interactive messaging applications.
 To learn more, please visit the project site at http://rapidpro.github.io/rapidpro.
