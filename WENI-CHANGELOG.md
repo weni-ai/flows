@@ -1,3 +1,9 @@
+1.7.2-rapidpro-7.1.27
+----------
+* Update weni-rp-apps from 2.3.0 to 2.3.2
+* Remove codecov package from pyproject
+* Add read field in serializer of MsgReadSerializer
+
 1.7.1-rapidpro-7.1.27
 ----------
 * Add teams app in temba celery autodiscovery list
