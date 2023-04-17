@@ -1,0 +1,120 @@
+name: Build Rapidpro in SP (Push Tag)
+
+on:
+  push:
+    tags:
+      - '*.*.*-develop'
+      - '*.*.*-staging'
+      - '*.*.*'
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest 
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+        with:
+          ref: "${{env.GITHUB_SHA}}"
+
+      - name: Set variables
+        run: |
+            TAG="$( echo "${GITHUB_REF}" | cut -d'/' -f3 )"
+            if grep -qs -e '^.*.*-develop' <<< "${TAG}" ; then
+              echo "Found environment: DEVELOP - ${TAG}"
+              echo "ENVIRONMENT=develop" | tee -a "${GITHUB_ENV}"
+            elif grep -qs -e '^.*.*-staging' <<< "${TAG}" ; then
+              echo "Found environment: STAGING - ${TAG}"
+              echo "ENVIRONMENT=staging" | tee -a "${GITHUB_ENV}"
+            elif grep -qs -e '^.*.*' <<< "${TAG}" ; then
+              echo "No environment found, assuming: PRODUCTION - ${TAG}"
+              echo "ENVIRONMENT=production" | tee -a "${GITHUB_ENV}"
+            else
+              echo 'Not a valid tag. Skipping...'
+              exit 1
+            fi
+            echo "TAG=$TAG" | tee -a "${GITHUB_ENV}"
+            VERSION="${TAG}"
+            echo "VERSION=${VERSION}" | tee -a "${GITHUB_ENV}"
+            echo "COMMIT_SHA=$GITHUB_SHA" | tee -a "${GITHUB_ENV}"
+            echo "IMAGE_TAG=${{ secrets.ECR_SP }}/push-backend:$TAG" | tee -a "${GITHUB_ENV}"
+            echo "IMAGE_SOURCE_URL=https://github.com/Ilhasoft/rapidpro" | tee -a "${GITHUB_ENV}"
+
+            FLOWEDITOR_VERSION=$(jq -r '.dependencies["@nyaruka/flow-editor"]' < package.json)
+            echo "FLOWEDITOR_VERSION=${FLOWEDITOR_VERSION}" | tee -a "${GITHUB_ENV}"
+            echo "FLOWEDITOR_REPO=https://github.com/ilhasoft/floweditor" | tee -a "${GITHUB_ENV}"
+            FLOWEDITOR_BRANCH=$(jq -r '.weni["floweditor-branch"]' < package.json)
+            echo "FLOWEDITOR_BRANCH=$FLOWEDITOR_BRANCH" | tee -a "${GITHUB_ENV}"
+
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to ECR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.ECR_SP }}
+          username: ${{ secrets.AWS_ACCESS_KEY_ID_SP }}      
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY_SP }}
+
+      - name: Build and push - Rapidpro Image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          labels: |
+            tag=${{env.TAG}}
+            commit=${{env.COMMIT_SHA}}
+            repository=${{env.IMAGE_SOURCE_URL}}
+          file: docker/Dockerfile
+          push: true
+          tags: "${{env.IMAGE_TAG}}"
+          no-cache: true
+          build-args: |
+            FLOWEDITOR_VERSION=${{ env.FLOWEDITOR_VERSION }}
+            FLOWEDITOR_REPO=${{ env.FLOWEDITOR_REPO }}
+            FLOWEDITOR_BRANCH=${{ env.FLOWEDITOR_BRANCH }}   
+
+      - name: Build and push - Flows Varnish Image
+        uses: docker/build-push-action@v3
+        with:
+          context: ./docker
+          labels: |
+            tag=${{env.TAG}}
+            commit=${{env.COMMIT_SHA}}
+            repository=${{env.IMAGE_SOURCE_URL}}
+          file: docker/Dockerfile.varnish
+          push: true
+          tags: "${{env.IMAGE_TAG}}-varnish"
+          no-cache: true
+          build-args: |
+            BACKEND_ADDRESS=push-${{env.ENVIRONMENT}}:8000
+
+      - name: Update WENI-CHANGELOG.md
+        if: ${{ !contains(env.TAG, 'develop') && !contains(env.TAG, 'staging') }}
+        run: |
+          TAG_ANT=$(git ls-remote --tags --sort=-creatordate | egrep -v '(develop|staging)' | head -n3 | tail -n1 | cut -f2)
+          pull_requests=$(curl -s -H "Authorization: Bearer ${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/pulls?state=closed&base=main&sort=created&direction=desc&per_page=15")
+          DATE_TAG=$(TZ=UTC0 git show --quiet --date='format-local:%Y-%m-%dT%H:%M:%SZ' --format="%cd" ${TAG_ANT} | tail -1)
+          echo "" >> temp.md
+          echo "${{ env.TAG }}" > temp.md  
+          echo "----------" >> temp.md
+          echo "$pull_requests" | jq -r --arg DATE_TAG "$DATE_TAG" 'map(select(.created_at > $DATE_TAG)) | .[].title' | while read title; do
+            url=$(echo "$pull_requests" | jq -r --arg title "$title" 'map(select(.title == $title)) | .[].html_url')
+            echo "* [$title]($url)" >> temp.md
+          done
+          echo "" >> temp.md
+          cat WENI-CHANGELOG.md >> temp.md  
+          mv temp.md WENI-CHANGELOG.md
+          cat WENI-CHANGELOG.md
+          
+      - name: Commit & Push changes in repository
+        uses: actions-js/push@master
+        with:
+          github_token: "${{ secrets.GH_TOKEN }}"
+          repository: ${{ github.repository }}
+          directory: .
+          branch: main
+          message: "Update WENI-CHANGELOG.md"
+
