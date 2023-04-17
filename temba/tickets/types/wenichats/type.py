@@ -1,4 +1,4 @@
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from temba.tickets.models import TicketerType
 from temba.tickets.types.wenichats.views import ConnectView
@@ -19,9 +19,7 @@ class WeniChatsType(TicketerType):
 
     connect_view = ConnectView
     # TODO: improve descriptiton
-    connect_blurb = _("%(link)s wheni chats ticketer.") % {
-        "link": '<a href="https://chats.weni.ai/">Weni Chats</a>'
-    }
+    connect_blurb = _("%(link)s wheni chats ticketer.") % {"link": '<a href="https://chats.weni.ai/">Weni Chats</a>'}
 
     def is_available_to(self, user):
         return True

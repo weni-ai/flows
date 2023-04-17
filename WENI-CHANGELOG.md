@@ -1,4 +1,13 @@
+1.6.22-rapidpro-7.4.2
+----------
+* Update Rapidpro to version 7.4.2
+* Fix: Add instance check on contact field form
+* Update django-compressor to 4.3.1
+* Feat: branding inactive threshold env
+* Fix: Missing aws querystring auth and codecov
+
 1.6.21-rapidpro-7.1.27
+----------
 * Update weni-rp-apps from 2.1.2 to 2.1.3
 
 1.6.20-rapidpro-7.1.27

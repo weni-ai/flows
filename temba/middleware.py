@@ -142,7 +142,7 @@ class OrgMiddleware:
                 return org
 
         # otherwise if user only belongs to one org, we can use that
-        user_orgs = user.get_user_orgs()
+        user_orgs = user.get_orgs()
         if user_orgs.count() == 1:
             return user_orgs[0]
 
@@ -185,10 +185,11 @@ class LanguageMiddleware:
             language = request.branding.get("language", settings.DEFAULT_LANGUAGE)
             translation.activate(language)
         else:
-            user_settings = user.get_settings()
-            translation.activate(user_settings.language)
+            translation.activate(user.settings.language)
 
-        return self.get_response(request)
+        response = self.get_response(request)
+        response.headers.setdefault("Content-Language", translation.get_language())
+        return response
 
 
 class ProfilerMiddleware:  # pragma: no cover
@@ -234,12 +235,14 @@ class ProfilerMiddleware:  # pragma: no cover
             args = (request,) + callback_args
             return self.profiler.runcall(callback, *args, **callback_kwargs)
 
+
 class RedirectMiddleware:
     def __init__(self, get_response=None):
         self.get_response = get_response
+
     def __call__(self, request):
-        if hasattr(settings, 'WENI_DOMAINS'):
-            if use_weni_layout(request)['use_weni_layout']:
+        if hasattr(settings, "WENI_DOMAINS"):
+            if use_weni_layout(request)["use_weni_layout"]:
                 return self.get_response(request)
         if not request.path.startswith("/redirect") and not request.path.startswith("/api"):
             return HttpResponseRedirect(reverse("weni.redirect"))
