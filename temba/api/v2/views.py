@@ -1269,7 +1269,7 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
     only deleted contacts by passing the "deleted=true" parameter to your call.
 
      * **uuid** - the UUID of the contact (string), filterable as `uuid`.
-     * **name** - the name of the contact (string).
+     * **name** - the name of the contact (string), filterable as `name`.
      * **language** - the preferred language of the contact (string).
      * **urns** - the URNs associated with the contact (string array), filterable as `urn`.
      * **groups** - the UUIDs of any groups the contact is part of (array of objects), filterable as `group` with group name or UUID.
@@ -1396,7 +1396,7 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
     write_with_transaction = False
     pagination_class = ModifiedOnCursorPagination
     throttle_scope = "v2.contacts"
-    lookup_params = {"uuid": "uuid", "urn": "urns__identity"}
+    lookup_params = {"uuid": "uuid", "urn": "urns__identity", "name": "name"}
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
@@ -1414,6 +1414,11 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
         urn = params.get("urn")
         if urn:
             queryset = queryset.filter(urns__identity=self.normalize_urn(urn))
+
+        # filter by contact name (optional)
+        name = params.get("name")
+        if name:
+            queryset = queryset.filter(name=name)
 
         # filter by group name/uuid (optional)
         group_ref = params.get("group")
