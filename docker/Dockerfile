@@ -69,6 +69,8 @@ RUN su $PROJECT_USER -c "npm install --global \
   less \
   yarn"
 
+RUN su $PROJECT_USER -c "npm install"
+
 RUN su $PROJECT_USER -c "ln -s $PROJECT_PATH/temba/settings.py.prod $PROJECT_PATH/temba/settings.py"
 
 EXPOSE 8000
