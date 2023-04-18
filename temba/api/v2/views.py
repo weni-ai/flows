@@ -1418,7 +1418,7 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
         # filter by contact name (optional)
         name = params.get("name")
         if name:
-            queryset = queryset.filter(name=name)
+            queryset = queryset.filter(name__contains=name)
 
         # filter by group name/uuid (optional)
         group_ref = params.get("group")
