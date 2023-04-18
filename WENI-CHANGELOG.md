@@ -1,3 +1,7 @@
+1.8.0-rapidpro-7.1.27
+----------
+* Use Weni Floweditor from package.json
+
 1.7.2-rapidpro-7.1.27
 ----------
 * Update weni-rp-apps from 2.3.0 to 2.3.2
