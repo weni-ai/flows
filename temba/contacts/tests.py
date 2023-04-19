@@ -633,7 +633,11 @@ class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
         start_url = reverse("contacts.contact_start", args=[contact.id])
 
         response = self.assertUpdateFetch(start_url, allow_viewers=False, allow_editors=True, form_fields=["flow"])
-        self.assertEqual([background_flow] + sample_flows, list(response.context["form"].fields["flow"].queryset))
+
+        self.assertEqual(
+            [sample_flows[0]] + [background_flow] + sample_flows[1:],
+            list(response.context["form"].fields["flow"].queryset),
+        )
 
         # try to submit without specifying a flow
         self.assertUpdateSubmit(
