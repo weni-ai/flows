@@ -25,7 +25,6 @@ DROP INDEX msgs_broadcasts_org_created_id_where_active
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("msgs", "0149_auto_20210621_1926"),
     ]

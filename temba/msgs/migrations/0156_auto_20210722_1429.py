@@ -10,7 +10,6 @@ def update_null_sent_on(apps, schema_editor):  # pragma: no cover
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("msgs", "0155_auto_20210715_1854"),
     ]

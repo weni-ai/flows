@@ -128,7 +128,6 @@ class WhatsAppCloudTypeTest(TembaTest):
 
         with patch("requests.get") as wa_cloud_get:
             with patch("requests.post") as wa_cloud_post:
-
                 wa_cloud_get.side_effect = [
                     # pre-process missing permissions
                     MockResponse(
@@ -159,7 +158,6 @@ class WhatsAppCloudTypeTest(TembaTest):
 
         with patch("requests.get") as wa_cloud_get:
             with patch("requests.post") as wa_cloud_post:
-
                 wa_cloud_get.side_effect = [
                     # pre-process for get
                     MockResponse(

@@ -10,7 +10,6 @@ def remove_alert_notifications(apps, schema_editor):  # pragma: no cover
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("notifications", "0006_auto_20211116_2221"),
     ]

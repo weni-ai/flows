@@ -11,7 +11,6 @@ def backfill_event_contact(apps, schema_editor):  # pragma: no cover
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("tickets", "0008_auto_20210617_1425"),
     ]
