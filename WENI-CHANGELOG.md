@@ -1,3 +1,10 @@
+1.8.1-rapidpro-7.1.27
+----------
+* Update weni-rp-apps from 2.3.2 to 2.3.3
+* Removing the internal ticketer this will no longer be used
+* Update release function in external services
+* Add contact name filter in ContactEndpoint
+
 1.8.0-rapidpro-7.1.27
 ----------
 * Use Weni Floweditor from package.json
