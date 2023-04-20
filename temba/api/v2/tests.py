@@ -1739,6 +1739,10 @@ class APITest(TembaTest):
         response = self.fetchJSON(url, "urn=%s" % quote_plus("tel:078-8000004"))
         self.assertResultsByUUID(response, [contact4])
 
+        # filter by Name
+        response = self.fetchJSON(url, "name=%s" % contact2.name)
+        self.assertResultsByUUID(response, [contact2])
+
         # error if URN can't be parsed
         response = self.fetchJSON(url, "urn=12345")
         self.assertResponseError(response, None, "Invalid URN: 12345")
@@ -2015,11 +2019,11 @@ class APITest(TembaTest):
 
         # try to update a contact by both UUID and URN
         response = self.postJSON(url, "uuid=%s&urn=%s" % (jean.uuid, quote_plus("tel:+250784444444")), {})
-        self.assertResponseError(response, None, "URL can only contain one of the following parameters: urn, uuid")
+        self.assertResponseError(response, None, "URL can only contain one of the following parameters: name, urn, uuid")
 
         # try an empty delete request
         response = self.deleteJSON(url, None)
-        self.assertResponseError(response, None, "URL must contain one of the following parameters: urn, uuid")
+        self.assertResponseError(response, None, "URL must contain one of the following parameters: name, urn, uuid")
 
         # delete a contact by UUID
         response = self.deleteJSON(url, "uuid=%s" % jean.uuid)
