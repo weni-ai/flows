@@ -101,7 +101,6 @@ class ExternalService(SmartModel, DependencyMixin):
         return TYPES[self.ticketer_type]
 
     def release(self, user):
-        super().release(user)
         self.is_active = False
         self.modified_by = user
         self.save(update_fields=("is_active", "modified_by", "modified_on"))
