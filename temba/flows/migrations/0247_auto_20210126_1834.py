@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("flows", "0246_auto_20210119_1717"),
         ("sql", "0002_squashed"),

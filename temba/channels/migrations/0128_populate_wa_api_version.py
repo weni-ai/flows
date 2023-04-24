@@ -19,7 +19,6 @@ def populate_wa_api_version(apps, schema_editor):  # pragma: no cover
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("channels", "0127_auto_20210715_1825"),
     ]
