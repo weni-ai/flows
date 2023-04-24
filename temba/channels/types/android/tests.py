@@ -1,6 +1,7 @@
 import json
 
 from django.urls import reverse
+from django.db.models.signals import post_save
 
 from temba.contacts.models import URN
 from temba.orgs.models import Org
@@ -12,6 +13,7 @@ from ...models import Channel
 
 class AndroidTypeTest(TembaTest):
     def test_claim(self):
+        post_save.receivers = []
         # remove our explicit country so it needs to be derived from channels
         self.org.country = None
         self.org.timezone = "UTC"
