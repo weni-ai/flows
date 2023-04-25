@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("contacts", "0132_tweak_contact_indexes"),
         ("tickets", "0007_backfill_ticket_events"),

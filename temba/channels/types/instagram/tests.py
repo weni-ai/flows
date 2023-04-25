@@ -14,7 +14,7 @@ class InstagramTypeTest(TembaTest):
         super().setUp()
 
         self.token = "x" * 200
-        self.long_life_user_token = f"page-long-life-{self.token}"
+        self.long_life_page_token = f"page-long-life-{self.token}"
         self.channel = Channel.create(
             self.org,
             self.user,
@@ -32,7 +32,7 @@ class InstagramTypeTest(TembaTest):
     @patch("requests.get")
     def test_claim(self, mock_get, mock_post):
         mock_get.side_effect = [
-            MockResponse(200, json.dumps({"access_token": self.long_life_user_token})),
+            MockResponse(200, json.dumps({"access_token": self.long_life_page_token})),
             MockResponse(
                 200,
                 json.dumps(
@@ -41,7 +41,7 @@ class InstagramTypeTest(TembaTest):
                             {
                                 "name": "Temba",
                                 "id": "123456",
-                                "access_token": self.long_life_user_token,
+                                "access_token": self.long_life_page_token,
                             }
                         ]
                     }
@@ -79,7 +79,7 @@ class InstagramTypeTest(TembaTest):
 
         # assert our channel got created
         channel = Channel.objects.get(address="1234567", channel_type="IG")  # address is ig user
-        self.assertEqual(channel.config[Channel.CONFIG_AUTH_TOKEN], self.long_life_user_token)
+        self.assertEqual(channel.config[Channel.CONFIG_AUTH_TOKEN], self.long_life_page_token)
         self.assertEqual(channel.config[Channel.CONFIG_PAGE_NAME], "Temba")
         self.assertEqual(channel.address, "1234567")
 
@@ -100,24 +100,24 @@ class InstagramTypeTest(TembaTest):
 
         mock_get.assert_any_call(
             "https://graph.facebook.com/v12.0/098765/accounts",
-            params={"access_token": self.long_life_user_token},
+            params={"access_token": self.long_life_page_token},
         )
 
         mock_post.assert_any_call(
             "https://graph.facebook.com/v12.0/123456/subscribed_apps",
             data={"subscribed_fields": "messages,messaging_postbacks"},
-            params={"access_token": self.long_life_user_token},
+            params={"access_token": self.long_life_page_token},
         )
 
         mock_get.assert_any_call(
             "https://graph.facebook.com/123456?fields=instagram_business_account",
             params={
-                "access_token": self.long_life_user_token,
+                "access_token": self.long_life_page_token,
             },
         )
 
         mock_get.side_effect = [
-            MockResponse(200, json.dumps({"access_token": self.long_life_user_token})),
+            MockResponse(200, json.dumps({"access_token": self.long_life_page_token})),
             Exception("blah"),
         ]
 
@@ -188,7 +188,7 @@ class InstagramTypeTest(TembaTest):
                             {
                                 "name": "Temba",
                                 "id": "123456",
-                                "access_token": self.long_life_user_token,
+                                "access_token": self.long_life_page_token,
                             }
                         ]
                     }
@@ -210,7 +210,7 @@ class InstagramTypeTest(TembaTest):
 
         # assert our channel got created
         channel = Channel.objects.get(address="019283", channel_type="IG")
-        self.assertEqual(channel.config[Channel.CONFIG_AUTH_TOKEN], self.long_life_user_token)
+        self.assertEqual(channel.config[Channel.CONFIG_AUTH_TOKEN], self.long_life_page_token)
         self.assertEqual(channel.config[Channel.CONFIG_PAGE_NAME], "Temba")
         self.assertEqual(channel.address, "019283")
 
@@ -231,11 +231,11 @@ class InstagramTypeTest(TembaTest):
 
         mock_get.assert_any_call(
             "https://graph.facebook.com/v12.0/098765/accounts",
-            params={"access_token": self.long_life_user_token},
+            params={"access_token": self.long_life_page_token},
         )
 
         mock_post.assert_any_call(
             "https://graph.facebook.com/v12.0/123456/subscribed_apps",
             data={"subscribed_fields": "messages,messaging_postbacks"},
-            params={"access_token": self.long_life_user_token},
+            params={"access_token": self.long_life_page_token},
         )

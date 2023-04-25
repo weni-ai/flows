@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("msgs", "0161_remove_response_to_and_connection"),
     ]

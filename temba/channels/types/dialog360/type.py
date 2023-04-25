@@ -72,7 +72,6 @@ class Dialog360Type(ChannelType):
 
         start = timezone.now()
         try:
-
             templates_url = "%s/v1/configs/templates" % channel.config.get(Channel.CONFIG_BASE_URL, "")
 
             response = requests.get(templates_url, headers=self.get_headers(channel))

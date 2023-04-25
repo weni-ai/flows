@@ -524,7 +524,6 @@ class UserTest(TembaTest):
         self.assertTrue(self.editor.is_active)
 
     def test_ui_management(self):
-
         # only customer support gets in on this sweet action
         self.login(self.customer_support)
 
@@ -616,7 +615,6 @@ class UserTest(TembaTest):
         self.assertRedirect(response, "/msg/inbox/")
 
     def test_release(self):
-
         # admin doesn't "own" any orgs
         self.assertEqual(0, len(self.admin.get_owned_orgs()))
 
@@ -856,7 +854,6 @@ class OrgDeleteTest(TembaNonAtomicTest):
         self.parent_org.apply_topups()
 
     def release_org(self, org, child_org=None, delete=False, expected_files=3):
-
         with patch("temba.utils.s3.client", return_value=self.mock_s3):
             # save off the ids of our current users
             org_user_ids = list(org.get_users().values_list("id", flat=True))
@@ -927,7 +924,6 @@ class OrgDeleteTest(TembaNonAtomicTest):
                 # org is still around but has been released
                 self.assertTrue(Org.objects.filter(id=org.id, is_active=False).exclude(deleted_on=None).exists())
             else:
-
                 org.refresh_from_db()
                 self.assertIsNone(org.deleted_on)
                 self.assertFalse(org.is_active)
@@ -1112,7 +1108,6 @@ class OrgTest(TembaTest):
 
     @patch("temba.utils.email.send_temba_email")
     def test_user_forget(self, mock_send_temba_email):
-
         invitation = Invitation.objects.create(
             org=self.org,
             user_group="A",
@@ -2006,7 +2001,6 @@ class OrgTest(TembaTest):
         self.assertEqual(10, self.org.get_topup_ttl(topup))
 
     def test_topup_expiration(self):
-
         contact = self.create_contact("Usain Bolt", phone="+250788123123")
         welcome_topup = self.org.topups.get()
 
@@ -2076,7 +2070,6 @@ class OrgTest(TembaTest):
             self.assertContains(response, "1,000 Credits")
 
     def test_topups(self):
-
         settings.BRANDING[settings.DEFAULT_BRAND]["tiers"] = dict(multi_user=100_000, multi_org=1_000_000)
         self.org.is_multi_org = False
         self.org.is_multi_user = False
@@ -3208,7 +3201,6 @@ class OrgTest(TembaTest):
         self.assertContains(response, "600 Credits")
 
     def test_account_value(self):
-
         # base value
         self.assertEqual(self.org.account_value(), 0.0)
 
@@ -3729,7 +3721,12 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertEqual(["created_on", "id", "language", "last_seen_on", "name"], system_fields)
         self.assertEqual(["Active", "Archived", "Blocked", "Stopped"], system_groups)
         self.assertEqual(
-            ["Sample Flow - Order Status Checker", "Sample Flow - Satisfaction Survey", "Sample Flow - Simple Poll"],
+            [
+                "Abra para aprender a construir seu primeiro fluxo",
+                "Sample Flow - Order Status Checker",
+                "Sample Flow - Satisfaction Survey",
+                "Sample Flow - Simple Poll",
+            ],
             sample_flows,
         )
         self.assertEqual("RapidPro Tickets", internal_ticketer.name)
@@ -4392,7 +4389,6 @@ class BulkExportTest(TembaTest):
         self.assertEqual(voice_flow.expires_after_minutes, 15)
 
     def test_import(self):
-
         self.login(self.admin)
 
         post_data = dict(import_file=open("%s/test_flows/too_old.json" % settings.MEDIA_ROOT, "rb"))
@@ -5249,7 +5245,6 @@ class StripeCreditsTest(TembaTest):
         self.assertEqual(1000, self.org.get_credits_total())
 
     def test_add_credits_invalid_bundle(self):
-
         with self.assertRaises(ValidationError):
             self.org.add_credits("-10", "stripe-token", self.admin)
 
