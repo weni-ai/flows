@@ -56,7 +56,6 @@ from .tasks import export_messages_task
 
 
 class SendMessageForm(Form):
-
     omnibox = OmniboxField(
         label=_("Recipients"),
         required=False,
@@ -403,7 +402,6 @@ class BroadcastCRUDL(SmartCRUDL):
                 get_params.update({"s": step_uuid})
                 send_to_flow_node.delay(org.pk, user.pk, text, **get_params)
             else:
-
                 omnibox = omnibox_deserialize(org, form.cleaned_data["omnibox"])
                 has_schedule = form.cleaned_data["schedule"]
 
@@ -606,7 +604,6 @@ class MsgCRUDL(SmartCRUDL):
                 ]
 
     class Export(ModalMixin, OrgPermsMixin, SmartFormView):
-
         form_class = ExportForm
         submit_button_name = "Export"
         success_url = "@msgs.msg_inbox"

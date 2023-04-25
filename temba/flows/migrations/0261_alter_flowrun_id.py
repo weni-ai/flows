@@ -15,7 +15,6 @@ $$ LANGUAGE plpgsql;"""
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("flows", "0260_remove_flowrun_parent"),
     ]

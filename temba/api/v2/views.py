@@ -33,6 +33,7 @@ from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
 from temba.classifiers.models import Classifier
 from temba.contacts.models import Contact, ContactField, ContactGroup, ContactGroupCount, ContactURN
+from temba.externals.models import ExternalService
 from temba.flows.models import Flow, FlowRun, FlowStart
 from temba.globals.models import Global
 from temba.locations.models import AdminBoundary, BoundaryAlias
@@ -40,7 +41,6 @@ from temba.msgs.models import Broadcast, Label, LabelCount, Msg, SystemLabel
 from temba.orgs.models import OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
-from temba.externals.models import ExternalService
 from temba.utils import splitting_getlist, str_to_bool
 
 from ..models import SSLPermission
@@ -64,6 +64,7 @@ from .serializers import (
     ContactGroupWriteSerializer,
     ContactReadSerializer,
     ContactWriteSerializer,
+    ExternalServicesReadSerializer,
     FlowReadSerializer,
     FlowRunReadSerializer,
     FlowStartReadSerializer,
@@ -86,7 +87,6 @@ from .serializers import (
     UserReadSerializer,
     WebHookEventReadSerializer,
     WorkspaceReadSerializer,
-    ExternalServicesReadSerializer,
 )
 
 
@@ -2430,7 +2430,6 @@ class MediaEndpoint(BaseAPIView):
     permission = "msgs.msg_api"
 
     def post(self, request, format=None, *args, **kwargs):
-
         org = self.request.user.get_org()
         media_file = request.data.get("media_file", None)
         extension = request.data.get("extension", None)

@@ -18,7 +18,6 @@ def channellog_url(context, log, *args, **kwargs):
 
 @register.simple_tag(takes_context=True)
 def channellog_request(context, log, *args, **kwargs):
-
     request = []
     for header in log.request.split("\r\n"):
         can_add = True
