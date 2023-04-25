@@ -48,7 +48,6 @@ CREATE TRIGGER temba_notifications_update_notificationcount
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ("orgs", "0088_auto_20210715_1825"),
