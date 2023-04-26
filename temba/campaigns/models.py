@@ -130,7 +130,6 @@ class Campaign(TembaModel):
 
                 # create our message flow for message events
                 if event_spec["event_type"] == CampaignEvent.TYPE_MESSAGE:
-
                     message = event_spec["message"]
                     base_language = event_spec.get("base_language")
 

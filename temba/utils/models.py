@@ -270,7 +270,6 @@ class JSONField(DjangoJSONField):
 
 
 class TembaModel(SmartModel):
-
     uuid = models.CharField(
         max_length=36,
         unique=True,

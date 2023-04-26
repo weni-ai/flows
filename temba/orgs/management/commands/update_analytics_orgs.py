@@ -18,7 +18,6 @@ class Command(BaseCommand):  # pragma: no cover
         users = User.objects.all().order_by("id")
         total = users.count()
         for user in users:
-
             # update their orgs
             users = (user,)
             orgs = Org.objects.filter(
