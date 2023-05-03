@@ -18,6 +18,7 @@ from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
 from temba.classifiers.models import Classifier
 from temba.contacts.models import Contact, ContactField, ContactGroup
+from temba.externals.models import ExternalService
 from temba.flows.models import Flow, FlowRun, FlowStart
 from temba.globals.models import Global
 from temba.locations.models import AdminBoundary
@@ -26,7 +27,6 @@ from temba.msgs.models import Broadcast, Label, Msg
 from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
-from temba.externals.models import ExternalService
 from temba.utils import extract_constants, json, on_transaction_commit
 
 from . import fields
@@ -1445,6 +1445,7 @@ class TicketerReadSerializer(ReadSerializer):
     class Meta:
         model = Ticketer
         fields = ("uuid", "name", "type", "created_on")
+
 
 class ExternalServicesReadSerializer(ReadSerializer):
     external_service_type = serializers.SerializerMethodField()
