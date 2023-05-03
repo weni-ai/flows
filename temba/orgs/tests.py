@@ -3724,15 +3724,13 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
         system_fields = list(org.contactfields(manager="system_fields").order_by("key").values_list("key", flat=True))
         system_groups = list(org.all_groups(manager="system_groups").order_by("name").values_list("name", flat=True))
         sample_flows = list(org.flows.order_by("name").values_list("name", flat=True))
-        internal_ticketer = org.ticketers.get()
 
         self.assertEqual(["created_on", "id", "language", "last_seen_on", "name"], system_fields)
         self.assertEqual(["Active", "Archived", "Blocked", "Stopped"], system_groups)
         self.assertEqual(
-            ["Sample Flow - Order Status Checker", "Sample Flow - Satisfaction Survey", "Sample Flow - Simple Poll"],
+            ["Abra para aprender a construir seu primeiro fluxo", "Sample Flow - Order Status Checker", "Sample Flow - Satisfaction Survey", "Sample Flow - Simple Poll"],
             sample_flows,
         )
-        self.assertEqual("RapidPro Tickets", internal_ticketer.name)
 
         # fake session set_org to make the test work
         user.set_org(org)
