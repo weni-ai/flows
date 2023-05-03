@@ -12,13 +12,13 @@ from smartmin.tests import SmartminTest
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core import mail
+from django.db.models import signals
 from django.template import loader
 from django.test import RequestFactory
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_bytes
-from django.db.models import signals
 
 from temba.channels.views import channel_status_processor
 from temba.contacts.models import URN, Contact, ContactGroup, ContactURN

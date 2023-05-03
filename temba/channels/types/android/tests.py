@@ -1,7 +1,7 @@
 import json
 
-from django.urls import reverse
 from django.db.models.signals import post_save
+from django.urls import reverse
 
 from temba.contacts.models import URN
 from temba.orgs.models import Org
