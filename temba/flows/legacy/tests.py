@@ -1052,7 +1052,6 @@ class FlowMigrationTest(TembaTest):
 
         # our test user doesn't use an email address, check for Administrator for the email
         email_node = order_checker.get_definition()["nodes"][10]
-        print(email_node)
         email_action = email_node["actions"][1]
 
         self.assertEqual(["ilanna.lins@weni.ai"], email_action["addresses"])
