@@ -1,3 +1,7 @@
+1.8.3-rapidpro-7.1.27
+----------
+* Update weni-rp-apps from 2.3.4 to 2.4.0
+
 1.8.2-rapidpro-7.1.27
 ----------
 * Update weni-rp-apps from 2.3.3 to 2.3.4
