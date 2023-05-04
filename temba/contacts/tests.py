@@ -1504,7 +1504,6 @@ class ContactTest(TembaTest):
         self.create_incoming_call(msg_flow, contact)
 
         # give contact an open and a closed ticket
-
         self.assertEqual(1, group.contacts.all().count())
         self.assertEqual(1, contact.connections.all().count())
         self.assertEqual(2, contact.addressed_broadcasts.all().count())
@@ -1514,18 +1513,12 @@ class ContactTest(TembaTest):
         self.assertEqual(2, len(contact.fields))
         self.assertEqual(1, contact.campaign_fires.count())
 
-        # self.assertEqual(2, TicketCount.get_all(self.org, Ticket.STATUS_OPEN))
-        # self.assertEqual(1, TicketCount.get_all(self.org, Ticket.STATUS_CLOSED))
-
         # first try a regular release and make sure our urns are anonymized
         contact.release(self.admin, full=False)
         self.assertEqual(2, contact.urns.all().count())
         for urn in contact.urns.all():
             uuid.UUID(urn.path, version=4)
             self.assertEqual(URN.DELETED_SCHEME, urn.scheme)
-
-        # tickets unchanged
-        # self.assertEqual(2, contact.tickets.count())
 
         # a new contact arrives with those urns
         new_contact = self.create_contact("URN Thief", urns=["tel:+12065552000", "twitter:tweettweet"])
@@ -1538,22 +1531,6 @@ class ContactTest(TembaTest):
         contact.release(self.admin)
 
         contact.refresh_from_db()
-        # self.assertEqual(0, group.contacts.all().count())
-        # self.assertEqual(0, contact.connections.all().count())
-        # self.assertEqual(0, contact.addressed_broadcasts.all().count())
-        # self.assertEqual(0, contact.urns.all().count())
-        # self.assertEqual(0, contact.runs.all().count())
-        # self.assertEqual(0, contact.msgs.all().count())
-        # self.assertEqual(0, contact.campaign_fires.count())
-
-        # tickets deleted (only for this contact)
-        # self.assertEqual(0, contact.tickets.count())
-        # self.assertEqual(1, TicketCount.get_all(self.org, Ticket.STATUS_OPEN))
-        # self.assertEqual(0, TicketCount.get_all(self.org, Ticket.STATUS_CLOSED))
-
-        # contact who used to own our urn had theirs released too
-        # self.assertEqual(0, old_contact.connections.all().count())
-        # self.assertEqual(0, old_contact.msgs.all().count())
 
         self.assertIsNone(contact.fields)
         self.assertIsNone(contact.name)
@@ -1562,7 +1539,6 @@ class ContactTest(TembaTest):
         Org.objects.get(id=self.org.id)
         Flow.objects.get(id=msg_flow.id)
         Flow.objects.get(id=ivr_flow.id)
-        # self.assertEqual(1, Ticket.objects.count())
 
     @mock_mailroom
     def test_status_changes_and_release(self, mr_mocks):
