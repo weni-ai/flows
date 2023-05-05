@@ -21,7 +21,7 @@ python-versions = "*"
 backoff = "1.10.0"
 monotonic = ">=1.5"
 python-dateutil = ">2.1"
-requests = ">=2.7,<3.0"
+requests = ">=2.7,<2.29.0"
 six = ">=1.5"
 
 [package.extras]
@@ -276,7 +276,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.dependencies]
 coverage = "*"
-requests = ">=2.7.9"
+requests =  ">=2.0.1,<2.29.0"
 
 [[package]]
 name = "colorama"
@@ -306,7 +306,7 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-requests = "*"
+requests =  ">=2.0.1,<2.29.0"
 
 [[package]]
 name = "cryptography"
@@ -508,9 +508,9 @@ urllib3 = ">=1.21.1,<2"
 
 [package.extras]
 async = ["aiohttp (>=3,<4)"]
-develop = ["requests (>=2.0.0,<3.0.0)", "coverage", "mock", "pyyaml", "pytest", "pytest-cov", "sphinx (<1.7)", "sphinx-rtd-theme", "black", "jinja2"]
+develop = ["requests (>=2.0.0,<2.29.0)", "coverage", "mock", "pyyaml", "pytest", "pytest-cov", "sphinx (<1.7)", "sphinx-rtd-theme", "black", "jinja2"]
 docs = ["sphinx (<1.7)", "sphinx-rtd-theme"]
-requests = ["requests (>=2.4.0,<3.0.0)"]
+requests = ["requests (>=2.4.0,<2.29.0)"]
 
 [[package]]
 name = "elasticsearch-dsl"
@@ -949,7 +949,7 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-requests = "*"
+requests =  ">=2.0.1,<2.29.0"
 urllib3 = ">=1.26.0"
 
 [package.extras]
@@ -1030,7 +1030,7 @@ python-versions = "*"
 certifi = "*"
 inflection = "*"
 pytz = "*"
-requests = "*"
+requests = ">=2.0.1,<2.29.0"
 six = "*"
 
 [[package]]
@@ -1121,7 +1121,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.dependencies]
 oauthlib = ">=3.0.0"
-requests = ">=2.0.0"
+requests =  ">=2.0.1,<2.29.0"
 
 [package.extras]
 rsa = ["oauthlib[signedtoken] (>=3.0.0)"]
@@ -1135,7 +1135,7 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-requests = ">=2.0.1,<3.0.0"
+requests = ">=2.0.1,<2.29.0"
 
 [[package]]
 name = "responses"
@@ -1146,7 +1146,7 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [package.dependencies]
-requests = ">=2.0"
+requests =  ">=2.0.1,<2.29.0"
 six = "*"
 urllib3 = ">=1.25.10"
 
@@ -1254,7 +1254,7 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.dependencies]
-requests = {version = ">=2.20", markers = "python_version >= \"3.0\""}
+requests = {version =  ">=2.0.1,<2.29.0", markers = "python_version >= \"3.0\""}
 
 [[package]]
 name = "texttable"
@@ -1284,7 +1284,7 @@ python-versions = "*"
 PyJWT = ">=1.4.2"
 pysocks = {version = "*", markers = "python_version >= \"3.0\""}
 pytz = "*"
-requests = {version = ">=2.0.0", markers = "python_version >= \"3.0\""}
+requests = {version =  ">=2.0.1,<2.29.0", markers = "python_version >= \"3.0\""}
 six = "*"
 
 [[package]]
@@ -1296,7 +1296,7 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-requests = ">=2.1.0"
+requests =  ">=2.0.1,<2.29.0"
 requests_oauthlib = ">=0.4.0"
 
 [[package]]
@@ -1340,7 +1340,7 @@ python-versions = ">=3, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 Deprecated = "*"
 PyJWT = {version = ">=1.6.4", extras = ["crypto"]}
 pytz = ">=2018.5"
-requests = ">=2.4.2"
+requests =  ">=2.0.1,<2.29.0"
 
 [[package]]
 name = "wcwidth"
