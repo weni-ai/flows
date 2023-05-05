@@ -310,7 +310,7 @@ typing-extensions==3.7.4.3 ; python_version < "3.8" and python_version >= "3.6"
     # via
     #   -r ../pip-requires.txt
     #   importlib-metadata
-urllib3==1.26.4 ; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version < "4"
+urllib3==1.26.15 ; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version < "4"
     # via
     #   -r ../pip-requires.txt
     #   botocore
