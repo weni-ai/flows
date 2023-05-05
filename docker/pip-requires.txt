@@ -11,3 +11,6 @@ slack_sdk==3.17.0
 dulwich==0.20.45
 django-cors-headers==3.8.0
 sentry-sdk==1.9.8
+click==7.1.2
+iso-639@git+https://github.com/noumar/iso639.git
+
