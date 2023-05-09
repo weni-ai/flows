@@ -1024,6 +1024,11 @@ class Flow(TembaModel):
 
         super().delete()
 
+    @property
+    def is_first_org_flow(self):
+        assert self.id is not None, "This object need be saved before the count"
+        return self.org.flows.filter(is_active=True).count() == 1
+
     def __str__(self):
         return self.name
 

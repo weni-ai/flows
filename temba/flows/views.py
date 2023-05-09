@@ -500,6 +500,10 @@ class FlowCRUDL(SmartCRUDL):
                 for keyword in keywords:
                     Trigger.create(org, user, Trigger.TYPE_KEYWORD, flow=obj, keyword=keyword)
 
+            # create trigger if this is a first flow created
+            if obj.is_first_org_flow:
+                Trigger.create(org, user, Trigger.TYPE_CATCH_ALL, flow=obj)
+
             return obj
 
     class Delete(AllowOnlyActiveFlowMixin, ModalMixin, OrgObjPermsMixin, SmartDeleteView):
