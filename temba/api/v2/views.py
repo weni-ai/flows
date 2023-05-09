@@ -1413,7 +1413,7 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
         # filter by URN (optional)
         urn = params.get("urn")
         if urn:
-            queryset = queryset.filter(urns__identity=self.normalize_urn(urn))
+            queryset = queryset.filter(urns__identity__icontains=self.normalize_urn(urn))
 
         # filter by contact name (optional)
         name = params.get("name")
@@ -2430,7 +2430,6 @@ class MediaEndpoint(BaseAPIView):
     permission = "msgs.msg_api"
 
     def post(self, request, format=None, *args, **kwargs):
-
         org = self.request.user.get_org()
         media_file = request.data.get("media_file", None)
         extension = request.data.get("extension", None)
