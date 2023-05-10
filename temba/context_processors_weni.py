@@ -36,3 +36,10 @@ def logrocket(request):
 
 def old_design_excluded_channels_codes(request):
     return {"old_design_excluded_channels_codes": settings.OLD_DESIGN_EXCLUDED_CHANNELS_CODES}
+
+def show_onboard_modal(request):
+    triggers = request.user.get_org().triggers.all();
+
+    show_trigger_onboard_modal = len(triggers) == 0;
+    
+    return {"show_trigger_onboard_modal": show_trigger_onboard_modal}

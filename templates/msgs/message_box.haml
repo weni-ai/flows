@@ -19,6 +19,9 @@
 
 -block content
 
+  -if show_trigger_onboard_modal
+    -include "weni/trigger-onboard-modal.html"
+
   #numeric-form.hide
     %form
       %label
