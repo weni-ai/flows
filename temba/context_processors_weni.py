@@ -5,9 +5,7 @@ def use_weni_layout(request):
 
     host = request.get_host().split(":")[0]
 
-    # return {"use_weni_layout": host.endswith(settings.WENI_DOMAINS["weni"])}
-    print("request", )
-    return {"use_weni_layout": True}
+    return {"use_weni_layout": host.endswith(settings.WENI_DOMAINS["weni"])}
 
 
 def show_sidemenu(request):
