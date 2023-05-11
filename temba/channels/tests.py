@@ -12,6 +12,7 @@ from smartmin.tests import SmartminTest
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core import mail
+from django.db.models import signals
 from django.template import loader
 from django.test import RequestFactory
 from django.test.utils import override_settings
@@ -43,6 +44,8 @@ from .tasks import (
 class ChannelTest(TembaTest):
     def setUp(self):
         super().setUp()
+
+        signals.post_save.receivers = []
 
         self.channel.delete()
 
@@ -822,9 +825,9 @@ class ChannelTest(TembaTest):
         self.assertEqual(response.context["channel_types"]["PHONE"][-1].code, "ZVS")
 
         self.assertEqual(response.context["channel_types"]["SOCIAL_MEDIA"][0].code, "WA")
-        self.assertEqual(response.context["channel_types"]["SOCIAL_MEDIA"][2].code, "D3")
-        self.assertEqual(response.context["channel_types"]["SOCIAL_MEDIA"][3].code, "ZVW")
-        self.assertEqual(response.context["channel_types"]["SOCIAL_MEDIA"][4].code, "TWA")
+        self.assertEqual(response.context["channel_types"]["SOCIAL_MEDIA"][2].code, "ZVW")
+        self.assertEqual(response.context["channel_types"]["SOCIAL_MEDIA"][3].code, "TWA")
+        self.assertEqual(response.context["channel_types"]["SOCIAL_MEDIA"][4].code, "FBA")
 
     def test_register_unsupported_android(self):
         # remove our explicit country so it needs to be derived from channels
@@ -1612,6 +1615,8 @@ class SyncEventTest(SmartminTest):
 
 
 class ChannelAlertTest(TembaTest):
+    signals.post_save.receivers = []
+
     def test_no_alert_email(self):
         # set our last seen to a while ago
         self.channel.last_seen = timezone.now() - timedelta(minutes=40)
