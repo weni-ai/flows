@@ -4427,8 +4427,6 @@ class APITest(TembaTest):
         url = reverse("api.v2.ticketers")
         self.assertEndpointAccess(url)
 
-        t1 = self.org.ticketers.get()  # the internal ticketer
-
         # create some additional ticketers
         t2 = Ticketer.create(self.org, self.admin, MailgunType.slug, "bob@acme.com", {})
         t3 = Ticketer.create(self.org, self.admin, MailgunType.slug, "jim@acme.com", {})
@@ -4461,12 +4459,6 @@ class APITest(TembaTest):
                     "name": "bob@acme.com",
                     "type": "mailgun",
                     "created_on": format_datetime(t2.created_on),
-                },
-                {
-                    "uuid": str(t1.uuid),
-                    "name": "RapidPro Tickets",
-                    "type": "internal",
-                    "created_on": format_datetime(t1.created_on),
                 },
             ],
         )
