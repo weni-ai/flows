@@ -1,3 +1,12 @@
+1.8.4-rapidpro-7.1.27
+----------
+* Update README to flows build status
+* Adjust ticketers errors tests
+* Adjust tests in flows
+* Resolve errors in flows CI
+* Run black in flows
+* Update Dockerfile to lock requests version
+
 1.8.3-rapidpro-7.1.27
 ----------
 * Update weni-rp-apps from 2.3.4 to 2.4.0
