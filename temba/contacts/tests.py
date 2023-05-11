@@ -633,7 +633,11 @@ class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
         start_url = reverse("contacts.contact_start", args=[contact.id])
 
         response = self.assertUpdateFetch(start_url, allow_viewers=False, allow_editors=True, form_fields=["flow"])
-        self.assertEqual([background_flow] + sample_flows, list(response.context["form"].fields["flow"].queryset))
+
+        self.assertEqual(
+            [sample_flows[0]] + [background_flow] + sample_flows[1:],
+            list(response.context["form"].fields["flow"].queryset),
+        )
 
         # try to submit without specifying a flow
         self.assertUpdateSubmit(
@@ -1087,7 +1091,6 @@ class ContactGroupCRUDLTest(TembaTest, CRUDLTestMixin):
 
     @mock_mailroom
     def test_list(self, mr_mocks):
-
         list_url = reverse("contacts.contactgroup_list")
         response = self.assertListFetch(list_url, allow_viewers=True, allow_editors=True, allow_agents=False)
         self.assertEqual(
@@ -2703,7 +2706,6 @@ class ContactTest(TembaTest):
         )
 
     def test_read_language(self):
-
         # this is a bogus
         self.joe.language = "zzz"
         self.joe.save(update_fields=("language",))
@@ -4888,7 +4890,6 @@ class URNTest(TembaTest):
         self.assertFalse(URN.validate("freshchat:+12065551212"))
 
     def test_from_parts(self):
-
         self.assertEqual(URN.from_parts("deleted", "12345"), "deleted:12345")
         self.assertEqual(URN.from_parts("tel", "12345"), "tel:12345")
         self.assertEqual(URN.from_parts("tel", "+12345"), "tel:+12345")

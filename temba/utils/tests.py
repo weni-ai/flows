@@ -60,7 +60,6 @@ from .timezones import TimeZoneFormField, timezone_to_country_code
 
 class InitTest(TembaTest):
     def test_decode_base64(self):
-
         self.assertEqual("This test\nhas a newline", decode_base64("This test\nhas a newline"))
 
         self.assertEqual(
@@ -546,7 +545,6 @@ class EmailTest(TembaTest):
         self.assertOutbox(1, "no-reply@foo.com", "Test Subject", "Test Body", ["recipient@bar.com"])
 
     def test_is_valid_address(self):
-
         self.VALID_EMAILS = [
             # Cases from https://en.wikipedia.org/wiki/Email_address
             "prettyandsimple@example.com",
@@ -1241,7 +1239,6 @@ class AnalyticsTest(SmartminTest):
         mocked_logging.error.assert_called_with("error posting to intercom", exc_info=True)
 
     def test_identify(self):
-
         self.crisp_mock.website.get_people_profile.side_effect = Exception("No Profile")
         temba.utils.analytics.identify(self.admin, {"slug": "test", "host": "rapidpro.io"}, self.org)
 
@@ -1373,7 +1370,6 @@ class AnalyticsTest(SmartminTest):
         self.intercom_mock.users.delete.assert_not_called()
 
     def test_consent_valid_user(self):
-
         # valid user which did not consent
         self.intercom_mock.users.find.return_value = MagicMock(custom_attributes={"consent": False})
         self.crisp_mock.website.get_people_profile.return_value = {"segments": []}
@@ -1399,7 +1395,6 @@ class AnalyticsTest(SmartminTest):
         self.intercom_mock.users.create.assert_not_called()
 
     def test_consent_valid_user_decline(self):
-
         # valid user which did not consent
         self.intercom_mock.users.find.return_value = MagicMock(custom_attributes={"consent": False})
         self.crisp_mock.website.get_people_profile.return_value = {"segments": ["random-3", "consented"]}

@@ -37,7 +37,6 @@ class PolicyViewTest(TembaTest):
         )
 
     def test_policy_list(self):
-
         # non logged in users can visit
         response = self.client.get(reverse("policies.policy_list"))
         self.assertEqual(3, response.context["object_list"].count())
@@ -68,7 +67,6 @@ class PolicyViewTest(TembaTest):
         self.assertContains(response, "Privacy matters")
 
     def test_admin(self):
-
         # have to be logged in
         response = self.client.get(reverse("policies.policy_admin"))
         self.assertRedirect(response, reverse("users.user_login"))

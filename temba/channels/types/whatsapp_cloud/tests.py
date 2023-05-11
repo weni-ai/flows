@@ -128,7 +128,6 @@ class WhatsAppCloudTypeTest(TembaTest):
 
         with patch("requests.get") as wa_cloud_get:
             with patch("requests.post") as wa_cloud_post:
-
                 wa_cloud_get.side_effect = [
                     # pre-process missing permissions
                     MockResponse(
@@ -159,7 +158,6 @@ class WhatsAppCloudTypeTest(TembaTest):
 
         with patch("requests.get") as wa_cloud_get:
             with patch("requests.post") as wa_cloud_post:
-
                 wa_cloud_get.side_effect = [
                     # pre-process for get
                     MockResponse(
@@ -310,7 +308,7 @@ class WhatsAppCloudTypeTest(TembaTest):
             MockResponse(200, '{"data": ["foo", "bar"]}'),
             MockResponse(
                 200,
-                '{"data": ["foo"], "paging": {"cursors": {"after": "MjQZD"}, "next": "https://graph.facebook.com/v13.0/111111111111111/message_templates?after=MjQZD" } }',
+                '{"data": ["foo"], "paging": {"cursors": {"after": "MjQZD"}, "next": "https://graph.facebook.com/v14.0/111111111111111/message_templates?after=MjQZD" } }',
             ),
             MockResponse(200, '{"data": ["bar"], "paging": {"cursors": {"after": "MjQZD"} } }'),
         ]
@@ -332,7 +330,7 @@ class WhatsAppCloudTypeTest(TembaTest):
         self.assertEqual(["foo", "bar"], templates_data)
 
         mock_get.assert_called_with(
-            "https://graph.facebook.com/v13.0/111111111111111/message_templates",
+            "https://graph.facebook.com/v14.0/111111111111111/message_templates",
             params={"limit": 255},
             headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
         )
@@ -345,12 +343,12 @@ class WhatsAppCloudTypeTest(TembaTest):
         mock_get.assert_has_calls(
             [
                 call(
-                    "https://graph.facebook.com/v13.0/111111111111111/message_templates",
+                    "https://graph.facebook.com/v14.0/111111111111111/message_templates",
                     params={"limit": 255},
                     headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
                 ),
                 call(
-                    "https://graph.facebook.com/v13.0/111111111111111/message_templates?after=MjQZD",
+                    "https://graph.facebook.com/v14.0/111111111111111/message_templates?after=MjQZD",
                     params={"limit": 255},
                     headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
                 ),

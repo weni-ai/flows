@@ -2019,7 +2019,9 @@ class APITest(TembaTest):
 
         # try to update a contact by both UUID and URN
         response = self.postJSON(url, "uuid=%s&urn=%s" % (jean.uuid, quote_plus("tel:+250784444444")), {})
-        self.assertResponseError(response, None, "URL can only contain one of the following parameters: name, urn, uuid")
+        self.assertResponseError(
+            response, None, "URL can only contain one of the following parameters: name, urn, uuid"
+        )
 
         # try an empty delete request
         response = self.deleteJSON(url, None)
@@ -3432,7 +3434,6 @@ class APITest(TembaTest):
 
         def assert_media_upload(filename, ext):
             with open(filename, "rb") as data:
-
                 post_data = dict(media_file=data, extension=ext, HTTP_X_FORWARDED_HTTPS="https")
                 response = self.client.post(url, post_data)
 

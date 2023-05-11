@@ -1,8 +1,9 @@
 from django.utils.translation import ugettext_lazy as _
 
 from temba.externals.models import ExternalServiceType
-from .views import ConnectView
+
 from .serializers import OmieSerializer
+from .views import ConnectView
 
 
 class OmieType(ExternalServiceType):

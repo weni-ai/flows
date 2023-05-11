@@ -31,7 +31,6 @@ def reverse(apps, schema_editor):  # pragma: no cover
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("orgs", "0085_org_flow_languages"),
     ]

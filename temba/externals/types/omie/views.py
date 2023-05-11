@@ -1,10 +1,9 @@
 from django import forms
 from django.utils.translation import ugettext_lazy as _
 
-from temba.utils.uuid import uuid4
-
-from temba.externals.views import BaseConnectView
 from temba.externals.models import ExternalService
+from temba.externals.views import BaseConnectView
+from temba.utils.uuid import uuid4
 
 
 class ConnectView(BaseConnectView):

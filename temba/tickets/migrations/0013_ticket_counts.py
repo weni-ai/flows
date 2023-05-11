@@ -44,7 +44,6 @@ CREATE TRIGGER temba_ticket_on_change_trg
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("orgs", "0088_auto_20210715_1825"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

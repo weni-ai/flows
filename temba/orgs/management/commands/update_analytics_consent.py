@@ -19,7 +19,6 @@ class Command(BaseCommand):  # pragma: no cover
         users = User.objects.all().order_by("id")
         total = users.count()
         for user in users:
-
             # update their policy consent
             if Policy.get_policies_needing_consent(user):
                 analytics.change_consent(user.email, False)

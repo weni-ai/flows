@@ -8,6 +8,7 @@ COPY ./docker/pip-requires.txt .
 
 RUN python -m pip install -U poetry==1.1.15 \
  && poetry cache clear -n --all pypi \
+ && pip install requests==2.29.0 \
  && poetry add -n --lock $(cat pip-requires.txt) \
  && poetry export --without-hashes --output requirements.txt
 

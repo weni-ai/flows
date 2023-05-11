@@ -24,7 +24,6 @@ def reverse(apps, schema_editor):  # pragma: no cover
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("orgs", "0075_auto_20210204_1638"),
     ]

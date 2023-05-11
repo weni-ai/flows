@@ -7,7 +7,6 @@ import temba.utils.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("orgs", "0078_auto_20210208_1937"),
     ]

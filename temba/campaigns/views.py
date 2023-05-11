@@ -217,7 +217,6 @@ class CampaignCRUDL(SmartCRUDL):
             return qs
 
     class Archive(OrgFilterMixin, OrgPermsMixin, SmartUpdateView):
-
         fields = ()
         success_url = "id@campaigns.campaign_read"
         success_message = _("Campaign archived")
@@ -237,7 +236,6 @@ class CampaignCRUDL(SmartCRUDL):
 
 
 class CampaignEventForm(forms.ModelForm):
-
     event_type = forms.ChoiceField(
         choices=((CampaignEvent.TYPE_MESSAGE, "Send a message"), (CampaignEvent.TYPE_FLOW, "Start a flow")),
         required=True,
@@ -343,7 +341,6 @@ class CampaignEventForm(forms.ModelForm):
 
         # if its a message flow, set that accordingly
         if self.cleaned_data["event_type"] == CampaignEvent.TYPE_MESSAGE:
-
             if self.instance.id:
                 base_language = self.instance.flow.base_language
             else:
@@ -526,7 +523,6 @@ class CampaignEventCRUDL(SmartCRUDL):
             return links
 
     class Delete(ModalMixin, OrgObjPermsMixin, SmartDeleteView):
-
         default_template = "smartmin/delete_confirm.html"
         submit_button_name = _("Delete")
         fields = ("uuid",)
@@ -581,7 +577,6 @@ class CampaignEventCRUDL(SmartCRUDL):
             return super().get_context_data(**kwargs)
 
         def derive_fields(self):
-
             from copy import deepcopy
 
             fields = deepcopy(self.default_fields)
@@ -620,7 +615,6 @@ class CampaignEventCRUDL(SmartCRUDL):
             return obj
 
         def pre_save(self, obj):
-
             obj = super().pre_save(obj)
             self.form.pre_save(self.request, obj)
 
@@ -650,7 +644,6 @@ class CampaignEventCRUDL(SmartCRUDL):
             return reverse("campaigns.campaignevent_read", args=[self.object.pk])
 
     class Create(OrgPermsMixin, ModalMixin, SmartCreateView):
-
         default_fields = [
             "event_type",
             "flow_to_start",
@@ -676,7 +669,6 @@ class CampaignEventCRUDL(SmartCRUDL):
                     raise Http404("Campaign not found")
 
         def derive_fields(self):
-
             from copy import deepcopy
 
             fields = deepcopy(self.default_fields)
