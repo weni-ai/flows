@@ -2,8 +2,9 @@ import json
 import os
 
 from rest_framework import status
-from django.test import TestCase
 from rest_framework.test import APITestCase
+
+from django.test import TestCase
 from django.urls import reverse
 
 from temba.externals.types import TYPES

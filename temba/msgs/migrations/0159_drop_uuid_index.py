@@ -6,7 +6,6 @@ SQL = "DROP INDEX msgs_msg_uuid_not_null"
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("msgs", "0158_scheduled_bcast_cleanup"),
     ]

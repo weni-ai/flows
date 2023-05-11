@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("channels", "0130_channellog_channels_log_error_created"),
     ]

@@ -11,7 +11,6 @@ def delete_all_notifications(apps, schema_editor):  # pragma: no cover
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("flows", "0259_auto_20210825_1438"),
         ("contacts", "0142_auto_20210803_2000"),

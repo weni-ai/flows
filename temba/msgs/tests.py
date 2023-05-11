@@ -114,7 +114,6 @@ class MsgTest(TembaTest):
         )
 
     def test_deletes(self):
-
         # create some incoming messages
         msg1 = self.create_incoming_msg(self.joe, "i'm having a problem")
         msg2 = self.create_incoming_msg(self.frank, "ignore joe, he's a liar")

@@ -97,7 +97,6 @@ def identify_org(org, attributes=None):
         attributes = {}
 
     if _intercom:
-
         intercom_attributes = {}
         for key in ("monthly_spend", "industry", "website"):
             value = attributes.pop(key, None)
@@ -162,7 +161,6 @@ def identify(user, brand, org):
             logger.error("error posting to intercom", exc_info=True)
 
     if _crisp:
-
         user_settings = user.get_settings()
         existing_profile = None
         external_id = user_settings.external_id
@@ -243,7 +241,6 @@ def change_consent(email, consent):
 
     if _intercom:
         try:
-
             user = get_intercom_user(email)
 
             if consent:
@@ -264,7 +261,6 @@ def change_consent(email, consent):
             logger.error("error posting to intercom", exc_info=True)
 
     if _crisp:
-
         consented_segment = "consented"
 
         try:
@@ -347,7 +343,6 @@ def track(user, event_name, properties=None, context=None):
             logger.error("error posting to intercom", exc_info=True)
 
     if _crisp:
-
         color = "grey"
 
         if "signup" in event_name:

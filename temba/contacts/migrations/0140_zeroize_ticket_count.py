@@ -36,7 +36,6 @@ def apply_manual():  # pragma: no cover
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("contacts", "0139_contact_ticket_count"),
     ]

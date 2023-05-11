@@ -1,6 +1,7 @@
 from django.conf.urls import include, url
 
 from .models import IntegrationType
+from .password_forget import UserCRUDL
 from .views import (
     ConfirmAccessView,
     LoginView,
@@ -12,9 +13,6 @@ from .views import (
     TwoFactorVerifyView,
     check_login,
 )
-
-from .password_forget import UserCRUDL
-
 
 urlpatterns = OrgCRUDL().as_urlpatterns()
 urlpatterns += TopUpCRUDL().as_urlpatterns()

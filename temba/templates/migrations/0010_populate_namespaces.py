@@ -19,7 +19,6 @@ def reverse(apps, schema_editor):  # pragma: no cover
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("templates", "0009_templatetranslation_namespace"),
     ]
