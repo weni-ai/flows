@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("contacts", "0131_contactimport_group_name"),
         ("triggers", "0018_auto_20210531_1503"),

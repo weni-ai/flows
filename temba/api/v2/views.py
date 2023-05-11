@@ -2430,7 +2430,6 @@ class MediaEndpoint(BaseAPIView):
     permission = "msgs.msg_api"
 
     def post(self, request, format=None, *args, **kwargs):
-
         org = self.request.user.get_org()
         media_file = request.data.get("media_file", None)
         extension = request.data.get("extension", None)

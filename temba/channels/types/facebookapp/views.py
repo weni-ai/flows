@@ -162,7 +162,6 @@ class RefreshToken(ModalMixin, OrgObjPermsMixin, SmartModelActionView):
         return Channel.objects.filter(is_active=True, org=self.request.user.get_org(), channel_type="FBA")
 
     def execute_action(self):
-
         form = self.form
         channel = self.object
 
