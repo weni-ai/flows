@@ -37,7 +37,11 @@ def logrocket(request):
 def old_design_excluded_channels_codes(request):
     return {"old_design_excluded_channels_codes": settings.OLD_DESIGN_EXCLUDED_CHANNELS_CODES}
 
+
 def show_onboard_modal(request):
+    if not request.user or request.user.is_anonymous:
+        return {"show_trigger_onboard_modal": False}
+
     triggers = request.user.get_org().triggers.all();
 
     show_trigger_onboard_modal = len(triggers) == 0;
