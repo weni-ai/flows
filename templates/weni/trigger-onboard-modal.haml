@@ -1,0 +1,76 @@
+-load smartmin i18n humanize temba compress
+
+#unnnic-modal.hidden{class: "unnnic-modal"}
+
+  %div{class: "unnnic-modal-container"}
+    #close-modal.unnnic-icon-close-1.unnnic-icon-sm{class: "unnnic-modal-close"}
+
+    %span{class: "unnnic-modal-title"}
+      Como utilizar disparadores
+    
+    %div#step-1{class: "unnnic-modal-content"}
+      %img{class: "onboard-gif", src:"/sitestatic/brands/push/trigger1.gif"}
+
+      %div{class: "onboard-scrollable"}
+        Em disparadores, uma das possibilidades é criar uma palavra-chave para disparar um fluxo específico para seus contatos.
+        %ol{class: "onboard-list"}
+          %li
+            Acesse o módulo de estúdio e clique em “Disparadores”. Em seguida, clique no botão “Criar disparadores”.
+          %li
+            Escolha o card, “Crie uma palavra-chave que inicia um fluxo”.
+          %li
+            Adicione uma palavra-chave e defina o fluxo que será iniciado, e Clique em "criar disparadores" e pronto!
+
+    %div#step-1-buttons{class: "unnnic-modal-buttons"}
+      %button{class: "unnnic-button unnnic-button--secondary unnnic-button--size-large w-full", onclick:"nextStep()"}
+        Próximo
+
+    %div#step-2.hidden{class: "unnnic-modal-content"}
+      %img{class: "onboard-gif", src:"/sitestatic/brands/push/trigger2.gif"}
+
+      %div{class: "onboard-scrollable"}
+        Em disparadores você também pode agendar quando um fluxo de mensagem deverá ser disparado para seus contatos.
+        %ol{class: "onboard-list"}
+          %li
+            Para isso, clique em “iniciar um fluxo diariamente ou segundo agendamento”, defina o dia e o horário de disparo.
+          %li
+            Escolha a frequência semanal que você desejada, disparar.
+          %li
+            Adicione os grupos de contatos aos quais deseja enviar as mensagens. Por fim, clique em "criar disparador".
+
+    %div#step-2-buttons.hidden{class: "unnnic-modal-buttons"}
+      %button{class: "unnnic-button unnnic-button--tertiary unnnic-button--size-large w-full", onclick:"previousStep()"}
+        Voltar
+      %button{class: "unnnic-button unnnic-button--secondary unnnic-button--size-large w-full", onclick:"complete()"}
+        Começar
+
+-block extra-script
+  :javascript
+    let hideOnboardTriggerModal = sessionStorage.getItem('hideOnboardTriggerModal')
+
+    if (!hideOnboardTriggerModal) {
+      $("#unnnic-modal").css('display','flex');
+    }
+
+    let currentStep = 1;
+
+    function nextStep() {
+      $(`#step-${currentStep}, #step-${currentStep}-buttons`).css('display','none'); 
+      $(`#step-${currentStep + 1}, #step-${currentStep + 1}-buttons`).css('display','flex'); 
+      currentStep += 1;
+    }
+
+    function previousStep() {
+      $(`#step-${currentStep}, #step-${currentStep}-buttons`).css('display','none'); 
+      $(`#step-${currentStep - 1}, #step-${currentStep - 1}-buttons`).css('display','flex'); 
+      currentStep -= 1;
+    }
+
+    function complete() {
+      $("#unnnic-modal").hide()
+      sessionStorage.setItem('hideOnboardTriggerModal', '1')
+    }
+
+    $("#close-modal").live('click', (event) => {
+      complete()
+    })
