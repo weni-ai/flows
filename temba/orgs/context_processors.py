@@ -1,4 +1,5 @@
 from collections import defaultdict
+
 from django.contrib.auth.models import Permission
 
 from .models import get_stripe_credentials
