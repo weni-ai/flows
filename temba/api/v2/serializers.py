@@ -18,6 +18,7 @@ from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
 from temba.classifiers.models import Classifier
 from temba.contacts.models import Contact, ContactField, ContactGroup
+from temba.externals.models import ExternalService
 from temba.flows.models import Flow, FlowRun, FlowStart
 from temba.globals.models import Global
 from temba.locations.models import AdminBoundary
@@ -26,7 +27,6 @@ from temba.msgs.models import Broadcast, Label, Msg
 from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
-from temba.externals.models import ExternalService
 from temba.utils import extract_constants, json, on_transaction_commit
 
 from . import fields
@@ -66,7 +66,7 @@ def _normalize_extra(extra, count):
     elif isinstance(extra, dict):
         count += 1
         normalized = OrderedDict()
-        for (k, v) in extra.items():
+        for k, v in extra.items():
             (normalized[normalize_key(k)], count) = _normalize_extra(v, count)
 
             if count >= settings.FLOW_START_PARAMS_SIZE:
@@ -77,7 +77,7 @@ def _normalize_extra(extra, count):
     elif isinstance(extra, list):
         count += 1
         normalized = OrderedDict()
-        for (i, v) in enumerate(extra):
+        for i, v in enumerate(extra):
             (normalized[str(i)], count) = _normalize_extra(v, count)
 
             if count >= settings.FLOW_START_PARAMS_SIZE:
@@ -380,7 +380,6 @@ class CampaignEventWriteSerializer(WriteSerializer):
         flow = self.validated_data.get("flow")
 
         if self.instance:
-
             # we dont update, we only create
             self.instance = self.instance.recreate()
 
@@ -1445,6 +1444,7 @@ class TicketerReadSerializer(ReadSerializer):
     class Meta:
         model = Ticketer
         fields = ("uuid", "name", "type", "created_on")
+
 
 class ExternalServicesReadSerializer(ReadSerializer):
     external_service_type = serializers.SerializerMethodField()

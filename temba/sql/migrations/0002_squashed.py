@@ -6,7 +6,6 @@ from . import InstallSQL
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("contacts", "0129_squashed"),
         ("flows", "0244_squashed"),

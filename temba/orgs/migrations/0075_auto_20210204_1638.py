@@ -11,7 +11,6 @@ import temba.utils.text
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ("orgs", "0074_auto_20201214_1714"),

@@ -228,7 +228,6 @@ class FlowCRUDL(SmartCRUDL):
             return r"^%s/%s/((?P<submenu>[A-z]+)/)?$" % (path, action)
 
         def derive_menu(self):
-
             labels = FlowLabel.objects.filter(org=self.request.user.get_org(), parent=None)
 
             menu = []
@@ -1030,7 +1029,6 @@ class FlowCRUDL(SmartCRUDL):
                     data = json.load(json_file)
 
             for key, filename in data.get("files").items():
-
                 # tack on our prefix for dev mode
                 filename = prefix + filename
 
@@ -1578,7 +1576,6 @@ class FlowCRUDL(SmartCRUDL):
         }
 
         def get_context_data(self, *args, **kwargs):
-
             total_responses = 0
             context = super().get_context_data(*args, **kwargs)
 

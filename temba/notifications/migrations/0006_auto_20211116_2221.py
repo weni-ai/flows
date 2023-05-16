@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("orgs", "0089_auto_20211111_1917"),
         ("channels", "0135_alter_channellog_created_on"),

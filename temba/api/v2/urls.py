@@ -16,6 +16,7 @@ from .views import (
     ContactsEndpoint,
     DefinitionsEndpoint,
     ExplorerView,
+    ExternalServicesEndpoint,
     FieldsEndpoint,
     FlowsEndpoint,
     FlowStartsEndpoint,
@@ -37,7 +38,6 @@ from .views import (
     TopicsEndpoint,
     UsersEndpoint,
     WorkspaceEndpoint,
-    ExternalServicesEndpoint,
 )
 
 urlpatterns = [

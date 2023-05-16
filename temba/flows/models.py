@@ -70,7 +70,6 @@ FLOW_LOCK_KEY = "org:%d:lock:flow:%d:definition"
 
 
 class Flow(TembaModel):
-
     CONTACT_CREATION = "contact_creation"
     CONTACT_PER_RUN = "run"
     CONTACT_PER_LOGIN = "login"
@@ -2355,7 +2354,6 @@ class FlowLabel(models.Model):
 
     @classmethod
     def create(cls, org, base, parent=None):
-
         base = base.strip()
 
         # truncate if necessary

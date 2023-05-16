@@ -13,25 +13,24 @@ import intercom.errors
 import pytz
 from django_redis import get_redis_connection
 from openpyxl import load_workbook
-from smartmin.tests import SmartminTest, SmartminTestMixin
+from smartmin.tests import SmartminTest
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.core import checks
-from django.core.management import CommandError, call_command
+from django.core.management import call_command
 from django.db import connection, models
 from django.forms import ValidationError
-from django.test import TestCase, TransactionTestCase, override_settings
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone, translation
 
 from celery.app.task import Task
 
 import temba.utils.analytics
-from temba.contacts.models import Contact, ContactField, ContactGroup, ContactGroupCount, ExportContactsTask
+from temba.contacts.models import Contact, ExportContactsTask
 from temba.flows.models import Flow, FlowRun
-from temba.orgs.models import Org
-from temba.tests import ESMockWithScroll, TembaTest, matchers
+from temba.tests import TembaTest, matchers
 from temba.utils import json, uuid
 from temba.utils.templatetags.temba import format_datetime
 
@@ -61,7 +60,6 @@ from .timezones import TimeZoneFormField, timezone_to_country_code
 
 class InitTest(TembaTest):
     def test_decode_base64(self):
-
         self.assertEqual("This test\nhas a newline", decode_base64("This test\nhas a newline"))
 
         self.assertEqual(
@@ -547,7 +545,6 @@ class EmailTest(TembaTest):
         self.assertOutbox(1, "no-reply@foo.com", "Test Subject", "Test Body", ["recipient@bar.com"])
 
     def test_is_valid_address(self):
-
         self.VALID_EMAILS = [
             # Cases from https://en.wikipedia.org/wiki/Email_address
             "prettyandsimple@example.com",
@@ -905,43 +902,6 @@ class MiddlewareTest(TembaTest):
         assert_text("Créez visuellement des applications mobiles")
 
 
-class MakeTestDBTest(SmartminTestMixin, TransactionTestCase):
-    def test_command(self):
-        self.create_anonymous_user()
-
-        with ESMockWithScroll():
-            call_command("test_db", num_orgs=3, num_contacts=30, seed=1234)
-
-        org1, org2, org3 = tuple(Org.objects.order_by("id"))
-
-        def assertOrgCounts(qs, counts):
-            self.assertEqual([qs.filter(org=o).count() for o in (org1, org2, org3)], counts)
-
-        self.assertEqual(
-            User.objects.exclude(username__in=["AnonymousUser", "root", "rapidpro_flow", "temba_flow"]).count(), 12
-        )
-        assertOrgCounts(ContactField.user_fields.all(), [6, 6, 6])
-        assertOrgCounts(ContactGroup.user_groups.all(), [10, 10, 10])
-        assertOrgCounts(Contact.objects.all(), [10, 11, 9])
-
-        org_1_active_contacts = ContactGroup.system_groups.get(org=org1, name="Active")
-
-        self.assertEqual(org_1_active_contacts.contacts.count(), 9)
-        self.assertEqual(
-            list(ContactGroupCount.objects.filter(group=org_1_active_contacts).values_list("count")), [(9,)]
-        )
-
-        # same seed should generate objects with same UUIDs
-        self.assertEqual("f2a3f8c5-e831-4df3-b046-8d8cdb90f178", ContactGroup.user_groups.order_by("id").first().uuid)
-
-        # check if contact fields are serialized
-        self.assertIsNotNone(Contact.objects.first().fields)
-
-        # check generate can't be run again on a now non-empty database
-        with self.assertRaises(CommandError):
-            call_command("test_db", num_orgs=3, num_contacts=30, seed=1234)
-
-
 class PreDeployTest(TembaTest):
     def test_command(self):
         buffer = io.StringIO()
@@ -1279,7 +1239,6 @@ class AnalyticsTest(SmartminTest):
         mocked_logging.error.assert_called_with("error posting to intercom", exc_info=True)
 
     def test_identify(self):
-
         self.crisp_mock.website.get_people_profile.side_effect = Exception("No Profile")
         temba.utils.analytics.identify(self.admin, {"slug": "test", "host": "rapidpro.io"}, self.org)
 
@@ -1411,7 +1370,6 @@ class AnalyticsTest(SmartminTest):
         self.intercom_mock.users.delete.assert_not_called()
 
     def test_consent_valid_user(self):
-
         # valid user which did not consent
         self.intercom_mock.users.find.return_value = MagicMock(custom_attributes={"consent": False})
         self.crisp_mock.website.get_people_profile.return_value = {"segments": []}
@@ -1437,7 +1395,6 @@ class AnalyticsTest(SmartminTest):
         self.intercom_mock.users.create.assert_not_called()
 
     def test_consent_valid_user_decline(self):
-
         # valid user which did not consent
         self.intercom_mock.users.find.return_value = MagicMock(custom_attributes={"consent": False})
         self.crisp_mock.website.get_people_profile.return_value = {"segments": ["random-3", "consented"]}

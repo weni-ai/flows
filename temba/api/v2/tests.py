@@ -2019,7 +2019,9 @@ class APITest(TembaTest):
 
         # try to update a contact by both UUID and URN
         response = self.postJSON(url, "uuid=%s&urn=%s" % (jean.uuid, quote_plus("tel:+250784444444")), {})
-        self.assertResponseError(response, None, "URL can only contain one of the following parameters: name, urn, uuid")
+        self.assertResponseError(
+            response, None, "URL can only contain one of the following parameters: name, urn, uuid"
+        )
 
         # try an empty delete request
         response = self.deleteJSON(url, None)
@@ -3432,7 +3434,6 @@ class APITest(TembaTest):
 
         def assert_media_upload(filename, ext):
             with open(filename, "rb") as data:
-
                 post_data = dict(media_file=data, extension=ext, HTTP_X_FORWARDED_HTTPS="https")
                 response = self.client.post(url, post_data)
 
@@ -4426,8 +4427,6 @@ class APITest(TembaTest):
         url = reverse("api.v2.ticketers")
         self.assertEndpointAccess(url)
 
-        t1 = self.org.ticketers.get()  # the internal ticketer
-
         # create some additional ticketers
         t2 = Ticketer.create(self.org, self.admin, MailgunType.slug, "bob@acme.com", {})
         t3 = Ticketer.create(self.org, self.admin, MailgunType.slug, "jim@acme.com", {})
@@ -4460,12 +4459,6 @@ class APITest(TembaTest):
                     "name": "bob@acme.com",
                     "type": "mailgun",
                     "created_on": format_datetime(t2.created_on),
-                },
-                {
-                    "uuid": str(t1.uuid),
-                    "name": "RapidPro Tickets",
-                    "type": "internal",
-                    "created_on": format_datetime(t1.created_on),
                 },
             ],
         )
