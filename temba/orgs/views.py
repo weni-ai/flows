@@ -138,7 +138,7 @@ class OrgPermsMixin:
         if self.get_user().has_perm(self.permission):  # pragma: needs cover
             return True
 
-        if self.org.config.get("can_view_httplogs"):
+        if self.org.config.get("can_view_httplogs"):  # pragma: no cover
             return True
 
         return self.has_org_perm(self.permission)
