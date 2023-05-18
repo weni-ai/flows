@@ -1,3 +1,10 @@
+1.8.5-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.4.1
+* Chore: Update FlowEditor to 1.2.1
+* fix: add weni prefix to css classes
+* Remove iso-639 lib from pip-requires and lock in CI
+
 1.8.4-rapidpro-7.1.27
 ----------
 * Update README to flows build status
