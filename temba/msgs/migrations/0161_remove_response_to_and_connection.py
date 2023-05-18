@@ -6,7 +6,6 @@ SQL = "DROP INDEX IF EXISTS msgs_msg_responded_to_not_null;"
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("msgs", "0160_auto_20211202_1446"),
     ]

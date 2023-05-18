@@ -14,7 +14,6 @@ from ...views import ClaimViewMixin
 
 class ClaimView(ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
-
         user_access_token = forms.CharField(min_length=32, required=True, help_text=_("The User Access Token"))
         fb_user_id = forms.CharField(
             required=True,
@@ -194,7 +193,6 @@ class RefreshToken(ModalMixin, OrgObjPermsMixin, SmartModelActionView):
         return Channel.objects.filter(is_active=True, org=self.request.user.get_org(), channel_type="IG")
 
     def execute_action(self):
-
         form = self.form
         channel = self.object
 

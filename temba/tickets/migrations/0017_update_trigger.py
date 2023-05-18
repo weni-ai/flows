@@ -39,7 +39,6 @@ $$ LANGUAGE plpgsql;
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("tickets", "0016_auto_20210727_1716"),
         ("contacts", "0140_zeroize_ticket_count"),

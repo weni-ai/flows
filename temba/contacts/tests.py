@@ -44,7 +44,7 @@ from temba.tests import (
 )
 from temba.tests.engine import MockSessionWriter
 from temba.tests.s3 import MockS3Client
-from temba.tickets.models import Ticket, TicketCount, Ticketer
+from temba.tickets.models import Ticketer
 from temba.triggers.models import Trigger
 from temba.utils import json
 from temba.utils.dates import datetime_to_str, datetime_to_timestamp
@@ -633,7 +633,11 @@ class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
         start_url = reverse("contacts.contact_start", args=[contact.id])
 
         response = self.assertUpdateFetch(start_url, allow_viewers=False, allow_editors=True, form_fields=["flow"])
-        self.assertEqual([background_flow] + sample_flows, list(response.context["form"].fields["flow"].queryset))
+
+        self.assertEqual(
+            [sample_flows[0]] + [background_flow] + sample_flows[1:],
+            list(response.context["form"].fields["flow"].queryset),
+        )
 
         # try to submit without specifying a flow
         self.assertUpdateSubmit(
@@ -1087,7 +1091,6 @@ class ContactGroupCRUDLTest(TembaTest, CRUDLTestMixin):
 
     @mock_mailroom
     def test_list(self, mr_mocks):
-
         list_url = reverse("contacts.contactgroup_list")
         response = self.assertListFetch(list_url, allow_viewers=True, allow_editors=True, allow_agents=False)
         self.assertEqual(
@@ -1449,8 +1452,6 @@ class ContactTest(TembaTest):
         self.create_incoming_msg(old_contact, "hola mundo")
         urn = old_contact.get_urn()
 
-        self.create_ticket(self.org.ticketers.get(), old_contact, "Hi")
-
         ivr_flow = self.get_flow("ivr")
         msg_flow = self.get_flow("favorites_v13")
 
@@ -1506,9 +1507,6 @@ class ContactTest(TembaTest):
         self.create_incoming_call(msg_flow, contact)
 
         # give contact an open and a closed ticket
-        self.create_ticket(self.org.ticketers.get(), contact, "Hi")
-        self.create_ticket(self.org.ticketers.get(), contact, "Hi", closed_on=timezone.now())
-
         self.assertEqual(1, group.contacts.all().count())
         self.assertEqual(1, contact.connections.all().count())
         self.assertEqual(2, contact.addressed_broadcasts.all().count())
@@ -1518,18 +1516,12 @@ class ContactTest(TembaTest):
         self.assertEqual(2, len(contact.fields))
         self.assertEqual(1, contact.campaign_fires.count())
 
-        self.assertEqual(2, TicketCount.get_all(self.org, Ticket.STATUS_OPEN))
-        self.assertEqual(1, TicketCount.get_all(self.org, Ticket.STATUS_CLOSED))
-
         # first try a regular release and make sure our urns are anonymized
         contact.release(self.admin, full=False)
         self.assertEqual(2, contact.urns.all().count())
         for urn in contact.urns.all():
             uuid.UUID(urn.path, version=4)
             self.assertEqual(URN.DELETED_SCHEME, urn.scheme)
-
-        # tickets unchanged
-        self.assertEqual(2, contact.tickets.count())
 
         # a new contact arrives with those urns
         new_contact = self.create_contact("URN Thief", urns=["tel:+12065552000", "twitter:tweettweet"])
@@ -1542,6 +1534,7 @@ class ContactTest(TembaTest):
         contact.release(self.admin)
 
         contact.refresh_from_db()
+
         self.assertEqual(0, group.contacts.all().count())
         self.assertEqual(0, contact.connections.all().count())
         self.assertEqual(0, contact.addressed_broadcasts.all().count())
@@ -1549,11 +1542,6 @@ class ContactTest(TembaTest):
         self.assertEqual(0, contact.runs.all().count())
         self.assertEqual(0, contact.msgs.all().count())
         self.assertEqual(0, contact.campaign_fires.count())
-
-        # tickets deleted (only for this contact)
-        self.assertEqual(0, contact.tickets.count())
-        self.assertEqual(1, TicketCount.get_all(self.org, Ticket.STATUS_OPEN))
-        self.assertEqual(0, TicketCount.get_all(self.org, Ticket.STATUS_CLOSED))
 
         # contact who used to own our urn had theirs released too
         self.assertEqual(0, old_contact.connections.all().count())
@@ -1566,7 +1554,6 @@ class ContactTest(TembaTest):
         Org.objects.get(id=self.org.id)
         Flow.objects.get(id=msg_flow.id)
         Flow.objects.get(id=ivr_flow.id)
-        self.assertEqual(1, Ticket.objects.count())
 
     @mock_mailroom
     def test_status_changes_and_release(self, mr_mocks):
@@ -2719,7 +2706,6 @@ class ContactTest(TembaTest):
         )
 
     def test_read_language(self):
-
         # this is a bogus
         self.joe.language = "zzz"
         self.joe.save(update_fields=("language",))
@@ -4904,7 +4890,6 @@ class URNTest(TembaTest):
         self.assertFalse(URN.validate("freshchat:+12065551212"))
 
     def test_from_parts(self):
-
         self.assertEqual(URN.from_parts("deleted", "12345"), "deleted:12345")
         self.assertEqual(URN.from_parts("tel", "12345"), "tel:12345")
         self.assertEqual(URN.from_parts("tel", "+12345"), "tel:+12345")

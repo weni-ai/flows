@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("channels", "0128_populate_wa_api_version"),
         ("sql", "0003_bigint_m2ms"),

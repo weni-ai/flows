@@ -13,7 +13,6 @@ class Command(BaseCommand):
     help = "Verify Sentry reports with verify_sentry"
 
     def handle(self, *args, **kwargs):
-
         failing_task.delay()
         foo = 1 / 0
         print(foo)

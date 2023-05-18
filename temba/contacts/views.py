@@ -243,14 +243,12 @@ class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
             sort_field = sort_on
 
         if sort_field == "created_on":
-
             return (
                 sort_field,
                 sort_direction,
                 {"field_type": "attribute", "sort_direction": sort_direction, "field_name": "created_on"},
             )
         if sort_field == "last_seen_on":
-
             return (
                 sort_field,
                 sort_direction,
@@ -641,7 +639,6 @@ class ContactCRUDL(SmartCRUDL):
             return JsonResponse({"results": menu})
 
     class Export(ModalMixin, OrgPermsMixin, SmartFormView):
-
         form_class = ExportForm
         submit_button_name = "Export"
         success_url = "@contacts.contact_list"
@@ -1058,7 +1055,6 @@ class ContactCRUDL(SmartCRUDL):
             # serialize our contact sample
             json_contacts = []
             for contact in summary["sample"]:
-
                 primary_urn = contact.get_urn()
                 if primary_urn:
                     primary_urn = primary_urn.get_display(org=org, international=True)
@@ -1129,7 +1125,6 @@ class ContactCRUDL(SmartCRUDL):
                 )
 
             if is_spa:
-
                 links.append(
                     dict(
                         id="create-contact",
@@ -1778,7 +1773,6 @@ class ContactFieldListView(SpaMixin, OrgPermsMixin, SmartListView):
     template_name = "contacts/contactfield_list.haml"
 
     def _get_static_context_data(self, **kwargs):
-
         org = self.request.user.get_org()
         org_active_fields_limit = org.get_limit(Org.LIMIT_FIELDS)
         active_user_fields = self.queryset.filter(org=org, is_active=True)
@@ -1829,7 +1823,6 @@ class ContactFieldCRUDL(SmartCRUDL):
 
     class Menu(OrgPermsMixin, SmartTemplateView):
         def render_to_response(self, context, **response_kwargs):
-
             org = self.request.user.get_org()
             menu = []
 
@@ -1922,7 +1915,6 @@ class ContactFieldCRUDL(SmartCRUDL):
 
     class UpdatePriority(OrgPermsMixin, SmartView, View):
         def post(self, request, *args, **kwargs):
-
             try:
                 post_data = json.loads(request.body)
 
