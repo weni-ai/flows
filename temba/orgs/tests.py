@@ -4248,6 +4248,10 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.client.post(service_url, dict())
         self.assertRedirect(response, "/org/manage/")
 
+        # can no longer go to inbox, asked to log in
+        response = self.client.get(reverse("msgs.msg_inbox"))
+        self.assertRedirect(response, "/users/login/")
+
     def test_languages(self):
         home_url = reverse("orgs.org_home")
         langs_url = reverse("orgs.org_languages")
