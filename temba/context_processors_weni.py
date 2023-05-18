@@ -46,6 +46,6 @@ def show_onboard_modal(request):
 
     triggers = request.user.get_org().triggers.all()
 
-    show_trigger_onboard_modal = len(triggers) == 0
+    show_trigger_onboard_modal = not triggers.exists()
 
     return {"show_trigger_onboard_modal": show_trigger_onboard_modal}
