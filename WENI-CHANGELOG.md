@@ -1,3 +1,8 @@
+1.8.7-rapidpro-7.1.27
+----------
+* Add a condition to enable httplog_webhook to a org
+* New trigger onboard modal
+
 1.8.6-rapidpro-7.1.27
 ----------
 * Update version of weni-rp-apps to 2.4.2
