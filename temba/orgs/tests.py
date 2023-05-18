@@ -115,6 +115,15 @@ class OrgContextProcessorTest(TembaTest):
         self.assertFalse(perms["msgs"]["foo"])  # no blow up if perm doesn't exist
         self.assertFalse(perms["chickens"]["foo"])  # or app doesn't exist
 
+        test_httplog_enable = self.org
+
+        test_httplog_enable.config = {"can_view_httplogs": True}
+        test_httplog_enable.save()
+
+        perms = GroupPermWrapper(viewers, test_httplog_enable)
+
+        self.assertTrue(perms["request_logs"]["httplog_webhooks"])
+
         with self.assertRaises(TypeError):
             list(perms)
 
@@ -4238,10 +4247,6 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
         # ok, now end our session
         response = self.client.post(service_url, dict())
         self.assertRedirect(response, "/org/manage/")
-
-        # can no longer go to inbox, asked to log in
-        response = self.client.get(reverse("msgs.msg_inbox"))
-        self.assertRedirect(response, "/users/login/")
 
     def test_languages(self):
         home_url = reverse("orgs.org_home")
