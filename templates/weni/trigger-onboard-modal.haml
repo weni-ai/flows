@@ -1,14 +1,14 @@
 -load smartmin i18n humanize temba compress
 
-#unnnic-modal.hidden{class: "unnnic-modal"}
+#unnnic-modal.hidden{class: "weni-unnnic-modal"}
 
-  %div{class: "unnnic-modal-container"}
-    #close-modal.unnnic-icon-close-1.unnnic-icon-sm{class: "unnnic-modal-close"}
+  %div{class: "weni-unnnic-modal-container"}
+    #close-modal.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{class: "weni-unnnic-modal-close"}
 
-    %span{class: "unnnic-modal-title"}
+    %span{class: "weni-unnnic-modal-title"}
       Como utilizar disparadores
     
-    %div#step-1{class: "unnnic-modal-content"}
+    %div#step-1{class: "weni-unnnic-modal-content"}
       %img{class: "onboard-gif", src:"/sitestatic/brands/push/trigger1.gif"}
 
       %div{class: "onboard-scrollable"}
@@ -21,11 +21,11 @@
           %li
             Adicione uma palavra-chave e defina o fluxo que será iniciado, e Clique em "criar disparadores" e pronto!
 
-    %div#step-1-buttons{class: "unnnic-modal-buttons"}
-      %button{class: "unnnic-button unnnic-button--secondary unnnic-button--size-large w-full", onclick:"nextStep()"}
+    %div#step-1-buttons{class: "weni-unnnic-modal-buttons"}
+      %button{class: "weni-unnnic-button weni-unnnic-button--secondary weni-unnnic-button--size-large w-full", onclick:"nextStep()"}
         Próximo
 
-    %div#step-2.hidden{class: "unnnic-modal-content"}
+    %div#step-2.hidden{class: "weni-unnnic-modal-content"}
       %img{class: "onboard-gif", src:"/sitestatic/brands/push/trigger2.gif"}
 
       %div{class: "onboard-scrollable"}
@@ -38,10 +38,10 @@
           %li
             Adicione os grupos de contatos aos quais deseja enviar as mensagens. Por fim, clique em "criar disparador".
 
-    %div#step-2-buttons.hidden{class: "unnnic-modal-buttons"}
-      %button{class: "unnnic-button unnnic-button--tertiary unnnic-button--size-large w-full", onclick:"previousStep()"}
+    %div#step-2-buttons.hidden{class: "weni-unnnic-modal-buttons"}
+      %button{class: "weni-unnnic-button weni-unnnic-button--tertiary weni-unnnic-button--size-large w-full", onclick:"previousStep()"}
         Voltar
-      %button{class: "unnnic-button unnnic-button--secondary unnnic-button--size-large w-full", onclick:"complete()"}
+      %button{class: "weni-unnnic-button weni-unnnic-button--secondary weni-unnnic-button--size-large w-full", onclick:"complete()"}
         Começar
 
 -block extra-script
