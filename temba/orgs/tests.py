@@ -90,7 +90,7 @@ class OrgContextProcessorTest(TembaTest):
         editors = Group.objects.get(name="Editors")
         viewers = Group.objects.get(name="Viewers")
 
-        perms = GroupPermWrapper(administrators)
+        perms = GroupPermWrapper(administrators, self.org)
 
         self.assertTrue(perms["msgs"]["msg_inbox"])
         self.assertTrue(perms["contacts"]["contact_update"])
@@ -98,14 +98,14 @@ class OrgContextProcessorTest(TembaTest):
         self.assertTrue(perms["orgs"]["org_manage_accounts"])
         self.assertFalse(perms["orgs"]["org_delete"])
 
-        perms = GroupPermWrapper(editors)
+        perms = GroupPermWrapper(editors, self.org)
 
         self.assertTrue(perms["msgs"]["msg_inbox"])
         self.assertTrue(perms["contacts"]["contact_update"])
         self.assertFalse(perms["orgs"]["org_manage_accounts"])
         self.assertFalse(perms["orgs"]["org_delete"])
 
-        perms = GroupPermWrapper(viewers)
+        perms = GroupPermWrapper(viewers, self.org)
 
         self.assertTrue(perms["msgs"]["msg_inbox"])
         self.assertFalse(perms["contacts"]["contact_update"])
@@ -114,6 +114,15 @@ class OrgContextProcessorTest(TembaTest):
 
         self.assertFalse(perms["msgs"]["foo"])  # no blow up if perm doesn't exist
         self.assertFalse(perms["chickens"]["foo"])  # or app doesn't exist
+
+        test_httplog_enable = self.org
+
+        test_httplog_enable.config = {"can_view_httplogs": True}
+        test_httplog_enable.save()
+
+        perms = GroupPermWrapper(viewers, test_httplog_enable)
+
+        self.assertTrue(perms["request_logs"]["httplog_webhooks"])
 
         with self.assertRaises(TypeError):
             list(perms)
