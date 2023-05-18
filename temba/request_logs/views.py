@@ -68,6 +68,11 @@ class HTTPLogCRUDL(SmartCRUDL):
         def get_queryset(self, **kwargs):
             return super().get_queryset(**kwargs).filter(org=self.request.org, flow__isnull=False)
 
+        def has_permission(self, request, *args, **kwargs):
+            if self.derive_org().config.get("can_view_httplogs"):  # pragma: no cover
+                return True
+            return super().has_permission(request, *args, **kwargs)
+
     class Classifier(BaseObjLogsView):
         source_field = "classifier"
         source_url = "uuid@classifiers.classifier_read"
@@ -86,6 +91,11 @@ class HTTPLogCRUDL(SmartCRUDL):
 
     class Read(OrgObjPermsMixin, SmartReadView):
         fields = ("description", "created_on")
+
+        def has_permission(self, request, *args, **kwargs):
+            if self.derive_org().config.get("can_view_httplogs"):  # pragma: no cover
+                return True
+            return super().has_permission(request, *args, **kwargs)
 
         @property
         def permission(self):
