@@ -62,13 +62,17 @@ jobs:
 
     - name: Initialize environment
       run: |
+        poetry add setuptools==67.7.2
         poetry add git+https://github.com/noumar/iso639.git
         poetry add -n --lock $(cat ${{ github.workspace }}/docker/pip-requires.txt)
         poetry install
         npm install
         sudo npm install -g less
         ln -s ${{ github.workspace }}/temba/settings.py.dev ${{ github.workspace }}/temba/settings.py
+        test -f "./manage.py" && echo "manage.py found" || echo "manage.py not found"
+        poetry run python manage.py migrate
         poetry run ./manage.py migrate
+        echo "AAAAAAAAAAAAAAAAA"
         # fetch and extract rp-indexer
         wget https://github.com/nyaruka/rp-indexer/releases/download/v${{ env.rpindexer-version }}/rp-indexer_${{ env.rpindexer-version }}_linux_amd64.tar.gz
         tar -xvf rp-indexer_${{ env.rpindexer-version }}_linux_amd64.tar.gz rp-indexer
