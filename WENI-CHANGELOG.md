@@ -1,3 +1,8 @@
+1.8.8-rapidpro-7.1.27
+----------
+* Change in CI, from './manage.py' to 'python manage.py'
+* Update verion of weni-rp-apps to 2.4.3
+
 1.8.7-rapidpro-7.1.27
 ----------
 * Add a condition to enable httplog_webhook to a org
