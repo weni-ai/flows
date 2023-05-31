@@ -1,0 +1,21 @@
+[
+  {
+    "name": "CreateCompletion",
+    "value": "CreateCompletion",
+    "verboseName": "Create Completion",
+    "params": [
+      {
+        "type": "prompt",
+        "verboseName": "prompt"
+      },
+      {
+        "type": "history",
+        "verboseName": "send history"
+      },
+      {
+        "type": "input",
+        "verboseName": "input"
+      }
+    ]
+  }
+]
