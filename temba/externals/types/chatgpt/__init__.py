@@ -1,1 +1,1 @@
-from .type import ChatGPTType #noqa
+from .type import ChatGPTType  # noqa

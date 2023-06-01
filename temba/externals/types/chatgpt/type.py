@@ -1,6 +1,7 @@
 from temba.externals.models import ExternalServiceType
 from .serializers import ChatGPTSerializer
 
+
 class ChatGPTType(ExternalServiceType):
     """
     Type for using chatgpt as a external service
@@ -10,6 +11,11 @@ class ChatGPTType(ExternalServiceType):
     CONFIG_AI_MODEL = "ai_model"
     CONFIG_RULES = "rules"
     CONFIG_KNOWLEDGE_BASE = "knowledge_base"
+
+    AI_MODELS = [
+        ("gpt-3.5-turbo", "gpt-3.5-turbo"),
+        ("gpt-4", "gpt-4"),
+    ]
 
     serializer_class = ChatGPTSerializer
 
