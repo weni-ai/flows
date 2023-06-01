@@ -4,23 +4,26 @@ from django.utils.translation import ugettext_lazy as _
 from temba.externals.models import ExternalService
 from temba.externals.views import BaseConnectView
 from temba.utils.uuid import uuid4
-from .type import ChatGPTType
 
+AI_MODELS = [
+        ("gpt-3.5-turbo", "gpt-3.5-turbo"),
+        ("gpt-4", "gpt-4"),
+    ]
 
 class ConnectView(BaseConnectView):
     class Form(BaseConnectView.Form):
-        name = forms.CharField(max_length=256, label=_("Name"), help_text=_("Name"))
+        service_name = forms.CharField(max_length=256, label=_("Name"), help_text=_("Name"))
         api_key = forms.CharField(
             label=_("ChatGPT API Key"), help_text=_("ChatGPT API Key")
         )
         rules = forms.CharField(label=_("Rules"), help_text=_("Rules"))
-        knowledge_base = forms.ChaField(
+        knowledge_base = forms.CharField(
             label=("Knowledge Base"), help_text=_("Knowledge Base")
         )
         ai_model = forms.ChoiceField(
             label=("A.I Model"),
             help_text=_("A.I Model"),
-            choices=ChatGPTType.AI_MODEL,
+            choices=AI_MODELS,
             initial="gpt-3.5-turbo",
         )
 
@@ -30,7 +33,9 @@ class ConnectView(BaseConnectView):
                 raise forms.ValidationError(_("Invalid API Key"))
 
     def form_valid(self, form):
-        name = form.cleaned_data["name"]
+        from .type import ChatGPTType
+        
+        service_name = form.cleaned_data["service_name"]
         api_key = form.cleaned_data["api_key"]
         rules = form.cleaned_data["rules"]
         knowledge_base = form.cleaned_data["knowledge_base"]
@@ -48,7 +53,7 @@ class ConnectView(BaseConnectView):
             org=self.org,
             external_service_type=ChatGPTType.slug,
             config=config,
-            name=name,
+            name=service_name,
             created_by=self.request.user,
             modified_by=self.request.user,
         )
@@ -57,4 +62,4 @@ class ConnectView(BaseConnectView):
         return super().form_valid(form)
 
     form_class = Form
-    template_name = "external_services/types/chatgpt/connect.haml"
+    template_name = "externals/types/chatgpt/connect.haml"

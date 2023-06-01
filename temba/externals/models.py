@@ -99,7 +99,7 @@ class ExternalService(SmartModel, DependencyMixin):
         """
         from temba.externals.types import TYPES
 
-        return TYPES[self.ticketer_type]
+        return TYPES[self.external_service_type]
 
     def release(self, user):
         self.is_active = False
@@ -110,5 +110,5 @@ class ExternalService(SmartModel, DependencyMixin):
         return f"ExternalService[uuid={self.uuid}, name={self.name}"
 
 class Prompt(models.Model):
-    text = models.CharField(max_length=250)
+    text = models.TextField()
     chat_gpt_service = models.ForeignKey(ExternalService, on_delete=models.CASCADE)

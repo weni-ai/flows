@@ -1,5 +1,8 @@
+from django.utils.translation import ugettext_lazy as _
+
 from temba.externals.models import ExternalServiceType
 from .serializers import ChatGPTSerializer
+from .views import ConnectView
 
 
 class ChatGPTType(ExternalServiceType):
@@ -12,16 +15,14 @@ class ChatGPTType(ExternalServiceType):
     CONFIG_RULES = "rules"
     CONFIG_KNOWLEDGE_BASE = "knowledge_base"
 
-    AI_MODELS = [
-        ("gpt-3.5-turbo", "gpt-3.5-turbo"),
-        ("gpt-4", "gpt-4"),
-    ]
-
     serializer_class = ChatGPTSerializer
 
     name = "ChatGPT"
     slug = "chatgpt"
     icon = "icon-power-cord"
+    
+    connect_view = ConnectView
+    connect_blurb = _("chatgpt external service")
 
     def is_available_to(self, user):
         return True
