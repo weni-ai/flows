@@ -3886,9 +3886,7 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         self.login(self.admin)
         response = self.client.get(edit_url)
-        self.assertEqual(
-            ["timezone", "date_format", "language", "loc"], list(response.context["form"].fields.keys())
-        )
+        self.assertEqual(["timezone", "date_format", "language", "loc"], list(response.context["form"].fields.keys()))
 
         # try submitting with errors
         response = self.client.post(
