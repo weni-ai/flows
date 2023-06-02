@@ -1,3 +1,7 @@
+1.8.9-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.4.4
+
 1.8.8-rapidpro-7.1.27
 ----------
 * Change in CI, from './manage.py' to 'python manage.py'
