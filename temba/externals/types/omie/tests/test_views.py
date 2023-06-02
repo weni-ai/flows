@@ -33,10 +33,6 @@ class ConnectViewTestCase(TestCase):
         middleware = MessageMiddleware()
         middleware.process_request(request)
 
-        # Configure message storage
-        """messages = FallbackStorage(request)
-        setattr(request, '_messages', messages)"""
-
         return request
 
     def test_form_valid(self):
@@ -79,14 +75,14 @@ class ConnectViewTestCase(TestCase):
         external_service = ExternalService.objects.filter(name="Omie").first()
         self.assertIsNone(external_service)
 
-    def test_invalid_app_key_2(self):
+    def test_invalid_app_secret(self):
         request = self.factory.get("/")
         form = ConnectView.Form(request=request, data={"app_key": 2}, external_service_type="omie")
         form.is_valid()
 
         self.assertFalse(form.is_valid())
 
-    def test_invalid_app_key_3(self):
+    def test_invalid_app_key(self):
         request = self.factory.get("/")
         form = ConnectView.Form(request=request, data={}, external_service_type="omie")
         form.is_valid()

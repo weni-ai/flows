@@ -20,10 +20,10 @@ class TestGetActions(TestCase):
         self.action = self.file.read()
         self.user = User.objects.create_user(username="super", email="super@user.com", password="super")
 
-    def test_get_actions_sucess(self):
+    def test_get_actions_success(self):
         slug = "omie"
         self.types = TYPES.get(slug).get_actions()
-        self.assertEqual(self.types, dict(json.loads(self.action)))
+        self.assertEqual(self.types, json.loads(self.action))
 
     def test_is_available_to(self):
         omie_type = OmieType()
@@ -46,7 +46,7 @@ class TestGetExternalTypes(APITestCase):
         response = self.client.get(reverse("actions", args=[slug]))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, dict(json.loads(self.action)))
+        self.assertEqual(response.data, json.loads(self.action))
 
     def test_get_external_types_error(self):
         slug = "omiee"
