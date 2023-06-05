@@ -16,10 +16,6 @@ class ConnectView(BaseConnectView):
         api_key = forms.CharField(
             label=_("ChatGPT API Key"), help_text=_("ChatGPT API Key")
         )
-        rules = forms.CharField(label=_("Rules"), help_text=_("Rules"))
-        knowledge_base = forms.CharField(
-            label=("Knowledge Base"), help_text=_("Knowledge Base")
-        )
         ai_model = forms.ChoiceField(
             label=("A.I Model"),
             help_text=_("A.I Model"),
@@ -37,15 +33,11 @@ class ConnectView(BaseConnectView):
         
         service_name = form.cleaned_data["service_name"]
         api_key = form.cleaned_data["api_key"]
-        rules = form.cleaned_data["rules"]
-        knowledge_base = form.cleaned_data["knowledge_base"]
         ai_model = form.cleaned_data["ai_model"]
 
         config = {
             ChatGPTType.CONFIG_API_KEY: api_key,
             ChatGPTType.CONFIG_AI_MODEL: ai_model,
-            ChatGPTType.CONFIG_RULES: rules,
-            ChatGPTType.CONFIG_KNOWLEDGE_BASE: knowledge_base,
         }
 
         self.object = ExternalService(
@@ -62,4 +54,4 @@ class ConnectView(BaseConnectView):
         return super().form_valid(form)
 
     form_class = Form
-    template_name = "externals/types/chatgpt/connect.haml"
+
