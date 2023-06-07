@@ -27,3 +27,10 @@ class ChatGPTType(ExternalServiceType):
 
     def is_available_to(self, user):
         return True
+
+    def get_actions(self):
+        actions = super().get_actions()
+        # incluir aqui a busca ao banco de dados
+        
+        return actions
+

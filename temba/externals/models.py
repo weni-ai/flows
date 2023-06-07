@@ -101,6 +101,10 @@ class ExternalService(SmartModel, DependencyMixin):
         from temba.externals.types import TYPES
 
         return TYPES[self.external_service_type]
+    
+    @property
+    def actions(self):
+        return self.type.get_actions()
 
     def release(self, user):
         self.is_active = False
