@@ -6,16 +6,15 @@ from temba.externals.views import BaseConnectView
 from temba.utils.uuid import uuid4
 
 AI_MODELS = [
-        ("gpt-3.5-turbo", "gpt-3.5-turbo"),
-        ("gpt-4", "gpt-4"),
-    ]
+    ("gpt-3.5-turbo", "gpt-3.5-turbo"),
+    ("gpt-4", "gpt-4"),
+]
+
 
 class ConnectView(BaseConnectView):
     class Form(BaseConnectView.Form):
         service_name = forms.CharField(max_length=256, label=_("Name"), help_text=_("Name"))
-        api_key = forms.CharField(
-            label=_("ChatGPT API Key"), help_text=_("ChatGPT API Key")
-        )
+        api_key = forms.CharField(label=_("ChatGPT API Key"), help_text=_("ChatGPT API Key"))
         ai_model = forms.ChoiceField(
             label=("A.I Model"),
             help_text=_("A.I Model"),
@@ -30,7 +29,7 @@ class ConnectView(BaseConnectView):
 
     def form_valid(self, form):
         from .type import ChatGPTType
-        
+
         service_name = form.cleaned_data["service_name"]
         api_key = form.cleaned_data["api_key"]
         ai_model = form.cleaned_data["ai_model"]
@@ -54,4 +53,3 @@ class ConnectView(BaseConnectView):
         return super().form_valid(form)
 
     form_class = Form
-

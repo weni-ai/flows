@@ -1,5 +1,3 @@
-
-
 [
   {
     "name": "ConsultarChatGPT",
@@ -14,18 +12,6 @@
         "verboseName": "Aditional Prompts",
         "required": true,
         "options": [
-          {
-            "value": "Aditional Prompt 1 content",
-            "uuid": "ab154b06-5ecd-43d9-afca-39738e6859d7"
-          },
-          {
-            "value": "Aditional Prompt 2 content",
-            "uuid": "ac154b06-5ecd-43d9-afca-39738e6859d7"
-          },
-          {
-            "value": "Aditional Prompt 3 content",
-            "uuid": "ad154b06-5ecd-43d9-afca-39738e6859d7"
-          }
         ]
       },
       {
