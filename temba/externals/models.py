@@ -110,5 +110,6 @@ class ExternalService(SmartModel, DependencyMixin):
         return f"ExternalService[uuid={self.uuid}, name={self.name}"
 
 class Prompt(models.Model):
+    uuid = models.UUIDField(default=uuid4)
     text = models.TextField()
     chat_gpt_service = models.ForeignKey(ExternalService, on_delete=models.CASCADE)
