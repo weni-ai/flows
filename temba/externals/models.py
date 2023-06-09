@@ -23,6 +23,7 @@ class ExternalServiceType(metaclass=ABCMeta):
     slug = None
     connect_blurb = None
     connect_view = None
+    external_service = None
 
     @abstractproperty
     def serializer_class(self):
@@ -101,9 +102,10 @@ class ExternalService(SmartModel, DependencyMixin):
         from temba.externals.types import TYPES
 
         return TYPES[self.external_service_type]
-    
+
     @property
     def actions(self):
+        self.type.external_service = self
         return self.type.get_actions()
 
     def release(self, user):
