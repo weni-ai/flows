@@ -1,5 +1,3 @@
-import json
-
 from django.utils.translation import ugettext_lazy as _
 
 from temba.externals.models import ExternalServiceType, Prompt
@@ -32,9 +30,8 @@ class ChatGPTType(ExternalServiceType):
 
     def get_actions(self):
         actions = super().get_actions()
-        options_data = Prompt.objects.filter(chat_gpt_service_id=self.external_service.id)
-
-        options_data_json = json.loads(json.dumps(list(options_data.values())))
+        options_data = Prompt.objects.filter(chat_gpt_service=self.external_service)
+        options_data_json = list(options_data.values())
         if options_data:
             actions[0]["params"][0]["options"].append(options_data_json)
             actions[0]["params"][0]["options"] = actions[0]["params"][0]["options"][0]
