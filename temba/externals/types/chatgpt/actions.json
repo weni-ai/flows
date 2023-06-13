@@ -1,20 +1,34 @@
 [
   {
-    "name": "CreateCompletion",
-    "value": "CreateCompletion",
-    "verboseName": "Create Completion",
+    "name": "ConsultarChatGPT",
+    "value": "ConsultarChatGPT",
+    "verboseName": "Consultar Chat GPT",
+    "disableEmptyParams": true,
     "params": [
       {
-        "type": "prompt",
-        "verboseName": "prompt"
+        "name": "AditionalPrompts",
+        "type": "AditionalPrompts",
+        "paramType": "multiSelect",
+        "verboseName": "Aditional Prompts",
+        "required": true,
+        "options": [
+        ]
       },
       {
-        "type": "history",
-        "verboseName": "send history"
+        "name": "SendCompleteHistory",
+        "type": "SendCompleteHistory",
+        "paramType": "boolean",
+        "verboseName": "Send complete messages history as context",
+        "defaultValue": true,
+        "required": true
       },
       {
-        "type": "input",
-        "verboseName": "input"
+        "name": "UserInput",
+        "type": "UserInput",
+        "paramType": "expressionInput",
+        "verboseName": "User Input",
+        "defaultValue": "@input.value",
+        "required": true
       }
     ]
   }

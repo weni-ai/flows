@@ -10,6 +10,7 @@ from django.db import models
 from django.template import Engine
 
 from temba.orgs.models import DependencyMixin, Org
+from temba.utils.models import TembaModel
 from temba.utils.uuid import uuid4
 
 
@@ -22,6 +23,7 @@ class ExternalServiceType(metaclass=ABCMeta):
     slug = None
     connect_blurb = None
     connect_view = None
+    external_service = None
 
     @abstractproperty
     def serializer_class(self):
@@ -101,6 +103,11 @@ class ExternalService(SmartModel, DependencyMixin):
 
         return TYPES[self.external_service_type]
 
+    @property
+    def actions(self):
+        self.type.external_service = self
+        return self.type.get_actions()
+
     def release(self, user):
         self.is_active = False
         self.modified_by = user
@@ -109,7 +116,7 @@ class ExternalService(SmartModel, DependencyMixin):
     def __str__(self):
         return f"ExternalService[uuid={self.uuid}, name={self.name}"
 
-class Prompt(models.Model):
-    uuid = models.UUIDField(default=uuid4)
+
+class Prompt(TembaModel):
     text = models.TextField()
     chat_gpt_service = models.ForeignKey(ExternalService, on_delete=models.CASCADE)

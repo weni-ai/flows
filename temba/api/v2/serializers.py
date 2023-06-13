@@ -1455,7 +1455,7 @@ class ExternalServicesReadSerializer(ReadSerializer):
 
     class Meta:
         model = ExternalService
-        fields = ("uuid", "name", "external_service_type", "created_on")
+        fields = ("uuid", "name", "external_service_type", "created_on", "actions")
 
 
 class TicketReadSerializer(ReadSerializer):
