@@ -4,15 +4,16 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('orgs', '0091_alter_org_plan'),
+        ("orgs", "0091_alter_org_plan"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='org',
-            name='plan',
-            field=models.CharField(default='topups', help_text='What plan your organization is on', max_length=16, verbose_name='Plan'),
+            model_name="org",
+            name="plan",
+            field=models.CharField(
+                default="topups", help_text="What plan your organization is on", max_length=16, verbose_name="Plan"
+            ),
         ),
     ]

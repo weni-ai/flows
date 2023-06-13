@@ -1201,7 +1201,7 @@ CHANNEL_TYPES = [
 ]
 
 EXTERNALSERVICE_TYPES = [
-    "temba.externals.types.omie.OmieType", 
+    "temba.externals.types.omie.OmieType",
     "temba.externals.types.chatgpt.ChatGPTType",
 ]
 

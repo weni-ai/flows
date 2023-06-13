@@ -39,7 +39,11 @@ class ExternalServiceType(metaclass=ABCMeta):
         return [self.get_connect_url()]
 
     def get_connect_url(self):
-        return url(r"^connect", self.connect_view.as_view(external_service_type=self), name="connect")
+        return url(
+            r"^connect",
+            self.connect_view.as_view(external_service_type=self),
+            name="connect",
+        )
 
     def get_actions(self):
         try:
