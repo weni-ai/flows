@@ -1,10 +1,12 @@
 from rest_framework import serializers
+
 from temba.externals.models import ExternalService
 
 AI_MODELS = [
-        ("gpt-3.5-turbo", "gpt-3.5-turbo"),
-        ("gpt-4", "gpt-4"),
-    ]
+    ("gpt-3.5-turbo", "gpt-3.5-turbo"),
+    ("gpt-4", "gpt-4"),
+]
+
 
 class ChatGPTSerializer(serializers.ModelSerializer):
     name = serializers.CharField()
@@ -24,8 +26,5 @@ class ChatGPTSerializer(serializers.ModelSerializer):
         }
 
         return ExternalService.objects.create(
-            external_service_type=type.slug,
-            name=validated_data.pop("name"),
-            config=config,
-            **validated_data
+            external_service_type=type.slug, name=validated_data.pop("name"), config=config, **validated_data
         )

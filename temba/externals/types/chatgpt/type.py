@@ -1,6 +1,7 @@
 from django.utils.translation import ugettext_lazy as _
 
 from temba.externals.models import ExternalServiceType
+
 from .serializers import ChatGPTSerializer
 from .views import ConnectView
 
@@ -20,7 +21,7 @@ class ChatGPTType(ExternalServiceType):
     name = "ChatGPT"
     slug = "chatgpt"
     icon = "icon-power-cord"
-    
+
     connect_view = ConnectView
     connect_blurb = _("chatgpt external service")
 
