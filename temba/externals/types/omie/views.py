@@ -44,4 +44,4 @@ class ConnectView(BaseConnectView):
         return super().form_valid(form)
 
     form_class = Form
-    template_name = "external_services/types/omie/connect.haml"
+    template_name = "externals/types/omie/connect.haml"

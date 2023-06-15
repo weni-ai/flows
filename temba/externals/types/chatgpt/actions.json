@@ -1,0 +1,35 @@
+[
+  {
+    "name": "ConsultarChatGPT",
+    "value": "ConsultarChatGPT",
+    "verboseName": "Consultar Chat GPT",
+    "disableEmptyParams": true,
+    "params": [
+      {
+        "name": "AditionalPrompts",
+        "type": "AditionalPrompts",
+        "paramType": "multiSelect",
+        "verboseName": "Aditional Prompts",
+        "required": true,
+        "options": [
+        ]
+      },
+      {
+        "name": "SendCompleteHistory",
+        "type": "SendCompleteHistory",
+        "paramType": "boolean",
+        "verboseName": "Send complete messages history as context",
+        "defaultValue": true,
+        "required": true
+      },
+      {
+        "name": "UserInput",
+        "type": "UserInput",
+        "paramType": "expressionInput",
+        "verboseName": "User Input",
+        "defaultValue": "@input.value",
+        "required": true
+      }
+    ]
+  }
+]

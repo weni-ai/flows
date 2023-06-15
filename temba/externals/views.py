@@ -43,7 +43,7 @@ class BaseConnectView(ComponentFormMixin, OrgPermsMixin, SmartFormView):
     def get_template_names(self):
         return (
             "externals/types/%s/connect.html" % self.external_service_type.slug,
-            "external_services/external_service_connect_form.html",
+            "externals/externalservice_connect_form.html",
         )
 
     def derive_title(self):
@@ -70,7 +70,7 @@ class ExternalServiceCRUDL(SmartCRUDL):
             context["external_service_types"] = [
                 est for est in ExternalService.get_types() if est.is_available_to(self.get_user())
             ]
-            print(context)
+
             return context
 
     class Read(OrgObjPermsMixin, SmartReadView):
