@@ -10,6 +10,7 @@ from django.db import models
 from django.template import Engine
 
 from temba.orgs.models import DependencyMixin, Org
+from temba.utils.models import TembaModel
 from temba.utils.uuid import uuid4
 
 
@@ -99,7 +100,7 @@ class ExternalService(SmartModel, DependencyMixin):
         """
         from temba.externals.types import TYPES
 
-        return TYPES[self.ticketer_type]
+        return TYPES[self.external_service_type]
 
     def release(self, user):
         self.is_active = False
@@ -108,3 +109,8 @@ class ExternalService(SmartModel, DependencyMixin):
 
     def __str__(self):
         return f"ExternalService[uuid={self.uuid}, name={self.name}"
+
+
+class Prompt(TembaModel):
+    text = models.TextField()
+    chat_gpt_service = models.ForeignKey(ExternalService, on_delete=models.CASCADE)
