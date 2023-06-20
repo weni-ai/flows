@@ -6,6 +6,7 @@ from temba.externals.views import BaseConnectView
 from temba.utils.uuid import uuid4
 
 AI_MODELS = [
+    ("gpt-3.5-turbo-16k", "gpt-3.5-turbo-16k"),
     ("gpt-3.5-turbo", "gpt-3.5-turbo"),
     ("gpt-4", "gpt-4"),
 ]
@@ -35,6 +36,7 @@ class ConnectView(BaseConnectView):
         ai_model = form.cleaned_data["ai_model"]
 
         config = {
+            ChatGPTType.CONFIG_SERVICE_NAME: service_name,
             ChatGPTType.CONFIG_API_KEY: api_key,
             ChatGPTType.CONFIG_AI_MODEL: ai_model,
         }
