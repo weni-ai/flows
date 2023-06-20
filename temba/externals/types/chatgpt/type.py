@@ -10,6 +10,7 @@ class ChatGPTType(ExternalServiceType):
     """
     Type for using chatgpt as a external service
     """
+
     CONFIG_SERVICE_NAME = "name"
     CONFIG_API_KEY = "api_key"
     CONFIG_AI_MODEL = "ai_model"
