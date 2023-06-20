@@ -36,6 +36,7 @@ class ConnectView(BaseConnectView):
         ai_model = form.cleaned_data["ai_model"]
 
         config = {
+            ChatGPTType.CONFIG_SERVICE_NAME: service_name,
             ChatGPTType.CONFIG_API_KEY: api_key,
             ChatGPTType.CONFIG_AI_MODEL: ai_model,
         }
