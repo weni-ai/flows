@@ -29,7 +29,7 @@
         "type": "UserInput",
         "paramType": "expressionInput",
         "verboseName": "User Input",
-        "defaultValue": "@input.value",
+        "defaultValue": "@input.text",
         "required": true
       }
     ]
