@@ -1,3 +1,15 @@
+1.9.0-rapidpro-7.1.27
+----------
+* Implement tests for context_processors_weni
+* Add tests to middleware
+* Add tests to omie type
+* Update python version in docker file
+* External service chatgpt
+* remove migration 0091 org plan
+* Create action endpoint to chatgpt
+* Update version of weni-rp-apps to 2.6.0
+* Update FlowEditor to 1.3.0
+
 1.8.10-rapidpro-7.1.27
 ----------
 * Update version of weni-rp-apps to 2.5.0
