@@ -16,7 +16,11 @@ class ChatGPTType(ExternalServiceType):
     CONFIG_AI_MODEL = "ai_model"
     CONFIG_RULES = "rules"
     CONFIG_KNOWLEDGE_BASE = "knowledge_base"
-
+    AI_MODELS = [
+        ("gpt-3.5-turbo-16k", "gpt-3.5-turbo-16k"),
+        ("gpt-3.5-turbo", "gpt-3.5-turbo"),
+        ("gpt-4", "gpt-4"),
+    ]  # TODO: Use this snippet at other points
     serializer_class = ChatGPTSerializer
 
     name = "ChatGPT"
