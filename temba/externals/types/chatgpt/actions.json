@@ -7,14 +7,14 @@
     "params": [
       {
         "name": "AditionalPrompts",
+        "defaultValue": [],
         "type": "AditionalPrompts",
         "paramType": "multiSelect",
         "verboseName": "Aditional Prompts",
         "nameKey": "text",
         "valueKey": "uuid",
         "required": true,
-        "options": [
-        ]
+        "options": []
       },
       {
         "name": "SendCompleteHistory",
