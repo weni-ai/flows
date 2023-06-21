@@ -1200,7 +1200,10 @@ CHANNEL_TYPES = [
     "temba.channels.types.teams.TeamsType",
 ]
 
-EXTERNALSERVICE_TYPES = ["temba.externals.types.omie.OmieType"]
+EXTERNALSERVICE_TYPES = [
+    "temba.externals.types.omie.OmieType",
+    "temba.externals.types.chatgpt.ChatGPTType",
+]
 
 # set of ISO-639-3 codes of languages to allow in addition to all ISO-639-1 languages
 NON_ISO6391_LANGUAGES = {}
