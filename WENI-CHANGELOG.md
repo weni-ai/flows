@@ -1,3 +1,7 @@
+1.9.1-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.0
+
 1.9.0-rapidpro-7.1.27
 ----------
 * Implement tests for context_processors_weni
