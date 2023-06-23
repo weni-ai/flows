@@ -24,4 +24,5 @@ app.autodiscover_tasks(
 # TODO: Move logic to settings.py.prod or rapidpro-apps
 app.conf.task_routes = {
     "create_recent_activity": {"queue": "async"},
+    "generate_sent_report_messages": {"queue": "async"},
 }
