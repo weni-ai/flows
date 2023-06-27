@@ -1,3 +1,14 @@
+1.9.3-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.2
+* Remove weni.internal.msgs module import from INSTALLED_APPS
+
+1.9.2-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.1
+* Add task generate_sent_report_messages
+* Change staging build
+
 1.9.1-rapidpro-7.1.27
 ----------
 * Update version of weni-rp-apps to 2.7.0
