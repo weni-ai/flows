@@ -40,6 +40,7 @@ jobs:
             echo "MANIFESTS_REPOSITORY=Ilhasoft/kubernetes-manifests-platform" | tee -a "${GITHUB_ENV}"
             echo "MANIFESTS_APPLICATION=weni-flows/flows" | tee -a "${GITHUB_ENV}"
             echo "MANIFESTS_PATCH_TARGET=deployment-flows.json" | tee -a "${GITHUB_ENV}"
+            echo "MANIFESTS_PATCH_TARGET1=deployment-flows-image.json" | tee -a "${GITHUB_ENV}"
 
             FLOWEDITOR_VERSION=$(jq -r '.dependencies["@nyaruka/flow-editor"]' < package.json)
             echo "FLOWEDITOR_VERSION=${FLOWEDITOR_VERSION}" | tee -a "${GITHUB_ENV}"
@@ -137,14 +138,20 @@ jobs:
                 )
                 echo "Old image version to compare: ${OLD_VERSION}<=${{env.VERSION}}"
                 if verlte "${OLD_VERSION}" "${VERSION}" || [[ ! "${OLD_VERSION}" =~ [0-9]+\.[0-9]+\.[0-9]+ ]] ; then
-                  echo 'New configurations:'
+                  echo 'New configurations for varnish:'
                   new_configuration=$(
                     cat "${e}/${{ env.MANIFESTS_PATCH_TARGET }}" \
-                      | jq '(..|select(.path == "/spec/template/spec/containers/0/image")?) += {value: "'"${{env.IMAGE_TAG}}"'"}' \
                       | jq '(..|select(.path == "/spec/template/spec/containers/1/image")?) += {value: "'"${{env.IMAGE_TAG}}"'-varnish"}'
                   )
                   echo "${new_configuration}"
                   echo "${new_configuration}" > "${e}/${{ env.MANIFESTS_PATCH_TARGET }}"
+                  echo 'New configurations for image flows:'
+                  new_configuration=$(
+                    cat "${e}/${{ env.MANIFESTS_PATCH_TARGET1 }}" \
+                      | jq '(..|select(.path == "/spec/template/spec/containers/0/image")?) += {value: "'"${{env.IMAGE_TAG}}"'"}'
+                  )
+                  echo "${new_configuration}"
+                  echo "${new_configuration}" > "${e}/${{ env.MANIFESTS_PATCH_TARGET1 }}"
                 else
                   echo "Version in file is greater than build, skipping update yaml"
                 fi
