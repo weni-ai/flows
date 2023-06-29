@@ -1,3 +1,8 @@
+1.9.4-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.3
+* Add mail_base.html and msg_mail_body.haml 
+
 1.9.3-rapidpro-7.1.27
 ----------
 * Update version of weni-rp-apps to 2.7.2
