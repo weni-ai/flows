@@ -224,3 +224,8 @@ class RocketChatViewTest(RocketChatMixin):
         self.check_exceptions(
             mock_choices, mock_request, "Connection to RocketChat is taking too long.", "Configuration has failed"
         )
+
+
+class RocketChatTypeTest(TembaTest):
+    def test_is_available_to(self):
+        self.assertTrue(RocketChatType().is_available_to(self.admin))
