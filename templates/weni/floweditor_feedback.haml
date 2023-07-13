@@ -338,13 +338,14 @@
           {{ _("Submit comment") }}
     
 
-  %div.launcher{onclick: "toggleFeedback()"}
+  %div.launcher.hidden{onclick: "toggleFeedback()"}
     %img{src:"{{STATIC_URL}}images/emoji/man-detective.png"}
 
 
 -block extra-script
   %script{type:"module"}
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
     import { getFirestore, doc, collection, addDoc, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -360,6 +361,15 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const auth = getAuth();
+
+    try {
+      await signInAnonymously(auth)
+      showFeedbackLauncher();
+    } catch (error) {
+      hideFeedbackLauncher();
+    }
+
     let lastRatingRef = null;
 
     async function saveRatingResponse(rating) {
@@ -412,6 +422,19 @@
       setTimeout(toggleFeedback, 12000)
     }
 
+    function hideFeedbackLauncher() {
+      const launcher = $('.launcher');
+      launcher.addClass('fade-out');
+      launcher.addClass('hidden');
+    }
+
+    function showFeedbackLauncher() {
+      const launcher = $('.launcher');
+      launcher.addClass('fade-in');
+      launcher.removeClass('fade-out');
+      launcher.removeClass('hidden');
+
+    }
 
     function toggleFeedback() {
       const content = $('.content');
