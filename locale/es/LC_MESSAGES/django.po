@@ -7848,3 +7848,9 @@ msgstr "Enviar comentario"
 
 msgid "Write here..."
 msgstr "Escribe aquí..."
+
+msgid "Your review has been submitted! Thank you."
+msgstr "¡Tu reseña ha sido enviada! Muchas gracias."
+
+msgid "CLOSE"
+msgstr "CERRAR"
