@@ -50,6 +50,7 @@ def show_onboard_modal(request):
 
     return {"show_trigger_onboard_modal": show_trigger_onboard_modal}
 
+
 def firebase_credentials(request):
     return {
         "firebase_api_key": settings.FIREBASE_API_KEY,

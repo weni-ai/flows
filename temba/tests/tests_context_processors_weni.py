@@ -1,12 +1,12 @@
 from django.test import RequestFactory, TestCase, override_settings
 
 from temba.context_processors_weni import (
+    firebase_credentials,
     logrocket,
     old_design_excluded_channels_codes,
     show_sidemenu,
     use_weni_layout,
     weni_announcement,
-    firebase_credentials
 )
 
 
