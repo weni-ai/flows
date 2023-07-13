@@ -356,6 +356,7 @@ TEMPLATES[0]["OPTIONS"]["context_processors"] += [
     "temba.context_processors_weni.show_sidemenu",
     "temba.context_processors_weni.old_design_excluded_channels_codes",
     "temba.context_processors_weni.show_onboard_modal",
+    "temba.context_processors_weni.firebase_credentials",
 ]
 WENI_DOMAINS = {"weni": env("WENI_DOMAIN", default="weni.ai")}
 
@@ -480,3 +481,15 @@ DISABLED_CHANNELS_INTEGRATIONS = env.list("DISABLED_CHANNELS_INTEGRATIONS", defa
 
 CONTACT_IMPORT_MAX_RECORDS = env.int("CONTACT_IMPORT_MAX_RECORDS", default=25_000)
 CONTACT_IMPORT_BATCH_SIZE = env.int("CONTACT_IMPORT_BATCH_SIZE", default=100)
+
+
+# ----------------------------------------------------------------------------------------
+# # FlowEditor feedback firebase database credentials
+# ----------------------------------------------------------------------------------------
+FIREBASE_API_KEY = os.environ.get("FIREBASE_API_KEY", "MISSING_FIREBASE_API_KEY")
+FIREBASE_AUTH_DOMAIN = os.environ.get("FIREBASE_AUTH_DOMAIN", "MISSING_FIREBASE_AUTH_DOMAIN")
+FIREBASE_PROJECT_ID = os.environ.get("FIREBASE_PROJECT_ID", "MISSING_FIREBASE_PROJECT_ID")
+FIREBASE_STORAGE_BUCKET = os.environ.get("FIREBASE_STORAGE_BUCKET", "MISSING_FIREBASE_STORAGE_BUCKET")
+FIREBASE_MESSAGING_SENDER_ID = os.environ.get("FIREBASE_MESSAGING_SENDER_ID", "MISSING_FIREBASE_MESSAGING_SENDER_ID")
+FIREBASE_APP_ID = os.environ.get("FIREBASE_APP_ID", "MISSING_FIREBASE_APP_ID")
+FIREBASE_MEASUREMENT_ID = os.environ.get("FIREBASE_MEASUREMENT_ID", "MISSING_FIREBASE_MEASUREMENT_ID")
