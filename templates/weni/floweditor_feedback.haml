@@ -19,8 +19,8 @@
         border: 1px solid #E2E6ED;
         background: #FFF;
         box-shadow: 0px 12px 34px 0px rgba(0, 0, 0, 0.04);
-        width: 60px;
-        height: 60px;
+        width: 62px;
+        height: 62px;
 
         & :hover {
           cursor: pointer;
@@ -366,6 +366,19 @@
     try {
       await signInAnonymously(auth)
       showFeedbackLauncher();
+
+      const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
+      const lastFeedback = localStorage.getItem('lastFeedback');
+      if (lastFeedback) {
+        const now = new Date();
+        const diff = now.getTime() - lastFeedback;
+        if (diff > ONE_WEEK) {
+          setTimeout(toggleFeedback, 120000)
+        }
+      } else {
+        setTimeout(toggleFeedback, 120000)
+      }
+
     } catch (error) {
       hideFeedbackLauncher();
     }
@@ -410,18 +423,6 @@
     window.saveFeedbackResponse = saveFeedbackResponse;
 
   :javascript
-    const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
-    const lastFeedback = localStorage.getItem('lastFeedback');
-    if (lastFeedback) {
-      const now = new Date();
-      const diff = now.getTime() - lastFeedback;
-      if (diff > ONE_WEEK) {
-        setTimeout(toggleFeedback, 12000)
-      }
-    } else {
-      setTimeout(toggleFeedback, 12000)
-    }
-
     function hideFeedbackLauncher() {
       const launcher = $('.launcher');
       launcher.addClass('fade-out');
