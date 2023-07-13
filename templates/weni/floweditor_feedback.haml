@@ -407,9 +407,9 @@
   .toast-content
     .toast-icon.weni-unnnic-check-circle-1-1.weni-unnnic-icon-sm
     .toast-text
-      _("Your review has been submitted! Thank you.")
+      {{ _("Your review has been submitted! Thank you.") }}
     .toast-close-button{onclick:"hideSuccessToast()"}
-      _("CLOSE")
+      {{ _("CLOSE") }}
 
 -block extra-script
   %script{type:"module"}
