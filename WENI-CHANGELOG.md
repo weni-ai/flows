@@ -1,3 +1,16 @@
+1.9.5-rapidpro-7.1.27
+----------
+* Add test to Twilio Flex
+* Add test to RocketChat
+* Add tests to Weni Chats
+* Add tests to ChatGPT
+* Add tests to org app
+* Add tests for flows views
+* Refact externals model to not use ConnectViewBase
+* update floweditor to 1.3.1
+* Feat: FlowEditor Feedback component
+* Remove Org name edit option
+
 1.9.4-rapidpro-7.1.27
 ----------
 * Update version of weni-rp-apps to 2.7.3
