@@ -3182,25 +3182,23 @@ class OrgTest(TembaTest):
         # edit our sub org's details
         response = self.client.post(
             f"{reverse('orgs.org_edit_sub_org')}?org={sub_org.id}",
-            {"name": "New Sub Org Name", "timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
+            {"timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
         )
 
         sub_org.refresh_from_db()
-        self.assertEqual("New Sub Org Name", sub_org.name)
 
         self.assertEqual(response.url, f"/org/sub_orgs/")
 
         # edit our sub org's details in a spa view
         response = self.client.post(
             f"{reverse('orgs.org_edit_sub_org')}?org={sub_org.id}",
-            {"name": "Spa Sub Org Name", "timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
+            {"timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
             **headers,
         )
 
         self.assertEqual(response.url, f"/org/manage_accounts_sub_org/?org={sub_org.id}")
 
         sub_org.refresh_from_db()
-        self.assertEqual("Spa Sub Org Name", sub_org.name)
         self.assertEqual("Africa/Nairobi", str(sub_org.timezone))
         self.assertEqual("Y", sub_org.date_format)
         self.assertEqual("es", sub_org.language)
@@ -3889,16 +3887,13 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         self.login(self.admin)
         response = self.client.get(edit_url)
-        self.assertEqual(
-            ["name", "timezone", "date_format", "language", "loc"], list(response.context["form"].fields.keys())
-        )
+        self.assertEqual(["timezone", "date_format", "language", "loc"], list(response.context["form"].fields.keys()))
 
         # try submitting with errors
         response = self.client.post(
             reverse("orgs.org_edit"),
-            {"name": "", "timezone": "Bad/Timezone", "date_format": "X", "language": "klingon"},
+            {"timezone": "Bad/Timezone", "date_format": "X", "language": "klingon"},
         )
-        self.assertFormError(response, "form", "name", "This field is required.")
         self.assertFormError(
             response, "form", "timezone", "Select a valid choice. Bad/Timezone is not one of the available choices."
         )
@@ -3911,12 +3906,11 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         response = self.client.post(
             reverse("orgs.org_edit"),
-            {"name": "New Name", "timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
+            {"timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
         )
         self.assertEqual(302, response.status_code)
 
         self.org.refresh_from_db()
-        self.assertEqual("New Name", self.org.name)
         self.assertEqual("Africa/Nairobi", str(self.org.timezone))
         self.assertEqual("Y", self.org.date_format)
         self.assertEqual("es", self.org.language)

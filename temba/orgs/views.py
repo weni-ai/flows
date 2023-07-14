@@ -3427,14 +3427,13 @@ class OrgCRUDL(SmartCRUDL):
 
     class Edit(InferOrgMixin, OrgPermsMixin, SmartUpdateView):
         class Form(forms.ModelForm):
-            name = forms.CharField(max_length=128, label=_("Workspace Name"), help_text="", widget=InputWidget())
             timezone = TimeZoneFormField(
                 label=_("Timezone"), help_text="", widget=SelectWidget(attrs={"searchable": True})
             )
 
             class Meta:
                 model = Org
-                fields = ("name", "timezone", "date_format", "language")
+                fields = ("timezone", "date_format", "language")
                 widgets = {"date_format": SelectWidget(), "language": SelectWidget()}
 
         success_message = ""
