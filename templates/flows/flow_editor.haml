@@ -24,8 +24,7 @@
     }
 
     #rp-flow-editor #simulator {
-      top: -180px;
-      margin-left: 20px;
+      top: 0px;
     }
 
     #header *, #top-menu *, .org-header * {
@@ -64,12 +63,6 @@
 
     .page-wrap:after {
       height: 0px;
-    }
-
-    #rp-flow-editor input {
-      font-family: 'Roboto', sans-serif;
-      font-size: 14px !important;
-      font-weight: 300 !important;
     }
 
     #rp-flow-editor input:focus {
@@ -136,7 +129,6 @@
 
     #rp-flow-editor h1 {
       font-weight: 300;
-      font-family: 'Roboto'
     }
 
     #rp-flow-editor #canvas-container > div {
@@ -264,6 +256,7 @@
         users: api + 'users.json',
         topics: api + 'topics.json',
         editor: '/flow/editor',
+        completion: '/mr/docs/{{ LANGUAGE_CODE }}/editor.json',
 
         ticketer_queues: api + 'ticketer_queues.json',
         external_services: api + 'external_services.json',
