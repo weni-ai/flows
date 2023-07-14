@@ -7759,3 +7759,42 @@ msgstr ""
 
 msgid "No synced templates at this time."
 msgstr "Sem templates sincronizados neste momento."
+
+msgid "How has your experience with the flow editor features been this week?"
+msgstr "Como está sendo sua experiência com as funcionalidades do editor de fluxos nesta semana?"
+
+msgid "Terrible"
+msgstr "Terrível"
+
+msgid "Bad"
+msgstr "Ruim"
+
+msgid "Satisfactory"
+msgstr "Satisfatória"
+
+msgid "Good"
+msgstr "Boa"
+
+msgid "Excellent"
+msgstr "Excelente"
+
+msgid "Thank you for the review!"
+msgstr "Muito obrigado pela avaliação!"
+
+msgid "Want to add a comment to your review?"
+msgstr "Quer adicionar um comentário a sua avaliação?"
+
+msgid "Ignore"
+msgstr "Ignorar"
+
+msgid "Submit comment"
+msgstr "Enviar comentário"
+
+msgid "Write here..."
+msgstr "Escreva aqui..."
+
+msgid "Your review has been submitted! Thank you."
+msgstr "Sua avaliação foi enviada! Muito obrigado."
+
+msgid "CLOSE"
+msgstr "FECHAR"

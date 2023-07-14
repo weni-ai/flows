@@ -1,0 +1,621 @@
+-load smartmin i18n humanize temba compress
+
+-block extra-style
+  :css
+    #floweditor-feedback {
+      display: flex;
+      gap: 12px;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: flex-end;
+      position: fixed;
+      bottom: 150px;
+      right: 16px;
+      z-index: 9999;
+    }
+
+    #floweditor-feedback .launcher {
+      position: relative;
+      border-radius: 600px;
+      border: 1px solid #E2E6ED;
+      background: #FFF;
+      box-shadow: 0px 12px 34px 0px rgba(0, 0, 0, 0.04);
+      width: 62px;
+      height: 62px;
+
+      -webkit-transition: all .2s ease-out;
+      -moz-transition: all .2s ease-out;
+      -o-transition: all .2s ease-out;
+      transition: all .2s ease-out;;
+    }
+
+    #floweditor-feedback .launcher:hover {
+      cursor: pointer;
+      background: #E2E6ED;
+    }
+
+    #floweditor-feedback .launcher.alert-badge::before {
+      content: '';
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background-color: #009E96;
+      border-radius: 600px;
+      right: 3px;
+      top: 3px;
+    }
+    
+    #floweditor-feedback .launcher img {
+      padding: 16px;
+    }
+
+    #floweditor-feedback .content {
+      width: 500px;
+      padding: 16px;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      border-radius: 4px;
+      background: #F9F9F9;
+
+      box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.08);
+    }
+
+    #floweditor-feedback .content .rating {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      align-self: stretch;
+    }
+
+    #floweditor-feedback .content .feedback {
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      align-self: stretch;
+    }
+
+    #floweditor-feedback .content .header {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      width: 100%;
+
+      color: #3B414D;
+      text-align: center;
+      text-wrap: balance;
+
+      font-family: Lato;
+      font-size: 16px;
+      font-style: normal;
+      font-weight: 900;
+      line-height: 24px;
+    }
+
+    #floweditor-feedback .content .header .text{
+      padding-right: 16px;
+    }
+
+    #floweditor-feedback .content .header .close-icon {
+      position: absolute;
+      right: 0;
+      background-color: #4E5666;
+      opacity: 1;
+      cursor: pointer;
+    }
+
+    #floweditor-feedback .content .options {
+      display: flex;
+      gap: 8px;
+    }
+
+    #floweditor-feedback .content .options .option {
+      display: flex;
+      width: 67px;
+      height: 67px;
+      padding: 8px;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+
+      color: var(--neutral-black, #272B33);
+      text-align: center;
+
+      font-family: Lato;
+      font-size: 12px;
+      font-style: normal;
+      font-weight: 400;
+      line-height: 20px;
+      border-radius: 4px;
+      background: rgba(249, 249, 249, 1);
+      -webkit-transition: all .3s ease-out;
+      -moz-transition: all .3s ease-out;
+      -o-transition: all .3s ease-out;
+      transition: all .3s ease-out;;
+    }
+
+    #floweditor-feedback .content .options .option:hover {;
+      background: rgba(226, 230, 237, 1);
+      cursor: pointer;
+    }
+
+    #floweditor-feedback .content .options .option.selected {
+      border: 1px solid #00A49F;
+      background: #EEFFFC;
+    }
+
+    #floweditor-feedback .content .options img {
+      width: 24px;
+      height: 24px;
+    }
+
+    #floweditor-feedback .content .opaque {
+      opacity: 0;
+    }
+
+    #floweditor-feedback .content .bottom {
+      color: #272B33;
+      text-align: center;
+
+      font-family: Lato;
+      font-size: 12px;
+      font-style: normal;
+      font-weight: 400;
+      line-height: 20px;
+    }
+
+    #floweditor-feedback .content #feedback-textarea {
+      margin-bottom: 8px;
+
+      outline: none;
+      height: 80px;
+      width: 100%;
+      resize: none;
+      box-sizing: border-box;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #E2E6ED;
+      background: #FFF;
+
+      color: #4E5666;
+      font-family: Lato;
+    }
+
+    #floweditor-feedback .content #feedback-textarea::placeholder {
+      color: #67738B;
+      font-family: Lato;
+      font-size: 14px;
+      line-height: 22px;
+      opacity: 0.7;
+    }
+
+    #floweditor-feedback .content #feedback-textarea:focus {
+      border-color: #9CACCC;
+    }
+
+    #floweditor-feedback .content #feedback-textarea:focus::placeholder {
+      color: #D0D3D9;
+    }
+
+    #floweditor-feedback .content .buttons {
+      display: flex;
+      gap: 32px; 
+    }
+
+    #floweditor-feedback .content .buttons #send-feedback {
+      background: #00A49F;
+    }
+
+    #floweditor-feedback .content .buttons #send-feedback:hover {
+      opacity: 0.8;
+    }
+
+    #floweditor-feedback .content .buttons #skip-feedback {
+      border: 1px solid transparent;
+    }
+
+    #floweditor-feedback .content .buttons #skip-feedback:hover {
+      border: 1px solid #E2E6ED;
+    }
+
+    .slide-in-left {
+      -webkit-animation: slide-in-left 0.75s ease both;
+              animation: slide-in-left 0.75s ease both;
+    }
+    @-webkit-keyframes slide-in-left {
+      0% {
+        -webkit-transform: translateX(-200px);
+                transform: translateX(-200px);
+        opacity: 0;
+      }
+      70% {
+        -webkit-transform: translateX(10px);
+                transform: translateX(10px);
+        opacity: 0.7;
+      }
+      100% {
+        -webkit-transform: translateX(0);
+                transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    @keyframes slide-in-left {
+      0% {
+        -webkit-transform: translateX(-200px);
+                transform: translateX(-200px);
+        opacity: 0;
+      }
+      70% {
+        -webkit-transform: translateX(10px);
+                transform: translateX(10px);
+        opacity: 0.7;
+      }
+      100% {
+        -webkit-transform: translateX(0);
+                transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .fade-in {
+      -webkit-animation: fade-in 0.5s cubic-bezier(0.390, 0.575, 0.565, 1.000) both;
+              animation: fade-in 0.5s cubic-bezier(0.390, 0.575, 0.565, 1.000) both;
+    }
+    @-webkit-keyframes fade-in {
+      0% {
+        opacity: 0;
+      }
+      100% {
+        opacity: 1;
+      }
+    }
+    @keyframes fade-in {
+      0% {
+        opacity: 0;
+      }
+      100% {
+        opacity: 1;
+      }
+    }
+
+    .fade-out {
+      -webkit-animation: fade-out 0.3s ease-out both;
+              animation: fade-out 0.3s ease-out both;
+    }
+    @-webkit-keyframes fade-out {
+      0% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+      }
+    }
+    @keyframes fade-out {
+      0% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+      }
+    }
+
+    #success-toast {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      border-radius: 4px;
+      background: #FFF;
+
+      box-shadow: 0px 4px 8px 0px rgba(0, 0, 0, 0.10);
+    }
+
+    #success-toast .toast-content {
+      display: flex;
+      padding: 12px;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #success-toast .toast-content .toast-icon {
+      background-color: #47D66F;
+    }
+
+    #success-toast .toast-content .toast-text {
+      color: #3B414D;
+
+      font-family: Lato;
+      font-size: 14px;
+      font-style: normal;
+      font-weight: 400;
+      line-height: 21px;
+    }
+
+    #success-toast .toast-content .toast-close-button {
+      color: #CCC;
+      text-align: right;
+
+      font-family: Lato;
+      font-size: 12px;
+      font-style: normal;
+      font-weight: 400;
+      line-height: 20px;
+    }
+
+
+
+#floweditor-feedback
+  .content.hidden
+    .rating
+      .header
+        %span.text
+          {{ _("How has your experience with the flow editor features been this week?") }}
+        %span.close-icon.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{onclick: "toggleFeedback()"}
+
+      .options
+        #option1.option{onclick:"saveRating(1)"}
+          %img{src:"{{STATIC_URL}}images/emoji/terrible.png"}
+          %span
+            {{ _("Terrible") }}
+
+        #option2.option{onclick:"saveRating(2)"}
+          %img{src:"{{STATIC_URL}}images/emoji/bad.png"}
+          %span
+            {{ _("Bad") }}
+        
+        #option3.option{onclick:"saveRating(3)"}
+          %img{src:"{{STATIC_URL}}images/emoji/satisfactory.png"}
+          %span
+            {{ _("Satisfactory") }}
+
+        #option4.option{onclick:"saveRating(4)"}
+          %img{src:"{{STATIC_URL}}images/emoji/good.png"}
+          %span
+            {{ _("Good") }}
+
+        #option5.option{onclick:"saveRating(5)"}
+          %img{src:"{{STATIC_URL}}images/emoji/excellent.png"}
+          %span
+            {{ _("Excellent") }}
+
+      %span#rating-thanks.opaque.bottom
+        {{ _("Thank you for the review!") }}
+
+    .feedback.hidden
+      .header
+        %span.text
+          {{ _("Want to add a comment to your review?") }}
+        %span.close-icon.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{onclick: "toggleFeedback()"}
+
+      {% translate "Write here..." as textarea_placeholder %}
+      %textarea#feedback-textarea{placeholder:"{{ textarea_placeholder }}"}
+
+      .buttons.w-full
+        #skip-feedback{class: "weni-unnnic-button weni-unnnic-button--terciary weni-unnnic-button--size-large w-full", onclick:"toggleFeedback()"}
+          {{ _("Ignore") }}
+        #send-feedback{class: "weni-unnnic-button weni-unnnic-button--primary weni-unnnic-button--size-large w-full", onclick:"sendFeedback()"}
+          {{ _("Submit comment") }}
+    
+
+  %div.launcher.hidden{onclick: "toggleFeedback()"}
+    %img{src:"{{STATIC_URL}}images/emoji/man-detective.png"}
+
+
+#success-toast.hidden
+  .toast-content
+    .toast-icon.weni-unnnic-check-circle-1-1.weni-unnnic-icon-sm
+    .toast-text
+      {{ _("Your review has been submitted! Thank you.") }}
+    .toast-close-button{onclick:"hideSuccessToast()"}
+      {{ _("CLOSE") }}
+
+-block extra-script
+  %script{type:"module"}
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+    import { getFirestore, doc, collection, addDoc, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "{{ firebase_api_key }}",
+      authDomain: "{{ firebase_auth_domain }}",
+      projectId: "{{ firebase_project_id}}",
+      storageBucket: "{{ firebase_storage_bucket }}",
+      messagingSenderId: "{{ firebase_messaging_sender_id }}",
+      appId: "{{ firebase_app_id}}",
+      measurementId: "{{ firebase_measurement_id }}"
+    };
+    const collectionName = "feedbacks";
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth();
+
+    try {
+      await signInAnonymously(auth)
+      showFeedbackLauncher();
+
+      const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
+      const lastFeedback = localStorage.getItem('lastFeedback');
+      if (lastFeedback) {
+        const now = new Date();
+        const diff = now.getTime() - lastFeedback;
+        if (diff > ONE_WEEK) {
+          showAlertBadge();
+          setTimeout(toggleFeedback, 120000)
+        }
+      } else {
+        showAlertBadge();
+        setTimeout(toggleFeedback, 120000)
+      }
+
+    } catch (error) {
+      hideFeedbackLauncher();
+    }
+
+    let lastRatingRef = null;
+
+    async function saveRatingResponse(rating) {
+      lastRatingRef = null;
+      const userEmail = '{{ user.email|escapejs }}';
+      const userName = '{{ user.name|escapejs }}';
+      const createdOn = new Date().toISOString();
+
+      try {
+        const docRef = await addDoc(collection(db, collectionName), {
+          userEmail,
+          userName,
+          rating,
+          createdOn,
+        });
+
+        lastRatingRef = docRef.id;
+      } catch (e) {
+        lastRatingRef = null;
+      }
+    }
+
+    async function saveFeedbackResponse(feedback) {
+      const userEmail = '{{ user.email|escapejs }}';
+      const feedbackDate = new Date().toISOString();
+
+      const ratingRef = doc(db, collectionName, lastRatingRef);
+
+      await updateDoc(ratingRef, {
+        feedback: feedback.trim(),
+      });
+
+      lastRatingRef = null;
+
+    }
+
+    window.saveRatingResponse = saveRatingResponse;
+    window.saveFeedbackResponse = saveFeedbackResponse;
+
+  :javascript
+    function showAlertBadge() {
+      const launcher = $('.launcher');
+      launcher.addClass('alert-badge');
+    }
+
+    function hideAlertBadge() {
+      const launcher = $('.launcher');
+      launcher.removeClass('alert-badge');
+    }
+
+    function hideFeedbackLauncher() {
+      const launcher = $('.launcher');
+      launcher.addClass('fade-out');
+      launcher.addClass('hidden');
+    }
+
+    function showFeedbackLauncher() {
+      const launcher = $('.launcher');
+      launcher.addClass('fade-in');
+      launcher.removeClass('fade-out');
+      launcher.removeClass('hidden');
+    }
+
+    function toggleFeedback() {
+      const content = $('.content');
+
+      if (content.hasClass('hidden')) {
+        content.addClass('fade-in');
+        content.removeClass('hidden');
+      } else {
+        content.removeClass('fade-in');
+        content.addClass('fade-out');
+        setTimeout(hideContent, 500);
+      }
+
+      hideAlertBadge();
+    }
+
+    function hideContent() {
+      const content = $('.content');
+      content.removeClass('fade-out');
+      content.addClass('hidden');
+    }
+
+    function saveRating(rating) {
+
+      function showOnlySelected() {
+        $("div[id^='option']").hide();
+
+        option.show();
+        option.addClass('slide-in-left');
+        $("#rating-thanks").css('opacity', "1");
+      }
+
+      saveRatingResponse(rating);
+      const option = $(`#option${rating}`);
+      option.addClass('selected');
+
+      setTimeout(showOnlySelected, 250);
+
+      setTimeout(changeToFeedback, 2000);
+      $("div[id^='option']").removeClass('fade-out');
+      localStorage.setItem('lastFeedback', new Date().getTime());
+    }
+
+    function changeToFeedback() {
+      const rating = $('.rating');
+      const feedback = $('.feedback');
+
+      rating.addClass('fade-out');
+      rating.hide();
+      feedback.addClass('fade-in');
+      feedback.removeClass('hidden');
+      feedback.css('display','flex'); 
+    }
+
+    function changeToRating() {
+      const rating = $('.rating');
+      const feedback = $('.feedback');
+
+      feedback.removeClass('fade-out');
+      feedback.removeClass('fade-in');
+      feedback.hide();
+      rating.removeClass('fade-in');
+      rating.removeClass('fade-out');
+      rating.removeClass('hidden');
+      rating.css('display','flex'); 
+
+      $("#rating-thanks").css('opacity', "0");
+      $("div[id^='option']").show();
+      $("div[id^='option']").removeClass('selected');
+      $("div[id^='option']").removeClass('slide-in-left');
+    }
+
+    function sendFeedback() {
+      const feedback = $('#feedback-textarea').val();
+      if (feedback && feedback.trim()) {
+        saveFeedbackResponse(feedback);
+        toggleSuccessToast();
+      }
+      toggleFeedback();
+
+      setTimeout(changeToRating, 500);
+      $('#feedback-textarea').val("");
+
+      localStorage.setItem('lastFeedback', new Date().getTime());
+    }
+
+    function toggleSuccessToast() {
+      const toast = $('#success-toast');
+      toast.removeClass('hidden');
+      setTimeout(hideSuccessToast, 5000);
+    }
+
+    function hideSuccessToast() {
+      const toast = $('#success-toast');
+      toast.addClass('fade-out');
+      setTimeout(hideToast, 500);
+    }
+
+    function hideToast() {
+      const toast = $('#success-toast');
+      toast.addClass('hidden');
+      toast.removeClass('fade-out');
+    }

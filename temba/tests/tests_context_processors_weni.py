@@ -1,6 +1,7 @@
 from django.test import RequestFactory, TestCase, override_settings
 
 from temba.context_processors_weni import (
+    firebase_credentials,
     logrocket,
     old_design_excluded_channels_codes,
     show_sidemenu,
@@ -68,3 +69,24 @@ class ContextProcessorsWeniTestCase(TestCase):
         request = self.factory.get("/")
         result = old_design_excluded_channels_codes(request)
         self.assertEqual(result["old_design_excluded_channels_codes"], ["code1", "code2"])
+
+    @override_settings(
+        FIREBASE_API_KEY="api_key",
+        FIREBASE_AUTH_DOMAIN="auth_domain",
+        FIREBASE_PROJECT_ID="project_id",
+        FIREBASE_STORAGE_BUCKET="storage_bucket",
+        FIREBASE_MESSAGING_SENDER_ID="messaging_sender_id",
+        FIREBASE_APP_ID="app_id",
+        FIREBASE_MEASUREMENT_ID="measurement_id",
+    )
+    def test_firebase_credentials(self):
+        request = self.factory.get("/")
+
+        result = firebase_credentials(request)
+        self.assertEqual(result["firebase_api_key"], "api_key")
+        self.assertEqual(result["firebase_auth_domain"], "auth_domain")
+        self.assertEqual(result["firebase_project_id"], "project_id")
+        self.assertEqual(result["firebase_storage_bucket"], "storage_bucket")
+        self.assertEqual(result["firebase_messaging_sender_id"], "messaging_sender_id")
+        self.assertEqual(result["firebase_app_id"], "app_id")
+        self.assertEqual(result["firebase_measurement_id"], "measurement_id")
