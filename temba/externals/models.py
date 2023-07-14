@@ -5,7 +5,6 @@ from abc import ABCMeta, abstractproperty
 
 from smartmin.models import SmartModel
 
-from django.conf.urls import url
 from django.db import models
 from django.template import Engine
 
@@ -14,7 +13,13 @@ from temba.utils.models import TembaModel
 from temba.utils.uuid import uuid4
 
 
-class ExternalServiceType(metaclass=ABCMeta):
+class ExternalServiceTypeInterface(metaclass=ABCMeta):  # pragma: no cover
+    @abstractproperty
+    def serializer_class(self):
+        pass
+
+
+class ExternalServiceType(object):
     """
     ExternalServiceType is our abstraction base type for external services.
     """
@@ -22,28 +27,13 @@ class ExternalServiceType(metaclass=ABCMeta):
     name = None
     slug = None
     connect_blurb = None
-    connect_view = None
     external_service = None
-
-    @abstractproperty
-    def serializer_class(self):
-        pass
 
     def is_available_to(self, user):
         return True
 
     def get_connect_blurb(self):
         return Engine.get_default().from_string(str(self.connect_blurb))
-
-    def get_urls(self):
-        return [self.get_connect_url()]
-
-    def get_connect_url(self):
-        return url(
-            r"^connect",
-            self.connect_view.as_view(external_service_type=self),
-            name="connect",
-        )
 
     def get_actions(self):
         try:
@@ -118,7 +108,7 @@ class ExternalService(SmartModel, DependencyMixin):
         self.save(update_fields=("is_active", "modified_by", "modified_on"))
 
     def __str__(self):
-        return f"ExternalService[uuid={self.uuid}, name={self.name}"
+        return f"ExternalService[uuid={self.uuid}, name={self.name}]"
 
 
 class Prompt(TembaModel):
