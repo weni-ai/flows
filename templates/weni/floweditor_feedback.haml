@@ -34,7 +34,7 @@
       background: #E2E6ED;
     }
 
-    #floweditor-feedback .launcher::before {
+    #floweditor-feedback .launcher.alert-badge::before {
       content: '';
       position: absolute;
       width: 12px;
@@ -442,9 +442,11 @@
         const now = new Date();
         const diff = now.getTime() - lastFeedback;
         if (diff > ONE_WEEK) {
+          showAlertBadge();
           setTimeout(toggleFeedback, 120000)
         }
       } else {
+        showAlertBadge();
         setTimeout(toggleFeedback, 120000)
       }
 
@@ -492,6 +494,16 @@
     window.saveFeedbackResponse = saveFeedbackResponse;
 
   :javascript
+    function showAlertBadge() {
+      const launcher = $('.launcher');
+      launcher.addClass('alert-badge');
+    }
+
+    function hideAlertBadge() {
+      const launcher = $('.launcher');
+      launcher.removeClass('alert-badge');
+    }
+
     function hideFeedbackLauncher() {
       const launcher = $('.launcher');
       launcher.addClass('fade-out');
@@ -516,6 +528,8 @@
         content.addClass('fade-out');
         setTimeout(hideContent, 500);
       }
+
+      hideAlertBadge();
     }
 
     function hideContent() {
