@@ -1,3 +1,7 @@
+1.9.6-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.4
+
 1.9.5-rapidpro-7.1.27
 ----------
 * Add test to Twilio Flex
