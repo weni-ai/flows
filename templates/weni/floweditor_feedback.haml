@@ -66,19 +66,49 @@
       flex-direction: column;
       align-items: center;
       gap: 16px;
-      align-self: stretch;
     }
 
     #floweditor-feedback .content .feedback {
       flex-direction: column;
       align-items: center;
       gap: 16px;
-      align-self: stretch;
+    }
+
+    #floweditor-feedback .content .rate-again {
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    #floweditor-feedback .content .rate-again .text {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #floweditor-feedback .content .rate-again .text img {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+    }
+
+    #floweditor-feedback .content .rate-again .text span {
+      text-align: center;
+      text-wrap: balance;
+      color: #272B33;
+
+      font-family: Lato;
+      font-size: 14px;
+      line-height: 22px;
+    }
+
+    #floweditor-feedback .content .rate-again .buttons {
+      margin-top: 8px;
     }
 
     #floweditor-feedback .content .header {
-      position: relative;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       width: 100%;
 
@@ -93,16 +123,11 @@
       line-height: 24px;
     }
 
-    #floweditor-feedback .content .header .text{
-      padding-right: 16px;
-    }
-
     #floweditor-feedback .content .header .close-icon {
-      position: absolute;
-      right: 0;
       background-color: #4E5666;
       opacity: 1;
       cursor: pointer;
+      align-self: flex-end;
     }
 
     #floweditor-feedback .content .options {
@@ -350,9 +375,9 @@
   .content.hidden
     .rating
       .header
+        %span.close-icon.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{onclick: "toggleFeedback()"}
         %span.text
           {{ _("How has your experience with the flow editor features been this week?") }}
-        %span.close-icon.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{onclick: "toggleFeedback()"}
 
       .options
         #option1.option{onclick:"saveRating(1)"}
@@ -385,9 +410,9 @@
 
     .feedback.hidden
       .header
+        %span.close-icon.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{onclick: "toggleFeedback()"}
         %span.text
           {{ _("Want to add a comment to your review?") }}
-        %span.close-icon.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{onclick: "toggleFeedback()"}
 
       {% translate "Write here..." as textarea_placeholder %}
       %textarea#feedback-textarea{placeholder:"{{ textarea_placeholder }}"}
@@ -397,7 +422,25 @@
           {{ _("Ignore") }}
         #send-feedback{class: "weni-unnnic-button weni-unnnic-button--primary weni-unnnic-button--size-large w-full", onclick:"sendFeedback()"}
           {{ _("Submit comment") }}
-    
+
+    .rate-again.hidden
+      .header
+        %span.close-icon.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{onclick: "toggleFeedback()"}
+        %span.text
+          {{ _("Thank you!") }}
+
+      .text
+        %img{src:"{{STATIC_URL}}images/emoji/excellent.png"}
+        %span
+          {{ _("You have already rated your experience this week,") }}
+        %span
+           {{ _("would you like to rate it again?") }}
+
+      .buttons.w-full
+        #skip-feedback{class: "weni-unnnic-button weni-unnnic-button--terciary weni-unnnic-button--size-large w-full", onclick:"toggleFeedback()"}
+          {{ _("Close") }}
+        #send-feedback{class: "weni-unnnic-button weni-unnnic-button--primary weni-unnnic-button--size-large w-full", onclick:"restartRating()"}
+          {{ _("Rate again") }}
 
   %div.launcher.hidden{onclick: "toggleFeedback()"}
     %img{src:"{{STATIC_URL}}images/emoji/man-detective.png"}
@@ -415,7 +458,7 @@
   %script{type:"module"}
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
-    import { getFirestore, doc, collection, addDoc, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+    import { getFirestore, doc, collection, addDoc, setDoc, getDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "{{ firebase_api_key }}",
@@ -426,7 +469,8 @@
       appId: "{{ firebase_app_id}}",
       measurementId: "{{ firebase_measurement_id }}"
     };
-    const collectionName = "feedbacks";
+    const feedbacksCollection = "feedbacks";
+    const usersCollection = "users";
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
@@ -436,18 +480,18 @@
       await signInAnonymously(auth)
       showFeedbackLauncher();
 
-      const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
-      const lastFeedback = localStorage.getItem('lastFeedback');
+      const lastFeedback = await getUserLastFeedback();
       if (lastFeedback) {
-        const now = new Date();
-        const diff = now.getTime() - lastFeedback;
-        if (diff > ONE_WEEK) {
+        const diff = getLastFeedbackDiff(lastFeedback);
+        if (diff > 0) {
           showAlertBadge();
-          setTimeout(toggleFeedback, 120000)
+          delayedToggle();
+        } else {
+          changeToRateAgain();
         }
       } else {
         showAlertBadge();
-        setTimeout(toggleFeedback, 120000)
+        delayedToggle();
       }
 
     } catch (error) {
@@ -463,7 +507,7 @@
       const createdOn = new Date().toISOString();
 
       try {
-        const docRef = await addDoc(collection(db, collectionName), {
+        const docRef = await addDoc(collection(db, feedbacksCollection), {
           userEmail,
           userName,
           rating,
@@ -474,26 +518,88 @@
       } catch (e) {
         lastRatingRef = null;
       }
+      setUserLastFeedback();
     }
 
     async function saveFeedbackResponse(feedback) {
       const userEmail = '{{ user.email|escapejs }}';
       const feedbackDate = new Date().toISOString();
 
-      const ratingRef = doc(db, collectionName, lastRatingRef);
+      const ratingRef = doc(db, feedbacksCollection, lastRatingRef);
 
       await updateDoc(ratingRef, {
         feedback: feedback.trim(),
       });
 
       lastRatingRef = null;
+      setUserLastFeedback();
+    }
 
+    async function getUserLastFeedback() {
+      const userEmail = '{{ user.email|escapejs }}';
+      const userRef = doc(db, usersCollection, userEmail);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        return userSnap.data().lastFeedback;
+      } else {
+        return null;
+      }
+    }
+
+    async function setUserLastFeedback() {
+      const userEmail = '{{ user.email|escapejs }}';
+      const userRef = doc(db, usersCollection, userEmail);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        await updateDoc(userRef, {
+          lastFeedback: new Date().getTime(),
+        });
+      } else {
+        await setDoc(userRef, {
+          lastFeedback: new Date().getTime(),
+        });
+      }
     }
 
     window.saveRatingResponse = saveRatingResponse;
     window.saveFeedbackResponse = saveFeedbackResponse;
+    window.getUserLastFeedback = getUserLastFeedback;
 
   :javascript
+    let showRateAgain = false;
+
+    function debounce(func, timeout = 1000){
+      let timer;
+      return (...args) => {
+        if (!timer) {
+          func.apply(this, args);
+        }
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          timer = undefined;
+        }, timeout);
+      };
+    }
+
+    function getLastFeedbackDiff(lastFeedback) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0)
+      const prevMonday = new Date();
+      prevMonday.setDate(today.getDate() - (today.getDay()||7));
+      prevMonday.setHours(0, 0, 0, 0)
+      return prevMonday.getTime() - lastFeedback;
+    }
+
+    function delayedToggle() {
+      setTimeout(() => {
+        if ($('.content').hasClass('hidden')) {
+          toggleFeedback();
+        }
+      }, 120000)
+    }
+
     function showAlertBadge() {
       const launcher = $('.launcher');
       launcher.addClass('alert-badge');
@@ -517,20 +623,27 @@
       launcher.removeClass('hidden');
     }
 
-    function toggleFeedback() {
+    const toggleFeedback = debounce(async () => {
       const content = $('.content');
 
       if (content.hasClass('hidden')) {
+        const lastFeedback = await getUserLastFeedback();
+        if (lastFeedback) {
+          const diff = getLastFeedbackDiff(lastFeedback)
+          if (diff < 0 && showRateAgain) {
+            changeToRateAgain();
+          }
+        }
         content.addClass('fade-in');
         content.removeClass('hidden');
       } else {
         content.removeClass('fade-in');
         content.addClass('fade-out');
-        setTimeout(hideContent, 500);
+        setTimeout(hideContent, 250);
       }
 
       hideAlertBadge();
-    }
+    }, 250)
 
     function hideContent() {
       const content = $('.content');
@@ -538,8 +651,7 @@
       content.addClass('hidden');
     }
 
-    function saveRating(rating) {
-
+    const saveRating = debounce((rating) => {
       function showOnlySelected() {
         $("div[id^='option']").hide();
 
@@ -556,8 +668,7 @@
 
       setTimeout(changeToFeedback, 2000);
       $("div[id^='option']").removeClass('fade-out');
-      localStorage.setItem('lastFeedback', new Date().getTime());
-    }
+    })
 
     function changeToFeedback() {
       const rating = $('.rating');
@@ -567,18 +678,22 @@
       rating.hide();
       feedback.addClass('fade-in');
       feedback.removeClass('hidden');
-      feedback.css('display','flex'); 
+      feedback.css('display','flex');
     }
 
     function changeToRating() {
       const rating = $('.rating');
       const feedback = $('.feedback');
+      const rateAgain = $('.rate-again');
 
       feedback.removeClass('fade-out');
       feedback.removeClass('fade-in');
       feedback.hide();
-      rating.removeClass('fade-in');
+      rateAgain.removeClass('fade-out');
+      rateAgain.removeClass('fade-in');
+      rateAgain.hide();
       rating.removeClass('fade-out');
+      rating.addClass('fade-in');
       rating.removeClass('hidden');
       rating.css('display','flex'); 
 
@@ -588,7 +703,7 @@
       $("div[id^='option']").removeClass('slide-in-left');
     }
 
-    function sendFeedback() {
+    const sendFeedback = debounce(() => {
       const feedback = $('#feedback-textarea').val();
       if (feedback && feedback.trim()) {
         saveFeedbackResponse(feedback);
@@ -596,11 +711,12 @@
       }
       toggleFeedback();
 
-      setTimeout(changeToRating, 500);
+      showRateAgain = true;
+      setTimeout(changeToRateAgain, 500);
       $('#feedback-textarea').val("");
 
-      localStorage.setItem('lastFeedback', new Date().getTime());
-    }
+      isInFeedback = false;
+    })
 
     function toggleSuccessToast() {
       const toast = $('#success-toast');
@@ -619,3 +735,25 @@
       toast.addClass('hidden');
       toast.removeClass('fade-out');
     }
+
+    function changeToRateAgain() {
+      const rating = $('.rating');
+      const feedback = $('.feedback');
+      const rateAgain = $('.rate-again');
+
+      rating.addClass('fade-out');
+      rating.hide();
+      feedback.addClass('fade-out');
+      feedback.hide();
+      rateAgain.addClass('fade-in');
+      rateAgain.removeClass('hidden');
+      rateAgain.css('display','flex');
+    }
+
+    const restartRating = debounce(() => {
+      const rateAgain = $('.rate-again');
+      rateAgain.addClass('fade-out');
+      showRateAgain = false;
+
+      setTimeout(changeToRating, 500);
+    })
