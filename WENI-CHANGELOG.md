@@ -1,3 +1,7 @@
+1.9.8-rapidpro-7.1.27
+----------
+* Feat: Added new rate again step into floweditor feedback
+
 1.9.7-rapidpro-7.1.27
 ----------
 * Update version of weni-rp-apps to 2.7.5
