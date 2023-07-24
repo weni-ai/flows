@@ -476,29 +476,34 @@
     const db = getFirestore(app);
     const auth = getAuth();
 
+    let lastRatingRef = null;
+    let toggleTimoutId = null;
+
     try {
       await signInAnonymously(auth)
-      showFeedbackLauncher();
 
-      const lastFeedback = await getUserLastFeedback();
-      if (lastFeedback) {
-        const diff = getLastFeedbackDiff(lastFeedback);
-        if (diff > 0) {
-          showAlertBadge();
-          delayedToggle();
-        } else {
-          changeToRateAgain();
-        }
+      const userData = await getUserData();
+      if (!userData) {
+        showAlertAndDelay();
       } else {
-        showAlertBadge();
-        delayedToggle();
+        const { lastFeedbackTime, lastFeedbackId } = userData;
+        if (lastFeedbackTime) {
+          lastRatingRef = lastFeedbackId;
+          const diff = getLastFeedbackDiff(lastFeedbackTime);
+          if (diff > 0) {
+            showAlertAndDelay();
+          } else {
+            changeToRateAgain();
+          }
+        } else {
+          showAlertAndDelay();
+        }
       }
 
+      showFeedbackLauncher();
     } catch (error) {
       hideFeedbackLauncher();
     }
-
-    let lastRatingRef = null;
 
     async function saveRatingResponse(rating) {
       lastRatingRef = null;
@@ -507,18 +512,31 @@
       const createdOn = new Date().toISOString();
 
       try {
-        const docRef = await addDoc(collection(db, feedbacksCollection), {
-          userEmail,
-          userName,
-          rating,
-          createdOn,
-        });
+        const userData = await getUserData();
 
-        lastRatingRef = docRef.id;
+        if (userData) {
+          const { lastFeedbackTime, lastFeedbackId } = userData;
+          if (lastFeedbackTime) {
+            const diff = getLastFeedbackDiff(lastFeedbackTime);
+            if (diff > 0) {
+              await addFeedback(userEmail, userName, rating, createdOn);
+            } else {
+              const ratingRef = doc(db, feedbacksCollection, lastFeedbackId);
+              await updateDoc(ratingRef, {
+                rating,
+              });
+              lastRatingRef = lastFeedbackId;
+            }
+          } else {
+            await addFeedback(userEmail, userName, rating, createdOn);
+          }
+        } else {
+          await addFeedback(userEmail, userName, rating, createdOn);
+        }
       } catch (e) {
         lastRatingRef = null;
       }
-      setUserLastFeedback();
+      setUserLastFeedback(lastRatingRef);
     }
 
     async function saveFeedbackResponse(feedback) {
@@ -531,41 +549,57 @@
         feedback: feedback.trim(),
       });
 
+      setUserLastFeedback(lastRatingRef);
       lastRatingRef = null;
-      setUserLastFeedback();
     }
 
-    async function getUserLastFeedback() {
+    async function addFeedback(userEmail, userName, rating, createdOn) {
+      const docRef = await addDoc(collection(db, feedbacksCollection), {
+        userEmail,
+        userName,
+        rating,
+        createdOn,
+      });
+
+      lastRatingRef = docRef.id;
+      return docRef;
+    }
+
+    async function getUserData() {
       const userEmail = '{{ user.email|escapejs }}';
       const userRef = doc(db, usersCollection, userEmail);
       const userSnap = await getDoc(userRef);
 
       if (userSnap.exists()) {
-        return userSnap.data().lastFeedback;
+        return userSnap.data();
       } else {
         return null;
       }
     }
 
-    async function setUserLastFeedback() {
-      const userEmail = '{{ user.email|escapejs }}';
-      const userRef = doc(db, usersCollection, userEmail);
-      const userSnap = await getDoc(userRef);
+    async function setUserLastFeedback(feedbackId) {
+      if (feedbackId) {
+        const userEmail = '{{ user.email|escapejs }}';
+        const userRef = doc(db, usersCollection, userEmail);
+        const userSnap = await getDoc(userRef);
 
-      if (userSnap.exists()) {
-        await updateDoc(userRef, {
-          lastFeedback: new Date().getTime(),
-        });
-      } else {
-        await setDoc(userRef, {
-          lastFeedback: new Date().getTime(),
-        });
+        if (userSnap.exists()) {
+          await updateDoc(userRef, {
+            lastFeedbackTime: new Date().getTime(),
+            lastFeedbackId: feedbackId,
+          });
+        } else {
+          await setDoc(userRef, {
+            lastFeedbackTime: new Date().getTime(),
+            lastFeedbackId: feedbackId,
+          });
+        }
       }
     }
 
     window.saveRatingResponse = saveRatingResponse;
     window.saveFeedbackResponse = saveFeedbackResponse;
-    window.getUserLastFeedback = getUserLastFeedback;
+    window.getUserData = getUserData;
 
   :javascript
     let showRateAgain = false;
@@ -592,12 +626,24 @@
       return prevMonday.getTime() - lastFeedback;
     }
 
+    function showAlertAndDelay() {
+      showAlertBadge();
+      delayedToggle();
+    }
+
     function delayedToggle() {
-      setTimeout(() => {
+      toggleTimoutId = setTimeout(() => {
         if ($('.content').hasClass('hidden')) {
           toggleFeedback();
         }
       }, 120000)
+    }
+
+    function clearDelayTimeout() {
+      if (toggleTimoutId) {
+        clearTimeout(toggleTimoutId);
+        toggleTimoutId = null;
+      }
     }
 
     function showAlertBadge() {
@@ -627,11 +673,14 @@
       const content = $('.content');
 
       if (content.hasClass('hidden')) {
-        const lastFeedback = await getUserLastFeedback();
-        if (lastFeedback) {
-          const diff = getLastFeedbackDiff(lastFeedback)
-          if (diff < 0 && showRateAgain) {
-            changeToRateAgain();
+        const userData = await getUserData();
+        if (userData) {
+          const { lastFeedbackTime } = userData;
+          if (lastFeedbackTime) {
+            const diff = getLastFeedbackDiff(lastFeedbackTime)
+            if (diff < 0 && showRateAgain) {
+              changeToRateAgain();
+            }
           }
         }
         content.addClass('fade-in');
@@ -643,6 +692,7 @@
       }
 
       hideAlertBadge();
+      clearDelayTimeout();
     }, 250)
 
     function hideContent() {
@@ -668,6 +718,7 @@
 
       setTimeout(changeToFeedback, 2000);
       $("div[id^='option']").removeClass('fade-out');
+      clearDelayTimeout();
     })
 
     function changeToFeedback() {
@@ -716,6 +767,7 @@
       $('#feedback-textarea').val("");
 
       isInFeedback = false;
+      clearDelayTimeout();
     })
 
     function toggleSuccessToast() {
