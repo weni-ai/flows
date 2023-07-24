@@ -7854,3 +7854,18 @@ msgstr "¡Tu reseña ha sido enviada! Muchas gracias."
 
 msgid "CLOSE"
 msgstr "CERRAR"
+
+msgid "Thank you!"
+msgstr "¡Muchas gracias!"
+
+msgid "You have already rated your experience this week,"
+msgstr "Ya ha evaluado su experiencia de esta semana,"
+
+msgid "would you like to rate it again?"
+msgstr "¿desea evaluar de nuevo?"
+
+msgid "Close"
+msgstr "Cerrar"
+
+msgid "Rate again"
+msgstr "Evaluar de nuevo"
