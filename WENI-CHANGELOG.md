@@ -1,3 +1,9 @@
+1.9.9-rapidpro-7.1.27
+----------
+* Add tests to Templatetag
+* Add test to Teams channel
+* Add tests to api app
+
 1.9.8-rapidpro-7.1.27
 ----------
 * Feat: Added new rate again step into floweditor feedback
