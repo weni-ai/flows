@@ -7816,5 +7816,59 @@ msgstr "Las plantillas se sincronizan desde su cuenta cada 15 minutos."
 msgid "No synced templates at this time."
 msgstr "No hay plantillas sincronizadas en este momento."
 
+msgid "How has your experience with the flow editor features been this week?"
+msgstr "¿Cómo ha sido tu experiencia con las funciones del editor de flujo esta semana?"
+
+msgid "Terrible"
+msgstr "Horrible"
+
+msgid "Bad"
+msgstr "Malo"
+
+msgid "Satisfactory"
+msgstr "Satisfactorio"
+
+msgid "Good"
+msgstr "Bien"
+
+msgid "Excellent"
+msgstr "Excelente"
+
+msgid "Thank you for the review!"
+msgstr "¡Muchas gracias por la reseña!"
+
+msgid "Want to add a comment to your review?"
+msgstr "¿Quieres añadir un comentario a tu reseña?"
+
+msgid "Ignore"
+msgstr "Ignorar"
+
+msgid "Submit comment"
+msgstr "Enviar comentario"
+
+msgid "Write here..."
+msgstr "Escribe aquí..."
+
+msgid "Your review has been submitted! Thank you."
+msgstr "¡Tu reseña ha sido enviada! Muchas gracias."
+
+msgid "CLOSE"
+msgstr "CERRAR"
+
+msgid "Thank you!"
+msgstr "¡Muchas gracias!"
+
+msgid "You have already rated your experience this week,"
+msgstr "Ya ha evaluado su experiencia de esta semana,"
+
+msgid "would you like to rate it again?"
+msgstr "¿desea evaluar de nuevo?"
+
+msgid "Close"
+msgstr "Cerrar"
+
+msgid "Rate again"
+msgstr "Evaluar de nuevo"
+
 msgid "Trigger Flow"
 msgstr "Desencadenar flujo"

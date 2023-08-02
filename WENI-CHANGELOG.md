@@ -1,3 +1,74 @@
+1.9.9-rapidpro-7.1.27
+----------
+* Add tests to Templatetag
+* Add test to Teams channel
+* Add tests to api app
+
+1.9.8-rapidpro-7.1.27
+----------
+* Feat: Added new rate again step into floweditor feedback
+
+1.9.7-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.5
+
+1.9.6-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.4
+
+1.9.5-rapidpro-7.1.27
+----------
+* Add test to Twilio Flex
+* Add test to RocketChat
+* Add tests to Weni Chats
+* Add tests to ChatGPT
+* Add tests to org app
+* Add tests for flows views
+* Refact externals model to not use ConnectViewBase
+* update floweditor to 1.3.1
+* Feat: FlowEditor Feedback component
+* Remove Org name edit option
+
+1.9.4-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.3
+* Add mail_base.html and msg_mail_body.haml 
+
+1.9.3-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.2
+* Remove weni.internal.msgs module import from INSTALLED_APPS
+
+1.9.2-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.1
+* Add task generate_sent_report_messages
+* Change staging build
+
+1.9.1-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.0
+
+1.9.0-rapidpro-7.1.27
+----------
+* Implement tests for context_processors_weni
+* Add tests to middleware
+* Add tests to omie type
+* Update python version in docker file
+* External service chatgpt
+* remove migration 0091 org plan
+* Create action endpoint to chatgpt
+* Update version of weni-rp-apps to 2.6.0
+* Update FlowEditor to 1.3.0
+
+1.8.10-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.5.0
+
+1.8.9-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.4.4
+
 1.8.8-rapidpro-7.1.27
 ----------
 * Change in CI, from './manage.py' to 'python manage.py'
