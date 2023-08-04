@@ -708,6 +708,32 @@ class FlowMigrationTest(TembaTest):
 
         self.assertEqual(migrated, definition)
 
+    def test_migrate_to_11_0_with_rs_type(self):
+        flow = self.get_flow("migrate_to_11_0")
+        definition = {
+            "rule_sets": [
+                {
+                    "uuid": "9ed4a233-c737-4f46-9b0a-de6e88134e14",
+                    "rules": [
+                        {"test": {"type": "true"}},
+                        {"test": {"type": "D"}},
+                        {"test": {"type": "S"}},
+                        {"test": {"type": "W"}},
+                    ],
+                    "ruleset_type": "wait_message",
+                    "label": None,
+                    "operand": None,
+                    "finished_key": None,
+                    "y": 180,
+                    "x": 179,
+                }
+            ]
+        }
+
+        migrated = migrate_to_version_11_0(definition, flow)
+
+        self.assertEqual(migrated, definition)
+
     def test_migrate_to_11_0_with_null_msg_text(self):
         flow = self.get_flow("migrate_to_11_0")
         definition = {
