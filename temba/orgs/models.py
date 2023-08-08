@@ -630,6 +630,7 @@ class Org(SmartModel):
         exported_flows = []
         exported_campaigns = []
         exported_triggers = []
+        integrations = []
 
         # users can't choose which fields/groups to export - we just include all the dependencies
         fields = set()
