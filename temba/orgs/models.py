@@ -601,8 +601,71 @@ class Org(SmartModel):
         for trigger_def in import_def.get("triggers", []):
             Trigger.validate_import_def(trigger_def)
 
+    def search_integrations(self, exported_flows):
+        integrations = {
+            "classifiers": [],
+            "ticketers": []
+        }
+
+        for node in exported_flows[0]["nodes"]:
+            if node["actions"]:
+                if "classifier" in node["actions"][0]:
+                    classifier = {
+                        "uuid": node["actions"][0]["classifier"]["uuid"],
+                        "name": node["actions"][0]["classifier"]["name"]
+                    }
+                    integrations["classifiers"].append(classifier)
+
+                if "ticketer" in node["actions"][0]:
+                    ticketer = {
+                        "uuid": node["actions"][0]["ticketer"]["uuid"],
+                        "name": node["actions"][0]["ticketer"]["name"],
+                        "queues": []
+                    }
+                    if "topic" in node["actions"][0]:
+                        queue = {
+                            "uuid": node["actions"][0]["topic"]["uuid"],
+                            "name": node["actions"][0]["topic"]["name"]
+                        }
+                        ticketer["queues"].append(queue)
+                    integrations["ticketers"].append(ticketer)
+
+        return integrations
+
+    '''def search_integrations(self, exported_flows):
+        integrations = []
+        list_classifier = []
+        list_ticketer = []
+        list_queue = []
+        classifier = {}
+        ticketer = {}
+        queue = {}
+        flows = exported_flows
+        for node in flows[0]["nodes"]:
+            if node["actions"]:
+                if "classifier" in node["actions"][0]:
+                    classifier["uuid"] = node["actions"][0]["classifier"]["uuid"]
+                    classifier["name"] = node["actions"][0]["classifier"]["name"]
+                    
+                    list_classifier.append(classifier)
+
+                if "ticketer" in node["actions"][0]:
+                    ticketer["uuid"] = node["actions"][0]["ticketer"]["uuid"]
+                    ticketer["name"] = node["actions"][0]["ticketer"]["name"]
+                    if "topic" in node["actions"][0]:
+                        queue["uuid"] = node["actions"][0]["topic"]["uuid"]
+                        queue["name"] = node["actions"][0]["topic"]["name"]
+                        ticketer["queue"] = list_queue
+                    list_ticketer.append(ticketer)
+        
+        integrations.append(list_classifier)
+        integrations.append(list_ticketer)
+        print(integrations)
+
+        return integrations'''
+
     @classmethod
-    def export_definitions(cls, site_link, components, include_fields=True, include_groups=True):
+    def export_definitions(self, cls, site_link, components, include_fields=True, include_groups=True):
         from temba.contacts.models import ContactField
         from temba.campaigns.models import Campaign
         from temba.flows.models import Flow
@@ -611,6 +674,7 @@ class Org(SmartModel):
         exported_flows = []
         exported_campaigns = []
         exported_triggers = []
+        integrations = []
 
         # users can't choose which fields/groups to export - we just include all the dependencies
         fields = set()
@@ -641,7 +705,11 @@ class Org(SmartModel):
                     exported_triggers.append(component.as_export_def())
                     if include_groups:
                         groups.update(component.groups.all())
+        
+        if exported_flows:
+            integrations = self.search_integrations(exported_flows)
 
+        print(integrations)
         return {
             "version": Org.CURRENT_EXPORT_VERSION,
             "site": site_link,
@@ -650,7 +718,9 @@ class Org(SmartModel):
             "triggers": exported_triggers,
             "fields": [f.as_export_def() for f in sorted(fields, key=lambda f: f.key)],
             "groups": [g.as_export_def() for g in sorted(groups, key=lambda g: g.name)],
+            "integrations": integrations,
         }
+
 
     def can_add_sender(self):  # pragma: needs cover
         """
