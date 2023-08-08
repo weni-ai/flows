@@ -601,6 +601,25 @@ class Org(SmartModel):
         for trigger_def in import_def.get("triggers", []):
             Trigger.validate_import_def(trigger_def)
 
+    def search_integrations(self, exported_flows):
+        integrations = []
+        classifier = {}
+        ticketer = {}
+        flows = exported_flows
+        for node in flows[0]["nodes"]:
+            if node["actions"]:
+                if "classifier" in node["actions"][0]:
+                    classifier["type"] = "classifier"
+                    classifier["uuid"] = node["actions"][0]["classifier"]["uuid"]
+                    integrations.append(classifier)
+
+                if "ticketer" in node["actions"][0]:
+                    ticketer["type"] = "ticketer"
+                    ticketer["uuid"] = node["actions"][0]["ticketer"]["uuid"]
+                    integrations.append(ticketer)
+        
+        return integrations
+
     @classmethod
     def export_definitions(cls, site_link, components, include_fields=True, include_groups=True):
         from temba.contacts.models import ContactField
@@ -611,6 +630,7 @@ class Org(SmartModel):
         exported_flows = []
         exported_campaigns = []
         exported_triggers = []
+        integrations = []
 
         # users can't choose which fields/groups to export - we just include all the dependencies
         fields = set()
@@ -641,6 +661,9 @@ class Org(SmartModel):
                     exported_triggers.append(component.as_export_def())
                     if include_groups:
                         groups.update(component.groups.all())
+        
+        if exported_flows:
+            integrations = cls.search_integrations(exported_flows)
 
         return {
             "version": Org.CURRENT_EXPORT_VERSION,
@@ -650,7 +673,9 @@ class Org(SmartModel):
             "triggers": exported_triggers,
             "fields": [f.as_export_def() for f in sorted(fields, key=lambda f: f.key)],
             "groups": [g.as_export_def() for g in sorted(groups, key=lambda g: g.name)],
+            "integrations": integrations,
         }
+
 
     def can_add_sender(self):  # pragma: needs cover
         """
