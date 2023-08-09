@@ -602,6 +602,37 @@ class Org(SmartModel):
             Trigger.validate_import_def(trigger_def)
 
     def search_integrations(self, exported_flows):
+        integrations = {
+            "classifiers": [],
+            "ticketers": []
+        }
+
+        for node in exported_flows[0]["nodes"]:
+            if node["actions"]:
+                if "classifier" in node["actions"][0]:
+                    classifier = {
+                        "uuid": node["actions"][0]["classifier"]["uuid"],
+                        "name": node["actions"][0]["classifier"]["name"]
+                    }
+                    integrations["classifiers"].append(classifier)
+
+                if "ticketer" in node["actions"][0]:
+                    ticketer = {
+                        "uuid": node["actions"][0]["ticketer"]["uuid"],
+                        "name": node["actions"][0]["ticketer"]["name"],
+                        "queues": []
+                    }
+                    if "topic" in node["actions"][0]:
+                        queue = {
+                            "uuid": node["actions"][0]["topic"]["uuid"],
+                            "name": node["actions"][0]["topic"]["name"]
+                        }
+                        ticketer["queues"].append(queue)
+                    integrations["ticketers"].append(ticketer)
+
+        return integrations
+
+    '''def search_integrations(self, exported_flows):
         integrations = []
         list_classifier = []
         list_ticketer = []
@@ -631,10 +662,10 @@ class Org(SmartModel):
         integrations.append(list_ticketer)
         print(integrations)
 
-        return integrations
+        return integrations'''
 
     @classmethod
-    def export_definitions(cls, site_link, components, include_fields=True, include_groups=True):
+    def export_definitions(self, cls, site_link, components, include_fields=True, include_groups=True):
         from temba.contacts.models import ContactField
         from temba.campaigns.models import Campaign
         from temba.flows.models import Flow
@@ -676,7 +707,7 @@ class Org(SmartModel):
                         groups.update(component.groups.all())
         
         if exported_flows:
-            integrations = cls.search_integrations(exported_flows)
+            integrations = self.search_integrations(exported_flows)
 
         print(integrations)
         return {
