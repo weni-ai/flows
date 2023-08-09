@@ -603,21 +603,34 @@ class Org(SmartModel):
 
     def search_integrations(self, exported_flows):
         integrations = []
+        list_classifier = []
+        list_ticketer = []
+        list_queue = []
         classifier = {}
         ticketer = {}
+        queue = {}
         flows = exported_flows
         for node in flows[0]["nodes"]:
             if node["actions"]:
                 if "classifier" in node["actions"][0]:
-                    classifier["type"] = "classifier"
                     classifier["uuid"] = node["actions"][0]["classifier"]["uuid"]
-                    integrations.append(classifier)
+                    classifier["name"] = node["actions"][0]["classifier"]["name"]
+                    
+                    list_classifier.append(classifier)
 
                 if "ticketer" in node["actions"][0]:
-                    ticketer["type"] = "ticketer"
                     ticketer["uuid"] = node["actions"][0]["ticketer"]["uuid"]
-                    integrations.append(ticketer)
+                    ticketer["name"] = node["actions"][0]["ticketer"]["name"]
+                    if "topic" in node["actions"][0]:
+                        queue["uuid"] = node["actions"][0]["topic"]["uuid"]
+                        queue["name"] = node["actions"][0]["topic"]["name"]
+                        ticketer["queue"] = list_queue
+                    list_ticketer.append(ticketer)
         
+        integrations.append(list_classifier)
+        integrations.append(list_ticketer)
+        print(integrations)
+
         return integrations
 
     @classmethod
@@ -665,6 +678,7 @@ class Org(SmartModel):
         if exported_flows:
             integrations = cls.search_integrations(exported_flows)
 
+        print(integrations)
         return {
             "version": Org.CURRENT_EXPORT_VERSION,
             "site": site_link,
