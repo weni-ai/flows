@@ -632,40 +632,45 @@ class Org(SmartModel):
 
         return integrations
 
-    '''def search_integrations(self, exported_flows):
-        integrations = []
-        list_classifier = []
-        list_ticketer = []
-        list_queue = []
-        classifier = {}
-        ticketer = {}
-        queue = {}
-        flows = exported_flows
-        for node in flows[0]["nodes"]:
+    @classmethod
+    def search_integrations(cls, exported_flows):
+        from temba.classifiers.models import Classifier
+
+        integrations = {"classifiers": [], "ticketers": []}
+        repository_uuid = ""
+
+        for node in exported_flows[0]["nodes"]:
             if node["actions"]:
                 if "classifier" in node["actions"][0]:
-                    classifier["uuid"] = node["actions"][0]["classifier"]["uuid"]
-                    classifier["name"] = node["actions"][0]["classifier"]["name"]
-                    
-                    list_classifier.append(classifier)
+                    classifier_object = Classifier.objects.filter(uuid=node["actions"][0]["classifier"]["uuid"])
+                    if classifier_object:
+                        classifier_object = classifier_object.first()
+                        repository_uuid = classifier_object.config.get("repository_uuid", None)
+                    classifier = {
+                        "uuid": node["actions"][0]["classifier"]["uuid"],
+                        "name": node["actions"][0]["classifier"]["name"],
+                        "repository_uuid": repository_uuid,
+                    }
+                    integrations["classifiers"].append(classifier)
 
                 if "ticketer" in node["actions"][0]:
-                    ticketer["uuid"] = node["actions"][0]["ticketer"]["uuid"]
-                    ticketer["name"] = node["actions"][0]["ticketer"]["name"]
+                    ticketer = {
+                        "uuid": node["actions"][0]["ticketer"]["uuid"],
+                        "name": node["actions"][0]["ticketer"]["name"],
+                        "queues": [],
+                    }
                     if "topic" in node["actions"][0]:
-                        queue["uuid"] = node["actions"][0]["topic"]["uuid"]
-                        queue["name"] = node["actions"][0]["topic"]["name"]
-                        ticketer["queue"] = list_queue
-                    list_ticketer.append(ticketer)
-        
-        integrations.append(list_classifier)
-        integrations.append(list_ticketer)
-        print(integrations)
+                        queue = {
+                            "uuid": node["actions"][0]["topic"]["uuid"],
+                            "name": node["actions"][0]["topic"]["name"],
+                        }
+                        ticketer["queues"].append(queue)
+                    integrations["ticketers"].append(ticketer)
 
-        return integrations'''
+        return integrations
 
     @classmethod
-    def export_definitions(self, cls, site_link, components, include_fields=True, include_groups=True):
+    def export_definitions(cls, site_link, components, include_fields=True, include_groups=True):
         from temba.contacts.models import ContactField
         from temba.campaigns.models import Campaign
         from temba.flows.models import Flow
@@ -684,7 +689,6 @@ class Org(SmartModel):
             if isinstance(component, Flow):
                 component.ensure_current_version()  # only export current versions
                 exported_flows.append(component.get_definition())
-
                 if include_groups:
                     groups.update(component.group_dependencies.all())
                 if include_fields:
@@ -709,7 +713,6 @@ class Org(SmartModel):
         if exported_flows:
             integrations = cls.search_integrations(exported_flows)
 
-        print(integrations)
         return {
             "version": Org.CURRENT_EXPORT_VERSION,
             "site": site_link,
