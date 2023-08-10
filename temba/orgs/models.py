@@ -601,43 +601,12 @@ class Org(SmartModel):
         for trigger_def in import_def.get("triggers", []):
             Trigger.validate_import_def(trigger_def)
 
-    def search_integrations(self, exported_flows):
-        integrations = {
-            "classifiers": [],
-            "ticketers": []
-        }
-
-        for node in exported_flows[0]["nodes"]:
-            if node["actions"]:
-                if "classifier" in node["actions"][0]:
-                    classifier = {
-                        "uuid": node["actions"][0]["classifier"]["uuid"],
-                        "name": node["actions"][0]["classifier"]["name"]
-                    }
-                    integrations["classifiers"].append(classifier)
-
-                if "ticketer" in node["actions"][0]:
-                    ticketer = {
-                        "uuid": node["actions"][0]["ticketer"]["uuid"],
-                        "name": node["actions"][0]["ticketer"]["name"],
-                        "queues": []
-                    }
-                    if "topic" in node["actions"][0]:
-                        queue = {
-                            "uuid": node["actions"][0]["topic"]["uuid"],
-                            "name": node["actions"][0]["topic"]["name"]
-                        }
-                        ticketer["queues"].append(queue)
-                    integrations["ticketers"].append(ticketer)
-
-        return integrations
-
     @classmethod
     def search_integrations(cls, exported_flows):
         from temba.classifiers.models import Classifier
 
         integrations = {"classifiers": [], "ticketers": []}
-        repository_uuid = ""
+        repository_uuid = None
 
         for node in exported_flows[0]["nodes"]:
             if node["actions"]:
