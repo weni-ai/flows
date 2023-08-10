@@ -707,7 +707,7 @@ class Org(SmartModel):
                         groups.update(component.groups.all())
         
         if exported_flows:
-            integrations = self.search_integrations(exported_flows)
+            integrations = cls.search_integrations(exported_flows)
 
         print(integrations)
         return {
