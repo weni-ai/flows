@@ -1,3 +1,9 @@
+1.9.10-rapidpro-7.1.27
+----------
+* Add tests to tickets model
+* Add test to instagram
+* Add test to legacy/migrations file
+
 1.9.9-rapidpro-7.1.27
 ----------
 * Add tests to Templatetag
