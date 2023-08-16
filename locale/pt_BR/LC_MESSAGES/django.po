@@ -7813,3 +7813,6 @@ msgstr "Fechar"
 
 msgid "Rate again"
 msgstr "Avaliar novamente"
+
+msgid "Trigger Flow"
+msgstr "Disparar Fluxo"
