@@ -7,7 +7,7 @@ from temba.utils.models import TembaModel
 
 
 class Catalog(TembaModel):
-    catalog_id_facebook = models.CharField(max_length=30, unique=True)
+    facebook_catalog_id = models.CharField(max_length=30, unique=True)
     name = models.CharField(max_length=100)
     org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="catalogs")
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="catalogs")
@@ -26,7 +26,7 @@ class Catalog(TembaModel):
 
 
 class Product(TembaModel):
-    product_id_facebook = models.CharField(max_length=30, unique=True)
+    facebook_product_id = models.CharField(max_length=30, unique=True)
     title = models.CharField(max_length=200)
     product_retailer_id = models.CharField(max_length=50)
     catalog = models.ForeignKey(Catalog, on_delete=models.CASCADE, related_name="products")
