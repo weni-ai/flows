@@ -1,9 +1,10 @@
-name: Build Flows in SP, India and Ireland (Push Tag)
+name: Build Flows in India and Ireland (Push Tag)
 
 on:
   push:
     tags:
-      - '*.*.*'
+      - '*.*.*-india'
+      - '*.*.*-ire'
 
 jobs:
   docker:
@@ -42,7 +43,8 @@ jobs:
             elif [[ "${TAG}" == *"-ire"* ]]; then
               echo "IMAGE_TAG=${{ secrets.ECR_IRE }}/rapidpro:${TAG}" | tee -a "${GITHUB_ENV}"
             else
-              echo "IMAGE_TAG=${{ secrets.ECR_SP }}/push-backend:$TAG" | tee -a "${GITHUB_ENV}"
+              echo 'Not a valid tag. Skipping...'
+              exit 1
             fi
             
             echo "IMAGE_SOURCE_URL=https://github.com/weni-ai/flows" | tee -a "${GITHUB_ENV}"
@@ -78,14 +80,6 @@ jobs:
           registry: ${{ secrets.ECR_IRE }}
           username: ${{ secrets.AWS_ACCESS_KEY_ID_IRE }}      
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY_IRE }}
-
-      - name: Login to Registry SP
-        if: ${{ !contains(env.TAG, '-india') && !contains(env.TAG, '-ire') }}
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ secrets.ECR_SP }}
-          username: ${{ secrets.AWS_ACCESS_KEY_ID_SP }}      
-          password: ${{ secrets.AWS_SECRET_ACCESS_KEY_SP }}
 
       - name: Build and push - Flows Image
         uses: docker/build-push-action@v3

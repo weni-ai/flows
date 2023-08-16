@@ -1,3 +1,7 @@
+1.9.11-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.6
+
 1.9.10-rapidpro-7.1.27
 ----------
 * Add tests to tickets model
