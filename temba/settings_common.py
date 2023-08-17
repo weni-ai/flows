@@ -294,6 +294,7 @@ INSTALLED_APPS = (
     "temba.sql",
     "temba.externals",
     "temba.event_driven",
+    "temba.projects",
 )
 
 # the last installed app that uses smartmin permissions
