@@ -2445,3 +2445,10 @@ def get_flow_user(org):
             __flow_users[username] = flow_user
 
     return flow_user
+
+
+class IntegrationRequest(models.Model):
+    flow = models.ForeignKey(Flow, on_delete=models.CASCADE, related_name="integrations_requests")
+    integration_uuid = models.UUIDField()
+    name = models.CharField(max_length=50)
+    repository = models.UUIDField(null=True)
