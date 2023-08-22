@@ -545,6 +545,19 @@ class Org(SmartModel):
         from temba.contacts.models import ContactField, ContactGroup
         from temba.flows.models import Flow
         from temba.triggers.models import Trigger
+        from temba.flows.models import IntegrationRequest
+
+
+        integrations = export_json.get("integrations")
+        for classifier in integrations.get("classifiers"):
+            IntegrationRequest.objects.create(flow_uuid=classifier.get("flow_uuid"), integration_uuid=classifier.get("uuid"), repository=classifier.get("repository_uuid"), name=classifier.get("name"))
+        
+        for ticketer in integrations.get("ticketers"):
+            IntegrationRequest.objects.create(flow_uuid=ticketer.get("flow_uuid"), integration_uuid=ticketer.get("uuid"), repository=None, name=ticketer.get("name"))
+        
+        for queue in integrations.get("ticketers").get("queues"):
+            IntegrationRequest.objects.create(flow_uuid=ticketer.get("flow_uuid"), integration_uuid=queue.get("uuid"), repository=None, name=queue.get("name"))
+
 
         # only required field is version
         if "version" not in export_json:
@@ -607,38 +620,43 @@ class Org(SmartModel):
 
         integrations = {"classifiers": [], "ticketers": []}
         repository_uuid = None
-
-        if exported_flows and "nodes" in exported_flows[0]:
-            for node in exported_flows[0]["nodes"]:
-                if "actions" in node and node["actions"]:
-                    if node["actions"]:
-                        if "classifier" in node["actions"][0]:
-                            classifier_object = Classifier.objects.filter(
-                                uuid=node["actions"][0]["classifier"]["uuid"]
-                            )
-                            if classifier_object:
-                                classifier_object = classifier_object.first()
-                                repository_uuid = classifier_object.config.get("repository_uuid", None)
-                            classifier = {
-                                "uuid": node["actions"][0]["classifier"]["uuid"],
-                                "name": node["actions"][0]["classifier"]["name"],
-                                "repository_uuid": repository_uuid,
-                            }
-                            integrations["classifiers"].append(classifier)
-
-                        if "ticketer" in node["actions"][0]:
-                            ticketer = {
-                                "uuid": node["actions"][0]["ticketer"]["uuid"],
-                                "name": node["actions"][0]["ticketer"]["name"],
-                                "queues": [],
-                            }
-                            if "topic" in node["actions"][0]:
-                                queue = {
-                                    "uuid": node["actions"][0]["topic"]["uuid"],
-                                    "name": node["actions"][0]["topic"]["name"],
+        
+        for flow in exported_flows:
+            flow_uuid = flow["uuid"]
+            
+            if flow and "nodes" in flow:
+                for node in flow["nodes"]:
+                    if "actions" in node and node["actions"]:
+                        if node["actions"]:
+                            if "classifier" in node["actions"][0]:
+                                classifier_object = Classifier.objects.filter(
+                                    uuid=node["actions"][0]["classifier"]["uuid"]
+                                )
+                                if classifier_object:
+                                    classifier_object = classifier_object.first()
+                                    repository_uuid = classifier_object.config.get("repository_uuid", None)
+                                classifier = {
+                                    "uuid": node["actions"][0]["classifier"]["uuid"],
+                                    "name": node["actions"][0]["classifier"]["name"],
+                                    "flow_uuid": flow_uuid,
+                                    "repository_uuid": repository_uuid,
                                 }
-                                ticketer["queues"].append(queue)
-                            integrations["ticketers"].append(ticketer)
+                                integrations["classifiers"].append(classifier)
+
+                            if "ticketer" in node["actions"][0]:
+                                ticketer = {
+                                    "uuid": node["actions"][0]["ticketer"]["uuid"],
+                                    "name": node["actions"][0]["ticketer"]["name"],
+                                    "flow_uuid": flow_uuid,
+                                    "queues": [],
+                                }
+                                if "topic" in node["actions"][0]:
+                                    queue = {
+                                        "uuid": node["actions"][0]["topic"]["uuid"],
+                                        "name": node["actions"][0]["topic"]["name"],
+                                    }
+                                    ticketer["queues"].append(queue)
+                                integrations["ticketers"].append(ticketer)
 
         return integrations
 
