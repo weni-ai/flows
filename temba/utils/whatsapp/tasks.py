@@ -14,6 +14,7 @@ from temba.contacts.models import URN, Contact, ContactURN
 from temba.request_logs.models import HTTPLog
 from temba.templates.models import TemplateTranslation
 from temba.utils import chunk_list
+from temba.wpp_products.models import Catalog, Product
 
 from . import update_api_version
 from .constants import LANGUAGE_MAPPING, STATUS_MAPPING
@@ -181,3 +182,63 @@ def refresh_whatsapp_templates():
 
             except Exception as e:
                 logger.error(f"Error refreshing whatsapp templates: {str(e)}", exc_info=True)
+
+def update_local_catalogs(channel, catalogs_data):
+    seen = []
+    for catalog in catalogs_data:
+        Catalog.objects.get_or_create(
+            facebook_catalog_id=catalog["id"],
+            name=catalog["name"],
+            org=channel.org,
+            channel=channel,
+        )
+
+        seen.append(catalog)
+
+    # trim any translations we didn't see
+    Catalog.trim(channel, seen)
+
+def update_local_products(channel, catalog, products_data):
+    seen = []
+    for product in products_data:
+        Product.objects.get_or_create(
+            facebook_product_id=product["id"],
+            title=product["name"],
+            product_retailer_id=product["retailer_id"],
+            catalog=catalog,
+        )
+
+        seen.append(product)
+
+    # trim any translations we didn't see
+    Product.trim(channel, seen)
+
+@shared_task(track_started=True, name="refresh_whatsapp_catalog_and_products")
+def refresh_whatsapp_catalog_and_products():
+    """
+    Fetches catalog data and associated products from Facebook's Graph API and syncs them to the local database.
+    """
+    r = get_redis_connection()
+    if r.get("refresh_whatsapp_catalog_and_products"):
+        return
+
+    with r.lock("refresh_whatsapp_catalog_and_products", 1800):
+        try:
+            for channel in Channel.objects.filter(is_active=True, channel_type__in=["WA", "D3", "WAC"]):
+                # Fetch catalog data
+                catalog_data, valid = channel.get_type().get_api_catalogs(channel)
+                if not valid:
+                    continue
+
+                update_local_catalogs(channel, catalog_data)
+                
+                for catalog in Catalog.objects.filter(channel=channel):
+                    # Fetch products for each catalog
+                    products_data, valid = channel.get_type().get_api_products(channel)
+                    if not valid:
+                        continue
+
+                    update_local_products(channel, catalog, products_data)
+
+        except Exception as e:
+            logger.error(f"Error refreshing WhatsApp catalog and products: {str(e)}", exc_info=True)

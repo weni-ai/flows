@@ -120,3 +120,63 @@ class WhatsAppCloudType(ChannelType):
         except requests.RequestException as e:
             HTTPLog.create_from_exception(HTTPLog.WHATSAPP_TEMPLATES_SYNCED, url, e, start, channel=channel)
             return [], False
+
+    def get_api_catalogs(self, channel):
+        if not settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN:  # pragma: no cover
+            return [], False
+
+        facebook_catalog_id = channel.config.get("wa_waba_id", None)
+        if not facebook_catalog_id:  # pragma: no cover
+            return [], False
+
+        start = timezone.now()
+        try:
+            catalog_data = []
+            url = f"https://graph.facebook.com/v16.0/{facebook_catalog_id}/owned_product_catalogs"
+
+            headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
+            while url:
+                resp = requests.get(url, params=dict(limit=255), headers=headers)
+                elapsed = (timezone.now() - start).total_seconds() * 1000
+                HTTPLog.create_from_response(
+                    HTTPLog.WHATSAPP_CATALOGS_SYNCED, url, resp, channel=channel, request_time=elapsed
+                )
+                if resp.status_code != 200:  # pragma: no cover
+                    return [], False
+
+                catalog_data.extend(resp.json()["data"])
+                url = resp.json().get("paging", {}).get("next", None)
+            return catalog_data, True
+        except requests.RequestException as e:
+            HTTPLog.create_from_exception(HTTPLog.WHATSAPP_CATALOGS_SYNCED, url, e, start, channel=channel)
+            return [], False
+
+    def get_api_products(self, channel):
+        if not settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN:  # pragma: no cover
+            return [], False
+
+        waba_id = channel.config.get("wa_waba_id", None)
+        if not waba_id:  # pragma: no cover
+            return [], False
+
+        start = timezone.now()
+        try:
+            product_data = []
+            url = f"https://graph.facebook.com/v16.0/{waba_id}/products"
+
+            headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
+            while url:
+                resp = requests.get(url, params=dict(limit=255), headers=headers)
+                elapsed = (timezone.now() - start).total_seconds() * 1000
+                HTTPLog.create_from_response(
+                    HTTPLog.WHATSAPP_PRODUCTS_SYNCED, url, resp, channel=channel, request_time=elapsed
+                )
+                if resp.status_code != 200:  # pragma: no cover
+                    return [], False
+
+                product_data.extend(resp.json()["data"])
+                url = resp.json().get("paging", {}).get("next", None)
+            return product_data, True
+        except requests.RequestException as e:
+            HTTPLog.create_from_exception(HTTPLog.WHATSAPP_CATALOGS_SYNCED, url, e, start, channel=channel)
+            return [], False
