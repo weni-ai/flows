@@ -547,22 +547,6 @@ class Org(SmartModel):
         from temba.triggers.models import Trigger
         from temba.flows.models import IntegrationRequest
 
-
-        '''integrations = export_json.get("integrations", {})
-        
-        for classifier in integrations.get("classifiers", []):
-            flow = Flow.objects.get(uuid=classifier.get("flow_uuid"))
-            IntegrationRequest.objects.create(flow=flow, integration_uuid=classifier.get("uuid"), repository=classifier.get("repository_uuid"), name=classifier.get("name"))
-        
-        for ticketer in integrations.get("ticketers", []):
-            flow = Flow.objects.get(uuid=ticketer.get("flow_uuid"))
-            IntegrationRequest.objects.create(flow=flow, integration_uuid=ticketer.get("uuid"), repository=None, name=ticketer.get("name"))'''
-        
-        # for queue in integrations.get("ticketers").get("queues"):
-        #     flow = Flow.objects.get(uuid=ticketer.get("flow_uuid"))
-        #     IntegrationRequest.objects.create(flow=flow, integration_uuid=queue.get("uuid"), repository=None, name=queue.get("name"))
-
-
         # only required field is version
         if "version" not in export_json:
             raise ValueError("Export missing version field")
@@ -607,14 +591,13 @@ class Org(SmartModel):
 
         # with all the flows and dependencies committed, we can now have mailroom do full validation
         for flow in new_flows:
-
             definition = flow.get_definition()
             integrations = definition.get("integrations", {})
             for classifier in integrations.get("classifiers", []):
-                IntegrationRequest.objects.create(flow=flow, integration_uuid=classifier.get("uuid"), repository=classifier.get("repository_uuid"), name=classifier.get("name"))
+                IntegrationRequest.objects.create(flow=flow, integration_uuid=classifier.get("uuid"), repository=classifier.get("repository_uuid"), name=classifier.get("name"), project=self.project)
 
             for ticketer in integrations.get("ticketers", []):
-                IntegrationRequest.objects.create(flow=flow, integration_uuid=ticketer.get("uuid"), repository=None, name=ticketer.get("name"))
+                IntegrationRequest.objects.create(flow=flow, integration_uuid=ticketer.get("uuid"), repository=None, name=ticketer.get("name"), project=self.project)
 
             flow_info = mailroom.get_client().flow_inspect(self.id, definition)
             flow.has_issues = len(flow_info[Flow.INSPECT_ISSUES]) > 0
@@ -630,9 +613,6 @@ class Org(SmartModel):
     def search_integrations(cls, exported_flows):
         from temba.classifiers.models import Classifier
 
-        '''integrations = {"classifiers": [], "ticketers": []}
-        repository_uuid = None'''
-        
         for flow in exported_flows:
             integrations = {"classifiers": [], "ticketers": []}
             repository_uuid = None
