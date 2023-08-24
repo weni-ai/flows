@@ -2,6 +2,7 @@ import io
 import smtplib
 from datetime import timedelta
 from decimal import Decimal
+from unittest import TestCase
 from unittest.mock import patch
 from urllib.parse import urlencode
 
@@ -15,6 +16,7 @@ from smartmin.users.models import FailedLogin, RecoveryToken
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core import mail
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -44,6 +46,7 @@ from temba.locations.models import AdminBoundary
 from temba.msgs.models import Broadcast, ExportMessagesTask, Label, Msg
 from temba.notifications.models import Notification
 from temba.orgs.models import BackupToken, Debit, OrgActivity
+from temba.orgs.password_forget import USER_RECOVER_ATTEMPTS_CACHE_KEY, UserCRUDL
 from temba.orgs.tasks import suspend_topup_orgs_task
 from temba.request_logs.models import HTTPLog
 from temba.templates.models import Template, TemplateTranslation
@@ -3179,25 +3182,23 @@ class OrgTest(TembaTest):
         # edit our sub org's details
         response = self.client.post(
             f"{reverse('orgs.org_edit_sub_org')}?org={sub_org.id}",
-            {"name": "New Sub Org Name", "timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
+            {"timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
         )
 
         sub_org.refresh_from_db()
-        self.assertEqual("New Sub Org Name", sub_org.name)
 
         self.assertEqual(response.url, f"/org/sub_orgs/")
 
         # edit our sub org's details in a spa view
         response = self.client.post(
             f"{reverse('orgs.org_edit_sub_org')}?org={sub_org.id}",
-            {"name": "Spa Sub Org Name", "timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
+            {"timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
             **headers,
         )
 
         self.assertEqual(response.url, f"/org/manage_accounts_sub_org/?org={sub_org.id}")
 
         sub_org.refresh_from_db()
-        self.assertEqual("Spa Sub Org Name", sub_org.name)
         self.assertEqual("Africa/Nairobi", str(sub_org.timezone))
         self.assertEqual("Y", sub_org.date_format)
         self.assertEqual("es", sub_org.language)
@@ -3886,16 +3887,13 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         self.login(self.admin)
         response = self.client.get(edit_url)
-        self.assertEqual(
-            ["name", "timezone", "date_format", "language", "loc"], list(response.context["form"].fields.keys())
-        )
+        self.assertEqual(["timezone", "date_format", "language", "loc"], list(response.context["form"].fields.keys()))
 
         # try submitting with errors
         response = self.client.post(
             reverse("orgs.org_edit"),
-            {"name": "", "timezone": "Bad/Timezone", "date_format": "X", "language": "klingon"},
+            {"timezone": "Bad/Timezone", "date_format": "X", "language": "klingon"},
         )
-        self.assertFormError(response, "form", "name", "This field is required.")
         self.assertFormError(
             response, "form", "timezone", "Select a valid choice. Bad/Timezone is not one of the available choices."
         )
@@ -3908,12 +3906,11 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         response = self.client.post(
             reverse("orgs.org_edit"),
-            {"name": "New Name", "timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
+            {"timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
         )
         self.assertEqual(302, response.status_code)
 
         self.org.refresh_from_db()
-        self.assertEqual("New Name", self.org.name)
         self.assertEqual("Africa/Nairobi", str(self.org.timezone))
         self.assertEqual("Y", self.org.date_format)
         self.assertEqual("es", self.org.language)
@@ -5410,3 +5407,41 @@ class BackupTokenTest(TembaTest):
         self.assertEqual(10, len(new_admin_tokens))
         self.assertNotEqual([t.token for t in admin_tokens], [t.token for t in new_admin_tokens])
         self.assertEqual(10, self.admin.backup_tokens.count())
+
+
+class UserCRUDLTestCase(TestCase):
+    def setUp(self):
+        self.user_email = "test@example.com"
+        self.user_recover_attempts_cache_key = USER_RECOVER_ATTEMPTS_CACHE_KEY.format(email=self.user_email)
+        self.user_recover_max_attempts = settings.USER_RECOVER_MAX_ATTEMPTS
+
+    def tearDown(self):
+        cache.delete(self.user_recover_attempts_cache_key)
+
+    @patch("django.core.cache.cache.get_or_set")
+    @patch("django.core.cache.cache.incr")
+    @patch("django.core.cache.cache.touch")
+    @override_settings(USER_RECOVER_TIME_INTERVAL=1)
+    def test_forget_form_exceeded_max_attempts(self, mock_touch, mock_incr, mock_get_or_set):
+        mock_get_or_set.return_value = self.user_recover_max_attempts + 1
+
+        form_data = {"email": self.user_email}
+        form = UserCRUDL.Forget.ForgetForm(data=form_data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
+        expected_error = "You have exceeded the maximum number of attempts, please try again in {settings.USER_RECOVER_TIME_INTERVAL} hours!"
+        self.assertEqual(form.errors["email"][0], expected_error)
+
+    @patch("django.core.cache.cache.get_or_set")
+    @patch("django.core.cache.cache.incr")
+    @patch("django.core.cache.cache.touch")
+    @override_settings(USER_RECOVER_TIME_INTERVAL=1)
+    def test_forget_form_within_max_attempts(self, mock_touch, mock_incr, mock_get_or_set):
+        mock_get_or_set.return_value = self.user_recover_max_attempts - 1
+
+        form_data = {"email": self.user_email}
+        form = UserCRUDL.Forget.ForgetForm(data=form_data)
+
+        self.assertTrue(form.is_valid())
+        self.assertEqual(form.cleaned_data["email"], self.user_email)

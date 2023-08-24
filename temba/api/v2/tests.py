@@ -1,9 +1,10 @@
 import base64
 import time
+import uuid
 from collections import OrderedDict
 from datetime import datetime
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from urllib.parse import quote_plus
 
 import iso8601
@@ -16,11 +17,12 @@ from django.contrib.auth.models import Group, User
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
 from django.db import connection
-from django.test import override_settings
+from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from temba.api.models import APIToken, Resthook, WebHookEvent
+from temba.api.v2.views import ExternalServicesEndpoint
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
@@ -28,6 +30,7 @@ from temba.classifiers.models import Classifier
 from temba.classifiers.types.luis import LuisType
 from temba.classifiers.types.wit import WitType
 from temba.contacts.models import Contact, ContactField, ContactGroup, ContactURN
+from temba.externals.models import ExternalService
 from temba.flows.models import Flow, FlowLabel, FlowRun, FlowStart
 from temba.globals.models import Global
 from temba.locations.models import AdminBoundary, BoundaryAlias
@@ -43,7 +46,7 @@ from temba.triggers.models import Trigger
 from temba.utils import json
 
 from . import fields
-from .serializers import format_datetime, normalize_extra
+from .serializers import ExternalServicesReadSerializer, format_datetime, normalize_extra
 
 NUM_BASE_REQUEST_QUERIES = 6  # number of db queries required for any API request
 
@@ -4806,3 +4809,57 @@ class APITest(TembaTest):
         response = self.fetchJSON(endpoint_url, "role=caretaker&role=editor")
         resp_json = response.json()
         self.assertEqual(["Editor@nyaruka.com"], [u["email"] for u in resp_json["results"]])
+
+
+class ExternalServicesEndpointTestCase(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.external_service = ExternalService.objects.create(
+            uuid=uuid.uuid4(),
+            external_service_type="chatgpt",
+            name="test_chatgpt",
+            config={},
+            org=self.org,
+            created_by=self.user,
+            modified_by=self.user,
+        )
+
+        self.client = Client()
+        self.view = ExternalServicesEndpoint.as_view()
+
+    def test_filter_queryset_with_uuid(self):
+        self.client.force_login(self.user)
+        url = reverse("api.v2.external_services") + ".json"
+        uuid = self.external_service.uuid
+        request_mock = Mock()
+        request_mock.query_params = {"uuid": uuid}
+        request_mock.user = Mock()
+        request_mock.user.get_org.return_value = self.org
+
+        queryset = ExternalService.objects.filter(org=self.org, is_active=True, uuid=uuid)
+        filter_before_after_mock = Mock(return_value=queryset)
+
+        with patch("temba.api.v2.views.ExternalServicesEndpoint.filter_before_after", filter_before_after_mock):
+            response = self.client.get(url, data={"uuid": uuid}, request=request_mock)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.external_service.uuid)
+
+
+class ExternalServicesReadSerializerTest(TembaTest):
+    def test_get_external_service_type(self):
+        external_service_type = "chatgpt"
+        external_service = ExternalService.objects.create(
+            uuid=uuid.uuid4(),
+            external_service_type="chatgpt",
+            name="test_chatgpt",
+            config={},
+            org=self.org,
+            created_by=self.user,
+            modified_by=self.user,
+        )
+
+        serializer = ExternalServicesReadSerializer(instance=external_service)
+        result = serializer.get_external_service_type(external_service)
+
+        self.assertEqual(result, external_service_type)
