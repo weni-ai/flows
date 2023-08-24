@@ -49,3 +49,15 @@ def show_onboard_modal(request):
     show_trigger_onboard_modal = not triggers.exists()
 
     return {"show_trigger_onboard_modal": show_trigger_onboard_modal}
+
+
+def firebase_credentials(request):
+    return {
+        "firebase_api_key": settings.FIREBASE_API_KEY,
+        "firebase_auth_domain": settings.FIREBASE_AUTH_DOMAIN,
+        "firebase_project_id": settings.FIREBASE_PROJECT_ID,
+        "firebase_storage_bucket": settings.FIREBASE_STORAGE_BUCKET,
+        "firebase_messaging_sender_id": settings.FIREBASE_MESSAGING_SENDER_ID,
+        "firebase_app_id": settings.FIREBASE_APP_ID,
+        "firebase_measurement_id": settings.FIREBASE_MEASUREMENT_ID,
+    }

@@ -609,3 +609,16 @@ class TopicTest(TembaTest):
         self.assertEqual(topic2, Topic.get_or_create(self.org, self.admin, "SUPPORT"))
 
         self.assertEqual(f"Topic[uuid={topic1.uuid}, topic=Sales]", str(topic1))
+
+
+class CreateTicketerTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.brand = {"name": "Test Brand"}
+
+    def test_create_internal_ticketer_success(self):
+        ticketer = Ticketer.create_internal_ticketer(self.org, self.brand)
+
+        self.assertEqual(ticketer.org, self.org)
+        self.assertEqual(ticketer.ticketer_type, "internal")
+        self.assertEqual(ticketer.name, "Test Brand Tickets")

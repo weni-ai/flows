@@ -4,13 +4,14 @@ import hashlib
 import hmac
 import time
 from datetime import datetime, timedelta
-from unittest.mock import patch
+from unittest import TestCase
+from unittest.mock import Mock, patch
 from urllib.parse import quote
 
 from smartmin.tests import SmartminTest
 
 from django.conf import settings
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import AnonymousUser, Group, User
 from django.core import mail
 from django.db.models import signals
 from django.template import loader
@@ -20,6 +21,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 
+from temba.channels.templatetags.channels import channellog_request
 from temba.channels.views import channel_status_processor
 from temba.contacts.models import URN, Contact, ContactGroup, ContactURN
 from temba.ivr.models import IVRCall
@@ -2774,3 +2776,17 @@ class CourierTest(TembaTest):
         response = self.client.get(reverse("courier.t", args=[self.channel.uuid, "receive"]))
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.content, b"this URL should be mapped to a Courier instance")
+
+
+class ChannelLogRequestTestCase(TestCase):
+    @override_settings(EXCLUDED_HTTP_HEADERS=["header2", "header3"])
+    def test_channellog_request_with_excluded_headers(self):
+        log = Mock(request="Header1: Value1\r\nHeader2: Value2\r\nHeader3: Value3")
+
+        context = {"user": AnonymousUser()}
+
+        channellog_request(context, log)
+
+        self.assertFalse("header1" in context)
+        self.assertFalse("header2" in context)
+        self.assertFalse("header3" in context)
