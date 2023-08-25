@@ -282,7 +282,6 @@
         showNewUpdates: showV2Updates
       };
 
-      console.log('Starting flow editor with config', config);
       showFlowEditor(document.getElementById('rp-flow-editor'), config);
     }
 
@@ -338,7 +337,8 @@
         if (userSnap.exists()) {
           return userSnap.data();
         } else {
-          return null;
+          await setDoc(userRef, { seenV2Updates: true });
+          return { seenV2Updates: false };
         }
       }
     } catch (err) {
