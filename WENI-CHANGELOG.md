@@ -1,3 +1,8 @@
+2.0.0
+----------
+* Update FlowEditor to version 2.0.0
+* Modified trigger flow button text
+
 1.9.11-rapidpro-7.1.27
 ----------
 * Update version of weni-rp-apps to 2.7.6
