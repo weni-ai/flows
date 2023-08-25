@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from temba.tests.base import TembaTest
 from temba.wpp_products.models import Catalog, Product
@@ -7,12 +8,12 @@ from temba.wpp_products.models import Catalog, Product
 class CatalogModelTestCase(TembaTest):
     def test_clean_method_valid_channel(self):
         catalog = Catalog(
-            catalog_id_facebook="12345",
+            facebook_catalog_id="12345",
             name="Test Catalog",
             org=self.org,
             channel=self.channel,
-            created_by=self.user,
-            modified_by=self.user,
+            created_on=timezone.now(),
+            modified_on=timezone.now(),
         )
 
         catalog.channel.get_type().code = "WAC"
@@ -25,7 +26,7 @@ class CatalogModelTestCase(TembaTest):
 
     def test_clean_method_invalid_channel(self):
         catalog = Catalog(
-            catalog_id_facebook="12345",
+            facebook_catalog_id="12345",
             name="Test Catalog",
             org=self.org,
             channel=self.channel,
@@ -38,12 +39,12 @@ class CatalogModelTestCase(TembaTest):
 
     def test_str_method(self):
         catalog = Catalog(
-            catalog_id_facebook="12345",
+            facebook_catalog_id="12345",
             name="Test Catalog",
             org=self.org,
             channel=self.channel,
-            created_by=self.user,
-            modified_by=self.user,
+            created_on=timezone.now(),
+            modified_on=timezone.now(),
         )
         catalog.channel.get_type().code = "WAC"
         catalog.save()
@@ -54,18 +55,18 @@ class CatalogModelTestCase(TembaTest):
 class ProductModelTestCase(TembaTest):
     def test_str_method(self):
         catalog = Catalog(
-            catalog_id_facebook="12345",
+            facebook_catalog_id="12345",
             name="Test Catalog",
             org=self.org,
             channel=self.channel,
-            created_by=self.user,
-            modified_by=self.user,
+            created_on=timezone.now(),
+            modified_on=timezone.now(),
         )
         catalog.channel.get_type().code = "WAC"
         catalog.save()
 
         product = Product(
-            product_id_facebook="40028922",
+            facebook_product_id="40028922",
             title="Apple",
             product_retailer_id="usajbsjbfpohw",
             catalog=catalog,

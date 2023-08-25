@@ -183,35 +183,38 @@ def refresh_whatsapp_templates():
             except Exception as e:
                 logger.error(f"Error refreshing whatsapp templates: {str(e)}", exc_info=True)
 
+
 def update_local_catalogs(channel, catalogs_data):
     seen = []
     for catalog in catalogs_data:
-        Catalog.objects.get_or_create(
-            facebook_catalog_id=catalog["id"],
+        new_catalog = Catalog.get_or_create(
             name=catalog["name"],
-            org=channel.org,
             channel=channel,
+            facebook_catalog_id=catalog["id"],
         )
 
-        seen.append(catalog)
-
-    # trim any translations we didn't see
+        seen.append(new_catalog)
+    print(seen)
     Catalog.trim(channel, seen)
 
-def update_local_products(channel, catalog, products_data):
+
+def update_local_products(catalog, products_data, channel):
     seen = []
     for product in products_data:
-        Product.objects.get_or_create(
+        new_product = Product.get_or_create(
             facebook_product_id=product["id"],
             title=product["name"],
             product_retailer_id=product["retailer_id"],
             catalog=catalog,
+            name=catalog.name,
+            channel=channel,
+            facebook_catalog_id=catalog.facebook_catalog_id,
         )
 
-        seen.append(product)
+        seen.append(new_product)
 
-    # trim any translations we didn't see
-    Product.trim(channel, seen)
+    Product.trim(catalog, seen)
+
 
 @shared_task(track_started=True, name="refresh_whatsapp_catalog_and_products")
 def refresh_whatsapp_catalog_and_products():
@@ -224,21 +227,21 @@ def refresh_whatsapp_catalog_and_products():
 
     with r.lock("refresh_whatsapp_catalog_and_products", 1800):
         try:
-            for channel in Channel.objects.filter(is_active=True, channel_type__in=["WA", "D3", "WAC"]):
+            for channel in Channel.objects.filter(is_active=True, channel_type="WAC"):
                 # Fetch catalog data
                 catalog_data, valid = channel.get_type().get_api_catalogs(channel)
                 if not valid:
                     continue
 
                 update_local_catalogs(channel, catalog_data)
-                
+
                 for catalog in Catalog.objects.filter(channel=channel):
                     # Fetch products for each catalog
-                    products_data, valid = channel.get_type().get_api_products(channel)
+                    products_data, valid = channel.get_type().get_api_products(channel, catalog)
                     if not valid:
                         continue
 
-                    update_local_products(channel, catalog, products_data)
+                    update_local_products(catalog, products_data, channel)
 
         except Exception as e:
             logger.error(f"Error refreshing WhatsApp catalog and products: {str(e)}", exc_info=True)

@@ -126,7 +126,7 @@ class WhatsAppType(ChannelType):
         except requests.RequestException as e:
             HTTPLog.create_from_exception(HTTPLog.WHATSAPP_TEMPLATES_SYNCED, url, e, start, channel=channel)
             return [], False
-        
+
     def get_api_catalogs(self, channel):
         if (
             CONFIG_FB_BUSINESS_ID not in channel.config or CONFIG_FB_ACCESS_TOKEN not in channel.config

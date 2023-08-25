@@ -151,18 +151,18 @@ class WhatsAppCloudType(ChannelType):
             HTTPLog.create_from_exception(HTTPLog.WHATSAPP_CATALOGS_SYNCED, url, e, start, channel=channel)
             return [], False
 
-    def get_api_products(self, channel):
+    def get_api_products(self, channel, catalog):
         if not settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN:  # pragma: no cover
             return [], False
 
-        waba_id = channel.config.get("wa_waba_id", None)
-        if not waba_id:  # pragma: no cover
+        catalog_id = catalog.facebook_catalog_id
+        if not catalog_id:  # pragma: no cover
             return [], False
 
         start = timezone.now()
         try:
             product_data = []
-            url = f"https://graph.facebook.com/v16.0/{waba_id}/products"
+            url = f"https://graph.facebook.com/v16.0/{catalog_id}/products"
 
             headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
             while url:
@@ -178,5 +178,5 @@ class WhatsAppCloudType(ChannelType):
                 url = resp.json().get("paging", {}).get("next", None)
             return product_data, True
         except requests.RequestException as e:
-            HTTPLog.create_from_exception(HTTPLog.WHATSAPP_CATALOGS_SYNCED, url, e, start, channel=channel)
+            HTTPLog.create_from_exception(HTTPLog.WHATSAPP_PRODUCTS_SYNCED, url, e, start, channel=channel)
             return [], False

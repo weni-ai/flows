@@ -1,16 +1,54 @@
+from uuid import uuid4
+
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from temba.channels.models import Channel
 from temba.orgs.models import Org
-from temba.utils.models import TembaModel
 
 
-class Catalog(TembaModel):
+class Catalog(models.Model):
+    uuid = models.UUIDField(default=uuid4())
     facebook_catalog_id = models.CharField(max_length=30, unique=True)
     name = models.CharField(max_length=100)
     org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="catalogs")
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="catalogs")
+    created_on = models.DateTimeField(default=timezone.now)
+    modified_on = models.DateTimeField(default=timezone.now)
+
+    @classmethod
+    def trim(cls, channel, existing):
+        ids = [tc.id for tc in existing]
+
+        Catalog.objects.filter(channel=channel).exclude(id__in=ids).delete()
+
+    @classmethod
+    def get_or_create(cls, name, channel, facebook_catalog_id):
+        existing = Catalog.objects.filter(name=name, facebook_catalog_id=facebook_catalog_id).first()
+
+        if not existing:
+            existing = Catalog.objects.create(
+                facebook_catalog_id=facebook_catalog_id,
+                name=name,
+                channel=channel,
+                org=channel.org,
+            )
+
+        else:
+            if existing.name != name:
+                existing.name = name
+
+                existing.save(
+                    update_fields=[
+                        "name",
+                    ]
+                )
+
+                existing.modified_on = timezone.now()
+                existing.save(update_fields=["modified_on"])
+
+        return existing
 
     def __str__(self):
         return self.name
@@ -25,11 +63,65 @@ class Catalog(TembaModel):
         super().save(*args, **kwargs)
 
 
-class Product(TembaModel):
+class Product(models.Model):
+    uuid = models.UUIDField(default=uuid4())
     facebook_product_id = models.CharField(max_length=30, unique=True)
     title = models.CharField(max_length=200)
     product_retailer_id = models.CharField(max_length=50)
     catalog = models.ForeignKey(Catalog, on_delete=models.CASCADE, related_name="products")
+    created_on = models.DateTimeField(default=timezone.now)
+    modified_on = models.DateTimeField(default=timezone.now)
+
+    @classmethod
+    def trim(cls, catalog, existing):
+        ids = [tc.id for tc in existing]
+
+        Product.objects.filter(catalog=catalog).exclude(id__in=ids).delete()
+
+    @classmethod
+    def get_or_create(
+        cls, facebook_product_id, title, product_retailer_id, catalog, name, channel, facebook_catalog_id
+    ):
+        existing = Product.objects.filter(catalog=catalog, facebook_product_id=facebook_product_id).first()
+
+        if not existing:
+            new_catalog = Catalog.objects.filter(org=channel.org, name=name).first()
+            if not new_catalog:
+                new_catalog = Catalog.objects.create(
+                    org=channel.org,
+                    name=name,
+                    channel=channel,
+                    facebook_catalog_id=facebook_catalog_id,
+                    created_on=timezone.now(),
+                    modified_on=timezone.now(),
+                )
+            else:
+                new_catalog.modified_on = timezone.now()
+                new_catalog.save(update_fields=["modified_on"])
+
+            existing = Product.objects.create(
+                facebook_product_id=facebook_product_id,
+                title=title,
+                product_retailer_id=product_retailer_id,
+                catalog=catalog,
+            )
+
+        else:
+            if existing.title != title or existing.product_retailer_id != product_retailer_id:
+                existing.title = title
+                existing.product_retailer_id = product_retailer_id
+
+                existing.save(
+                    update_fields=[
+                        "title",
+                        "product_retailer_id",
+                    ]
+                )
+
+                existing.catalog.modified_on = timezone.now()
+                existing.catalog.save(update_fields=["modified_on"])
+
+        return existing
 
     def __str__(self):
         return self.title
