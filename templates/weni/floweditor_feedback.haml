@@ -39,7 +39,7 @@
       position: absolute;
       width: 12px;
       height: 12px;
-      background-color: #009E96;
+      background-color: #E53E3E;
       border-radius: 600px;
       right: 3px;
       top: 3px;
@@ -477,26 +477,26 @@
     const auth = getAuth();
 
     let lastRatingRef = null;
-    let toggleTimoutId = null;
+    let toggleTimeoutId = null;
 
     try {
       await signInAnonymously(auth)
 
       const userData = await getUserData();
       if (!userData) {
-        showAlertAndDelay();
+        showAlertBadge();
       } else {
         const { lastFeedbackTime, lastFeedbackId } = userData;
         if (lastFeedbackTime) {
           lastRatingRef = lastFeedbackId;
           const diff = getLastFeedbackDiff(lastFeedbackTime);
           if (diff > 0) {
-            showAlertAndDelay();
+            showAlertBadge();
           } else {
             changeToRateAgain();
           }
         } else {
-          showAlertAndDelay();
+          showAlertBadge();
         }
       }
 
@@ -632,7 +632,7 @@
     }
 
     function delayedToggle() {
-      toggleTimoutId = setTimeout(() => {
+      toggleTimeoutId = setTimeout(() => {
         if ($('.content').hasClass('hidden')) {
           toggleFeedback();
         }
@@ -640,9 +640,9 @@
     }
 
     function clearDelayTimeout() {
-      if (toggleTimoutId) {
-        clearTimeout(toggleTimoutId);
-        toggleTimoutId = null;
+      if (toggleTimeoutId) {
+        clearTimeout(toggleTimeoutId);
+        toggleTimeoutId = null;
       }
     }
 
