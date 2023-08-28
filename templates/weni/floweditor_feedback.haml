@@ -380,27 +380,27 @@
           {{ _("How has your experience with the flow editor features been this week?") }}
 
       .options
-        #option1.option{onclick:"saveRating(1)"}
+        #feedback-option1.option{onclick:"saveRating(1)"}
           %img{src:"{{STATIC_URL}}images/emoji/terrible.png"}
           %span
             {{ _("Terrible") }}
 
-        #option2.option{onclick:"saveRating(2)"}
+        #feedback-option2.option{onclick:"saveRating(2)"}
           %img{src:"{{STATIC_URL}}images/emoji/bad.png"}
           %span
             {{ _("Bad") }}
         
-        #option3.option{onclick:"saveRating(3)"}
+        #feedback-option3.option{onclick:"saveRating(3)"}
           %img{src:"{{STATIC_URL}}images/emoji/satisfactory.png"}
           %span
             {{ _("Satisfactory") }}
 
-        #option4.option{onclick:"saveRating(4)"}
+        #feedback-option4.option{onclick:"saveRating(4)"}
           %img{src:"{{STATIC_URL}}images/emoji/good.png"}
           %span
             {{ _("Good") }}
 
-        #option5.option{onclick:"saveRating(5)"}
+        #feedback-option5.option{onclick:"saveRating(5)"}
           %img{src:"{{STATIC_URL}}images/emoji/excellent.png"}
           %span
             {{ _("Excellent") }}
@@ -647,30 +647,30 @@
     }
 
     function showAlertBadge() {
-      const launcher = $('.launcher');
+      const launcher = $('#floweditor-feedback .launcher');
       launcher.addClass('alert-badge');
     }
 
     function hideAlertBadge() {
-      const launcher = $('.launcher');
+      const launcher = $('#floweditor-feedback .launcher');
       launcher.removeClass('alert-badge');
     }
 
     function hideFeedbackLauncher() {
-      const launcher = $('.launcher');
+      const launcher = $('#floweditor-feedback .launcher');
       launcher.addClass('fade-out');
       launcher.addClass('hidden');
     }
 
     function showFeedbackLauncher() {
-      const launcher = $('.launcher');
+      const launcher = $('#floweditor-feedback .launcher');
       launcher.addClass('fade-in');
       launcher.removeClass('fade-out');
       launcher.removeClass('hidden');
     }
 
     const toggleFeedback = debounce(async () => {
-      const content = $('.content');
+      const content = $('#floweditor-feedback .content');
 
       if (content.hasClass('hidden')) {
         const userData = await getUserData();
@@ -696,14 +696,14 @@
     }, 250)
 
     function hideContent() {
-      const content = $('.content');
+      const content = $('#floweditor-feedback .content');
       content.removeClass('fade-out');
       content.addClass('hidden');
     }
 
     const saveRating = debounce((rating) => {
       function showOnlySelected() {
-        $("div[id^='option']").hide();
+        $("div[id^='feedback-option']").hide();
 
         option.show();
         option.addClass('slide-in-left');
@@ -711,13 +711,13 @@
       }
 
       saveRatingResponse(rating);
-      const option = $(`#option${rating}`);
+      const option = $(`#feedback-option${rating}`);
       option.addClass('selected');
 
       setTimeout(showOnlySelected, 250);
 
       setTimeout(changeToFeedback, 2000);
-      $("div[id^='option']").removeClass('fade-out');
+      $("div[id^='feedback-option']").removeClass('fade-out');
       clearDelayTimeout();
     })
 
@@ -749,9 +749,9 @@
       rating.css('display','flex'); 
 
       $("#rating-thanks").css('opacity', "0");
-      $("div[id^='option']").show();
-      $("div[id^='option']").removeClass('selected');
-      $("div[id^='option']").removeClass('slide-in-left');
+      $("div[id^='feedback-option']").show();
+      $("div[id^='feedback-option']").removeClass('selected');
+      $("div[id^='feedback-option']").removeClass('slide-in-left');
     }
 
     const sendFeedback = debounce(() => {
@@ -803,7 +803,7 @@
     }
 
     const restartRating = debounce(() => {
-      const rateAgain = $('.rate-again');
+      const rateAgain = $('#floweditor-feedback .rate-again');
       rateAgain.addClass('fade-out');
       showRateAgain = false;
 
