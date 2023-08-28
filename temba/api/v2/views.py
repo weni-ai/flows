@@ -3942,7 +3942,7 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
     def filter_queryset(self, queryset):
         org = self.request.user.get_org()
         queryset = org.catalogs.exclude(products=None)
-        return self.filter_before_after(queryset, "modified_on")
+        return queryset
 
     @classmethod
     def get_read_explorer(cls):

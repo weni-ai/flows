@@ -2,7 +2,7 @@ import base64
 import time
 import uuid
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from unittest.mock import Mock, patch
 from urllib.parse import quote_plus
@@ -22,7 +22,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from temba.api.models import APIToken, Resthook, WebHookEvent
-from temba.api.v2.views import ExternalServicesEndpoint
+from temba.api.v2.views import ExternalServicesEndpoint, ProductsEndpoint
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
@@ -44,9 +44,10 @@ from temba.tickets.types.mailgun import MailgunType
 from temba.tickets.types.zendesk import ZendeskType
 from temba.triggers.models import Trigger
 from temba.utils import json
+from temba.wpp_products.models import Catalog, Product
 
 from . import fields
-from .serializers import ExternalServicesReadSerializer, format_datetime, normalize_extra
+from .serializers import CatalogReadSerializer, ExternalServicesReadSerializer, format_datetime, normalize_extra
 
 NUM_BASE_REQUEST_QUERIES = 6  # number of db queries required for any API request
 
@@ -4863,3 +4864,94 @@ class ExternalServicesReadSerializerTest(TembaTest):
         result = serializer.get_external_service_type(external_service)
 
         self.assertEqual(result, external_service_type)
+
+
+class CatalogReadSerializerTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.catalog = Catalog(
+            facebook_catalog_id="111",
+            name="Test Catalog",
+            channel=self.channel,
+            org=self.org,
+        )
+
+        self.catalog.channel.get_type().code = "WAC"
+        self.catalog.save()
+
+        self.product1 = Product.objects.create(
+            catalog=self.catalog,
+            title="Product 1",
+            facebook_product_id="fb123",
+            product_retailer_id="retail123",
+        )
+        self.product2 = Product.objects.create(
+            catalog=self.catalog,
+            title="Product 2",
+            facebook_product_id="fb456",
+            product_retailer_id="retail456",
+        )
+
+    def test_catalog_read_serializer(self):
+        serializer = CatalogReadSerializer(instance=self.catalog)
+        serialized_data = serializer.data
+
+        self.assertEqual(serialized_data["uuid"], str(self.catalog.uuid))
+        self.assertEqual(serialized_data["name"], "Test Catalog")
+
+        expected_products = [
+            {
+                "title": "Product 1",
+                "facebook_product_id": "fb123",
+                "product_retailer_id": "retail123",
+                "channel": {"uuid": str(self.catalog.channel.uuid), "name": self.catalog.channel.name},
+            },
+            {
+                "title": "Product 2",
+                "facebook_product_id": "fb456",
+                "product_retailer_id": "retail456",
+                "channel": {"uuid": str(self.catalog.channel.uuid), "name": self.catalog.channel.name},
+            },
+        ]
+        self.assertEqual(serialized_data["products"], expected_products)
+
+
+class ProductsEndpointViewSetTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+
+        self.catalog1 = Catalog(name="Catalog 1", facebook_catalog_id="111", org=self.org, channel=self.channel)
+        self.catalog2 = Catalog(name="Catalog 2", facebook_catalog_id="222", org=self.org, channel=self.channel)
+        self.catalog3 = Catalog(name="Catalog 3", facebook_catalog_id="333", org=self.org, channel=self.channel)
+
+        self.catalog1.channel.get_type().code = "WAC"
+        self.catalog1.save()
+
+        self.catalog2.channel.get_type().code = "WAC"
+        self.catalog2.save()
+
+        self.catalog3.channel.get_type().code = "WAC"
+        self.catalog3.save()
+
+        self.product1 = Product.objects.create(
+            catalog=self.catalog1, title="Product 1", facebook_product_id="fb456", product_retailer_id="retail456"
+        )
+        self.product2 = Product.objects.create(
+            catalog=self.catalog2, title="Product 2", facebook_product_id="fb789", product_retailer_id="retail789"
+        )
+
+        self.catalog1.modified_on = timezone.now() - timedelta(days=2)
+        self.catalog1.save()
+
+        self.catalog2.modified_on = timezone.now() - timedelta(days=1)
+        self.catalog2.save()
+
+    def test_filter_queryset(self):
+        viewset = ProductsEndpoint()
+        viewset.request = self.client.get("/")
+        viewset.request.user = self.user
+
+        filtered_queryset = viewset.filter_queryset(Catalog.objects.all())
+
+        self.assertEqual(filtered_queryset.count(), 2)
+        self.assertEqual(filtered_queryset.first(), self.catalog1)
