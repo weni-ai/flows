@@ -1,3 +1,9 @@
+2.0.2
+----------
+* Update FlowEditor to version 2.0.2
+* Add id prefix on jquery selectors to prevent css conflict with unnnic modals 
+* Remove delayed toggle and changed alert color
+
 2.0.1
 ----------
 * Update FlowEditor to version 2.0.1
