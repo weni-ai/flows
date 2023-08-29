@@ -28,6 +28,7 @@ from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.utils import extract_constants, json, on_transaction_commit
+from temba.wpp_products.models import Catalog, Product
 
 from . import fields
 from .validators import UniqueForOrgValidator
@@ -1639,3 +1640,27 @@ class WorkspaceReadSerializer(ReadSerializer):
             "credits",
             "anon",
         )
+
+
+class CatalogReadSerializer(ReadSerializer):
+    products = serializers.SerializerMethodField()
+    modified_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+
+    def get_products(self, obj):
+        products = []
+        for product in Product.objects.filter(catalog=obj).order_by("title"):
+            products.append(
+                {
+                    "title": product.title,
+                    "facebook_product_id": product.facebook_product_id,
+                    "product_retailer_id": product.product_retailer_id,
+                    "channel": {"uuid": obj.channel.uuid, "name": obj.channel.name},
+                }
+            )
+
+        return products
+
+    class Meta:
+        model = Catalog
+        fields = ("uuid", "name", "products", "created_on", "modified_on")
