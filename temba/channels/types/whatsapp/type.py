@@ -20,8 +20,12 @@ CONFIG_FB_BUSINESS_ID = "fb_business_id"
 CONFIG_FB_ACCESS_TOKEN = "fb_access_token"
 CONFIG_FB_NAMESPACE = "fb_namespace"
 CONFIG_FB_TEMPLATE_LIST_DOMAIN = "fb_template_list_domain"
+CONFIG_FB_CATALOG = ""
+CONFIG_FB_PRODUCT = ""
 
-TEMPLATE_LIST_URL = "https://%s/v14.0/%s/message_templates"
+TEMPLATE_LIST_URL = "https://%s/v16.0/%s/message_templates"
+PRODUCT_LIST_URL = "https://%s/v16.0/%s/products"
+CATALOG_LIST_URL = "https://%s/v16.0/%s/owned_product_catalogs"
 
 
 class WhatsAppType(ChannelType):
@@ -121,6 +125,75 @@ class WhatsAppType(ChannelType):
             return template_data, True
         except requests.RequestException as e:
             HTTPLog.create_from_exception(HTTPLog.WHATSAPP_TEMPLATES_SYNCED, url, e, start, channel=channel)
+            return [], False
+
+    def get_api_catalogs(self, channel):
+        if (
+            CONFIG_FB_BUSINESS_ID not in channel.config or CONFIG_FB_ACCESS_TOKEN not in channel.config
+        ):  # pragma: no cover
+            return [], False
+
+        start = timezone.now()
+        try:
+            # Retrieve the template domain, fallback to the default for channels
+            # that have been setup earlier for backwards compatibility
+            facebook_catalog_domain = "graph.facebook.com"
+            facebook_business_id = channel.config.get(CONFIG_FB_BUSINESS_ID)
+            url = CATALOG_LIST_URL % (facebook_catalog_domain, facebook_business_id)
+            catalog_data = []
+            while url:
+                response = requests.get(
+                    url, params=dict(access_token=channel.config[CONFIG_FB_ACCESS_TOKEN], limit=255)
+                )
+                elapsed = (timezone.now() - start).total_seconds() * 1000
+                HTTPLog.create_from_response(
+                    HTTPLog.WHATSAPP_CATALOGS_SYNCED, url, response, channel=channel, request_time=elapsed
+                )
+
+                if response.status_code != 200:  # pragma: no cover
+                    return [], False
+
+                catalog_data.extend(response.json()["data"])
+                url = response.json().get("paging", {}).get("next", None)
+            return catalog_data, True
+        except requests.RequestException as e:
+            HTTPLog.create_from_exception(HTTPLog.WHATSAPP_CATALOGS_SYNCED, url, e, start, channel=channel)
+            return [], False
+
+    def get_api_products(self, channel, catalog):
+        if (
+            CONFIG_FB_BUSINESS_ID not in channel.config or CONFIG_FB_ACCESS_TOKEN not in channel.config
+        ):  # pragma: no cover
+            return [], False
+
+        catalog_id = catalog.facebook_catalog_id
+        if not catalog_id:  # pragma: no cover
+            return [], False
+
+        start = timezone.now()
+        try:
+            # Retrieve the template domain, fallback to the default for channels
+            # that have been setup earlier for backwards compatibility
+            facebook_product_domain = "graph.facebook.com"
+            url = PRODUCT_LIST_URL % (facebook_product_domain, catalog_id)
+            product_data = []
+            while url:
+                response = requests.get(
+                    url, params=dict(access_token=channel.config[CONFIG_FB_ACCESS_TOKEN], limit=255)
+                )
+                elapsed = (timezone.now() - start).total_seconds() * 1000
+                HTTPLog.create_from_response(
+                    HTTPLog.WHATSAPP_PRODUCTS_SYNCED, url, response, channel=channel, request_time=elapsed
+                )
+
+                if response.status_code != 200:  # pragma: no cover
+                    return [], False
+
+                product_data.extend(response.json()["data"])
+                url = response.json().get("paging", {}).get("next", None)
+            return product_data, True
+        except requests.RequestException as e:
+            HTTPLog.create_from_exception(HTTPLog.WHATSAPP_PRODUCTS_SYNCED, url, e, start, channel=channel)
             return [], False
 
     def check_health(self, channel):
