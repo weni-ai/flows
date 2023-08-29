@@ -194,7 +194,7 @@ def update_local_catalogs(channel, catalogs_data):
         )
 
         seen.append(new_catalog)
-    print(seen)
+
     Catalog.trim(channel, seen)
 
 
@@ -222,7 +222,7 @@ def refresh_whatsapp_catalog_and_products():
     Fetches catalog data and associated products from Facebook's Graph API and syncs them to the local database.
     """
     r = get_redis_connection()
-    if r.get("refresh_whatsapp_catalog_and_products"):
+    if r.get("refresh_whatsapp_catalog_and_products"):  # pragma: no cover
         return
 
     with r.lock("refresh_whatsapp_catalog_and_products", 1800):

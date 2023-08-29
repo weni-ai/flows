@@ -9,7 +9,7 @@ from temba.orgs.models import Org
 
 
 class Catalog(models.Model):
-    uuid = models.UUIDField(default=uuid4())
+    uuid = models.UUIDField(default=uuid4)
     facebook_catalog_id = models.CharField(max_length=30, unique=True)
     name = models.CharField(max_length=100)
     org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="catalogs")
@@ -25,28 +25,21 @@ class Catalog(models.Model):
 
     @classmethod
     def get_or_create(cls, name, channel, facebook_catalog_id):
-        existing = Catalog.objects.filter(name=name, facebook_catalog_id=facebook_catalog_id).first()
+        existing = Catalog.objects.filter(facebook_catalog_id=facebook_catalog_id).first()
 
-        if not existing:
+        if existing:
+            if existing.name != name:
+                existing.name = name
+                existing.modified_on = timezone.now()
+                existing.save(update_fields=["name", "modified_on"])
+
+        else:
             existing = Catalog.objects.create(
                 facebook_catalog_id=facebook_catalog_id,
                 name=name,
                 channel=channel,
                 org=channel.org,
             )
-
-        else:
-            if existing.name != name:
-                existing.name = name
-
-                existing.save(
-                    update_fields=[
-                        "name",
-                    ]
-                )
-
-                existing.modified_on = timezone.now()
-                existing.save(update_fields=["modified_on"])
 
         return existing
 
@@ -64,7 +57,7 @@ class Catalog(models.Model):
 
 
 class Product(models.Model):
-    uuid = models.UUIDField(default=uuid4())
+    uuid = models.UUIDField(default=uuid4)
     facebook_product_id = models.CharField(max_length=30, unique=True)
     title = models.CharField(max_length=200)
     product_retailer_id = models.CharField(max_length=50)
