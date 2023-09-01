@@ -545,6 +545,7 @@ class Org(SmartModel):
         from temba.contacts.models import ContactField, ContactGroup
         from temba.flows.models import Flow
         from temba.triggers.models import Trigger
+        from temba.flows.models import IntegrationRequest
 
         # only required field is version
         if "version" not in export_json:
@@ -580,7 +581,6 @@ class Org(SmartModel):
             ContactGroup.import_groups(self, user, export_groups, dependency_mapping)
 
             new_flows = Flow.import_flows(self, user, export_json, dependency_mapping, same_site)
-
             # these depend on flows so are imported last
             new_campaigns = Campaign.import_campaigns(self, user, export_campaigns, same_site)
             Trigger.import_triggers(self, user, export_triggers, same_site)
@@ -591,7 +591,15 @@ class Org(SmartModel):
 
         # with all the flows and dependencies committed, we can now have mailroom do full validation
         for flow in new_flows:
-            flow_info = mailroom.get_client().flow_inspect(self.id, flow.get_definition())
+            definition = flow.get_definition()
+            integrations = definition.get("integrations", {})
+            for classifier in integrations.get("classifiers", []):
+                IntegrationRequest.objects.create(flow=flow, integration_uuid=classifier.get("uuid"), repository=classifier.get("repository_uuid"), name=classifier.get("name"), project=self.project)
+
+            for ticketer in integrations.get("ticketers", []):
+                IntegrationRequest.objects.create(flow=flow, integration_uuid=ticketer.get("uuid"), repository=None, name=ticketer.get("name"), project=self.project)
+
+            flow_info = mailroom.get_client().flow_inspect(self.id, definition)
             flow.has_issues = len(flow_info[Flow.INSPECT_ISSUES]) > 0
             flow.save(update_fields=("has_issues",))
 
@@ -605,38 +613,44 @@ class Org(SmartModel):
     def search_integrations(cls, exported_flows):
         from temba.classifiers.models import Classifier
 
-        integrations = {"classifiers": [], "ticketers": []}
-        repository_uuid = None
+        for flow in exported_flows:
+            integrations = {"classifiers": [], "ticketers": []}
+            repository_uuid = None
 
-        for node in exported_flows[0]["nodes"]:
-            if node["actions"]:
-                if "classifier" in node["actions"][0]:
-                    classifier_object = Classifier.objects.filter(uuid=node["actions"][0]["classifier"]["uuid"])
-                    if classifier_object:
-                        classifier_object = classifier_object.first()
-                        repository_uuid = classifier_object.config.get("repository_uuid", None)
-                    classifier = {
-                        "uuid": node["actions"][0]["classifier"]["uuid"],
-                        "name": node["actions"][0]["classifier"]["name"],
-                        "repository_uuid": repository_uuid,
-                    }
-                    integrations["classifiers"].append(classifier)
+            if flow and "nodes" in flow:
+                for node in flow["nodes"]:
+                    if "actions" in node and node["actions"]:
+                        if node["actions"]:
+                            if "classifier" in node["actions"][0]:
+                                classifier_object = Classifier.objects.filter(
+                                    uuid=node["actions"][0]["classifier"]["uuid"]
+                                )
+                                if classifier_object:
+                                    classifier_object = classifier_object.first()
+                                    repository_uuid = classifier_object.config.get("repository_uuid", None)
+                                classifier = {
+                                    "uuid": node["actions"][0]["classifier"]["uuid"],
+                                    "name": node["actions"][0]["classifier"]["name"],
+                                    "repository_uuid": repository_uuid,
+                                }
+                                integrations["classifiers"].append(classifier)
 
-                if "ticketer" in node["actions"][0]:
-                    ticketer = {
-                        "uuid": node["actions"][0]["ticketer"]["uuid"],
-                        "name": node["actions"][0]["ticketer"]["name"],
-                        "queues": [],
-                    }
-                    if "topic" in node["actions"][0]:
-                        queue = {
-                            "uuid": node["actions"][0]["topic"]["uuid"],
-                            "name": node["actions"][0]["topic"]["name"],
-                        }
-                        ticketer["queues"].append(queue)
-                    integrations["ticketers"].append(ticketer)
+                            if "ticketer" in node["actions"][0]:
+                                ticketer = {
+                                    "uuid": node["actions"][0]["ticketer"]["uuid"],
+                                    "name": node["actions"][0]["ticketer"]["name"],
+                                    "queues": [],
+                                }
+                                if "topic" in node["actions"][0]:
+                                    queue = {
+                                        "uuid": node["actions"][0]["topic"]["uuid"],
+                                        "name": node["actions"][0]["topic"]["name"],
+                                    }
+                                    ticketer["queues"].append(queue)
+                                integrations["ticketers"].append(ticketer)
 
-        return integrations
+            flow["integrations"] = integrations
+        return exported_flows
 
     @classmethod
     def export_definitions(cls, site_link, components, include_fields=True, include_groups=True):
@@ -680,7 +694,7 @@ class Org(SmartModel):
                         groups.update(component.groups.all())
 
         if exported_flows:
-            integrations = cls.search_integrations(exported_flows)
+            cls.search_integrations(exported_flows)
 
         return {
             "version": Org.CURRENT_EXPORT_VERSION,
@@ -690,7 +704,6 @@ class Org(SmartModel):
             "triggers": exported_triggers,
             "fields": [f.as_export_def() for f in sorted(fields, key=lambda f: f.key)],
             "groups": [g.as_export_def() for g in sorted(groups, key=lambda g: g.name)],
-            "integrations": integrations,
         }
 
     def can_add_sender(self):  # pragma: needs cover

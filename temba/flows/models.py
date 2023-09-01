@@ -23,6 +23,7 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 
+from weni.internal.models import Project
 from temba import mailroom
 from temba.assets.models import register_asset_store
 from temba.channels.models import Channel, ChannelConnection
@@ -2445,3 +2446,11 @@ def get_flow_user(org):
             __flow_users[username] = flow_user
 
     return flow_user
+
+
+class IntegrationRequest(models.Model):
+    flow = models.ForeignKey(Flow, on_delete=models.CASCADE, related_name="integrations_requests", null=True)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="integrations_requests")
+    integration_uuid = models.UUIDField()
+    name = models.CharField(max_length=50)
+    repository = models.UUIDField(null=True)
