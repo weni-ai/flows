@@ -1,3 +1,7 @@
+2.0.4
+----------
+* Update FlowEditor to version 2.0.3
+
 2.0.3
 ----------
 * Create and Setup event driven app
