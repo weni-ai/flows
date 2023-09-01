@@ -1,5 +1,6 @@
 import amqp
 from sentry_sdk import capture_exception
+from temba.event_driven.consumers import EDAConsumer
 
 from temba.projects.usecases.project_creation import ProjectCreationUseCase
 
@@ -7,9 +8,8 @@ from ..usecases import ProjectCreationDTO, FlowSetupHandlerUseCase, TemplateType
 from temba.event_driven.parsers import JSONParser
 
 
-class ProjectConsumer:
-    @staticmethod
-    def consume(message: amqp.Message):
+class ProjectConsumer(EDAConsumer):
+    def consume(self, message: amqp.Message):  # pragma: no cover
         try:
             body = JSONParser.parse(message.body)
             print(f"[ProjectConsumer] - Consuming a message. Body: {body}")
