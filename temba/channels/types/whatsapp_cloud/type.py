@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from temba.channels.types.whatsapp_cloud.views import ClaimView
 from temba.contacts.models import URN
 from temba.request_logs.models import HTTPLog
-from temba.utils.whatsapp.views import SyncLogsView, TemplatesView
+from temba.utils.whatsapp.views import CatalogViewSet, SyncLogsView, TemplatesView
 
 from ...models import ChannelType
 
@@ -47,6 +47,7 @@ class WhatsAppCloudType(ChannelType):
             self.get_claim_url(),
             re_path(r"^(?P<uuid>[a-z0-9\-]+)/templates$", TemplatesView.as_view(), name="templates"),
             re_path(r"^(?P<uuid>[a-z0-9\-]+)/sync_logs$", SyncLogsView.as_view(), name="sync_logs"),
+            re_path(r"^(?P<uuid>[a-z0-9\-]+)/catalogs$", CatalogViewSet, name="catalogs"),
         ]
 
     def activate(self, channel):
@@ -125,14 +126,14 @@ class WhatsAppCloudType(ChannelType):
         if not settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN:  # pragma: no cover
             return [], False
 
-        facebook_catalog_id = channel.config.get("wa_waba_id", None)
-        if not facebook_catalog_id:  # pragma: no cover
+        waba_id = channel.config.get("wa_waba_id", None)
+        if not waba_id:  # pragma: no cover
             return [], False
 
         start = timezone.now()
         try:
             catalog_data = []
-            url = f"https://graph.facebook.com/v16.0/{facebook_catalog_id}/owned_product_catalogs"
+            url = f"https://graph.facebook.com/v16.0/{waba_id}/owned_product_catalogs"
 
             headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
             while url:
