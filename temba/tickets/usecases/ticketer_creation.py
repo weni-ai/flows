@@ -42,7 +42,7 @@ def create_ticketer(
             topic_uuid=None
             flow = integration.flow
             last_revision = FlowRevision.objects.filter(flow=flow).last()
-            definition = json.dumps(last_revision.definition)
+            definition = last_revision.definition
 
             for node in definition[0]["nodes"]:
                 if node["actions"]:
@@ -51,23 +51,25 @@ def create_ticketer(
                     if "topic" in node["actions"][0]:
                         topic_uuid = node["actions"][0]["topic"]["uuid"]
 
+            dumps_definition = json.dumps(last_revision.definition)
+            
             if ticketer_uuid:
-                update_ticketer = definition.replace(
+                update_ticketer = dumps_definition.replace(
                     ticketer_uuid, integration.integration_uuid, 
                 )
 
-                definition = json.loads(update_ticketer)
-                last_revision.definition = definition
+                loads_definition = json.loads(update_ticketer)
+                last_revision.definition = loads_definition
                 last_revision.save()
             
             if topic_uuid:
-                update_topic = definition.replace(
+                update_topic = dumps_definition.replace(
                     topic_uuid, integration.integration_uuid,
                 )
                  
 
-                definition = json.loads(update_topic)
-                last_revision.definition = definition
+                loads_definition = json.loads(update_topic)
+                last_revision.definition = loads_definition
                 last_revision.save()
 
     return new_ticketer
