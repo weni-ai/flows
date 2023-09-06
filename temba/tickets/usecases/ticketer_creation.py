@@ -1,75 +1,97 @@
 import json
 
+from weni.internal.models import Project, TicketerQueue
+
 from django.contrib.auth import get_user_model
 
-from weni.internal.models import Project
-
 from temba.flows.models import FlowRevision, IntegrationRequest
-from temba.tickets.models import Ticket, Ticketer, Topic
-
+from temba.tickets.models import Ticketer
 
 User = get_user_model()
 
 
+def list_flow_definition_ticketers(flow_definition) -> list:
+    ticketers = []
+
+    for node in flow_definition["nodes"]:
+        actions = node.get("actions", [])
+        for action in actions:
+            ticketer = action.get("ticketer", {})
+            topic = action.get("topic", {})
+            if ticketer:
+                ticketer = {
+                    "name": ticketer.get("name"),
+                    "uuid": ticketer.get("uuid"),
+                    "topic": {},
+                }
+                if topic:
+                    queue = {
+                        "name": topic.get("name"),
+                        "uuid": topic.get("uuid"),
+                    }
+                    ticketer["topic"].update(queue)
+                ticketers.append(ticketer)
+
+    return ticketers
+
+
 def create_ticketer(
-    ticketer_type: str, name: str, project_uuid: str, user_email: str, uuid: str
+    project_auth: str, name: str, project_uuid: str, user_email: str, uuid: str, queues: list
 ) -> Ticketer:
     project = Project.objects.get(project_uuid=project_uuid)
-    integration_request = IntegrationRequest.objects.filter(project=project)
+    integration_requests = IntegrationRequest.objects.filter(project=project, name=name)
+
+    if not integration_requests:
+        raise KeyError("IntegrationRquest does not exist")
 
     user, created = User.objects.get_or_create(email=user_email)
 
-    new_ticketer = Ticketer(
+    ticketer = Ticketer.objects.create(
+        uuid=uuid,
         org=project.org,
-        ticketer_type=ticketer_type, 
+        ticketer_type="wenichats",
         created_by=user,
         modified_by=user,
-        uuid=uuid,
         name=name,
-        config={},
+        config=dict(
+            project_auth=project_auth,
+            sector_uuid=uuid,
+        ),
     )
 
-    new_ticketer.save()
-
-    if not integration_request:
-        IntegrationRequest.objects.create(
-            flow=None, integration_uuid=uuid, name=name, repository=None, project=project
+    for queue in queues:
+        TicketerQueue.objects.create(
+            uuid=queue.get("uuid"),
+            name=queue.get("name"),
+            org=project.org,
+            created_by=user,
+            modified_by=user,
+            ticketer=ticketer,
         )
 
-    else:
-        for integration in integration_request:
-            ticketer_uuid=None
-            topic_uuid=None
-            flow = integration.flow
-            last_revision = FlowRevision.objects.filter(flow=flow).last()
-            definition = last_revision.definition
+    for integration_request in integration_requests:
+        flow = integration_request.flow
+        last_revision = FlowRevision.objects.filter(flow=flow).last()
+        definition = last_revision.definition
 
-            for node in definition[0]["nodes"]:
-                if node["actions"]:
-                    if "ticketer" in node["actions"][0]:
-                        ticketer_uuid = node["actions"][0]["ticketer"]["uuid"]
-                    if "topic" in node["actions"][0]:
-                        topic_uuid = node["actions"][0]["topic"]["uuid"]
+        dumps_definition = json.dumps(definition)
+        updated_definition = dumps_definition.replace(
+            str(integration_request.integration_uuid),
+            str(ticketer.uuid),
+        )
 
-            dumps_definition = json.dumps(last_revision.definition)
-            
-            if ticketer_uuid:
-                update_ticketer = dumps_definition.replace(
-                    ticketer_uuid, integration.integration_uuid, 
-                )
+        flow_definition_ticketers = list_flow_definition_ticketers(definition)
 
-                loads_definition = json.loads(update_ticketer)
-                last_revision.definition = loads_definition
-                last_revision.save()
-            
-            if topic_uuid:
-                update_topic = dumps_definition.replace(
-                    topic_uuid, integration.integration_uuid,
-                )
-                 
+        for flow_definition_ticketer in flow_definition_ticketers:
+            topic = flow_definition_ticketer.get("topic", {})
+            topic_uuid = topic.get("uuid")
+            topic_name = topic.get("name")
 
-                loads_definition = json.loads(update_topic)
-                last_revision.definition = loads_definition
-                last_revision.save()
+            queue = ticketer.queues.get(name=topic_name)
+            updated_definition = updated_definition.replace(str(topic_uuid), str(queue.uuid))
 
-    return new_ticketer
+        loads_definition = json.loads(updated_definition)
+        last_revision.definition = loads_definition
+        last_revision.save()
+
+    return ticketer
