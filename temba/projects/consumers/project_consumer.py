@@ -1,11 +1,11 @@
 import amqp
 from sentry_sdk import capture_exception
-from temba.event_driven.consumers import EDAConsumer
 
+from temba.event_driven.consumers import EDAConsumer
+from temba.event_driven.parsers import JSONParser
 from temba.projects.usecases.project_creation import ProjectCreationUseCase
 
-from ..usecases import ProjectCreationDTO, FlowSetupHandlerUseCase, TemplateTypeIntegrationUseCase
-from temba.event_driven.parsers import JSONParser
+from ..usecases import FlowSetupHandlerUseCase, ProjectCreationDTO, TemplateTypeIntegrationUseCase
 
 
 class ProjectConsumer(EDAConsumer):
@@ -26,11 +26,8 @@ class ProjectConsumer(EDAConsumer):
             template_type_integration = TemplateTypeIntegrationUseCase(flow_setup_handler)
             project_creation = ProjectCreationUseCase(template_type_integration)
             project_creation.create_project(project_dto, body.get("user_email"))
-        
+
         except Exception as exception:
             capture_exception(exception)
             message.channel.basic_reject(message.delivery_tag, requeue=False)
             print(f"[ProjectConsumer] - Message rejected by: {exception}")
-            return None
-
-        message.channel.basic_ack(message.delivery_tag)
