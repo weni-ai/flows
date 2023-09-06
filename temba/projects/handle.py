@@ -1,6 +1,7 @@
 import amqp
 
-from .consumers import TemplateTypeConsumer, ProjectConsumer
+from .consumers import ProjectConsumer, TemplateTypeConsumer
+
 
 def handle_consumers(channel: amqp.Channel):
     channel.basic_consume("flows.template-types", callback=TemplateTypeConsumer().handle)

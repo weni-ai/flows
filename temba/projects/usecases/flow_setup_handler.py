@@ -1,10 +1,9 @@
+from weni.internal.models import Project
+
 from django.contrib.auth import get_user_model
 
 from ..models import TemplateType
-from weni.internal.models import Project
 from .exceptions import InvalidTemplateTypeData
-
-
 
 User = get_user_model()
 

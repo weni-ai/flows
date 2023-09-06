@@ -1,8 +1,9 @@
 from dataclasses import dataclass
-from django.contrib.auth import get_user_model
-
 
 from weni.internal.models import Project
+
+from django.contrib.auth import get_user_model
+
 from .exceptions import InvalidProjectData
 from .interfaces import TemplateTypeIntegrationInterface
 
@@ -38,8 +39,9 @@ class ProjectCreationUseCase:
                 timezone=project_dto.timezone,
                 created_by=user,
                 modified_by=user,
-                config={"is_template":project_dto.is_template,},
-
+                config={
+                    "is_template": project_dto.is_template,
+                },
             ),
         )
 
@@ -48,7 +50,6 @@ class ProjectCreationUseCase:
         project, _ = self.get_or_create_project(project_dto, user)
 
         if project_dto.is_template:
-            print("e agora")
             self.__template_type_integration.integrate_template_type_in_project(
                 project, project_dto.template_type_uuid, user
             )
