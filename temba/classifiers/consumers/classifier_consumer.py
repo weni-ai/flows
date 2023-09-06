@@ -12,12 +12,12 @@ class ClassifierConsumer(EDAConsumer):
             body = JSONParser.parse(message.body)
             print(f"[ClassifierConsumer] - Consuming a message. Body: {body}")
             create_classifier(
+                uuid=body.get("uuid"),
                 repository=body.get("repository"),
                 access_token=body.get("access_token"),
                 name=body.get("name"),
                 project_uuid=body.get("project_uuid"),
                 user_email=body.get("user_email"),
-                uuid=body.get("uuid"),
             )
 
             message.channel.basic_ack(message.delivery_tag)
@@ -26,6 +26,3 @@ class ClassifierConsumer(EDAConsumer):
             capture_exception(exception)
             message.channel.basic_reject(message.delivery_tag, requeue=False)
             print(f"[ClassifierConsumer] - Message rejected by: {exception}")
-            return None
-
-        message.channel.basic_ack(message.delivery_tag)

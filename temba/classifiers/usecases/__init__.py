@@ -1,1 +1,1 @@
-from .classifier_creation import create_classifier
+from .classifier_creation import create_classifier  # noqa

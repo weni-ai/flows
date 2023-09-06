@@ -1,1 +1,1 @@
-from .classifier_consumer import ClassifierConsumer
+from .classifier_consumer import ClassifierConsumer  # noqa
