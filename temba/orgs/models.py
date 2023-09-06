@@ -594,10 +594,22 @@ class Org(SmartModel):
             definition = flow.get_definition()
             integrations = definition.get("integrations", {})
             for classifier in integrations.get("classifiers", []):
-                IntegrationRequest.objects.create(flow=flow, integration_uuid=classifier.get("uuid"), repository=classifier.get("repository_uuid"), name=classifier.get("name"), project=self.project)
+                IntegrationRequest.objects.create(
+                    flow=flow,
+                    integration_uuid=classifier.get("uuid"),
+                    repository=classifier.get("repository_uuid"),
+                    name=classifier.get("name"),
+                    project=self.project,
+                )
 
             for ticketer in integrations.get("ticketers", []):
-                IntegrationRequest.objects.create(flow=flow, integration_uuid=ticketer.get("uuid"), repository=None, name=ticketer.get("name"), project=self.project)
+                IntegrationRequest.objects.create(
+                    flow=flow,
+                    integration_uuid=ticketer.get("uuid"),
+                    repository=None,
+                    name=ticketer.get("name"),
+                    project=self.project,
+                )
 
             flow_info = mailroom.get_client().flow_inspect(self.id, definition)
             flow.has_issues = len(flow_info[Flow.INSPECT_ISSUES]) > 0

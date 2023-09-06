@@ -1,7 +1,7 @@
 from unittest import TestCase
 
-from ..json_parser import JSONParser
 from ..exceptions import ParseError
+from ..json_parser import JSONParser
 
 
 class JSONParserTestCase(TestCase):

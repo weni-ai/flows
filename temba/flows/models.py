@@ -10,6 +10,7 @@ import regex
 from django_redis import get_redis_connection
 from packaging.version import Version
 from smartmin.models import SmartModel
+from weni.internal.models import Project
 from xlsxlite.writer import XLSXBook
 
 from django.conf import settings
@@ -23,7 +24,6 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 
-from weni.internal.models import Project
 from temba import mailroom
 from temba.assets.models import register_asset_store
 from temba.channels.models import Channel, ChannelConnection
