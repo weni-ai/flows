@@ -10,9 +10,9 @@ from ..usecases import FlowSetupHandlerUseCase, ProjectCreationDTO, TemplateType
 
 class ProjectConsumer(EDAConsumer):
     def consume(self, message: amqp.Message):  # pragma: no cover
+        print(f"[ProjectConsumer] - Consuming a message. Body: {message.body}")
         try:
             body = JSONParser.parse(message.body)
-            print(f"[ProjectConsumer] - Consuming a message. Body: {body}")
             project_dto = ProjectCreationDTO(
                 uuid=body.get("uuid"),
                 name=body.get("name"),
@@ -26,6 +26,8 @@ class ProjectConsumer(EDAConsumer):
             template_type_integration = TemplateTypeIntegrationUseCase(flow_setup_handler)
             project_creation = ProjectCreationUseCase(template_type_integration)
             project_creation.create_project(project_dto, body.get("user_email"), body.get("extra_fields"))
+
+            message.channel.basic_ack(message.delivery_tag)
 
         except Exception as exception:
             capture_exception(exception)

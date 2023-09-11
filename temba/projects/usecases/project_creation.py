@@ -53,7 +53,7 @@ class ProjectCreationUseCase:
         project, _ = self.get_or_create_project(project_dto, user)
         ConnectInternalClient().update_project(project)
         project.administrators.add(user)
-        project.initialize()
+        project.initialize(sample_flows=False)
         project.save()
 
         if extra_fields:

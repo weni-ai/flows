@@ -8,9 +8,9 @@ from temba.event_driven.parsers.json_parser import JSONParser
 
 class ClassifierConsumer(EDAConsumer):
     def consume(self, message: amqp.Message):
+        print(f"[ClassifierConsumer] - Consuming a message. Body: {message.body}")
         try:
             body = JSONParser.parse(message.body)
-            print(f"[ClassifierConsumer] - Consuming a message. Body: {body}")
             create_classifier(
                 uuid=body.get("uuid"),
                 repository=body.get("repository"),
