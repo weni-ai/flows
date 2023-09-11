@@ -8,9 +8,9 @@ from temba.tickets.usecases.ticketer_creation import create_ticketer
 
 class TicketConsumer(EDAConsumer):
     def consume(self, message: amqp.Message):  # pragma: no cover
+        print(f"[TicketerConsumer] - Consuming a message. Body: {message.body}")
         try:
             body = JSONParser.parse(message.body)
-            print(f"[TicketerConsumer] - Consuming a message. Body: {body}")
             create_ticketer(
                 uuid=body.get("uuid"),
                 name=body.get("name"),
