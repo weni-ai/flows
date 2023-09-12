@@ -16,8 +16,8 @@ def create_classifier(
     project = Project.objects.get(project_uuid=project_uuid)
     integration_requests = IntegrationRequest.objects.filter(project=project, repository=repository)
 
-    if not integration_requests:
-        raise KeyError("IntegrationRquest does not exist")
+    # if not integration_requests:
+    #     raise KeyError("IntegrationRquest does not exist")
 
     user, created = User.objects.get_or_create(email=user_email)
 
