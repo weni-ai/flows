@@ -1,3 +1,11 @@
+2.0.6
+----------
+* Update FlowEditor to version 2.2.0
+
+2.0.5
+----------
+* Update FlowEditor to version 2.1.0
+
 2.0.4
 ----------
 * Update FlowEditor to version 2.0.3
