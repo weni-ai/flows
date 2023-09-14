@@ -28,6 +28,7 @@ def create_classifier(
         uuid=uuid,
         name=name,
         config={"access_token": access_token, "repository": repository},
+        classifier_type="bothub",
     )
 
     for integration_request in integration_requests:
