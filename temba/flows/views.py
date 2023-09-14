@@ -1096,10 +1096,10 @@ class FlowCRUDL(SmartCRUDL):
                 links.append(
                     dict(
                         id="start-flow",
-                        title=_("Start Flow"),
+                        title=_("Trigger Flow"),
                         style="button-primary",
                         href=f"{reverse('flows.flow_broadcast', args=[self.object.pk])}",
-                        modax=_("Start Flow"),
+                        modax=_("Trigger Flow"),
                     )
                 )
 
@@ -1933,7 +1933,7 @@ class FlowCRUDL(SmartCRUDL):
 
         form_class = Form
         success_message = ""
-        submit_button_name = _("Start Flow")
+        submit_button_name = _("Trigger Flow")
         success_url = "uuid@flows.flow_editor"
 
         blockers = {

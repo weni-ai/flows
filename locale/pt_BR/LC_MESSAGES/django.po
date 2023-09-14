@@ -7760,6 +7760,9 @@ msgstr ""
 msgid "No synced templates at this time."
 msgstr "Sem templates sincronizados neste momento."
 
+msgid "Trigger Flow"
+msgstr "Disparar Fluxo"
+
 msgid "How has your experience with the flow editor features been this week?"
 msgstr "Como está sendo sua experiência com as funcionalidades do editor de fluxos nesta semana?"
 
