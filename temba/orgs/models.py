@@ -673,7 +673,7 @@ class Org(SmartModel):
             for node in flow.get("nodes", []):
                 actions = node.get("actions")
 
-                if actions is None:
+                if not actions:
                     continue
 
                 first_action = actions[0]
