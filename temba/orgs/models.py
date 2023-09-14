@@ -673,16 +673,18 @@ class Org(SmartModel):
             for node in flow.get("nodes", []):
                 actions = node.get("actions")
 
-                if actions is None:
+                if not actions:
                     continue
 
                 first_action = actions[0]
 
                 classifiers = cls.get_action_classifiers(first_action)
-                integrations["classifiers"].append(classifiers)
+                if classifiers:
+                    integrations["classifiers"].append(classifiers)
 
                 ticketers = cls.get_action_ticketers(first_action)
-                integrations["ticketers"].append(ticketers)
+                if ticketers:
+                    integrations["ticketers"].append(ticketers)
 
             flow["integrations"] = integrations
 
@@ -717,6 +719,7 @@ class Org(SmartModel):
             classifier_name = action_classifier.get("name")
 
             classifier = Classifier.objects.filter(uuid=classifier_uuid)
+            repository_uuid = None
 
             if classifier:
                 classifier = classifier.first()
