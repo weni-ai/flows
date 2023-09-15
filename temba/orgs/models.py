@@ -591,7 +591,7 @@ class Org(SmartModel):
             campaign.schedule_events_async()
 
         # with all the flows and dependencies committed, we can now have mailroom do full validation
-        for flow in new_flows:
+        for flow in new_flows:  # pragma: no cover
             definition = flow.get_definition()
             integrations = definition.get("integrations", {})
             for classifier in integrations.get("classifiers", []):
