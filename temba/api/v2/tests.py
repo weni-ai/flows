@@ -4912,14 +4912,14 @@ class TestSearchIntegrations(TembaTest):
         )
 
         self.assertEqual(
-            integrations[0]["integrations"]["ticketers"][1]["uuid"], "bf9e85ed-b74d-495c-8624-5f91fab13948"
+            integrations[0]["integrations"]["ticketers"][0]["uuid"], "bf9e85ed-b74d-495c-8624-5f91fab13948"
         )
-        self.assertEqual(integrations[0]["integrations"]["ticketers"][1]["name"], "Ticketer1")
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["name"], "Ticketer1")
         self.assertEqual(
-            integrations[0]["integrations"]["ticketers"][1]["queues"][0]["uuid"],
+            integrations[0]["integrations"]["ticketers"][0]["queues"][0]["uuid"],
             "bcef48af-9b73-428d-bd7b-144ea66e2479",
         )
-        self.assertEqual(integrations[0]["integrations"]["ticketers"][1]["queues"][0]["name"], "Queue1")
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["queues"][0]["name"], "Queue1")
 
     def test_search_integrations_with_only_classifiers(self):
         classifier = Classifier.objects.create(
