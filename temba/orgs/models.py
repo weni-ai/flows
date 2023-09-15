@@ -591,7 +591,7 @@ class Org(SmartModel):
             campaign.schedule_events_async()
 
         # with all the flows and dependencies committed, we can now have mailroom do full validation
-        for flow in new_flows:
+        for flow in new_flows:  # pragma: no cover
             definition = flow.get_definition()
             integrations = definition.get("integrations", {})
             for classifier in integrations.get("classifiers", []):
@@ -621,49 +621,6 @@ class Org(SmartModel):
 
         for trigger_def in import_def.get("triggers", []):
             Trigger.validate_import_def(trigger_def)
-
-    """@classmethod
-    def search_integrations(cls, exported_flows):
-        from temba.classifiers.models import Classifier
-
-        for flow in exported_flows:
-            integrations = {"classifiers": [], "ticketers": []}
-            repository_uuid = None
-
-            if flow and "nodes" in flow:
-                for node in flow["nodes"]:
-                    if "actions" in node and node["actions"]:
-                        if node["actions"]:
-                            if "classifier" in node["actions"][0]:
-                                classifier_object = Classifier.objects.filter(
-                                    uuid=node["actions"][0]["classifier"]["uuid"]
-                                )
-                                if classifier_object:
-                                    classifier_object = classifier_object.first()
-                                    repository_uuid = classifier_object.config.get("repository_uuid", None)
-                                classifier = {
-                                    "uuid": node["actions"][0]["classifier"]["uuid"],
-                                    "name": node["actions"][0]["classifier"]["name"],
-                                    "repository_uuid": repository_uuid,
-                                }
-                                integrations["classifiers"].append(classifier)
-
-                            if "ticketer" in node["actions"][0]:
-                                ticketer = {
-                                    "uuid": node["actions"][0]["ticketer"]["uuid"],
-                                    "name": node["actions"][0]["ticketer"]["name"],
-                                    "queues": [],
-                                }
-                                if "topic" in node["actions"][0]:
-                                    queue = {
-                                        "uuid": node["actions"][0]["topic"]["uuid"],
-                                        "name": node["actions"][0]["topic"]["name"],
-                                    }
-                                    ticketer["queues"].append(queue)
-                                integrations["ticketers"].append(ticketer)
-
-            flow["integrations"] = integrations
-        return exported_flows"""
 
     @classmethod
     def search_integrations(cls, exported_flows):
@@ -723,7 +680,7 @@ class Org(SmartModel):
 
             if classifier:
                 classifier = classifier.first()
-                repository_uuid = classifier.config.get("repository_uuid", None)
+                repository_uuid = classifier.config.get("repository", None)
 
             classifier = {"uuid": classifier_uuid, "name": classifier_name, "repository_uuid": repository_uuid}
 

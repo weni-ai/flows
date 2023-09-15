@@ -4873,7 +4873,7 @@ class TestSearchIntegrations(TembaTest):
             modified_by=self.user,
             uuid=uuid.uuid4(),
             name="Classifier1",
-            config={"repository_uuid": "548eaa72-18ab-432a-b781-1ac922a35e83"},
+            config={"repository": "548eaa72-18ab-432a-b781-1ac922a35e83"},
             classifier_type="bothub",
         )
 
@@ -4928,7 +4928,7 @@ class TestSearchIntegrations(TembaTest):
             modified_by=self.user,
             uuid=uuid.uuid4(),
             name="Classifier1",
-            config={"repository_uuid": "repo123"},
+            config={"repository": "repo123"},
             classifier_type="bothub",
         )
 

@@ -44,7 +44,11 @@ def show_onboard_modal(request):
     if not request.user or request.user.is_anonymous:
         return {"show_trigger_onboard_modal": False}
 
-    triggers = request.user.get_org().triggers.all()
+    user_org = request.user.get_org()
+    if not user_org:
+        return {"show_trigger_onboard_modal": False}
+
+    triggers = user_org.triggers.all()
 
     show_trigger_onboard_modal = not triggers.exists()
 

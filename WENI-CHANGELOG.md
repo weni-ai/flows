@@ -1,3 +1,39 @@
+2.0.6
+----------
+* Update FlowEditor to version 2.2.0
+
+2.0.5
+----------
+* Update FlowEditor to version 2.1.0
+
+2.0.4
+----------
+* Update FlowEditor to version 2.0.3
+
+2.0.3
+----------
+* Create and Setup event driven app
+* Checks if the user user_org exists before fetching triggers 
+
+2.0.2
+----------
+* Update FlowEditor to version 2.0.2
+* Add id prefix on jquery selectors to prevent css conflict with unnnic modals 
+* Remove delayed toggle and changed alert color
+
+2.0.1
+----------
+* Update FlowEditor to version 2.0.1
+
+2.0.0
+----------
+* Update FlowEditor to version 2.0.0
+* Modified trigger flow button text
+
+1.9.11-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.6
+
 1.9.10-rapidpro-7.1.27
 ----------
 * Add tests to tickets model
