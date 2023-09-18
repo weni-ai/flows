@@ -10,12 +10,13 @@ from temba.orgs.models import Org
 
 class Catalog(models.Model):
     uuid = models.UUIDField(default=uuid4)
-    facebook_catalog_id = models.CharField(max_length=30, unique=True)
+    facebook_catalog_id = models.CharField(max_length=30)
     name = models.CharField(max_length=100)
     org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="catalogs")
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="catalogs")
     created_on = models.DateTimeField(default=timezone.now)
     modified_on = models.DateTimeField(default=timezone.now)
+    is_active = models.BooleanField(default=False)
 
     @classmethod
     def trim(cls, channel, existing):
@@ -24,14 +25,15 @@ class Catalog(models.Model):
         Catalog.objects.filter(channel=channel).exclude(id__in=ids).delete()
 
     @classmethod
-    def get_or_create(cls, name, channel, facebook_catalog_id):
+    def get_or_create(cls, name, channel, is_active, facebook_catalog_id):
         existing = Catalog.objects.filter(facebook_catalog_id=facebook_catalog_id).first()
 
         if existing:
             if existing.name != name:
                 existing.name = name
+                existing.is_active = is_active
                 existing.modified_on = timezone.now()
-                existing.save(update_fields=["name", "modified_on"])
+                existing.save(update_fields=["name", "is_active", "modified_on"])
 
         else:
             existing = Catalog.objects.create(
@@ -55,10 +57,18 @@ class Catalog(models.Model):
         self.clean()
         super().save(*args, **kwargs)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["facebook_catalog_id", "channel"],
+                name="unique_facebook_catalog_id_per_channel",
+            )
+        ]
+
 
 class Product(models.Model):
     uuid = models.UUIDField(default=uuid4)
-    facebook_product_id = models.CharField(max_length=30, unique=True)
+    facebook_product_id = models.CharField(max_length=30)
     title = models.CharField(max_length=200)
     product_retailer_id = models.CharField(max_length=50)
     catalog = models.ForeignKey(Catalog, on_delete=models.CASCADE, related_name="products")
