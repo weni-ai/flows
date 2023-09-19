@@ -26,6 +26,12 @@ from temba.api.v2.views import ExternalServicesEndpoint, ProductsEndpoint
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
+from temba.channels.types.whatsapp.type import (
+    CONFIG_FB_ACCESS_TOKEN,
+    CONFIG_FB_BUSINESS_ID,
+    CONFIG_FB_NAMESPACE,
+    CONFIG_FB_TEMPLATE_LIST_DOMAIN,
+)
 from temba.classifiers.models import Classifier
 from temba.classifiers.types.luis import LuisType
 from temba.classifiers.types.wit import WitType
@@ -4866,7 +4872,7 @@ class ExternalServicesReadSerializerTest(TembaTest):
         self.assertEqual(result, external_service_type)
 
 
-class CatalogReadSerializerTest(TembaTest):
+"""class CatalogReadSerializerTest(TembaTest):
     def setUp(self):
         super().setUp()
         self.catalog = Catalog(
@@ -4955,3 +4961,117 @@ class ProductsEndpointViewSetTest(TembaTest):
 
         self.assertEqual(filtered_queryset.count(), 2)
         self.assertEqual(filtered_queryset.first(), self.catalog1)
+"""
+
+
+class CatalogReadSerializerTest(TembaTest):
+    def test_catalog_read_serializer(self):
+        Channel.objects.all().delete()
+        org = Org.objects.create(
+            name="New Org",
+            timezone="UTC",
+            brand=settings.DEFAULT_BRAND,
+            created_by=self.user,
+            modified_by=self.user,
+        )
+        Channel.objects.all().delete()
+
+        channel = self.create_channel(
+            "WAC",
+            "WhatsApp: 1234",
+            "1234",
+            config={
+                Channel.CONFIG_BASE_URL: "https://nyaruka.com/whatsapp",
+                Channel.CONFIG_USERNAME: "temba",
+                Channel.CONFIG_PASSWORD: "tembapasswd1",
+                Channel.CONFIG_AUTH_TOKEN: "authtoken123",
+                CONFIG_FB_BUSINESS_ID: "1234",
+                CONFIG_FB_ACCESS_TOKEN: "token123",
+                CONFIG_FB_NAMESPACE: "my-custom-app-1",
+                CONFIG_FB_TEMPLATE_LIST_DOMAIN: "graph.facebook.com",
+            },
+        )
+
+        catalog = Catalog.objects.create(
+            facebook_catalog_id="111",
+            name="Test Catalog",
+            channel=channel,
+            org=org,
+        )
+
+        Product.objects.create(
+            catalog=catalog,
+            title="Product 1",
+            facebook_product_id="fb123",
+            product_retailer_id="retail123",
+        )
+        Product.objects.create(
+            catalog=catalog,
+            title="Product 2",
+            facebook_product_id="fb456",
+            product_retailer_id="retail456",
+        )
+        serializer = CatalogReadSerializer(instance=catalog)
+        serialized_data = serializer.data
+
+        self.assertEqual(serialized_data["uuid"], str(catalog.uuid))
+        self.assertEqual(serialized_data["name"], "Test Catalog")
+
+        expected_products = [
+            {
+                "title": "Product 1",
+                "facebook_product_id": "fb123",
+                "product_retailer_id": "retail123",
+                "channel": {"uuid": str(catalog.channel.uuid), "name": catalog.channel.name},
+            },
+            {
+                "title": "Product 2",
+                "facebook_product_id": "fb456",
+                "product_retailer_id": "retail456",
+                "channel": {"uuid": str(catalog.channel.uuid), "name": catalog.channel.name},
+            },
+        ]
+        self.assertEqual(serialized_data["products"], expected_products)
+
+
+class ProductsEndpointViewSetTest(TembaTest):
+    def test_filter_queryset(self):
+        Channel.objects.all().delete()
+        Catalog.objects.all().delete()
+
+        channel = self.create_channel(
+            "WAC",
+            "WhatsApp: 1234",
+            "1234",
+            org=self.org,
+            config={
+                Channel.CONFIG_BASE_URL: "https://nyaruka.com/whatsapp",
+                Channel.CONFIG_USERNAME: "temba",
+                Channel.CONFIG_PASSWORD: "tembapasswd2",
+                Channel.CONFIG_AUTH_TOKEN: "authtoken123",
+                CONFIG_FB_BUSINESS_ID: "1234",
+                CONFIG_FB_ACCESS_TOKEN: "token123",
+                CONFIG_FB_NAMESPACE: "my-custom-app-2",
+                CONFIG_FB_TEMPLATE_LIST_DOMAIN: "graph.facebook.com",
+            },
+        )
+
+        catalog1 = Catalog.objects.create(name="Catalog 1", facebook_catalog_id="111", org=self.org, channel=channel)
+        catalog2 = Catalog.objects.create(name="Catalog 2", facebook_catalog_id="222", org=self.org, channel=channel)
+        Catalog.objects.create(name="Catalog 3", facebook_catalog_id="333", org=self.org, channel=channel)
+
+        Product.objects.create(
+            catalog=catalog1, title="Product 1", facebook_product_id="fb456", product_retailer_id="retail456"
+        )
+        Product.objects.create(
+            catalog=catalog2, title="Product 2", facebook_product_id="fb789", product_retailer_id="retail789"
+        )
+
+        viewset = ProductsEndpoint()
+        viewset.request = self.client.get("/")
+        viewset.request.user = self.user
+
+        filtered_queryset = viewset.filter_queryset(Catalog.objects.all())
+
+        self.assertEqual(filtered_queryset.count(), 2)
+        self.assertEqual(filtered_queryset.first(), catalog1)

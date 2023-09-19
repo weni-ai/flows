@@ -42,7 +42,7 @@ from temba.orgs.models import OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.utils import splitting_getlist, str_to_bool
-from temba.wpp_products.models import Catalog
+from temba.wpp_products.models import Product
 
 from ..models import SSLPermission
 from ..support import InvalidQueryError
@@ -55,7 +55,6 @@ from .serializers import (
     CampaignEventWriteSerializer,
     CampaignReadSerializer,
     CampaignWriteSerializer,
-    CatalogReadSerializer,
     ChannelEventReadSerializer,
     ChannelReadSerializer,
     ClassifierReadSerializer,
@@ -77,6 +76,7 @@ from .serializers import (
     LabelWriteSerializer,
     MsgBulkActionSerializer,
     MsgReadSerializer,
+    ProductReadSerializer,
     ResthookReadSerializer,
     ResthookSubscriberReadSerializer,
     ResthookSubscriberWriteSerializer,
@@ -3935,14 +3935,14 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
     """
 
     permission = "templates.template_api"
-    model = Catalog
-    serializer_class = CatalogReadSerializer
+    model = Product
+    serializer_class = ProductReadSerializer
     pagination_class = ModifiedOnCursorPagination
 
-    def filter_queryset(self, queryset):
+    def get_queryset(self):
         org = self.request.user.get_org()
-        queryset = org.catalogs.exclude(products=None)
-        return queryset
+        catalog = org.catalogs.exclude(is_active=False).first()
+        return catalog.products.all()
 
     @classmethod
     def get_read_explorer(cls):
