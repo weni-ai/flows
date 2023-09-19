@@ -5,6 +5,7 @@ from weni.internal.models import Project
 
 from django.contrib.auth import get_user_model
 
+from temba.projects.usecases.authorizations_creation import create_authorizations
 from temba.projects.usecases.globals_creation import create_globals
 
 from .exceptions import InvalidProjectData
@@ -48,7 +49,9 @@ class ProjectCreationUseCase:
             ),
         )
 
-    def create_project(self, project_dto: ProjectCreationDTO, user_email: str, extra_fields: dict) -> None:
+    def create_project(
+        self, project_dto: ProjectCreationDTO, user_email: str, extra_fields: dict, authorizations: list
+    ) -> None:
         user = self.get_user_by_email(user_email)
         project, _ = self.get_or_create_project(project_dto, user)
         ConnectInternalClient().update_project(project)
@@ -58,6 +61,9 @@ class ProjectCreationUseCase:
 
         if extra_fields:
             create_globals(extra_fields, project, user)
+
+        if authorizations:
+            create_authorizations(authorizations, project)
 
         if project_dto.is_template:
             self.__template_type_integration.integrate_template_type_in_project(

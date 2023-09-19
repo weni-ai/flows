@@ -25,7 +25,9 @@ class ProjectConsumer(EDAConsumer):
             flow_setup_handler = FlowSetupHandlerUseCase()
             template_type_integration = TemplateTypeIntegrationUseCase(flow_setup_handler)
             project_creation = ProjectCreationUseCase(template_type_integration)
-            project_creation.create_project(project_dto, body.get("user_email"), body.get("extra_fields"))
+            project_creation.create_project(
+                project_dto, body.get("user_email"), body.get("extra_fields"), body.get("authorizations")
+            )
 
             message.channel.basic_ack(message.delivery_tag)
 
