@@ -16,19 +16,16 @@ def create_classifier(
     project = Project.objects.get(project_uuid=project_uuid)
     integration_requests = IntegrationRequest.objects.filter(project=project, repository=repository)
 
-    # if not integration_requests:
-    #     raise KeyError("IntegrationRquest does not exist")
-
     user, created = User.objects.get_or_create(email=user_email)
 
     classifier = Classifier.objects.create(
         org=project.org,
+        classifier_type="bothub",
         created_by=user,
         modified_by=user,
         uuid=uuid,
         name=name,
         config={"access_token": access_token, "repository": repository},
-        classifier_type="bothub",
     )
 
     for integration_request in integration_requests:

@@ -93,7 +93,7 @@ MAILROOM_AUTH_TOKEN = None
 # -----------------------------------------------------------------------------------
 # Load development apps
 # -----------------------------------------------------------------------------------
-INSTALLED_APPS = INSTALLED_APPS + ("storages", "macros", )
+INSTALLED_APPS = INSTALLED_APPS + ("storages", "macros", "weni.internal", )
 
 # -----------------------------------------------------------------------------------
 # In development, add in extra logging for exceptions and the debug toolbar

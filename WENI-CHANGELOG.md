@@ -1,3 +1,22 @@
+2.0.7
+----------
+* Update settings.dev to include weni.internal apps
+* Create integration request model
+* Update version of weni-rp-apps to 2.7.7
+* Create projects and TemplateType model
+
+2.0.6
+----------
+* Update FlowEditor to version 2.2.0
+
+2.0.5
+----------
+* Update FlowEditor to version 2.1.0
+
+2.0.4
+----------
+* Update FlowEditor to version 2.0.3
+
 2.0.3
 ----------
 * Create and Setup event driven app

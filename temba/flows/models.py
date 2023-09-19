@@ -2454,3 +2454,6 @@ class IntegrationRequest(models.Model):
     integration_uuid = models.UUIDField()
     name = models.CharField(max_length=50)
     repository = models.UUIDField(null=True)
+
+    def __str__(self) -> str:
+        return self.name  # pragma: no cover
