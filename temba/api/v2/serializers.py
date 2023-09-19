@@ -28,7 +28,7 @@ from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.utils import extract_constants, json, on_transaction_commit
-from temba.wpp_products.models import Catalog, Product
+from temba.wpp_products.models import Product
 
 from . import fields
 from .validators import UniqueForOrgValidator
@@ -1642,25 +1642,20 @@ class WorkspaceReadSerializer(ReadSerializer):
         )
 
 
-class CatalogReadSerializer(ReadSerializer):
-    products = serializers.SerializerMethodField()
-    modified_on = serializers.DateTimeField(default_timezone=pytz.UTC)
-    created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+class ProductReadSerializer(ReadSerializer):
+    title = serializers.CharField()
+    facebook_product_id = serializers.CharField()
+    product_retailer_id = serializers.CharField()
+    channel = serializers.SerializerMethodField()
 
-    def get_products(self, obj):
-        products = []
-        for product in Product.objects.filter(catalog=obj).order_by("title"):
-            products.append(
-                {
-                    "title": product.title,
-                    "facebook_product_id": product.facebook_product_id,
-                    "product_retailer_id": product.product_retailer_id,
-                    "channel": {"uuid": obj.channel.uuid, "name": obj.channel.name},
-                }
-            )
-
-        return products
+    def get_channel(self, obj):
+        return {"uuid": obj.catalog.channel.uuid, "name": obj.catalog.channel.name}
 
     class Meta:
-        model = Catalog
-        fields = ("uuid", "name", "products", "created_on", "modified_on")
+        model = Product
+        fields = (
+            "title",
+            "facebook_product_id",
+            "product_retailer_id",
+            "channel",
+        )
