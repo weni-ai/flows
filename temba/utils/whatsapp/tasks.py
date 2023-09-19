@@ -5,6 +5,7 @@ import time
 import requests
 from django_redis import get_redis_connection
 
+from django.conf import settings
 from django.utils import timezone
 
 from celery import shared_task
@@ -184,12 +185,36 @@ def refresh_whatsapp_templates():
                 logger.error(f"Error refreshing whatsapp templates: {str(e)}", exc_info=True)
 
 
-def update_local_catalogs(channel, catalogs_data):
-    seen = []
+def update_is_active_catalog(channel, catalogs_data):
+    waba_id = channel.config.get("wa_waba_id", None)
+
+    if not waba_id:
+        return catalogs_data
+
+    url = f"https://graph.facebook.com/v17.0/{waba_id}/product_catalogs"
+
+    headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
+    resp = requests.get(url, params=dict(limit=255), headers=headers)
+    actived_catalog = resp.json()["data"][0]["id"]
+
     for catalog in catalogs_data:
+        if catalog.get("id") != actived_catalog:
+            catalog["is_active"] = False
+
+        else:
+            catalog["is_active"] = True
+
+    return catalogs_data
+
+
+def update_local_catalogs(channel, catalogs_data):
+    updated_catalogs = update_is_active_catalog(channel, catalogs_data)
+    seen = []
+    for catalog in updated_catalogs:
         new_catalog = Catalog.get_or_create(
             name=catalog["name"],
             channel=channel,
+            is_active=catalog["is_active"],
             facebook_catalog_id=catalog["id"],
         )
 

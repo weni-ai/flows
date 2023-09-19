@@ -126,7 +126,7 @@ class WhatsAppCloudType(ChannelType):
         if not settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN:  # pragma: no cover
             return [], False
 
-        waba_id = channel.config.get("wa_waba_id", None)
+        waba_id = channel.config.get("wa_business_id", None)
         if not waba_id:  # pragma: no cover
             return [], False
 
@@ -136,8 +136,10 @@ class WhatsAppCloudType(ChannelType):
             url = f"https://graph.facebook.com/v16.0/{waba_id}/owned_product_catalogs"
 
             headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
+
             while url:
                 resp = requests.get(url, params=dict(limit=255), headers=headers)
+
                 elapsed = (timezone.now() - start).total_seconds() * 1000
                 HTTPLog.create_from_response(
                     HTTPLog.WHATSAPP_CATALOGS_SYNCED, url, resp, channel=channel, request_time=elapsed
