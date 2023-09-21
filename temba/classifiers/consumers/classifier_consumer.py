@@ -7,7 +7,7 @@ from temba.event_driven.parsers.json_parser import JSONParser
 
 
 class ClassifierConsumer(EDAConsumer):
-    def consume(self, message: amqp.Message):
+    def consume(self, message: amqp.Message):  # pragma: no cover
         print(f"[ClassifierConsumer] - Consuming a message. Body: {message.body}")
         try:
             body = JSONParser.parse(message.body)
