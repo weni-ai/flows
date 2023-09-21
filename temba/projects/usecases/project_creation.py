@@ -28,7 +28,7 @@ class ProjectCreationUseCase:
         self.__template_type_integration = template_type_integration
 
     def get_or_create_user_by_email(self, email: str) -> tuple:
-        return User.objects.get_or_create(email=email)
+        return User.objects.get_or_create(email=email, username=email)
 
     def get_or_create_project(self, project_dto: ProjectCreationDTO, user: User) -> tuple:
         return Project.objects.get_or_create(
@@ -39,6 +39,7 @@ class ProjectCreationUseCase:
                 timezone=project_dto.timezone,
                 created_by=user,
                 modified_by=user,
+                plan="infinity",
                 config={
                     "is_template": project_dto.is_template,
                 },
@@ -48,7 +49,7 @@ class ProjectCreationUseCase:
     def create_project(
         self, project_dto: ProjectCreationDTO, user_email: str, extra_fields: dict, authorizations: list
     ) -> None:
-        user = self.get_user_by_email(user_email)
+        user, _ = self.get_or_create_user_by_email(user_email)
         project, _ = self.get_or_create_project(project_dto, user)
         ConnectInternalClient().update_project(project)
         project.administrators.add(user)
