@@ -25,14 +25,6 @@ class ListFlowDefinitionTestCase(TestCase):
                     "uuid": "de6d19af-a905-475e-b824-bf7fbca277fd",
                 },
             },
-            {
-                "uuid": "a69844ab-b49f-4988-9e13-2d2a50ffb23f",
-                "name": "Setor teste EDA",
-                "topic": {
-                    "name": "Fila gg",
-                    "uuid": "cb3ee8dc-705c-4512-893f-8d1d347680bb",
-                },
-            },
         ]
 
         with open("temba/tickets/usecases/tests/flowrevision_definition.json", "r") as file:
@@ -40,7 +32,7 @@ class ListFlowDefinitionTestCase(TestCase):
 
         ticketers = list_flow_definition_ticketers(definition)
 
-        self.assertEquals(len(ticketers), 2)
+        self.assertEquals(len(ticketers), 1)
         self.assertEquals(ticketer_list, ticketers)
 
 

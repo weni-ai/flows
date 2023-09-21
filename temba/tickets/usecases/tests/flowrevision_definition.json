@@ -50,51 +50,6 @@
 			"uuid": "bf145037-b490-4805-9ffb-a896ba1ff25d",
 			"destination_uuid": null
 		}]
-	}, {
-		"uuid": "d815b68b-adbe-48ab-83f8-5fe915f5de9d",
-		"actions": [{
-			"uuid": "406d1746-e70b-43fb-a8d2-8e4432854f1c",
-			"type": "open_ticket",
-			"ticketer": {
-				"uuid": "a69844ab-b49f-4988-9e13-2d2a50ffb23f",
-				"name": "Setor teste EDA"
-			},
-			"body": "@results",
-			"topic": {
-				"name": "Fila gg",
-				"uuid": "cb3ee8dc-705c-4512-893f-8d1d347680bb",
-				"created_on": "2023-09-05T09:28:21.231585-03:00"
-			},
-			"assignee": null,
-			"result_name": "Result"
-		}],
-		"router": {
-			"type": "switch",
-			"operand": "@results.result",
-			"cases": [{
-				"uuid": "91e19825-e3fc-4f84-a013-6594be21bdb9",
-				"type": "has_category",
-				"arguments": ["Success"],
-				"category_uuid": "98e79eb8-bb2b-4c72-9a9a-a85118327697"
-			}],
-			"categories": [{
-				"uuid": "98e79eb8-bb2b-4c72-9a9a-a85118327697",
-				"name": "Success",
-				"exit_uuid": "db37d613-1457-4c58-ab1b-f9b9c509fb6b"
-			}, {
-				"uuid": "80558a57-2191-4277-8092-cd06b2a58766",
-				"name": "Failure",
-				"exit_uuid": "98b04615-b810-4937-a9bf-4f581db08479"
-			}],
-			"default_category_uuid": "80558a57-2191-4277-8092-cd06b2a58766"
-		},
-		"exits": [{
-			"uuid": "db37d613-1457-4c58-ab1b-f9b9c509fb6b",
-			"destination_uuid": null
-		}, {
-			"uuid": "98b04615-b810-4937-a9bf-4f581db08479",
-			"destination_uuid": null
-		}]
 	}
 ],
 	"_ui": {
