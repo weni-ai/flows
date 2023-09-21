@@ -15,7 +15,7 @@
 			},
 			"body": "@results",
 			"topic": {
-				"name": "opaaaaaaaaaaaaaaaaaa",
+				"name": "Queue 1",
 				"uuid": "de6d19af-a905-475e-b824-bf7fbca277fd",
 				"created_on": "2023-09-05T12:28:11.987898-03:00",
 				"value": "de6d19af-a905-475e-b824-bf7fbca277fd"
@@ -95,7 +95,8 @@
 			"uuid": "98b04615-b810-4937-a9bf-4f581db08479",
 			"destination_uuid": null
 		}]
-	}],
+	}
+],
 	"_ui": {
 		"nodes": {
 			"3464906e-42c6-4130-9fe8-ffc594ec8445": {
