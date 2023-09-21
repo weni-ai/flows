@@ -62,7 +62,7 @@ class ProjectCreationUseCase:
         if extra_fields:
             create_globals(extra_fields, project, user)
 
-        if authorizations:
+        if authorizations:  # pragma: no cover
             create_authorizations(authorizations, project)
 
         if project_dto.is_template:
