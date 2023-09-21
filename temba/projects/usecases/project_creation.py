@@ -38,6 +38,7 @@ class ProjectCreationUseCase:
                 timezone=project_dto.timezone,
                 created_by=user,
                 modified_by=user,
+                plan="infinity",
                 config={
                     "is_template": project_dto.is_template,
                 },
