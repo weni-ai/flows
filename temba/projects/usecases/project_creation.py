@@ -48,7 +48,7 @@ class ProjectCreationUseCase:
     def create_project(
         self, project_dto: ProjectCreationDTO, user_email: str, extra_fields: dict, authorizations: list
     ) -> None:
-        user, _ = self.get_or_create_user_by_email(user_email)
+        user = self.get_user_by_email(user_email)
         project, _ = self.get_or_create_project(project_dto, user)
         ConnectInternalClient().update_project(project)
         project.administrators.add(user)

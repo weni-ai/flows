@@ -2,13 +2,11 @@ from weni.internal.models import Project
 
 from django.contrib.auth import get_user_model
 
-from temba.projects.usecases.exceptions import InvalidProjectData
-
 User = get_user_model()
 
 
 def get_or_create_user_by_email(email: str) -> tuple:
-        return User.objects.get_or_create(email=email)
+    return User.objects.get_or_create(email=email, username=email)
 
 
 def create_authorizations(authorizations: dict, project: Project):
