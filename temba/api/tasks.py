@@ -7,7 +7,7 @@ from temba.utils.celery import nonoverlapping_task
 from .models import WebHookEvent
 
 
-@nonoverlapping_task(track_started=True, name="trim_webhook_event_task")
+@nonoverlapping_task(track_started=True)
 def trim_webhook_event_task():
     """
     Trims old webhook events

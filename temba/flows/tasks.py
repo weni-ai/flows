@@ -51,7 +51,7 @@ def export_flow_results_task(export_id):
     ExportFlowResultsTask.objects.select_related("org", "created_by").get(id=export_id).perform()
 
 
-@nonoverlapping_task(track_started=True, name="squash_flowcounts", lock_timeout=7200)
+@nonoverlapping_task(track_started=True, lock_timeout=7200)
 def squash_flowcounts():
     FlowNodeCount.squash()
     FlowRunCount.squash()
@@ -61,7 +61,7 @@ def squash_flowcounts():
     FlowPathCount.squash()
 
 
-@nonoverlapping_task(track_started=True, name="trim_flow_revisions")
+@nonoverlapping_task(track_started=True)
 def trim_flow_revisions():
     start = timezone.now()
 
@@ -80,7 +80,7 @@ def trim_flow_revisions():
     logger.info(f"Trimmed {count} flow revisions since {last_trim} in {elapsed}")
 
 
-@nonoverlapping_task(track_started=True, name="trim_flow_sessions_and_starts")
+@nonoverlapping_task(track_started=True)
 def trim_flow_sessions_and_starts():
     trim_flow_sessions()
     trim_flow_starts()

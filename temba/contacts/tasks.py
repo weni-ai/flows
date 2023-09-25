@@ -48,7 +48,7 @@ def export_contacts_task(task_id):
     ExportContactsTask.objects.select_related("org", "created_by").get(id=task_id).perform()
 
 
-@nonoverlapping_task(track_started=True, name="release_group_task")
+@nonoverlapping_task(track_started=True)
 def release_group_task(group_id):
     """
     Releases group
@@ -56,7 +56,7 @@ def release_group_task(group_id):
     ContactGroup.all_groups.get(id=group_id)._full_release()
 
 
-@nonoverlapping_task(track_started=True, name="squash_contactgroupcounts", lock_timeout=7200)
+@nonoverlapping_task(track_started=True, lock_timeout=7200)
 def squash_contactgroupcounts():
     """
     Squashes our ContactGroupCounts into single rows per ContactGroup
