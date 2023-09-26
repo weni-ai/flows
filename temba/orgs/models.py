@@ -545,6 +545,7 @@ class Org(SmartModel):
         from temba.contacts.models import ContactField, ContactGroup
         from temba.flows.models import Flow
         from temba.triggers.models import Trigger
+        from temba.flows.models import IntegrationRequest
 
         # only required field is version
         if "version" not in export_json:
@@ -590,8 +591,28 @@ class Org(SmartModel):
             campaign.schedule_events_async()
 
         # with all the flows and dependencies committed, we can now have mailroom do full validation
-        for flow in new_flows:
-            flow_info = mailroom.get_client().flow_inspect(self.id, flow.get_definition())
+        for flow in new_flows:  # pragma: no cover
+            definition = flow.get_definition()
+            integrations = definition.get("integrations", {})
+            for classifier in integrations.get("classifiers", []):
+                IntegrationRequest.objects.create(
+                    flow=flow,
+                    integration_uuid=classifier.get("uuid"),
+                    repository=classifier.get("repository_uuid"),
+                    name=classifier.get("name"),
+                    project=self.project,
+                )
+
+            for ticketer in integrations.get("ticketers", []):
+                IntegrationRequest.objects.create(
+                    flow=flow,
+                    integration_uuid=ticketer.get("uuid"),
+                    repository=None,
+                    name=ticketer.get("name"),
+                    project=self.project,
+                )
+
+            flow_info = mailroom.get_client().flow_inspect(self.id, definition)
             flow.has_issues = len(flow_info[Flow.INSPECT_ISSUES]) > 0
             flow.save(update_fields=("has_issues",))
 
@@ -681,6 +702,9 @@ class Org(SmartModel):
         
         if exported_flows:
             integrations = cls.search_integrations(exported_flows)
+
+        if exported_flows:
+            cls.search_integrations(exported_flows)
 
         return {
             "version": Org.CURRENT_EXPORT_VERSION,
