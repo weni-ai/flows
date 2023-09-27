@@ -10,6 +10,7 @@ import regex
 from django_redis import get_redis_connection
 from packaging.version import Version
 from smartmin.models import SmartModel
+from weni.internal.models import Project
 from xlsxlite.writer import XLSXBook
 
 from django.conf import settings
@@ -2445,3 +2446,14 @@ def get_flow_user(org):
             __flow_users[username] = flow_user
 
     return flow_user
+
+
+class IntegrationRequest(models.Model):
+    flow = models.ForeignKey(Flow, on_delete=models.CASCADE, related_name="integrations_requests", null=True)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="integrations_requests")
+    integration_uuid = models.UUIDField()
+    name = models.CharField(max_length=50)
+    repository = models.UUIDField(null=True)
+
+    def __str__(self) -> str:
+        return self.name  # pragma: no cover
