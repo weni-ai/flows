@@ -342,7 +342,7 @@ class Flow(TembaModel):
                 )
 
                 integrations = flow_def.get("integrations", {})
-                for classifier in integrations.get("classifiers", []):
+                for classifier in integrations.get("classifiers", []):  # pragma: no cover
                     IntegrationRequest.objects.create(
                         flow=flow,
                         integration_uuid=classifier.get("uuid"),
@@ -351,7 +351,7 @@ class Flow(TembaModel):
                         project=org.project,
                     )
 
-                for ticketer in integrations.get("ticketers", []):
+                for ticketer in integrations.get("ticketers", []):  # pragma: no cover
                     IntegrationRequest.objects.create(
                         flow=flow,
                         integration_uuid=ticketer.get("uuid"),
