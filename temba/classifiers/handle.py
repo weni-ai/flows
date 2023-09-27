@@ -1,6 +1,6 @@
 from amqp.channel import Channel  # pragma: no cover
 
-from temba.classifiers.consumers.classifier_consumer import ClassifierConsumer  # pragma: no cover
+from .consumers.classifier_consumer import ClassifierConsumer  # pragma: no cover
 
 
 def handle_consumers(channel: Channel) -> None:  # pragma: no cover

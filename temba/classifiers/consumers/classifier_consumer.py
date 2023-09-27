@@ -1,9 +1,10 @@
 import amqp
 from sentry_sdk import capture_exception
 
-from temba.classifiers.usecases.classifier_creation import create_classifier
 from temba.event_driven.consumers import EDAConsumer
 from temba.event_driven.parsers.json_parser import JSONParser
+
+from ..usecases.classifier_creation import create_classifier
 
 
 class ClassifierConsumer(EDAConsumer):
