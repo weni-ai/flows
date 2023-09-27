@@ -41,9 +41,6 @@ def create_ticketer(
     project = Project.objects.get(project_uuid=project_uuid)
     integration_requests = IntegrationRequest.objects.filter(project=project, name=name)
 
-    if not integration_requests:
-        raise KeyError("IntegrationRquest does not exist")
-
     user, created = User.objects.get_or_create(email=user_email)
 
     ticketer = Ticketer.objects.create(

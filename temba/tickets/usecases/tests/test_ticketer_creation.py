@@ -115,14 +115,3 @@ class TicketerCreationTestCase(TembaTest):
 
         created_queues = TicketerQueue.objects.filter(ticketer=ticketer)
         self.assertEqual(created_queues.count(), len(self.queues))
-
-    def test_create_ticketer_with_nonexistent_integration_request(self):
-        with self.assertRaises(KeyError):
-            create_ticketer(
-                project_auth=self.project_auth,
-                name="Nonexistent Integration Request",
-                project_uuid=self.project_uuid,
-                user_email=self.user_email,
-                uuid=self.uuid,
-                queues=self.queues,
-            )
