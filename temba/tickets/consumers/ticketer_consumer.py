@@ -3,7 +3,8 @@ from sentry_sdk import capture_exception
 
 from temba.event_driven.consumers import EDAConsumer
 from temba.event_driven.parsers.json_parser import JSONParser
-from temba.tickets.usecases.ticketer_creation import create_ticketer
+
+from ..usecases.ticketer_creation import create_ticketer
 
 
 class TicketConsumer(EDAConsumer):
