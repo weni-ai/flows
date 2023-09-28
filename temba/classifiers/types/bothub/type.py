@@ -1,5 +1,6 @@
 import requests
 
+from django.conf import settings
 from django.utils import timezone
 
 from temba.request_logs.models import HTTPLog
@@ -28,7 +29,7 @@ class BothubType(ClassifierType):
         You can find the access token for your bot on the Integration tab.
         """
 
-    INTENT_URL = "https://nlp.bothub.it/info/"
+    INTENT_URL = settings.BOTHUB_SYNC_INTENTS_URL
 
     def get_active_intents_from_api(self, classifier):
         access_token = classifier.config[self.CONFIG_ACCESS_TOKEN]

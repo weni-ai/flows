@@ -28,6 +28,8 @@ def create_classifier(
         config={"access_token": access_token, "repository": repository},
     )
 
+    classifier.sync()
+
     for integration_request in integration_requests:
         flow = integration_request.flow
         last_revision = FlowRevision.objects.filter(flow=flow).last()

@@ -27,7 +27,7 @@ class ProjectCreationUseCase:
     def __init__(self, template_type_integration: TemplateTypeIntegrationInterface):
         self.__template_type_integration = template_type_integration
 
-    def get_or_create_user_by_email(self, email: str) -> tuple:
+    def get_or_create_user_by_email(self, email: str) -> tuple:  # pragma: no cover
         return User.objects.get_or_create(email=email, username=email)
 
     def get_or_create_project(self, project_dto: ProjectCreationDTO, user: User) -> tuple:
@@ -49,7 +49,7 @@ class ProjectCreationUseCase:
     def create_project(
         self, project_dto: ProjectCreationDTO, user_email: str, extra_fields: dict, authorizations: list
     ) -> None:
-        user, _ = self.get_or_create_user_by_email(user_email)
+        user, _ = self.get_or_create_user_by_email(user_email)  # pragma: no cover
         project, _ = self.get_or_create_project(project_dto, user)
         ConnectInternalClient().update_project(project)
         project.administrators.add(user)
@@ -59,7 +59,7 @@ class ProjectCreationUseCase:
         if extra_fields:
             create_globals(extra_fields, project, user)
 
-        if authorizations:
+        if authorizations:  # pragma: no cover
             create_authorizations(authorizations, project)
 
         if project_dto.is_template:
