@@ -1,3 +1,12 @@
+3.0.0
+----------
+* Add authorizations for users in project creation
+* Add get_or_create in project creation
+* Remove has issues in flows
+* Add handle consumers in event_driven handle
+* Create classifier consumer
+* Create ticketer consumer
+
 2.2.4
 ----------
 * Update FlowEditor to version 2.5.2
