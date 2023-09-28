@@ -1,3 +1,23 @@
+2.2.4
+----------
+* Update FlowEditor to version 2.5.2
+
+2.2.3
+----------
+* Update FlowEditor to version 2.5.1
+
+2.2.2
+----------
+* Update FlowEditor to version 2.5.0
+
+2.2.1
+----------
+* Update FlowEditor to version 2.4.1
+
+2.2.0
+----------
+* Update FlowEditor to version 2.4.0
+
 2.1.0
 ----------
 * Create function to add integrations list to export flow
