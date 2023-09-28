@@ -16,3 +16,8 @@ class FlowSetupHandlerUseCase:
             raise InvalidTemplateTypeData(f"The `setup` of TemplateType {template_type.uuid} is empty!")
 
         project.import_app(setup, user)
+        self.disable_flows_has_issues(project, setup)
+
+    def disable_flows_has_issues(self, project, sample_flows):
+        flows_name = list(map(lambda flow: flow.get("name"), sample_flows.get("flows")))
+        project.flows.filter(name__in=flows_name).update(has_issues=False)
