@@ -1,3 +1,8 @@
+3.0.1
+----------
+* Add INTENT_URL in environment and add classifier intention sync
+* Update version of weni-rp-apps to 2.7.8
+
 3.0.0
 ----------
 * Add authorizations for users in project creation
