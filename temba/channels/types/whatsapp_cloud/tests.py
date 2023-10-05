@@ -9,6 +9,7 @@ from django.urls import reverse
 from temba.request_logs.models import HTTPLog
 from temba.templates.models import TemplateTranslation
 from temba.tests import MockResponse, TembaTest
+from temba.wpp_products.models import Catalog, Product
 
 from ...models import Channel
 from .type import WhatsAppCloudType
@@ -354,3 +355,148 @@ class WhatsAppCloudTypeTest(TembaTest):
                 ),
             ]
         )
+
+    @override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="WA_ADMIN_TOKEN")
+    @patch("requests.get")
+    def test_get_api_catalogs(self, mock_get):
+        Catalog.objects.all().delete()
+        Channel.objects.all().delete()
+
+        channel = self.create_channel(
+            "WAC",
+            "WABA name",
+            "123123123",
+            config={
+                "wa_waba_id": "111111111111111",
+            },
+        )
+
+        mock_get.side_effect = [
+            RequestException("Network is unreachable", response=MockResponse(100, "")),
+            MockResponse(400, '{ "meta": { "success": false } }'),
+            MockResponse(200, '{"data": ["foo", "bar"]}'),
+            MockResponse(
+                200,
+                '{"data": ["foo"], "paging": {"cursors": {"after": "MjQZD"}, "next": "https://graph.facebook.com/v16.0/111111111111111/owned_product_catalogs?after=MjQZD" } }',
+            ),
+            MockResponse(200, '{"data": ["bar"], "paging": {"cursors": {"after": "MjQZD"} } }'),
+        ]
+
+        # RequestException check HTTPLog
+        categories_data, no_error = WhatsAppCloudType().get_api_catalogs(channel)
+        self.assertEqual(1, HTTPLog.objects.filter(log_type=HTTPLog.WHATSAPP_CATALOGS_SYNCED).count())
+        self.assertFalse(no_error)
+        self.assertEqual([], categories_data)
+
+        # should be empty list with an error flag if fail with API
+        categories_data, no_error = WhatsAppCloudType().get_api_catalogs(channel)
+        self.assertFalse(no_error)
+        self.assertEqual([], categories_data)
+
+        # success no error and list
+        categories_data, no_error = WhatsAppCloudType().get_api_catalogs(channel)
+        self.assertTrue(no_error)
+        self.assertEqual(["foo", "bar"], categories_data)
+
+        mock_get.assert_called_with(
+            "https://graph.facebook.com/v16.0/111111111111111/owned_product_catalogs",
+            params={"limit": 255},
+            headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
+        )
+
+        # success no error and pagination
+        categories_data, no_error = WhatsAppCloudType().get_api_catalogs(channel)
+        self.assertTrue(no_error)
+        self.assertEqual(["foo", "bar"], categories_data)
+
+        mock_get.assert_has_calls(
+            [
+                call(
+                    "https://graph.facebook.com/v16.0/111111111111111/owned_product_catalogs",
+                    params={"limit": 255},
+                    headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
+                ),
+                call(
+                    "https://graph.facebook.com/v16.0/111111111111111/owned_product_catalogs?after=MjQZD",
+                    params={"limit": 255},
+                    headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
+                ),
+            ]
+        )
+
+    @override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="WA_ADMIN_TOKEN")
+    @patch("requests.get")
+    def test_get_api_produtcs(self, mock_get):
+        Product.objects.all().delete()
+        Catalog.objects.all().delete()
+        Channel.objects.all().delete()
+
+        channel = self.create_channel(
+            "WAC",
+            "WABA name",
+            "123123123",
+            config={
+                "wa_waba_id": "111111111111111",
+            },
+        )
+
+        catalog = Catalog(
+            facebook_catalog_id="12345",
+            name="Test Catalog",
+            org=self.org,
+            channel=self.channel,
+        )
+
+        mock_get.side_effect = [
+            RequestException("Network is unreachable", response=MockResponse(100, "")),
+            MockResponse(400, '{ "meta": { "success": false } }'),
+            MockResponse(200, '{"data": ["foo", "bar"]}'),
+            MockResponse(
+                200,
+                '{"data": ["foo"], "paging": {"cursors": {"after": "MjQZD"}, "next": "https://graph.facebook.com/v16.0/111111111111111/products?after=MjQZD" } }',
+            ),
+            MockResponse(200, '{"data": ["bar"], "paging": {"cursors": {"after": "MjQZD"} } }'),
+        ]
+
+        # RequestException check HTTPLog
+        products_data, no_error = WhatsAppCloudType().get_api_products(channel, catalog)
+        self.assertEqual(1, HTTPLog.objects.filter(log_type=HTTPLog.WHATSAPP_PRODUCTS_SYNCED).count())
+        self.assertFalse(no_error)
+        self.assertEqual([], products_data)
+
+        # should be empty list with an error flag if fail with API
+        products_data, no_error = WhatsAppCloudType().get_api_products(channel, catalog)
+        self.assertFalse(no_error)
+        self.assertEqual([], products_data)
+
+        # success no error and list
+        products_data, no_error = WhatsAppCloudType().get_api_products(channel, catalog)
+        self.assertTrue(no_error)
+        self.assertEqual(["foo", "bar"], products_data)
+
+        mock_get.assert_called_with(
+            "https://graph.facebook.com/v16.0/12345/products",
+            params={"limit": 255},
+            headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
+        )
+
+        # success no error and pagination
+        products_data, no_error = WhatsAppCloudType().get_api_products(channel, catalog)
+        self.assertTrue(no_error)
+        self.assertEqual(["foo", "bar"], products_data)
+
+        """mock_get.assert_has_calls(
+            [
+                call(
+                    "https://graph.facebook.com/v16.0/12345/products",
+                    params={"limit": 255},
+                    headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
+                ),
+                call(
+                    "https://graph.facebook.com/v16.0/12345/products?after=MjQZD",
+                    params={"limit": 255},
+                    headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
+                ),
+            ]
+        )
+"""

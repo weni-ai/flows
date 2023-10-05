@@ -4,7 +4,9 @@ import time
 
 import requests
 from django_redis import get_redis_connection
+from rest_framework.response import Response
 
+from django.conf import settings
 from django.utils import timezone
 
 from celery import shared_task
@@ -14,6 +16,7 @@ from temba.contacts.models import URN, Contact, ContactURN
 from temba.request_logs.models import HTTPLog
 from temba.templates.models import TemplateTranslation
 from temba.utils import chunk_list
+from temba.wpp_products.models import Catalog, Product
 
 from . import update_api_version
 from .constants import LANGUAGE_MAPPING, STATUS_MAPPING
@@ -181,3 +184,153 @@ def refresh_whatsapp_templates():
 
             except Exception as e:
                 logger.error(f"Error refreshing whatsapp templates: {str(e)}", exc_info=True)
+
+
+def update_is_active_catalog(channel, catalogs_data):
+    waba_id = channel.config.get("wa_waba_id", None)
+
+    if not waba_id:
+        return catalogs_data
+
+    url = f"https://graph.facebook.com/v17.0/{waba_id}/product_catalogs"
+
+    headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
+    resp = requests.get(url, params=dict(limit=255), headers=headers)
+    actived_catalog = resp.json()["data"][0]["id"]
+
+    for catalog in catalogs_data:
+        if catalog.get("id") != actived_catalog:
+            catalog["is_active"] = False
+
+        else:
+            catalog["is_active"] = True
+
+    return catalogs_data
+
+
+def update_local_catalogs(channel, catalogs_data):
+    updated_catalogs = update_is_active_catalog(channel, catalogs_data)
+    seen = []
+    for catalog in updated_catalogs:
+        new_catalog = Catalog.get_or_create(
+            name=catalog["name"],
+            channel=channel,
+            is_active=catalog["is_active"],
+            facebook_catalog_id=catalog["id"],
+        )
+
+        seen.append(new_catalog)
+
+    Catalog.trim(channel, seen)
+
+
+def update_local_products(catalog, products_data, channel):
+    seen = []
+    products_sentenx = {"catalog_id": catalog.facebook_catalog_id, "products": []}
+    for product in products_data:
+        new_product = Product.get_or_create(
+            facebook_product_id=product["id"],
+            title=product["name"],
+            product_retailer_id=product["retailer_id"],
+            catalog=catalog,
+            name=catalog.name,
+            channel=channel,
+            facebook_catalog_id=catalog.facebook_catalog_id,
+        )
+
+        seen.append(new_product)
+
+        sentenx_object = {
+            "facebook_id": new_product.facebook_product_id,
+            "title": new_product.title,
+            "org_id": catalog.channel_id,
+            "catalog_id": catalog.facebook_catalog_id,
+            "product_retailer_id": new_product.product_retailer_id,
+        }
+
+        products_sentenx["products"].append(sentenx_object)
+
+    sent_products_to_sentenx(products_sentenx)
+    sent_trim_products_to_sentenx(catalog, seen)
+    Product.trim(catalog, seen)
+
+
+@shared_task(track_started=True, name="refresh_whatsapp_catalog_and_products")
+def refresh_whatsapp_catalog_and_products():
+    """
+    Fetches catalog data and associated products from Facebook's Graph API and syncs them to the local database.
+    """
+    r = get_redis_connection()
+    if r.get("refresh_whatsapp_catalog_and_products"):  # pragma: no cover
+        return
+
+    with r.lock("refresh_whatsapp_catalog_and_products", 1800):
+        try:
+            for channel in Channel.objects.filter(is_active=True, channel_type="WAC"):
+                # Fetch catalog data
+                catalog_data, valid = channel.get_type().get_api_catalogs(channel)
+                if not valid:
+                    continue
+
+                update_local_catalogs(channel, catalog_data)
+
+                for catalog in Catalog.objects.filter(channel=channel):
+                    # Fetch products for each catalog
+                    products_data, valid = channel.get_type().get_api_products(channel, catalog)
+                    if not valid:
+                        continue
+
+                    update_local_products(catalog, products_data, channel)
+
+        except Exception as e:
+            logger.error(f"Error refreshing WhatsApp catalog and products: {str(e)}", exc_info=True)
+
+
+def sent_products_to_sentenx(products):
+    sentenx_url = settings.SENTENX_URL
+
+    if sentenx_url:
+        url = sentenx_url + "/products/batch"
+
+        resp = requests.put(
+            url,
+            data=products,
+        )
+
+        if resp.status_code == 200:
+            return Response("Products updated")
+        else:
+            raise Exception("Received non-200 response: %d", resp.status_code)
+
+    else:
+        raise Exception("Not found SENTENX_URL")
+
+
+def sent_trim_products_to_sentenx(catalog, products):
+    sentenx_url = settings.SENTENX_URL
+
+    if sentenx_url:
+        url = sentenx_url + "/products/batch"
+        ids = [tc.id for tc in products]
+        products_to_delete_list = list(
+            Product.objects.filter(catalog=catalog).exclude(id__in=ids).values_list("facebook_retailer_id")
+        )
+
+        if products_to_delete_list:
+            payload = {
+                "catalog_id": catalog.facebook_catalog_id,
+                "product_retailer_ids": products_to_delete_list,
+            }
+
+            resp = requests.delete(
+                url,
+                data=payload,
+            )
+
+            if resp.status_code == 200:
+                return Response("Products updated")
+            else:
+                raise Exception("Received non-200 response: %d", resp.status_code)
+
+    else:
+        raise Exception("Not found SENTENX_URL")
