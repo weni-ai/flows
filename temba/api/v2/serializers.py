@@ -28,6 +28,7 @@ from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.utils import extract_constants, json, on_transaction_commit
+from temba.wpp_products.models import Product
 
 from . import fields
 from .validators import UniqueForOrgValidator
@@ -1638,4 +1639,23 @@ class WorkspaceReadSerializer(ReadSerializer):
             "date_style",
             "credits",
             "anon",
+        )
+
+
+class ProductReadSerializer(ReadSerializer):
+    title = serializers.CharField()
+    facebook_product_id = serializers.CharField()
+    product_retailer_id = serializers.CharField()
+    channel = serializers.SerializerMethodField()
+
+    def get_channel(self, obj):
+        return {"uuid": obj.catalog.channel.uuid, "name": obj.catalog.channel.name}
+
+    class Meta:
+        model = Product
+        fields = (
+            "title",
+            "facebook_product_id",
+            "product_retailer_id",
+            "channel",
         )
