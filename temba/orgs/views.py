@@ -3248,7 +3248,6 @@ class OrgCRUDL(SmartCRUDL):
             user = self.request.user
             org = user.get_org()
 
-
             # if we are on the topups plan, show our usual credits view
             if org.plan == settings.TOPUP_PLAN:
                 if self.has_org_perm("orgs.topup_list"):
