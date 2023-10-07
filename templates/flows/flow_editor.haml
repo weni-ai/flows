@@ -179,7 +179,7 @@
     %script(type="text/javascript" src="{{script}}")
 
   :javascript
-    let showV2Updates = false;
+    let showUpdates = false;
     const base = '/flow/assets/{{object.org.id}}/' + new Date().getTime() + '/';
     const api = '/api/v2/';
     const flowType = '{{ object.engine_type }}';
@@ -279,7 +279,7 @@
           {% endif %}
         },
 
-        showNewUpdates: showV2Updates
+        showNewUpdates: showUpdates
       };
 
       showFlowEditor(document.getElementById('rp-flow-editor'), config);
@@ -310,11 +310,11 @@
       signInAnonymously(auth).then(() => {
         getUserData().then((userData) => {
           if (userData) {
-            const { seenV2Updates } = userData;
-            if (!seenV2Updates) {
-              showV2Updates = true;
+            const { seenV3Updates } = userData;
+            if (!seenV3Updates) {
+              showUpdates = true;
               updateDoc(doc(db, usersCollection, '{{ user.email|escapejs }}'), {
-                seenV2Updates: true
+                seenV3Updates: true
               });
             }
           }
@@ -337,8 +337,8 @@
         if (userSnap.exists()) {
           return userSnap.data();
         } else {
-          await setDoc(userRef, { seenV2Updates: true });
-          return { seenV2Updates: false };
+          await setDoc(userRef, { seenV3Updates: true });
+          return { seenV3Updates: false };
         }
       }
     } catch (err) {
@@ -383,7 +383,7 @@
         in this flow and no translation exists for their language or the default language of the workspace,
         communication with that contact will default to <b>{{ language }}</b>.
 
-  #grid.h-full
+  #grid.h-full.overflow-hidden
     <temba-loading units="10" size="8"></temba-loading>
     #rp-flow-editor
 
