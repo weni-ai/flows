@@ -53,7 +53,7 @@ from temba.utils import json
 from temba.wpp_products.models import Catalog, Product
 
 from . import fields
-from .serializers import CatalogReadSerializer, ExternalServicesReadSerializer, format_datetime, normalize_extra
+from .serializers import ExternalServicesReadSerializer, ProductReadSerializer, format_datetime, normalize_extra
 
 NUM_BASE_REQUEST_QUERIES = 6  # number of db queries required for any API request
 
@@ -4964,8 +4964,8 @@ class ProductsEndpointViewSetTest(TembaTest):
 """
 
 
-class CatalogReadSerializerTest(TembaTest):
-    def test_catalog_read_serializer(self):
+class ProductReadSerializersTestCase(TembaTest):
+    def test_product_read_serializer(self):
         Channel.objects.all().delete()
         org = Org.objects.create(
             name="New Org",
@@ -4999,7 +4999,7 @@ class CatalogReadSerializerTest(TembaTest):
             org=org,
         )
 
-        Product.objects.create(
+        product = Product.objects.create(
             catalog=catalog,
             title="Product 1",
             facebook_product_id="fb123",
@@ -5011,31 +5011,30 @@ class CatalogReadSerializerTest(TembaTest):
             facebook_product_id="fb456",
             product_retailer_id="retail456",
         )
-        serializer = CatalogReadSerializer(instance=catalog)
+        serializer = ProductReadSerializer(instance=product)
         serialized_data = serializer.data
 
-        self.assertEqual(serialized_data["uuid"], str(catalog.uuid))
-        self.assertEqual(serialized_data["name"], "Test Catalog")
+        # self.assertEqual(serialized_data["uuid"], str(product.uuid))
+        self.assertEqual(serialized_data["title"], "Product 1")
 
-        expected_products = [
-            {
-                "title": "Product 1",
-                "facebook_product_id": "fb123",
-                "product_retailer_id": "retail123",
-                "channel": {"uuid": str(catalog.channel.uuid), "name": catalog.channel.name},
-            },
-            {
-                "title": "Product 2",
-                "facebook_product_id": "fb456",
-                "product_retailer_id": "retail456",
-                "channel": {"uuid": str(catalog.channel.uuid), "name": catalog.channel.name},
-            },
-        ]
-        self.assertEqual(serialized_data["products"], expected_products)
+        expected_products = {
+            "title": "Product 1",
+            "facebook_product_id": "fb123",
+            "product_retailer_id": "retail123",
+            "channel": {"uuid": str(catalog.channel.uuid), "name": catalog.channel.name},
+        }
+        # {
+        #     "title": "Product 2",
+        #     "facebook_product_id": "fb456",
+        #     "product_retailer_id": "retail456",
+        #     "channel": {"uuid": str(catalog.channel.uuid), "name": catalog.channel.name},
+        # },
+
+        self.assertEqual(serialized_data, expected_products)
 
 
 class ProductsEndpointViewSetTest(TembaTest):
-    def test_filter_queryset(self):
+    def test_get_queryset(self):
         Channel.objects.all().delete()
         Catalog.objects.all().delete()
 
@@ -5056,11 +5055,13 @@ class ProductsEndpointViewSetTest(TembaTest):
             },
         )
 
-        catalog1 = Catalog.objects.create(name="Catalog 1", facebook_catalog_id="111", org=self.org, channel=channel)
+        catalog1 = Catalog.objects.create(
+            name="Catalog 1", facebook_catalog_id="111", org=self.org, channel=channel, is_active=True
+        )
         catalog2 = Catalog.objects.create(name="Catalog 2", facebook_catalog_id="222", org=self.org, channel=channel)
         Catalog.objects.create(name="Catalog 3", facebook_catalog_id="333", org=self.org, channel=channel)
 
-        Product.objects.create(
+        product1 = Product.objects.create(
             catalog=catalog1, title="Product 1", facebook_product_id="fb456", product_retailer_id="retail456"
         )
         Product.objects.create(
@@ -5071,7 +5072,108 @@ class ProductsEndpointViewSetTest(TembaTest):
         viewset.request = self.client.get("/")
         viewset.request.user = self.user
 
-        filtered_queryset = viewset.filter_queryset(Catalog.objects.all())
+        filtered_queryset = viewset.get_queryset()
 
-        self.assertEqual(filtered_queryset.count(), 2)
-        self.assertEqual(filtered_queryset.first(), catalog1)
+        self.assertEqual(filtered_queryset.count(), 1)
+        self.assertEqual(filtered_queryset.first(), product1)
+
+
+class TestSearchIntegrations(TembaTest):
+    def test_search_integrations_with_classifiers_and_ticketers(self):
+        classifier = Classifier.objects.create(
+            org=self.org,
+            created_by=self.user,
+            modified_by=self.user,
+            uuid=uuid.uuid4(),
+            name="Classifier1",
+            config={"repository": "548eaa72-18ab-432a-b781-1ac922a35e83"},
+            classifier_type="bothub",
+        )
+
+        exported_flows = [
+            {
+                "nodes": [
+                    {
+                        "actions": [
+                            {
+                                "classifier": {
+                                    "uuid": classifier.uuid,
+                                    "name": classifier.name,
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "actions": [
+                            {
+                                "ticketer": {"uuid": "bf9e85ed-b74d-495c-8624-5f91fab13948", "name": "Ticketer1"},
+                                "topic": {"uuid": "bcef48af-9b73-428d-bd7b-144ea66e2479", "name": "Queue1"},
+                            }
+                        ]
+                    },
+                ]
+            }
+        ]
+
+        integrations = Org.search_integrations(exported_flows)
+
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["uuid"], classifier.uuid)
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["name"], classifier.name)
+        self.assertEqual(
+            integrations[0]["integrations"]["classifiers"][0]["repository_uuid"],
+            "548eaa72-18ab-432a-b781-1ac922a35e83",
+        )
+
+        self.assertEqual(
+            integrations[0]["integrations"]["ticketers"][0]["uuid"], "bf9e85ed-b74d-495c-8624-5f91fab13948"
+        )
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["name"], "Ticketer1")
+        self.assertEqual(
+            integrations[0]["integrations"]["ticketers"][0]["queues"][0]["uuid"],
+            "bcef48af-9b73-428d-bd7b-144ea66e2479",
+        )
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["queues"][0]["name"], "Queue1")
+
+    def test_search_integrations_with_only_classifiers(self):
+        classifier = Classifier.objects.create(
+            org=self.org,
+            created_by=self.user,
+            modified_by=self.user,
+            uuid=uuid.uuid4(),
+            name="Classifier1",
+            config={"repository": "repo123"},
+            classifier_type="bothub",
+        )
+
+        exported_flows = [
+            {"nodes": [{"actions": [{"classifier": {"uuid": classifier.uuid, "name": classifier.name}}]}]}
+        ]
+
+        integrations = Org.search_integrations(exported_flows)
+
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["uuid"], classifier.uuid)
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["name"], classifier.name)
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["repository_uuid"], "repo123")
+
+    def test_search_integrations_with_only_ticketers(self):
+        exported_flows = [
+            {
+                "nodes": [
+                    {
+                        "actions": [
+                            {
+                                "ticketer": {"uuid": "ticketer123", "name": "Ticketer1"},
+                                "topic": {"uuid": "topic123", "name": "Queue1"},
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+
+        integrations = Org.search_integrations(exported_flows)
+
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["uuid"], "ticketer123")
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["name"], "Ticketer1")
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["queues"][0]["uuid"], "topic123")
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["queues"][0]["name"], "Queue1")
