@@ -143,7 +143,6 @@ class ClassifierCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # and buttons for delete and sync
         self.assertContains(response, reverse("classifiers.classifier_sync", args=[self.c1.id]))
-        self.assertContains(response, reverse("classifiers.classifier_delete", args=[self.c1.uuid]))
 
         self.c1.intents.all().delete()
 

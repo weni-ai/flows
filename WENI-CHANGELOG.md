@@ -1,3 +1,10 @@
+3.1.0
+----------
+* Fix CI
+* Update FlowEditor to version 2.6.0
+* Remove workspace edit and classifier delete
+* Redesign FlowEditor feedback
+
 3.0.1
 ----------
 * Add INTENT_URL in environment and add classifier intention sync

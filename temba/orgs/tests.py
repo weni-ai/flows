@@ -3121,7 +3121,6 @@ class OrgTest(TembaTest):
         self.org.reset_capabilities()
         self.assertTrue(self.org.is_multi_org)
         response = self.client.get(reverse("orgs.org_home"))
-        self.assertContains(response, "Manage Workspaces")
 
         # now we can manage our orgs
         response = self.client.get(reverse("orgs.org_sub_orgs"))
