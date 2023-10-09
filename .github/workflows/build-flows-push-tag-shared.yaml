@@ -99,34 +99,6 @@ jobs:
           build-args: |
             BACKEND_ADDRESS=flows:8000
 
-      - name: Update WENI-CHANGELOG.md
-        if: ${{ !contains(env.TAG, 'develop') && !contains(env.TAG, 'staging') }}
-        run: |
-          git pull --tags origin main
-          TAG_ANT=$(git for-each-ref refs/tags --sort=-creatordate --format='%(refname)' --count=15 | egrep -v '(develop|staging)' | head -n3 | tail -n1 | cut -d'/' -f3)
-          pull_requests=$(curl -s -H "Authorization: Bearer ${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/pulls?state=closed&base=main&sort=created&direction=desc&per_page=15")
-          DATE_TAG=$(TZ=UTC0 git show --quiet --date='format-local:%Y-%m-%dT%H:%M:%SZ' --format="%cd" ${TAG_ANT} | tail -1)
-          echo "" >> temp.md
-          echo "${{ env.TAG }}" > temp.md  
-          echo "----------" >> temp.md
-          echo -E "$pull_requests" | jq -r --arg DATE_TAG "$DATE_TAG" 'map(select(.created_at > $DATE_TAG)) | .[].title' | while read title; do
-          url=$(echo -E "$pull_requests" | jq -r --arg title "$title" 'map(select(.title == $title)) | .[].html_url')
-          echo "* [$title]($url)" >> temp.md
-          done
-          echo "" >> temp.md
-          cat WENI-CHANGELOG.md >> temp.md  
-          mv temp.md WENI-CHANGELOG.md
-          cat WENI-CHANGELOG.md
-          
-      - name: Commit & Push (Update WENI-CHANGELOG.md) changes in repository
-        if: ${{ !contains(env.TAG, 'develop') && !contains(env.TAG, 'staging') }}
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email github-actions[bot]@users.noreply.github.com
-          git add WENI-CHANGELOG.md
-          git commit -m "Update WENI-CHANGELOG.md [actions skip]"
-          git push origin main
-
       - name: Check out Kubernetes Manifests
         uses: actions/checkout@master
         with:
