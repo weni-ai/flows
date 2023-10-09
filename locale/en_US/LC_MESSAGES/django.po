@@ -7407,3 +7407,6 @@ msgstr ""
 
 msgid "No synced templates at this time."
 msgstr ""
+
+msgid "Trigger Flow"
+msgstr ""
