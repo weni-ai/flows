@@ -1,13 +1,45 @@
+from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory, TestCase, override_settings
 
 from temba.context_processors_weni import (
     firebase_credentials,
     logrocket,
     old_design_excluded_channels_codes,
+    show_onboard_modal,
     show_sidemenu,
     use_weni_layout,
     weni_announcement,
 )
+
+
+class MockUser:
+    def __init__(self, is_anonymous=False, org=None):
+        self.is_anonymous = is_anonymous
+        self.org = org
+
+    def get_org(self):
+        return self.org
+
+
+class MockTriggersQuerySet:
+    def __init__(self, triggers=None):
+        self.triggers = triggers or []
+
+    def all(self):
+        return self
+
+    def exists(self):
+        return bool(self.triggers)
+
+
+class MockOrg:
+    def __init__(self, triggers=None):
+        self.triggers = MockTriggersQuerySet(triggers)
+
+
+class MockTrigger:
+    def exists(self):
+        return True
 
 
 class ContextProcessorsWeniTestCase(TestCase):
@@ -90,3 +122,35 @@ class ContextProcessorsWeniTestCase(TestCase):
         self.assertEqual(result["firebase_messaging_sender_id"], "messaging_sender_id")
         self.assertEqual(result["firebase_app_id"], "app_id")
         self.assertEqual(result["firebase_measurement_id"], "measurement_id")
+
+    def test_show_onboard_modal_no_user(self):
+        request = self.factory.get("/")
+        request.user = None
+        result = show_onboard_modal(request)
+        self.assertEqual(result["show_trigger_onboard_modal"], False)
+
+    def test_show_onboard_modal_anonymous_user(self):
+        request = self.factory.get("/")
+        request.user = AnonymousUser()
+        result = show_onboard_modal(request)
+        self.assertEqual(result["show_trigger_onboard_modal"], False)
+
+    def test_show_onboard_modal_no_org(self):
+        request = self.factory.get("/")
+        request.user = MockUser(is_anonymous=False)
+        result = show_onboard_modal(request)
+        self.assertEqual(result["show_trigger_onboard_modal"], False)
+
+    def test_show_onboard_modal_no_triggers(self):
+        request = self.factory.get("/")
+        org = MockOrg(triggers=[])
+        request.user = MockUser(is_anonymous=False, org=org)
+        result = show_onboard_modal(request)
+        self.assertEqual(result["show_trigger_onboard_modal"], True)
+
+    def test_show_onboard_modal_with_triggers(self):
+        request = self.factory.get("/")
+        org = MockOrg(triggers=[MockTrigger()])
+        request.user = MockUser(is_anonymous=False, org=org)
+        result = show_onboard_modal(request)
+        self.assertEqual(result["show_trigger_onboard_modal"], False)

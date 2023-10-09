@@ -89,15 +89,6 @@ class ClassifierCRUDL(SmartCRUDL):
                         href=reverse("classifiers.classifier_sync", args=[self.object.id]),
                     )
                 )
-            if self.has_org_perm("classifiers.classifier_delete"):
-                links.append(
-                    dict(
-                        id="ticketer-delete",
-                        title=_("Delete"),
-                        modax=_("Delete Classifier"),
-                        href=reverse("classifiers.classifier_delete", args=[self.object.uuid]),
-                    )
-                )
 
             return links
 
