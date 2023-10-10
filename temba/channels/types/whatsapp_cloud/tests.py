@@ -368,6 +368,7 @@ class WhatsAppCloudTypeTest(TembaTest):
             "123123123",
             config={
                 "wa_waba_id": "111111111111111",
+                "wa_business_id": "333333333333",
             },
         )
 
@@ -377,13 +378,14 @@ class WhatsAppCloudTypeTest(TembaTest):
             MockResponse(200, '{"data": ["foo", "bar"]}'),
             MockResponse(
                 200,
-                '{"data": ["foo"], "paging": {"cursors": {"after": "MjQZD"}, "next": "https://graph.facebook.com/v16.0/111111111111111/owned_product_catalogs?after=MjQZD" } }',
+                '{"data": ["foo"], "paging": {"cursors": {"after": "MjQZD"}, "next": "https://graph.facebook.com/v16.0/333333333333/owned_product_catalogs?after=MjQZD" } }',
             ),
             MockResponse(200, '{"data": ["bar"], "paging": {"cursors": {"after": "MjQZD"} } }'),
         ]
 
         # RequestException check HTTPLog
         categories_data, no_error = WhatsAppCloudType().get_api_catalogs(channel)
+
         self.assertEqual(1, HTTPLog.objects.filter(log_type=HTTPLog.WHATSAPP_CATALOGS_SYNCED).count())
         self.assertFalse(no_error)
         self.assertEqual([], categories_data)
@@ -399,7 +401,7 @@ class WhatsAppCloudTypeTest(TembaTest):
         self.assertEqual(["foo", "bar"], categories_data)
 
         mock_get.assert_called_with(
-            "https://graph.facebook.com/v16.0/111111111111111/owned_product_catalogs",
+            "https://graph.facebook.com/v16.0/333333333333/owned_product_catalogs",
             params={"limit": 255},
             headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
         )
@@ -412,12 +414,12 @@ class WhatsAppCloudTypeTest(TembaTest):
         mock_get.assert_has_calls(
             [
                 call(
-                    "https://graph.facebook.com/v16.0/111111111111111/owned_product_catalogs",
+                    "https://graph.facebook.com/v16.0/333333333333/owned_product_catalogs",
                     params={"limit": 255},
                     headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
                 ),
                 call(
-                    "https://graph.facebook.com/v16.0/111111111111111/owned_product_catalogs?after=MjQZD",
+                    "https://graph.facebook.com/v16.0/333333333333/owned_product_catalogs?after=MjQZD",
                     params={"limit": 255},
                     headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
                 ),
@@ -437,6 +439,7 @@ class WhatsAppCloudTypeTest(TembaTest):
             "123123123",
             config={
                 "wa_waba_id": "111111111111111",
+                "wa_business_id": "333333333333",
             },
         )
 

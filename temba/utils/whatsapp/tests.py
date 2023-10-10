@@ -358,8 +358,8 @@ class WhatsAppUtilsTest(TembaTest):
 class UpdateLocalCatalogsTest(TembaTest):
     def test_update_local_catalogs(self):
         catalogs_data = [
-            {"name": "Catalog A", "id": 1},
-            {"name": "Catalog B", "id": 2},
+            {"name": "Catalog A", "id": 1, "is_active": True},
+            {"name": "Catalog B", "id": 2, "is_active": False},
         ]
 
         channel = self.channel
