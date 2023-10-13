@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import requests
 
@@ -19,6 +19,7 @@ from . import update_api_version
 from .tasks import (
     _calculate_variable_count,
     refresh_whatsapp_catalog_and_products,
+    update_is_active_catalog,
     update_local_catalogs,
     update_local_products,
     update_local_templates,
@@ -358,8 +359,8 @@ class WhatsAppUtilsTest(TembaTest):
 class UpdateLocalCatalogsTest(TembaTest):
     def test_update_local_catalogs(self):
         catalogs_data = [
-            {"name": "Catalog A", "id": 1},
-            {"name": "Catalog B", "id": 2},
+            {"name": "Catalog A", "id": 1, "is_active": True},
+            {"name": "Catalog B", "id": 2, "is_active": False},
         ]
 
         channel = self.channel
@@ -390,97 +391,87 @@ class UpdateLocalProductsTest(TembaTest):
         self.assertEqual(Product.objects.filter(catalog=catalog).count(), 2)
 
 
-class RefreshWhatsAppCatalogAndProductsTest(TembaTest):
-    @patch("temba.utils.whatsapp.tasks.Channel")
-    def test_refresh_whatsapp_catalog_and_products(self, mock_Channel):
-        channel = self.channel
-        channel.get_type().code = "WAC"
-        channel.save()
-
-        # Mock the get_type method to return a mock channel instance
-        mock_channel_instance = mock_Channel.objects.get.return_value
-        mock_channel_instance.get_type.return_value = mock_channel_instance
-
-        # Mock the get_api_catalogs and get_api_products methods
-        mock_catalog_data = [{"name": "Catalog A", "id": 1}]
-        mock_products_data = [{"id": 1, "name": "Product A", "retailer_id": 123}]
-        mock_channel_instance.get_api_catalogs.return_value = (mock_catalog_data, True)
-        mock_channel_instance.get_api_products.return_value = (mock_products_data, True)
-
-        # Mock the update_local_catalogs and update_local_products functions
-        with patch("temba.utils.whatsapp.tasks.update_local_catalogs"):
-            with patch("temba.utils.whatsapp.tasks.update_local_products"):
-                # Execute the task
-                refresh_whatsapp_catalog_and_products()
-
-                # Verifique se os métodos mock foram chamados corretamente
-                # mock_channel_instance.get_type.assert_called_once()
-                # mock_update_local_catalogs.assert_called_once_with(channel, mock_catalog_data)
-                # mock_update_local_products.assert_called_once_with(mock_update_local_catalogs.return_value, mock_products_data, channel)
-
-
-"""class RefreshWhatsAppCatalogAndProductsTestCase222(TembaTest):
-    @patch("temba.channels.types.whatsapp.WhatsAppType.get_api_products")
-    @patch("temba.channels.types.whatsapp.WhatsAppType.get_api_catalogs")
-    @patch("temba.utils.whatsapp.tasks.update_local_catalogs")
-    @patch("temba.utils.whatsapp.tasks.update_local_products")
-    def test_refresh_catalog_and_products_task(self, update_local_product_mock, update_local_catalogs_mock, mock_get_api_catalogs, mock_get_api_products):
+class RefreshCatalogAndProductsTest(TembaTest):
+    @patch("temba.channels.models.Channel")
+    @patch("temba.utils.whatsapp.tasks.get_redis_connection")
+    @patch("temba.utils.whatsapp.tasks.logger")
+    @patch("requests.get")
+    def test_refresh_whatsapp_catalog_and_products(
+        self, mock_requests_get, mock_logger, mock_get_redis_connection, mock_Channel
+    ):
+        # Limpe os modelos relevantes
+        Catalog.objects.all().delete()
         Channel.objects.all().delete()
 
-        # Create a test channel
-        channel = self.create_channel(
-            "WAC",
-            "WhatsApp Channel",
-            "1234",
-            config={Channel.CONFIG_BASE_URL: "https://nyaruka.com/whatsapp"},
-        )
+        channel = self.channel
+        channel.config = {
+            "wa_waba_id": "1111111111",  # Certifique-se de ter um WABA ID válido
+        }
 
-        self.login(self.admin)
-        mock_get_api_catalogs.side_effect = [
-            ([], False),
-            Exception("foo"),
-            ([{"name": "catalog1"}], True),
-            ([{"name": "catalog1"}], True),
-        ]
-        update_local_catalogs_mock.return_value = None
+        # Crie um objeto de mock separado para channel.get_type
+        channel_mock = Mock()
 
-        # Should skip if locked
-        r = get_redis_connection()
-        with r.lock("refresh_whatsapp_catalog_and_products", timeout=1800):
+        # Crie um objeto de mock para channel.get_type.return_value
+        channel_get_type_mock = Mock()
+
+        # Atribuir os mocks aos métodos apropriados
+        channel_get_type_mock.get_api_catalogs = Mock(return_value=([], False))
+        channel_get_type_mock.get_api_products = Mock(return_value=([], False))
+
+        # Atribuir o objeto de mock channel_get_type_mock ao objeto de mock channel_mock
+        channel_mock.get_type.return_value = channel_get_type_mock
+
+        # Substituir a função original get_api_catalogs e get_api_products com o objeto de mock
+        mock_Channel.objects.filter.return_value = [channel]
+        # mock_Channel.objects.filter.return_value.first.return_value = channel
+
+        # Simule o contexto do r.lock
+        with patch("temba.utils.whatsapp.tasks.get_redis_connection") as mock_get_redis_connection:
+            mock_lock = mock_get_redis_connection.return_value.lock.return_value
+            mock_lock.acquire.return_value = True
+
+            # Simule a resposta da API
+            mock_requests_get.return_value.json.return_value = {"data": [{"id": "123456789"}]}
+
+            # Chame a função
             refresh_whatsapp_catalog_and_products()
-            self.assertEqual(0, mock_get_api_catalogs.call_count)
-            self.assertEqual(0, update_local_catalogs_mock.call_count)
 
-        # Should skip if fail with API
-        refresh_whatsapp_catalog_and_products()
+        # Verifique se as funções de atualização foram chamadas
+        # channel_get_type_mock.get_api_catalogs.assert_called_once_with(channel)
+        # channel_get_type_mock.get_api_products.assert_called_once_with(channel, channel)
 
-        mock_get_api_catalogs.assert_called_with(channel)
-        self.assertEqual(1, mock_get_api_catalogs.call_count)
-        self.assertEqual(0, update_local_catalogs_mock.call_count)
+        mock_logger.error.assert_not_called()
 
-        # Any exception
-        refresh_whatsapp_catalog_and_products()
 
-        mock_get_api_catalogs.assert_called_with(channel)
-        self.assertEqual(2, mock_get_api_catalogs.call_count)
-        self.assertEqual(0, update_local_catalogs_mock.call_count)
+class UpdateIsActiveCatalogTestCase(TembaTest):
+    @patch("temba.utils.whatsapp.tasks.requests.get")
+    def test_update_is_active_catalog(self, mock_requests_get):
+        mock_response = {
+            "data": [
+                {"id": "catalog1"},
+                {"id": "catalog2"},
+            ]
+        }
+        mock_requests_get.return_value.json.return_value = mock_response
 
-        # Now it should refresh
-        refresh_whatsapp_catalog_and_products()
+        config = {"wa_waba_id": "1111111111111", "wa_business_id": "2222222222"}
 
-        mock_get_api_catalogs.assert_called_with(channel)
-        self.assertEqual(3, mock_get_api_catalogs.call_count)
-        update_local_catalogs_mock.assert_called_once_with(channel, [{"name": "catalog1"}])
+        channel = self.channel
+        channel.config = config
 
-        channel.refresh_from_db()
+        catalogs_data = [
+            {"id": "catalog1", "is_active": True},
+            {"id": "catalog2", "is_active": False},
+            {"id": "catalog3", "is_active": False},
+        ]
 
-        # Now it should refresh
-        refresh_whatsapp_catalog_and_products()
+        result = update_is_active_catalog(channel, catalogs_data)
 
-        mock_get_api_catalogs.assert_called_with(channel)
-        self.assertEqual(4, mock_get_api_catalogs.call_count)
-        update_local_catalogs_mock.assert_called_once_with(channel, [{"name": "catalog1"}])
-
-        # self.assertTrue(mock_logger_error.called)
-
-        channel.refresh_from_db()"""
+        self.assertEqual(
+            result,
+            [
+                {"id": "catalog1", "is_active": True},
+                {"id": "catalog2", "is_active": False},
+                {"id": "catalog3", "is_active": False},
+            ],
+        )
