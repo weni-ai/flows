@@ -243,15 +243,18 @@ def update_local_products(catalog, products_data, channel):
         sentenx_object = {
             "facebook_id": new_product.facebook_product_id,
             "title": new_product.title,
-            "org_id": catalog.channel_id,
+            "org_id": str(catalog.org_id),
             "catalog_id": catalog.facebook_catalog_id,
             "product_retailer_id": new_product.product_retailer_id,
+            "channel_id": str(catalog.channel_id),
         }
 
         products_sentenx["products"].append(sentenx_object)
 
-    sent_products_to_sentenx(products_sentenx)
-    sent_trim_products_to_sentenx(catalog, seen)
+    if len(products_sentenx["products"]) > 0:
+        sent_products_to_sentenx(products_sentenx)
+        sent_trim_products_to_sentenx(catalog, seen)
+
     Product.trim(catalog, seen)
 
 
@@ -294,7 +297,7 @@ def sent_products_to_sentenx(products):
 
         resp = requests.put(
             url,
-            data=products,
+            json=products,
         )
 
         if resp.status_code == 200:
@@ -313,7 +316,7 @@ def sent_trim_products_to_sentenx(catalog, products):
         url = sentenx_url + "/products/batch"
         ids = [tc.id for tc in products]
         products_to_delete_list = list(
-            Product.objects.filter(catalog=catalog).exclude(id__in=ids).values_list("facebook_retailer_id")
+            Product.objects.filter(catalog=catalog).exclude(id__in=ids).values_list("product_retailer_id")
         )
 
         if products_to_delete_list:
