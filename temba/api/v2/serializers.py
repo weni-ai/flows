@@ -1646,10 +1646,6 @@ class ProductReadSerializer(ReadSerializer):
     title = serializers.CharField()
     facebook_product_id = serializers.CharField()
     product_retailer_id = serializers.CharField()
-    channel = serializers.SerializerMethodField()
-
-    def get_channel(self, obj):
-        return {"uuid": obj.catalog.channel.uuid, "name": obj.catalog.channel.name}
 
     class Meta:
         model = Product
@@ -1657,5 +1653,4 @@ class ProductReadSerializer(ReadSerializer):
             "title",
             "facebook_product_id",
             "product_retailer_id",
-            "channel",
         )
