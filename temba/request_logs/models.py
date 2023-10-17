@@ -57,6 +57,8 @@ class HTTPLog(models.Model):
         (WHATSAPP_TOKENS_SYNCED, _("WhatsApp Tokens Synced")),
         (WHATSAPP_CONTACTS_REFRESHED, _("WhatsApp Contacts Refreshed")),
         (WHATSAPP_CHECK_HEALTH, _("WhatsApp Health Check")),
+        (WHATSAPP_CATALOGS_SYNCED, _("WhatsApp Catalogs Synced")),
+        (WHATSAPP_PRODUCTS_SYNCED, _("WhatsApp Products Synced")),
         (TEAMS_TOKENS_SYNCED, _("Teams Tokens Synced")),
     )
 

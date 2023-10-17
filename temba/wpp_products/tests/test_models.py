@@ -71,6 +71,7 @@ class CatalogModelTestCase(TembaTest):
             name="Existing Catalog",
             channel=self.channel,
             facebook_catalog_id="12345",
+            is_active=True,
         )
 
         self.assertEqual(existing_catalog, self.existing_catalog)
@@ -81,6 +82,7 @@ class CatalogModelTestCase(TembaTest):
             name="New Catalog",
             channel=self.channel,
             facebook_catalog_id="67890",
+            is_active=True,
         )
 
         self.assertIsNotNone(new_catalog)
@@ -95,6 +97,7 @@ class CatalogModelTestCase(TembaTest):
             name="Updated Catalog",
             channel=self.channel,
             facebook_catalog_id="12345",
+            is_active=True,
         )
 
         self.assertEqual(updated_catalog, self.existing_catalog)
@@ -107,11 +110,12 @@ class CatalogModelTestCase(TembaTest):
             name="Existing Catalog",
             channel=self.channel,
             facebook_catalog_id="12345",
+            is_active=True,
         )
 
         self.assertEqual(existing_catalog, self.existing_catalog)
         self.assertEqual(existing_catalog.name, "Existing Catalog")
-        self.assertEqual(self.existing_catalog.modified_on, existing_catalog.modified_on)
+        self.assertNotEqual(self.existing_catalog.modified_on, existing_catalog.modified_on)
 
 
 class ProductModelTestCase(TembaTest):

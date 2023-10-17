@@ -93,7 +93,7 @@ MAILROOM_AUTH_TOKEN = None
 # -----------------------------------------------------------------------------------
 # Load development apps
 # -----------------------------------------------------------------------------------
-INSTALLED_APPS = INSTALLED_APPS + ("storages", "macros", )
+INSTALLED_APPS = INSTALLED_APPS + ("storages", "macros", "weni.internal", )
 
 # -----------------------------------------------------------------------------------
 # In development, add in extra logging for exceptions and the debug toolbar
@@ -133,3 +133,20 @@ USER_RECOVER_MAX_ATTEMPTS = os.environ.get("USER_RECOVER_MAX_ATTEMPTS", 5)
 WENI_DOMAINS = {"weni": os.environ.get("WENI_DOMAIN", default="weni.ai")}
 EXCLUDED_HTTP_HEADERS = os.environ.get("EXCLUDED_HTTP_HEADERS", default=[])
 OLD_DESIGN_EXCLUDED_CHANNELS_CODES = os.environ.get("OLD_DESIGN_EXCLUDED_CHANNELS_CODES", default=[])
+
+
+# Event Driven Architecture configurations
+
+USE_EDA = os.environ.get("USE_EDA", default=False)
+
+if USE_EDA:
+    EDA_CONNECTION_BACKEND = "temba.event_driven.backends.PyAMQPConnectionBackend"
+    EDA_CONSUMERS_HANDLE = "temba.event_driven.handle.handle_consumers"
+
+    EDA_BROKER_HOST = os.environ.get("EDA_BROKER_HOST", default="localhost")
+    EDA_VIRTUAL_HOST = os.environ.get("EDA_VIRTUAL_HOST", default="/")
+    EDA_BROKER_PORT = os.environ.get("EDA_BROKER_PORT", default=5672)
+    EDA_BROKER_USER = os.environ.get("EDA_BROKER_USER", default="guest")
+    EDA_BROKER_PASSWORD = os.environ.get("EDA_BROKER_PASSWORD", default="guest")
+
+BOTHUB_SYNC_INTENTS_URL = os.environ.get("BOTHUB_SYNC_INTENTS_URL", default="https://nlp.bothub.it/info/")

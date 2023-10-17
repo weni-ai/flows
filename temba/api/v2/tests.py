@@ -4863,3 +4863,104 @@ class ExternalServicesReadSerializerTest(TembaTest):
         result = serializer.get_external_service_type(external_service)
 
         self.assertEqual(result, external_service_type)
+
+
+class TestSearchIntegrations(TembaTest):
+    def test_search_integrations_with_classifiers_and_ticketers(self):
+        classifier = Classifier.objects.create(
+            org=self.org,
+            created_by=self.user,
+            modified_by=self.user,
+            uuid=uuid.uuid4(),
+            name="Classifier1",
+            config={"repository": "548eaa72-18ab-432a-b781-1ac922a35e83"},
+            classifier_type="bothub",
+        )
+
+        exported_flows = [
+            {
+                "nodes": [
+                    {
+                        "actions": [
+                            {
+                                "classifier": {
+                                    "uuid": classifier.uuid,
+                                    "name": classifier.name,
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "actions": [
+                            {
+                                "ticketer": {"uuid": "bf9e85ed-b74d-495c-8624-5f91fab13948", "name": "Ticketer1"},
+                                "topic": {"uuid": "bcef48af-9b73-428d-bd7b-144ea66e2479", "name": "Queue1"},
+                            }
+                        ]
+                    },
+                ]
+            }
+        ]
+
+        integrations = Org.search_integrations(exported_flows)
+
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["uuid"], classifier.uuid)
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["name"], classifier.name)
+        self.assertEqual(
+            integrations[0]["integrations"]["classifiers"][0]["repository_uuid"],
+            "548eaa72-18ab-432a-b781-1ac922a35e83",
+        )
+
+        self.assertEqual(
+            integrations[0]["integrations"]["ticketers"][0]["uuid"], "bf9e85ed-b74d-495c-8624-5f91fab13948"
+        )
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["name"], "Ticketer1")
+        self.assertEqual(
+            integrations[0]["integrations"]["ticketers"][0]["queues"][0]["uuid"],
+            "bcef48af-9b73-428d-bd7b-144ea66e2479",
+        )
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["queues"][0]["name"], "Queue1")
+
+    def test_search_integrations_with_only_classifiers(self):
+        classifier = Classifier.objects.create(
+            org=self.org,
+            created_by=self.user,
+            modified_by=self.user,
+            uuid=uuid.uuid4(),
+            name="Classifier1",
+            config={"repository": "repo123"},
+            classifier_type="bothub",
+        )
+
+        exported_flows = [
+            {"nodes": [{"actions": [{"classifier": {"uuid": classifier.uuid, "name": classifier.name}}]}]}
+        ]
+
+        integrations = Org.search_integrations(exported_flows)
+
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["uuid"], classifier.uuid)
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["name"], classifier.name)
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["repository_uuid"], "repo123")
+
+    def test_search_integrations_with_only_ticketers(self):
+        exported_flows = [
+            {
+                "nodes": [
+                    {
+                        "actions": [
+                            {
+                                "ticketer": {"uuid": "ticketer123", "name": "Ticketer1"},
+                                "topic": {"uuid": "topic123", "name": "Queue1"},
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+
+        integrations = Org.search_integrations(exported_flows)
+
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["uuid"], "ticketer123")
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["name"], "Ticketer1")
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["queues"][0]["uuid"], "topic123")
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["queues"][0]["name"], "Queue1")
