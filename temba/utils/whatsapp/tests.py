@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 import requests
 from django_redis import get_redis_connection
 
+from django.conf import settings
 from django.utils import timezone
 
 from temba.channels.models import Channel
@@ -22,6 +23,8 @@ from . import update_api_version
 from .tasks import (
     _calculate_variable_count,
     refresh_whatsapp_catalog_and_products,
+    sent_products_to_sentenx,
+    sent_trim_products_to_sentenx,
     update_is_active_catalog,
     update_local_catalogs,
     update_local_products,
@@ -509,3 +512,103 @@ class UpdateIsActiveCatalogTestCase(TembaTest):
                 {"id": "catalog3", "is_active": False},
             ],
         )
+
+
+class SentenxTestCase(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.new_channel = self.create_channel("WAC", "Test WAC Channel", "54764868534")
+        self.catalog = Catalog.objects.create(
+            facebook_catalog_id="987654321",
+            name="Catalog1",
+            org=self.org,
+            channel=self.new_channel,
+            created_on=timezone.now(),
+            modified_on=timezone.now(),
+            is_active=True,
+        )
+        self.product1 = Product.objects.create(
+            facebook_product_id="123",
+            title="Existing Product 1",
+            product_retailer_id="product-1",
+            catalog=self.catalog,
+        )
+        self.product2 = Product.objects.create(
+            facebook_product_id="456",
+            title="Existing Product 2",
+            product_retailer_id="product-2",
+            catalog=self.catalog,
+        )
+        self.products = [self.product1, self.product2]
+
+    def test_sent_products_to_sentenx_success(self):
+        settings.SENTENX_URL = "http://example.com"
+        products = [{"product_id": 1, "name": "Product 1"}, {"product_id": 2, "name": "Product 2"}]
+
+        def mock_requests_put(*args, **kwargs):
+            class MockResponse:
+                status_code = 200
+
+            return MockResponse()
+
+        requests.put = mock_requests_put
+
+        sent_products_to_sentenx(products)
+
+    def test_sent_products_to_sentenx_failure(self):
+        settings.SENTENX_URL = "http://example.com"
+        products = [{"product_id": 1, "name": "Product 1"}, {"product_id": 2, "name": "Product 2"}]
+
+        def mock_requests_put(*args, **kwargs):
+            class MockResponse:
+                status_code = 400
+
+            return MockResponse()
+
+        requests.put = mock_requests_put
+
+        with self.assertRaises(Exception):
+            sent_products_to_sentenx(products)
+
+    def test_sent_products_to_sentenx_no_sentenx_url(self):
+        settings.SENTENX_URL = ""
+
+        with self.assertRaises(Exception) as context:
+            sent_products_to_sentenx([])
+
+        self.assertEqual(str(context.exception), "Not found SENTENX_URL")
+
+    def test_sent_trim_products_to_sentenx_success(self):
+        settings.SENTENX_URL = "http://example.com"
+
+        with patch("requests.delete") as mock_delete:
+            mock_response = mock_delete.return_value
+            mock_response.status_code = 200
+
+            sent_trim_products_to_sentenx(self.catalog, self.products)
+
+    def test_sent_trim_products_to_sentenx_no_products_to_delete(self):
+        settings.SENTENX_URL = "http://example.com"
+
+        with patch("requests.delete") as mock_delete:
+            mock_response = mock_delete.return_value
+            mock_response.status_code = 200
+
+            sent_trim_products_to_sentenx(self.catalog, [])
+
+    def test_sent_trim_products_to_sentenx_failure(self):
+        settings.SENTENX_URL = "http://example.com"
+        mock_response = Mock()
+        mock_response.status_code = 400
+
+        with patch("requests.delete", return_value=mock_response):
+            with self.assertRaises(Exception):
+                sent_trim_products_to_sentenx(self.catalog, [])
+
+    def test_sent_trim_products_to_sentenx_no_sentenx_url(self):
+        settings.SENTENX_URL = ""
+
+        with self.assertRaises(Exception) as context:
+            sent_trim_products_to_sentenx(self.catalog, self.products)
+
+        self.assertEqual(str(context.exception), "Not found SENTENX_URL")

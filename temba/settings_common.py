@@ -1329,3 +1329,6 @@ MACHINE_HOSTNAME = socket.gethostname().split(".")[0]
 
 # ElasticSearch configuration (URL RFC-1738)
 ELASTICSEARCH_URL = os.environ.get("ELASTICSEARCH_URL", "http://localhost:9200")
+
+# SextenX url
+SENTENX_URL = os.environ.get("SENTENX_URL", default="")
