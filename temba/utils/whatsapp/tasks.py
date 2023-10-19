@@ -186,6 +186,24 @@ def refresh_whatsapp_templates():
                 logger.error(f"Error refreshing whatsapp templates: {str(e)}", exc_info=True)
 
 
+def update_is_active_catalog_from_integrations(channel_uuid, facebook_catalog_id):
+    channel = Channel.objects.get(uuid=channel_uuid)
+    channel.config["catalog_id"] = facebook_catalog_id
+    channel.save(update_fields=["config"])
+
+    catalogs = Catalog.objects.filter(channel=channel)
+
+    for catalog in catalogs:
+        if catalog.facebook_catalog_id == facebook_catalog_id:
+            catalog.is_active = True
+        else:
+            catalog.is_active = False
+
+        catalog.save()
+
+    return Response("Flows updated")
+
+
 def update_is_active_catalog(channel, catalogs_data):
     waba_id = channel.config.get("wa_waba_id", None)
 
