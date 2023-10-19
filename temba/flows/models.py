@@ -341,6 +341,25 @@ class Flow(TembaModel):
                     expires_after_minutes=flow_expires,
                 )
 
+                integrations = flow_def.get("integrations", {})
+                for classifier in integrations.get("classifiers", []):  # pragma: no cover
+                    IntegrationRequest.objects.create(
+                        flow=flow,
+                        integration_uuid=classifier.get("uuid"),
+                        repository=classifier.get("repository_uuid"),
+                        name=classifier.get("name"),
+                        project=org.project,
+                    )
+
+                for ticketer in integrations.get("ticketers", []):  # pragma: no cover
+                    IntegrationRequest.objects.create(
+                        flow=flow,
+                        integration_uuid=ticketer.get("uuid"),
+                        repository=None,
+                        name=ticketer.get("name"),
+                        project=org.project,
+                    )
+
             # make sure the flow is unarchived
             if flow.is_archived:
                 flow.restore(user)

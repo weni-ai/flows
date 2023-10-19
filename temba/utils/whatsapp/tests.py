@@ -1,6 +1,10 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import requests
+from django_redis import get_redis_connection
+
+from django.conf import settings
+from django.utils import timezone
 
 from temba.channels.models import Channel
 from temba.channels.types.whatsapp.type import (
@@ -19,6 +23,9 @@ from . import update_api_version
 from .tasks import (
     _calculate_variable_count,
     refresh_whatsapp_catalog_and_products,
+    sent_products_to_sentenx,
+    sent_trim_products_to_sentenx,
+    update_is_active_catalog,
     update_local_catalogs,
     update_local_products,
     update_local_templates,
@@ -358,8 +365,8 @@ class WhatsAppUtilsTest(TembaTest):
 class UpdateLocalCatalogsTest(TembaTest):
     def test_update_local_catalogs(self):
         catalogs_data = [
-            {"name": "Catalog A", "id": 1},
-            {"name": "Catalog B", "id": 2},
+            {"name": "Catalog A", "id": 1, "is_active": True},
+            {"name": "Catalog B", "id": 2, "is_active": False},
         ]
 
         channel = self.channel
@@ -390,97 +397,218 @@ class UpdateLocalProductsTest(TembaTest):
         self.assertEqual(Product.objects.filter(catalog=catalog).count(), 2)
 
 
-class RefreshWhatsAppCatalogAndProductsTest(TembaTest):
-    @patch("temba.utils.whatsapp.tasks.Channel")
-    def test_refresh_whatsapp_catalog_and_products(self, mock_Channel):
-        channel = self.channel
-        channel.get_type().code = "WAC"
-        channel.save()
-
-        # Mock the get_type method to return a mock channel instance
-        mock_channel_instance = mock_Channel.objects.get.return_value
-        mock_channel_instance.get_type.return_value = mock_channel_instance
-
-        # Mock the get_api_catalogs and get_api_products methods
-        mock_catalog_data = [{"name": "Catalog A", "id": 1}]
-        mock_products_data = [{"id": 1, "name": "Product A", "retailer_id": 123}]
-        mock_channel_instance.get_api_catalogs.return_value = (mock_catalog_data, True)
-        mock_channel_instance.get_api_products.return_value = (mock_products_data, True)
-
-        # Mock the update_local_catalogs and update_local_products functions
-        with patch("temba.utils.whatsapp.tasks.update_local_catalogs"):
-            with patch("temba.utils.whatsapp.tasks.update_local_products"):
-                # Execute the task
-                refresh_whatsapp_catalog_and_products()
-
-                # Verifique se os métodos mock foram chamados corretamente
-                # mock_channel_instance.get_type.assert_called_once()
-                # mock_update_local_catalogs.assert_called_once_with(channel, mock_catalog_data)
-                # mock_update_local_products.assert_called_once_with(mock_update_local_catalogs.return_value, mock_products_data, channel)
-
-
-"""class RefreshWhatsAppCatalogAndProductsTestCase222(TembaTest):
-    @patch("temba.channels.types.whatsapp.WhatsAppType.get_api_products")
-    @patch("temba.channels.types.whatsapp.WhatsAppType.get_api_catalogs")
-    @patch("temba.utils.whatsapp.tasks.update_local_catalogs")
+class RefreshWhatsappCatalogAndProductsTestCase(TembaTest):
     @patch("temba.utils.whatsapp.tasks.update_local_products")
-    def test_refresh_catalog_and_products_task(self, update_local_product_mock, update_local_catalogs_mock, mock_get_api_catalogs, mock_get_api_products):
+    @patch("temba.utils.whatsapp.tasks.update_local_catalogs")
+    @patch("temba.channels.types.whatsapp_cloud.type.WhatsAppCloudType.get_api_products")
+    @patch("temba.channels.types.whatsapp_cloud.type.WhatsAppCloudType.get_api_catalogs")
+    def test_refresh_catalogs_and_products_task(
+        self, mock_get_api_catalogs, mock_get_api_products, update_local_catalogs_mock, update_local_products_mock
+    ):
+        Catalog.objects.all().delete()
+        Product.objects.all().delete()
         Channel.objects.all().delete()
 
-        # Create a test channel
-        channel = self.create_channel(
-            "WAC",
-            "WhatsApp Channel",
-            "1234",
-            config={Channel.CONFIG_BASE_URL: "https://nyaruka.com/whatsapp"},
+        channel = self.create_channel("WAC", "Test WAC Channel", "54764868534")
+
+        catalog = Catalog.objects.create(
+            facebook_catalog_id="123456789",
+            name="Catalog1",
+            org=self.org,
+            channel=channel,
+            created_on=timezone.now(),
+            modified_on=timezone.now(),
+            is_active=True,
         )
 
         self.login(self.admin)
         mock_get_api_catalogs.side_effect = [
             ([], False),
             Exception("foo"),
-            ([{"name": "catalog1"}], True),
-            ([{"name": "catalog1"}], True),
+            ([{"name": "hello"}], True),
+            ([{"name": "hello"}], True),
+            ([{"name": "hello"}], True),
         ]
-        update_local_catalogs_mock.return_value = None
 
-        # Should skip if locked
+        mock_get_api_products.side_effect = [
+            ([], False),
+            ([], True),
+        ]
+
+        update_local_catalogs_mock.return_value = None
+        update_local_products_mock.return_value = None
+
         r = get_redis_connection()
         with r.lock("refresh_whatsapp_catalog_and_products", timeout=1800):
             refresh_whatsapp_catalog_and_products()
             self.assertEqual(0, mock_get_api_catalogs.call_count)
+            self.assertEqual(0, mock_get_api_products.call_count)
             self.assertEqual(0, update_local_catalogs_mock.call_count)
+            self.assertEqual(0, update_local_products_mock.call_count)
 
-        # Should skip if fail with API
         refresh_whatsapp_catalog_and_products()
 
         mock_get_api_catalogs.assert_called_with(channel)
-        self.assertEqual(1, mock_get_api_catalogs.call_count)
-        self.assertEqual(0, update_local_catalogs_mock.call_count)
 
-        # Any exception
+        self.assertEqual(1, mock_get_api_catalogs.call_count)
+        self.assertEqual(0, mock_get_api_products.call_count)
+        self.assertEqual(0, update_local_catalogs_mock.call_count)
+        self.assertEqual(0, update_local_products_mock.call_count)
+
+        # any exception
         refresh_whatsapp_catalog_and_products()
 
         mock_get_api_catalogs.assert_called_with(channel)
         self.assertEqual(2, mock_get_api_catalogs.call_count)
+        self.assertEqual(0, mock_get_api_products.call_count)
         self.assertEqual(0, update_local_catalogs_mock.call_count)
+        self.assertEqual(0, update_local_products_mock.call_count)
 
-        # Now it should refresh
         refresh_whatsapp_catalog_and_products()
 
         mock_get_api_catalogs.assert_called_with(channel)
         self.assertEqual(3, mock_get_api_catalogs.call_count)
-        update_local_catalogs_mock.assert_called_once_with(channel, [{"name": "catalog1"}])
+        update_local_catalogs_mock.assert_called_once_with(channel, [{"name": "hello"}])
+        mock_get_api_products.assert_called_with(channel, catalog)
+        self.assertEqual(0, update_local_products_mock.call_count)
 
-        channel.refresh_from_db()
-
-        # Now it should refresh
         refresh_whatsapp_catalog_and_products()
 
         mock_get_api_catalogs.assert_called_with(channel)
         self.assertEqual(4, mock_get_api_catalogs.call_count)
-        update_local_catalogs_mock.assert_called_once_with(channel, [{"name": "catalog1"}])
+        mock_get_api_products.assert_called_with(channel, catalog)
+        self.assertEqual(1, update_local_products_mock.call_count)
 
-        # self.assertTrue(mock_logger_error.called)
 
-        channel.refresh_from_db()"""
+class UpdateIsActiveCatalogTestCase(TembaTest):
+    @patch("temba.utils.whatsapp.tasks.requests.get")
+    def test_update_is_active_catalog(self, mock_requests_get):
+        mock_response = {
+            "data": [
+                {"id": "catalog1"},
+                {"id": "catalog2"},
+            ]
+        }
+        mock_requests_get.return_value.json.return_value = mock_response
+
+        config = {"wa_waba_id": "1111111111111", "wa_business_id": "2222222222"}
+
+        channel = self.channel
+        channel.config = config
+
+        catalogs_data = [
+            {"id": "catalog1", "is_active": True},
+            {"id": "catalog2", "is_active": False},
+            {"id": "catalog3", "is_active": False},
+        ]
+
+        result = update_is_active_catalog(channel, catalogs_data)
+
+        self.assertEqual(
+            result,
+            [
+                {"id": "catalog1", "is_active": True},
+                {"id": "catalog2", "is_active": False},
+                {"id": "catalog3", "is_active": False},
+            ],
+        )
+
+
+class SentenxTestCase(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.new_channel = self.create_channel("WAC", "Test WAC Channel", "54764868534")
+        self.catalog = Catalog.objects.create(
+            facebook_catalog_id="987654321",
+            name="Catalog1",
+            org=self.org,
+            channel=self.new_channel,
+            created_on=timezone.now(),
+            modified_on=timezone.now(),
+            is_active=True,
+        )
+        self.product1 = Product.objects.create(
+            facebook_product_id="123",
+            title="Existing Product 1",
+            product_retailer_id="product-1",
+            catalog=self.catalog,
+        )
+        self.product2 = Product.objects.create(
+            facebook_product_id="456",
+            title="Existing Product 2",
+            product_retailer_id="product-2",
+            catalog=self.catalog,
+        )
+        self.products = [self.product1, self.product2]
+
+    def test_sent_products_to_sentenx_success(self):
+        settings.SENTENX_URL = "http://example.com"
+        products = [{"product_id": 1, "name": "Product 1"}, {"product_id": 2, "name": "Product 2"}]
+
+        def mock_requests_put(*args, **kwargs):
+            class MockResponse:
+                status_code = 200
+
+            return MockResponse()
+
+        requests.put = mock_requests_put
+
+        sent_products_to_sentenx(products)
+
+    def test_sent_products_to_sentenx_failure(self):
+        settings.SENTENX_URL = "http://example.com"
+        products = [{"product_id": 1, "name": "Product 1"}, {"product_id": 2, "name": "Product 2"}]
+
+        def mock_requests_put(*args, **kwargs):
+            class MockResponse:
+                status_code = 400
+
+            return MockResponse()
+
+        requests.put = mock_requests_put
+
+        with self.assertRaises(Exception):
+            sent_products_to_sentenx(products)
+
+    def test_sent_products_to_sentenx_no_sentenx_url(self):
+        settings.SENTENX_URL = ""
+
+        with self.assertRaises(Exception) as context:
+            sent_products_to_sentenx([])
+
+        self.assertEqual(str(context.exception), "Not found SENTENX_URL")
+
+    def test_sent_trim_products_to_sentenx_success(self):
+        settings.SENTENX_URL = "http://example.com"
+
+        with patch("requests.delete") as mock_delete:
+            mock_response = mock_delete.return_value
+            mock_response.status_code = 200
+
+            sent_trim_products_to_sentenx(self.catalog, self.products)
+
+    def test_sent_trim_products_to_sentenx_no_products_to_delete(self):
+        settings.SENTENX_URL = "http://example.com"
+
+        with patch("requests.delete") as mock_delete:
+            mock_response = mock_delete.return_value
+            mock_response.status_code = 200
+
+            sent_trim_products_to_sentenx(self.catalog, [])
+
+    def test_sent_trim_products_to_sentenx_failure(self):
+        settings.SENTENX_URL = "http://example.com"
+        mock_response = Mock()
+        mock_response.status_code = 400
+
+        with patch("requests.delete", return_value=mock_response):
+            with self.assertRaises(Exception):
+                sent_trim_products_to_sentenx(self.catalog, [])
+
+    def test_sent_trim_products_to_sentenx_no_sentenx_url(self):
+        settings.SENTENX_URL = ""
+
+        with self.assertRaises(Exception) as context:
+            sent_trim_products_to_sentenx(self.catalog, self.products)
+
+        self.assertEqual(str(context.exception), "Not found SENTENX_URL")

@@ -1,3 +1,24 @@
+3.1.0
+----------
+* Fix CI
+* Update FlowEditor to version 2.6.0
+* Remove workspace edit and classifier delete
+* Redesign FlowEditor feedback
+
+3.0.1
+----------
+* Add INTENT_URL in environment and add classifier intention sync
+* Update version of weni-rp-apps to 2.7.8
+
+3.0.0
+----------
+* Add authorizations for users in project creation
+* Add get_or_create in project creation
+* Remove has issues in flows
+* Add handle consumers in event_driven handle
+* Create classifier consumer
+* Create ticketer consumer
+
 2.2.4
 ----------
 * Update FlowEditor to version 2.5.2

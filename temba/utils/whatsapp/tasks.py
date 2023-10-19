@@ -4,7 +4,9 @@ import time
 
 import requests
 from django_redis import get_redis_connection
+from rest_framework.response import Response
 
+from django.conf import settings
 from django.utils import timezone
 
 from celery import shared_task
@@ -184,12 +186,54 @@ def refresh_whatsapp_templates():
                 logger.error(f"Error refreshing whatsapp templates: {str(e)}", exc_info=True)
 
 
-def update_local_catalogs(channel, catalogs_data):
-    seen = []
+def update_is_active_catalog_from_integrations(channel_uuid, facebook_catalog_id):
+    channel = Channel.objects.get(uuid=channel_uuid)
+    channel.config["catalog_id"] = facebook_catalog_id
+    channel.save(update_fields=["config"])
+
+    catalogs = Catalog.objects.filter(channel=channel)
+
+    for catalog in catalogs:
+        if catalog.facebook_catalog_id == facebook_catalog_id:
+            catalog.is_active = True
+        else:
+            catalog.is_active = False
+
+        catalog.save()
+
+    return Response("Flows updated")
+
+
+def update_is_active_catalog(channel, catalogs_data):
+    waba_id = channel.config.get("wa_waba_id", None)
+
+    if not waba_id:
+        return catalogs_data
+
+    url = f"https://graph.facebook.com/v17.0/{waba_id}/product_catalogs"
+
+    headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
+    resp = requests.get(url, params=dict(limit=255), headers=headers)
+    actived_catalog = resp.json()["data"][0]["id"]
+
     for catalog in catalogs_data:
+        if catalog.get("id") != actived_catalog:
+            catalog["is_active"] = False
+
+        else:
+            catalog["is_active"] = True
+
+    return catalogs_data
+
+
+def update_local_catalogs(channel, catalogs_data):
+    updated_catalogs = update_is_active_catalog(channel, catalogs_data)
+    seen = []
+    for catalog in updated_catalogs:
         new_catalog = Catalog.get_or_create(
             name=catalog["name"],
             channel=channel,
+            is_active=catalog["is_active"],
             facebook_catalog_id=catalog["id"],
         )
 
@@ -200,6 +244,7 @@ def update_local_catalogs(channel, catalogs_data):
 
 def update_local_products(catalog, products_data, channel):
     seen = []
+    products_sentenx = {"catalog_id": catalog.facebook_catalog_id, "products": []}
     for product in products_data:
         new_product = Product.get_or_create(
             facebook_product_id=product["id"],
@@ -212,6 +257,21 @@ def update_local_products(catalog, products_data, channel):
         )
 
         seen.append(new_product)
+
+        sentenx_object = {
+            "facebook_id": new_product.facebook_product_id,
+            "title": new_product.title,
+            "org_id": str(catalog.org_id),
+            "catalog_id": catalog.facebook_catalog_id,
+            "product_retailer_id": new_product.product_retailer_id,
+            "channel_id": str(catalog.channel_id),
+        }
+
+        products_sentenx["products"].append(sentenx_object)
+
+    if len(products_sentenx["products"]) > 0:
+        sent_products_to_sentenx(products_sentenx)
+        sent_trim_products_to_sentenx(catalog, seen)
 
     Product.trim(catalog, seen)
 
@@ -245,3 +305,53 @@ def refresh_whatsapp_catalog_and_products():
 
         except Exception as e:
             logger.error(f"Error refreshing WhatsApp catalog and products: {str(e)}", exc_info=True)
+
+
+def sent_products_to_sentenx(products):
+    sentenx_url = settings.SENTENX_URL
+
+    if sentenx_url:
+        url = sentenx_url + "/products/batch"
+
+        resp = requests.put(
+            url,
+            json=products,
+        )
+
+        if resp.status_code == 200:
+            return Response("Products updated")
+        else:
+            raise Exception("Received non-200 response: %d", resp.status_code)
+
+    else:
+        raise Exception("Not found SENTENX_URL")
+
+
+def sent_trim_products_to_sentenx(catalog, products):
+    sentenx_url = settings.SENTENX_URL
+
+    if sentenx_url:
+        url = sentenx_url + "/products/batch"
+        ids = [tc.id for tc in products]
+        products_to_delete_list = list(
+            Product.objects.filter(catalog=catalog).exclude(id__in=ids).values_list("product_retailer_id")
+        )
+
+        if products_to_delete_list:
+            payload = {
+                "catalog_id": catalog.facebook_catalog_id,
+                "product_retailer_ids": products_to_delete_list,
+            }
+
+            resp = requests.delete(
+                url,
+                data=payload,
+            )
+
+            if resp.status_code == 200:
+                return Response("Products updated")
+            else:
+                raise Exception("Received non-200 response: %d", resp.status_code)
+
+    else:
+        raise Exception("Not found SENTENX_URL")

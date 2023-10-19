@@ -29,7 +29,7 @@ class Catalog(models.Model):
         existing = Catalog.objects.filter(facebook_catalog_id=facebook_catalog_id).first()
 
         if existing:
-            if existing.name != name:
+            if existing.name != name or existing.is_active != is_active:
                 existing.name = name
                 existing.is_active = is_active
                 existing.modified_on = timezone.now()
@@ -41,6 +41,7 @@ class Catalog(models.Model):
                 name=name,
                 channel=channel,
                 org=channel.org,
+                is_active=is_active,
             )
 
         return existing
