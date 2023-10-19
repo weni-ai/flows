@@ -3339,7 +3339,8 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
 
     Each template has the following attributes:
 
-     * **name** - the name of the template
+     * **uuid** - filterable as `uuid`.
+     * **name** - the name of the template, filterable as `name`
      * **translations** - a dictionary of the translations of the template with the key being an ISO639-3 code
 
      Each translation contains the following attributes:
@@ -3389,10 +3390,20 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
     pagination_class = ModifiedOnCursorPagination
 
     def filter_queryset(self, queryset):
+        params = self.request.query_params
         org = self.request.user.get_org()
         queryset = org.templates.exclude(translations=None).prefetch_related(
             Prefetch("translations", TemplateTranslation.objects.filter(is_active=True))
         )
+
+        uuid = params.get("uuid")
+        if uuid:
+            queryset = queryset.filter(uuid=uuid)
+
+        name = params.get("name")
+        if name:
+            queryset = queryset.filter(name=name)
+
         return self.filter_before_after(queryset, "modified_on")
 
     @classmethod

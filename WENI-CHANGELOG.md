@@ -1,3 +1,15 @@
+3.1.3
+----------
+* Update FlowEditor to version 2.6.3
+
+3.1.2
+----------
+* Update FlowEditor to version 2.6.2
+
+3.1.1
+----------
+* Update FlowEditor to version 2.6.1
+
 3.1.0
 ----------
 * Fix CI
