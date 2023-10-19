@@ -1,3 +1,8 @@
+3.1.4
+----------
+* Update FlowEditor to version 2.6.4
+* Re-add feedback delayed toggle
+
 3.1.3
 ----------
 * Update FlowEditor to version 2.6.3
