@@ -22,7 +22,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from temba.api.models import APIToken, Resthook, WebHookEvent
-from temba.api.v2.views import ExternalServicesEndpoint
+from temba.api.v2.views import ExternalServicesEndpoint, TemplatesEndpoint
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
@@ -4964,3 +4964,51 @@ class TestSearchIntegrations(TembaTest):
         self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["name"], "Ticketer1")
         self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["queues"][0]["uuid"], "topic123")
         self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["queues"][0]["name"], "Queue1")
+
+
+class TestTemplateFilterQuerySetTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+
+        self.template1 = Template.objects.create(
+            name="Template1", uuid="ccb4ed42-0646-45b6-bd0f-78fc2e8bb083", org=self.org
+        )
+        self.template2 = Template.objects.create(
+            name="Template2", uuid="9f28abed-c2bd-41d7-9db4-cc2aaee79a74", org=self.org
+        )
+        self.url = reverse("api.v2.templates") + ".json"
+        self.client = APIClient()
+        self.view = TemplatesEndpoint
+        self.view.permission_classes = []
+        self.client.force_login(user=self.user)
+
+    @patch("temba.api.v2.views.TemplatesEndpoint.filter_before_after")
+    def test_filter_queryset_by_uuid(self, mock_filter_before_after):
+        uuid = self.template1.uuid
+        queryset = Template.objects.filter(org=self.org, uuid=uuid)
+        mock_filter_before_after.return_value = queryset
+
+        response = self.client.get(self.url, data={"uuid": uuid})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.template1.uuid)
+
+    @patch("temba.api.v2.views.TemplatesEndpoint.filter_before_after")
+    def test_filter_queryset_by_name(self, mock_filter_before_after):
+        name = self.template2.name
+        queryset = Template.objects.filter(org=self.org, name=name)
+        mock_filter_before_after.return_value = queryset
+
+        response = self.client.get(self.url, data={"name": name})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.template2.name)
+
+    @patch("temba.api.v2.views.TemplatesEndpoint.filter_before_after")
+    def test_filter_queryset_no_parameters(self, mock_filter_before_after):
+        queryset = Template.objects.filter(org=self.org)
+        mock_filter_before_after.return_value = queryset
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
