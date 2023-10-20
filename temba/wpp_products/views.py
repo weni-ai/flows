@@ -1,20 +1,21 @@
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
-
-from django.shortcuts import get_object_or_404
+from weni.internal.views import InternalGenericViewSet
 
 from temba.channels.models import Channel
-from temba.utils.whatsapp.tasks import (
-    update_is_active_catalog_from_integrations,
-    update_local_catalogs,
-    update_local_products,
-)
+from temba.utils.whatsapp.tasks import update_channel_catalogs_status, update_local_catalogs, update_local_products
 from temba.wpp_products.models import Catalog
+from temba.wpp_products.serializers import UpdateCatalogSerializer
 
 
-class CatalogViewSet(viewsets.ViewSet):
+class CatalogViewSet(viewsets.ViewSet, InternalGenericViewSet):
+    def get_object(self) -> Channel:
+        channel_uuid = self.request.data.get("channel")
+        return get_object_or_404(Channel, uuid=channel_uuid)
+
     def create(self, request, channel_uuid, feed_id, catalog_id, *args, **kwargs):
         channel = get_object_or_404(Channel, uuid=channel_uuid)
 
@@ -46,17 +47,11 @@ class CatalogViewSet(viewsets.ViewSet):
 
         return Response("The flows is updated", status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["POST"])
+    @action(detail=False, methods=["POST"], url_path="update-catalog")
     def update_catalog(self, request, *args, **kwargs):
-        channel = request.data.get("channel")
+        serializer = UpdateCatalogSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
 
-        if not channel:
-            return Response("Channel not provided", status=status.HTTP_400_BAD_REQUEST)
-
-        facebook_catalog_id = request.data.get("facebook_catalog_id")
-        if not facebook_catalog_id:
-            raise ValidationError("Facebook catalog id not provided")
-
-        if channel and facebook_catalog_id:
-            response = update_is_active_catalog_from_integrations(channel, facebook_catalog_id)
-            return Response(status=status.HTTP_200_OK, data=str(response))
+        update_channel_catalogs_status(self.get_object(), validated_data.get("facebook_catalog_id"))
+        return Response(status=status.HTTP_200_OK)
