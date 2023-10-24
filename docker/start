@@ -1,19 +1,25 @@
 #!/bin/bash
 
+export GUNICORN_APP=${GUNICORN_APP:-"temba.wsgi:application"}
+export GUNICORN_LOG_CONF=${GUNICORN_LOG_CONF:-"${PROJECT_PATH}/docker/gunicorn/gunicorn-logging.conf"}
+export GUNICORN_CONF=${GUNICORN_CONF:-"${PROJECT_PATH}/docker/gunicorn/gunicorn.conf.py"}
+export LOG_LEVEL=${LOG_LEVEL:-"INFO"}
+#export GUNICORN_CONF=${GUNICORN_CONF:-"python:flows.gunicorn"}
+
 #set -o errexit
 #set -o pipefail
 #set -o nounset
 
-do_gosu() {
+do_gosu(){
     user="$1"
     shift 1
-    
+
     is_exec="false"
     if [ "$1" = "exec" ]; then
         is_exec="true"
         shift 1
     fi
-    
+
     if [ "$(id -u)" = "0" ]; then
         if [ "${is_exec}" = "true" ]; then
             exec gosu "${user}" "$@"
@@ -31,22 +37,36 @@ do_gosu() {
     fi
 }
 
-if [ -n "${BRANDING_FILES}" ]; then
-    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" git clone -b "${BRANDING_BRANCH}" "${BRANDING_FILES}" "${PROJECT_PATH}/${BRANDING_SLUG}/"
-    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" mv "${PROJECT_PATH}/${BRANDING_SLUG}/${BRANDING_SLUG}/" "${PROJECT_PATH}/static/brands/"
+
+if [[ "start" == "$1" ]]; then
+    if [ -n "${BRANDING_FILES}" ]; then
+        do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" git clone -b "${BRANDING_BRANCH}" "${BRANDING_FILES}" "${PROJECT_PATH}/${BRANDING_SLUG}/"
+        do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" mv "${PROJECT_PATH}/${BRANDING_SLUG}/${BRANDING_SLUG}/" "${PROJECT_PATH}/static/brands/"
+    fi
+
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" python manage.py collectstatic --noinput
+    if [ "${COMPRESS_ENABLED}" = true ]; then
+        do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" python manage.py compress --extension=.haml,.html --force
+    fi
+    echo "Starting server..."
+    #gunicorn --access-logfile - --workers 3 --bind unix:/run/gunicorn.sock temba.wsgi:application
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec gunicorn "${GUNICORN_APP}" \
+      --name="${PROJECT}" \
+      --chdir="${PROJECT_PATH}" \
+      --bind=0.0.0.0:8001 \
+      --log-config="${GUNICORN_LOG_CONF}" \
+      -c "${PROJECT_PATH}/docker/gunicorn/gunicorn.conf.py"
+elif [[ "celery-worker" == "$1" ]]; then
+    celery_queue="celery"
+    if [ "${2}" ] ; then
+        celery_queue="${2}"
+    fi
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec celery \
+        -A temba --workdir="${PROJECT_PATH}" worker \
+        -Q "${celery_queue}" \
+        -O fair \
+        -l "${LOG_LEVEL}" \
+        --autoscale=4,1
 fi
 
-do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" python manage.py collectstatic --noinput
-if [ "${COMPRESS_ENABLED}" = true ]; then
-	do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" python manage.py compress --extension=.haml,.html --force
-fi
-
-echo "Starting server..."
-#gunicorn --access-logfile - --workers 3 --bind unix:/run/gunicorn.sock temba.wsgi:application
-do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec gunicorn temba.wsgi:application \
-  --name="${PROJECT}" \
-  --chdir="${PROJECT_PATH}" \
-  --bind=0.0.0.0:8001 \
-  --timeout=120 \
-  --log-config="${PROJECT_PATH}/docker/gunicorn/gunicorn-logging.conf" \
-  -c "${PROJECT_PATH}/docker/gunicorn/gunicorn.conf.py"
+exec "$@"
