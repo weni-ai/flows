@@ -3,8 +3,12 @@
 -for event in events
   %tr(class="{{event|history_class}}")
     %td.icon
-      %span.det(title='{% if event.obj.channel %}{{event.obj.channel.get_channel_type_name}} {{event.obj.channel.get_name}}{% endif %}')
-        {{ event|history_icon }}
+      -if event.type == 'product_sent'
+        %span.material-symbols-outlined.fill
+          storefront
+      -else
+        %span.det(title='{% if event.obj.channel %}{{event.obj.channel.get_channel_type_name}} {{event.obj.channel.get_name}}{% endif %}')
+          {{ event|history_icon }}
 
     %td.details.wrapped.w-full
       -if event.type == 'airtime_transferred'
@@ -141,7 +145,7 @@
             -for attachment in event.msg.attachments
               {% attachment_button attachment %}
 
-      -elif event.type == 'msg_created' or event.type == 'msg_received' or event.type == "ivr_created"
+      -elif event.type == 'msg_created' or event.type == 'msg_received' or event.type == "ivr_created" or event.type == "product_sent"
         .activity-message
           .activity-body
             -if event.msg.text
