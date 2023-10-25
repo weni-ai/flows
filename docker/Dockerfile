@@ -21,6 +21,7 @@ ARG RUNTIME_DEPS="\
   netcat-traditional \
   curl \
   gosu \
+  gdal-bin \
   npm"
 #libmariadb3 \
 
@@ -39,7 +40,7 @@ ENV PYTHONUNBUFFERED=1 \
   PROJECT_GROUP=rapidpro \
   NPM_CONFIG_PREFIX=/opt/npm-globals \
   PIP_DISABLE_PIP_VERSION_CHECK=1 \
-  PATH="${NPM_CONFIG_PREFIX}/bin:${PATH}:/install/bin"
+  PATH="/opt/npm-globals/bin:/app/node_modules/.bin/:${PATH}:/install/bin"
 
 ARG COMPRESS_ENABLED
 ARG BRANDING_ENABLED
