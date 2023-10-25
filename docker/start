@@ -40,7 +40,9 @@ do_gosu(){
 
 if [[ "start" == "$1" ]]; then
     if [ -n "${BRANDING_FILES}" ]; then
-        do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" git clone -b "${BRANDING_BRANCH}" "${BRANDING_FILES}" "${PROJECT_PATH}/${BRANDING_SLUG}/"
+        do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" git clone \
+            -b "${BRANDING_BRANCH}" "${BRANDING_FILES}" "${PROJECT_PATH}/${BRANDING_SLUG}/" \
+            --single-branch --depth=1
         do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" mv "${PROJECT_PATH}/${BRANDING_SLUG}/${BRANDING_SLUG}/" "${PROJECT_PATH}/static/brands/"
     fi
 
@@ -55,7 +57,7 @@ if [[ "start" == "$1" ]]; then
       --chdir="${PROJECT_PATH}" \
       --bind=0.0.0.0:8001 \
       --log-config="${GUNICORN_LOG_CONF}" \
-      -c "${PROJECT_PATH}/docker/gunicorn/gunicorn.conf.py"
+      -c "${GUNICORN_CONF}"
 elif [[ "celery-worker" == "$1" ]]; then
     celery_queue="celery"
     if [ "${2}" ] ; then

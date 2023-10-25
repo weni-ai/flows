@@ -64,12 +64,36 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: ${{ secrets.ECR }}
-          username: ${{ secrets.AWS_ACCESS_KEY_ID_SHARED }}      
+          username: ${{ secrets.AWS_ACCESS_KEY_ID_SHARED }}
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY_SHARED }}
+
+      # Cache
+      - name: Cache var-cache-apt
+        uses: actions/cache@v3
+        with:
+          path: var-cache-apt
+          key: var-cache-apt-${{ hashFiles('docker/Dockerfile') }}
+      - name: Cache var-lib-apt
+        uses: actions/cache@v3
+        with:
+          path: var-lib-apt
+          key: var-lib-apt-${{ hashFiles('docker/Dockerfile') }}
+      - name: inject var-cache-apt into docker
+        uses: reproducible-containers/buildkit-cache-dance@v2.1.3
+        with:
+          cache-source: var-cache-apt
+          cache-target: /var/cache/apt
+      - name: inject var-lib-apt into docker
+        uses: reproducible-containers/buildkit-cache-dance@v2.1.3
+        with:
+          cache-source: var-lib-apt
+          cache-target: /var/lib/apt
 
       - name: Build and push - Flows Image
         uses: docker/build-push-action@v3
         with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           context: .
           labels: |
             tag=${{env.TAG}}
@@ -78,26 +102,11 @@ jobs:
           file: docker/Dockerfile
           push: true
           tags: "${{env.IMAGE_TAG}}"
-          no-cache: true
+          #no-cache: true
           build-args: |
             FLOWEDITOR_VERSION=${{ env.FLOWEDITOR_VERSION }}
             FLOWEDITOR_REPO=${{ env.FLOWEDITOR_REPO }}
             FLOWEDITOR_BRANCH=${{ env.FLOWEDITOR_BRANCH }}
-          
-      - name: Build and push - Flows Varnish Image
-        uses: docker/build-push-action@v3
-        with:
-          context: ./docker
-          labels: |
-            tag=${{env.TAG}}
-            commit=${{env.COMMIT_SHA}}
-            repository=${{env.IMAGE_SOURCE_URL}}
-          file: docker/Dockerfile.varnish
-          push: true
-          tags: "${{env.IMAGE_TAG}}-varnish"
-          no-cache: true
-          build-args: |
-            BACKEND_ADDRESS=flows:8000
 
       - name: Check out Kubernetes Manifests
         uses: actions/checkout@master
@@ -140,13 +149,6 @@ jobs:
                 )
                 echo "Old image version to compare: ${OLD_VERSION}<=${{env.VERSION}}"
                 if verlte "${OLD_VERSION}" "${VERSION}" || [[ ! "${OLD_VERSION}" =~ [0-9]+\.[0-9]+\.[0-9]+ ]] ; then
-                  echo 'New configurations for varnish:'
-                  new_configuration=$(
-                    cat "${e}/${{ env.MANIFESTS_PATCH_TARGET }}" \
-                      | jq '(..|select(.path == "/spec/template/spec/containers/1/image")?) += {value: "'"${{env.IMAGE_TAG}}"'-varnish"}'
-                  )
-                  echo "${new_configuration}"
-                  echo "${new_configuration}" > "${e}/${{ env.MANIFESTS_PATCH_TARGET }}"
                   echo 'New configurations for image flows:'
                   new_configuration=$(
                     cat "${e}/${{ env.MANIFESTS_PATCH_TARGET1 }}" \
