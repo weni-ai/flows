@@ -198,6 +198,9 @@ def update_is_active_catalog(channel, catalogs_data):
     resp = requests.get(url, params=dict(limit=255), headers=headers)
     actived_catalog = resp.json()["data"][0]["id"]
 
+    channel.config["catalog_id"] = actived_catalog
+    channel.save(update_fields=["config"])
+
     for catalog in catalogs_data:
         if catalog.get("id") != actived_catalog:
             catalog["is_active"] = False

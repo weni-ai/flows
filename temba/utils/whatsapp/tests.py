@@ -1,6 +1,9 @@
 from unittest.mock import Mock, patch
 
 import requests
+from django_redis import get_redis_connection
+
+from django.utils import timezone
 
 from temba.channels.models import Channel
 from temba.channels.types.whatsapp.type import (
@@ -391,56 +394,87 @@ class UpdateLocalProductsTest(TembaTest):
         self.assertEqual(Product.objects.filter(catalog=catalog).count(), 2)
 
 
-class RefreshCatalogAndProductsTest(TembaTest):
-    @patch("temba.channels.models.Channel")
-    @patch("temba.utils.whatsapp.tasks.get_redis_connection")
-    @patch("temba.utils.whatsapp.tasks.logger")
-    @patch("requests.get")
-    def test_refresh_whatsapp_catalog_and_products(
-        self, mock_requests_get, mock_logger, mock_get_redis_connection, mock_Channel
+class RefreshWhatsappCatalogAndProductsTestCase(TembaTest):
+    @patch("temba.utils.whatsapp.tasks.update_local_products")
+    @patch("temba.utils.whatsapp.tasks.update_local_catalogs")
+    @patch("temba.channels.types.whatsapp_cloud.type.WhatsAppCloudType.get_api_products")
+    @patch("temba.channels.types.whatsapp_cloud.type.WhatsAppCloudType.get_api_catalogs")
+    def test_refresh_catalogs_and_products_task(
+        self, mock_get_api_catalogs, mock_get_api_products, update_local_catalogs_mock, update_local_products_mock
     ):
-        # Limpe os modelos relevantes
         Catalog.objects.all().delete()
+        Product.objects.all().delete()
         Channel.objects.all().delete()
 
-        channel = self.channel
-        channel.config = {
-            "wa_waba_id": "1111111111",  # Certifique-se de ter um WABA ID válido
-        }
+        channel = self.create_channel("WAC", "Test WAC Channel", "54764868534")
 
-        # Crie um objeto de mock separado para channel.get_type
-        channel_mock = Mock()
+        catalog = Catalog.objects.create(
+            facebook_catalog_id="123456789",
+            name="Catalog1",
+            org=self.org,
+            channel=channel,
+            created_on=timezone.now(),
+            modified_on=timezone.now(),
+            is_active=True,
+        )
 
-        # Crie um objeto de mock para channel.get_type.return_value
-        channel_get_type_mock = Mock()
+        self.login(self.admin)
+        mock_get_api_catalogs.side_effect = [
+            ([], False),
+            Exception("foo"),
+            ([{"name": "hello"}], True),
+            ([{"name": "hello"}], True),
+            ([{"name": "hello"}], True),
+        ]
 
-        # Atribuir os mocks aos métodos apropriados
-        channel_get_type_mock.get_api_catalogs = Mock(return_value=([], False))
-        channel_get_type_mock.get_api_products = Mock(return_value=([], False))
+        mock_get_api_products.side_effect = [
+            ([], False),
+            ([], True),
+        ]
 
-        # Atribuir o objeto de mock channel_get_type_mock ao objeto de mock channel_mock
-        channel_mock.get_type.return_value = channel_get_type_mock
+        update_local_catalogs_mock.return_value = None
+        update_local_products_mock.return_value = None
 
-        # Substituir a função original get_api_catalogs e get_api_products com o objeto de mock
-        mock_Channel.objects.filter.return_value = [channel]
-        # mock_Channel.objects.filter.return_value.first.return_value = channel
-
-        # Simule o contexto do r.lock
-        with patch("temba.utils.whatsapp.tasks.get_redis_connection") as mock_get_redis_connection:
-            mock_lock = mock_get_redis_connection.return_value.lock.return_value
-            mock_lock.acquire.return_value = True
-
-            # Simule a resposta da API
-            mock_requests_get.return_value.json.return_value = {"data": [{"id": "123456789"}]}
-
-            # Chame a função
+        r = get_redis_connection()
+        with r.lock("refresh_whatsapp_catalog_and_products", timeout=1800):
             refresh_whatsapp_catalog_and_products()
+            self.assertEqual(0, mock_get_api_catalogs.call_count)
+            self.assertEqual(0, mock_get_api_products.call_count)
+            self.assertEqual(0, update_local_catalogs_mock.call_count)
+            self.assertEqual(0, update_local_products_mock.call_count)
 
-        # Verifique se as funções de atualização foram chamadas
-        # channel_get_type_mock.get_api_catalogs.assert_called_once_with(channel)
-        # channel_get_type_mock.get_api_products.assert_called_once_with(channel, channel)
+        refresh_whatsapp_catalog_and_products()
 
-        mock_logger.error.assert_not_called()
+        mock_get_api_catalogs.assert_called_with(channel)
+
+        self.assertEqual(1, mock_get_api_catalogs.call_count)
+        self.assertEqual(0, mock_get_api_products.call_count)
+        self.assertEqual(0, update_local_catalogs_mock.call_count)
+        self.assertEqual(0, update_local_products_mock.call_count)
+
+        # any exception
+        refresh_whatsapp_catalog_and_products()
+
+        mock_get_api_catalogs.assert_called_with(channel)
+        self.assertEqual(2, mock_get_api_catalogs.call_count)
+        self.assertEqual(0, mock_get_api_products.call_count)
+        self.assertEqual(0, update_local_catalogs_mock.call_count)
+        self.assertEqual(0, update_local_products_mock.call_count)
+
+        refresh_whatsapp_catalog_and_products()
+
+        mock_get_api_catalogs.assert_called_with(channel)
+        self.assertEqual(3, mock_get_api_catalogs.call_count)
+        update_local_catalogs_mock.assert_called_once_with(channel, [{"name": "hello"}])
+        mock_get_api_products.assert_called_with(channel, catalog)
+        self.assertEqual(0, update_local_products_mock.call_count)
+
+        refresh_whatsapp_catalog_and_products()
+
+        mock_get_api_catalogs.assert_called_with(channel)
+        self.assertEqual(4, mock_get_api_catalogs.call_count)
+        mock_get_api_products.assert_called_with(channel, catalog)
+        self.assertEqual(1, update_local_products_mock.call_count)
 
 
 class UpdateIsActiveCatalogTestCase(TembaTest):
