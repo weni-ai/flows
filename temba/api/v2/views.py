@@ -3350,6 +3350,12 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
      * **variable_count** - the count of variables in this template
      * **status** - the status of this translation, either `approved`, `pending`, `rejected` or `unsupported_language`
 
+     For filter translations by status, you can use **status** attribute as folow:
+     * By default, the endpoint bring status `approved`
+     * `pending` - Use **P** , like status=P.
+     * `rejected` - Use **R**, like status=R.
+     * `unsupported_language` - Use **U**, like status=U.
+
     Example:
 
         GET /api/v2/templates.json
@@ -3393,8 +3399,14 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
         params = self.request.query_params
         org = self.request.user.get_org()
         queryset = org.templates.exclude(translations=None).prefetch_related(
-            Prefetch("translations", TemplateTranslation.objects.filter(is_active=True))
+            Prefetch(
+                "translations",
+                TemplateTranslation.objects.filter(is_active=True),
+            )
         )
+
+        status = params.get("status", "A")
+        queryset = queryset.filter(translations__status=status)
 
         uuid = params.get("uuid")
         if uuid:
