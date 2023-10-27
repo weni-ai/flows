@@ -42,7 +42,7 @@ def nonoverlapping_task(*task_args, **task_kwargs):
             task_name = task_kwargs.get("name", task_func.__name__)
 
             # lock key can be provided or defaults to celery-task-lock:<task_name>
-            lock_key = task_kwargs.pop("lock_key", "celery-task-lock:" + task_name)
+            lock_key = "celery-task-lock:" + task_name
 
             # lock timeout can be provided or defaults to task hard time limit
             lock_timeout = task_kwargs.pop("lock_timeout", None)
