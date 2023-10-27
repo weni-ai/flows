@@ -63,7 +63,13 @@ ACTIVITY_ICONS = {
     Event.TYPE_WEBHOOK_CALLED: "icon-cloud-upload",
 }
 
-MSG_EVENTS = {Event.TYPE_MSG_CREATED, Event.TYPE_MSG_RECEIVED, Event.TYPE_IVR_CREATED, Event.TYPE_BROADCAST_CREATED, Event.TYPE_PRODUCT_SENT}
+MSG_EVENTS = {
+    Event.TYPE_MSG_CREATED,
+    Event.TYPE_MSG_RECEIVED,
+    Event.TYPE_IVR_CREATED,
+    Event.TYPE_BROADCAST_CREATED,
+    Event.TYPE_PRODUCT_SENT,
+}
 
 # events that are included in the summary view
 SUMMARY_EVENTS = {
