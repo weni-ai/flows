@@ -40,6 +40,17 @@
       font-size: 20px;
     }
 
+    #floweditor-feedback .launcher.alert-badge::before {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: #E53E3E;
+      border-radius: 600px;
+      right: -2px;
+      top: -3px;
+    }
+
     #floweditor-feedback .content {
       width: 326px;
       position: fixed;
@@ -558,19 +569,19 @@
 
       const userData = await getUserData();
       if (!userData) {
-        showAlertBadge();
+        showAlertAndDelay();
       } else {
         const { lastFeedbackTime, lastFeedbackId } = userData;
         if (lastFeedbackTime) {
           lastRatingRef = lastFeedbackId;
           const diff = getLastFeedbackDiff(lastFeedbackTime);
           if (diff > 0) {
-            showAlertBadge();
+            showAlertAndDelay();
           } else {
             changeToRateAgain();
           }
         } else {
-          showAlertBadge();
+          showAlertAndDelay();
         }
       }
 
@@ -707,11 +718,12 @@
     }
 
     function delayedToggle() {
+      const timeout = 10 * 60 * 1000;
       toggleTimeoutId = setTimeout(() => {
         if ($('.content').hasClass('hidden')) {
           toggleFeedback();
         }
-      }, 120000)
+      }, timeout)
     }
 
     function clearDelayTimeout() {

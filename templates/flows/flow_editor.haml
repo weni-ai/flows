@@ -125,6 +125,7 @@
     #rp-flow-editor {
       visibility: visible;
       width: 100%;
+      height: 100%;
     }
 
     #rp-flow-editor h1 {
@@ -180,6 +181,7 @@
 
   :javascript
     let showUpdates = false;
+    let initialGuide = null;
     const base = '/flow/assets/{{object.org.id}}/' + new Date().getTime() + '/';
     const api = '/api/v2/';
     const flowType = '{{ object.engine_type }}';
@@ -279,7 +281,8 @@
           {% endif %}
         },
 
-        showNewUpdates: showUpdates
+        showNewUpdates: showUpdates,
+        initialGuide: initialGuide
       };
 
       showFlowEditor(document.getElementById('rp-flow-editor'), config);
@@ -310,12 +313,18 @@
       signInAnonymously(auth).then(() => {
         getUserData().then((userData) => {
           if (userData) {
-            const { seenV3Updates } = userData;
-            if (!seenV3Updates) {
+            const { seenV2Updates, seenV3Updates, seenControlToolsUpdates } = userData;
+            if (!seenControlToolsUpdates) {
               showUpdates = true;
-              updateDoc(doc(db, usersCollection, '{{ user.email|escapejs }}'), {
-                seenV3Updates: true
-              });
+              markAllUpdatesAsSeen();
+            }
+
+            if (!seenV2Updates) {
+              initialGuide = 'v2';
+              markAllUpdatesAsSeen();
+            } else if (!seenControlToolsUpdates) {
+              initialGuide = 'control_tools';
+              markAllUpdatesAsSeen();
             }
           }
           startFlowEditor();
@@ -327,6 +336,15 @@
         console.log('Error signing in anonymously', err);
         startFlowEditor();
       });
+      
+
+      async function markAllUpdatesAsSeen() {
+        updateDoc(doc(db, usersCollection, '{{ user.email|escapejs }}'), {
+          seenV2Updates: true,
+          seenV3Updates: true,
+          seenControlToolsUpdates: true
+        });
+      }
     
 
       async function getUserData() {
