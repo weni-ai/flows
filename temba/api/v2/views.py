@@ -3351,7 +3351,8 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
      * **status** - the status of this translation, either `approved`, `pending`, `rejected` or `unsupported_language`
 
      For filter translations by status, you can use **status** attribute as folow:
-     * By default, the endpoint bring status `approved`
+
+     * **By default**, the endpoint bring status `approved`
      * `pending` - Use **P** , like status=P.
      * `rejected` - Use **R**, like status=R.
      * `unsupported_language` - Use **U**, like status=U.
@@ -3425,7 +3426,19 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
             "title": "List Templates",
             "url": reverse("api.v2.templates"),
             "slug": "templates-list",
-            "params": [],
+            "params": [
+                {"name": "name", "required": False, "help": "A template name to filter by, ex: MyTemplate"},
+                {
+                    "name": "uuid",
+                    "required": False,
+                    "help": "Only return template with this UUID",
+                },
+                {
+                    "name": "status",
+                    "required": False,
+                    "help": "Only return templates with this status, ex: R",
+                },
+            ],
             "example": {},
         }
 

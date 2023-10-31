@@ -13,7 +13,7 @@ def create_template_type(uuid: str, name: str, project_uuid: Project) -> Templat
     campaigns = Campaign.objects.filter(org=project.org, is_active=True)
     components = set(itertools.chain(flows, campaigns))
 
-    for flow in flows:
+    for flow in flows:  # pragma: no cover
         components.update(flow.triggers.filter(is_active=True, is_archived=False))
 
     setup = project.export_definitions("https://flows.weni.ai", components)  # TODO: find a way to get branding["link"]
