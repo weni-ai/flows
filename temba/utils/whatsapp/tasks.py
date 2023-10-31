@@ -200,7 +200,7 @@ def update_is_active_catalog(channel, catalogs_data):
     waba_id = channel.config.get("wa_waba_id", None)
 
     if not waba_id:
-        return catalogs_data
+        raise ValueError("Channel wa_waba_id not found")
 
     url = f"https://graph.facebook.com/v17.0/{waba_id}/product_catalogs"
 
@@ -291,7 +291,8 @@ def refresh_whatsapp_catalog_and_products():
                 if not valid:
                     continue
 
-                update_local_catalogs(channel, catalog_data)
+                if len(catalog_data) > 0:
+                    update_local_catalogs(channel, catalog_data)
 
                 for catalog in Catalog.objects.filter(channel=channel):
                     # Fetch products for each catalog

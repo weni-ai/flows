@@ -26,7 +26,7 @@ class Catalog(models.Model):
 
     @classmethod
     def get_or_create(cls, name, channel, is_active, facebook_catalog_id):
-        existing = Catalog.objects.filter(facebook_catalog_id=facebook_catalog_id).first()
+        existing = Catalog.objects.filter(channel=channel, facebook_catalog_id=facebook_catalog_id).first()
 
         if existing:
             if existing.name != name or existing.is_active != is_active:
