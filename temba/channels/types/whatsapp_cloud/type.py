@@ -126,6 +126,7 @@ class WhatsAppCloudType(ChannelType):
             return [], False
 
         waba_id = channel.config.get("wa_business_id", None)
+        print('wa_business_id', waba_id)
         if not waba_id:  # pragma: no cover
             return [], False
 
@@ -158,6 +159,7 @@ class WhatsAppCloudType(ChannelType):
             return [], False
 
         catalog_id = catalog.facebook_catalog_id
+        print('catalog_id', catalog_id)
         if not catalog_id:  # pragma: no cover
             return [], False
 
