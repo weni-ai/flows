@@ -3978,7 +3978,9 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
     def get_queryset(self):
         org = self.request.user.get_org()
         catalog = org.catalogs.exclude(is_active=False).first()
-        return catalog.products.all()
+        if catalog:
+            return catalog.products.all()
+        return []
 
     @classmethod
     def get_read_explorer(cls):

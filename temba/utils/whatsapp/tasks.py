@@ -186,6 +186,16 @@ def refresh_whatsapp_templates():
                 logger.error(f"Error refreshing whatsapp templates: {str(e)}", exc_info=True)
 
 
+def update_channel_catalogs_status(channel, facebook_catalog_id):
+    channel.config["catalog_id"] = facebook_catalog_id
+    channel.save(update_fields=["config"])
+
+    Catalog.objects.filter(channel=channel).update(is_active=False)
+    Catalog.objects.filter(channel=channel, facebook_catalog_id=facebook_catalog_id).update(is_active=True)
+
+    return True
+
+
 def update_is_active_catalog(channel, catalogs_data):
     waba_id = channel.config.get("wa_waba_id", None)
 
@@ -212,22 +222,25 @@ def update_is_active_catalog(channel, catalogs_data):
 
 
 def update_local_catalogs(channel, catalogs_data):
-    updated_catalogs = update_is_active_catalog(channel, catalogs_data)
-    seen = []
-    for catalog in updated_catalogs:
-        new_catalog = Catalog.get_or_create(
-            name=catalog["name"],
-            channel=channel,
-            is_active=catalog["is_active"],
-            facebook_catalog_id=catalog["id"],
-        )
+    print('entrou em update_local_catalogs')
+    if len(catalogs_data)>0:
+        updated_catalogs = update_is_active_catalog(channel, catalogs_data)
+        seen = []
+        for catalog in updated_catalogs:
+            new_catalog = Catalog.get_or_create(
+                name=catalog["name"],
+                channel=channel,
+                is_active=catalog["is_active"],
+                facebook_catalog_id=catalog["id"],
+            )
 
-        seen.append(new_catalog)
+            seen.append(new_catalog)
 
-    Catalog.trim(channel, seen)
+        Catalog.trim(channel, seen)
 
 
 def update_local_products(catalog, products_data, channel):
+    print('entrou em update_local_products')
     seen = []
     products_sentenx = {"catalog_id": catalog.facebook_catalog_id, "products": []}
     for product in products_data:
@@ -294,6 +307,7 @@ def refresh_whatsapp_catalog_and_products():
 
 def sent_products_to_sentenx(products):
     sentenx_url = settings.SENTENX_URL
+    print(sentenx_url)
 
     if sentenx_url:
         url = sentenx_url + "/products/batch"
