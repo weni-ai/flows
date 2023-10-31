@@ -1,3 +1,121 @@
+3.2.0
+----------
+* Add filters in template.json endpoint
+* Fix error in import trigger
+* Chore: Update Floweditor to 2.7.0
+* Feat: Remove Helphero
+* Feat: Control tools guide and modal
+
+3.1.5
+----------
+* Update FlowEditor to version 2.6.5
+
+3.1.4
+----------
+* Update FlowEditor to version 2.6.4
+* Re-add feedback delayed toggle
+
+3.1.3
+----------
+* Update FlowEditor to version 2.6.3
+
+3.1.2
+----------
+* Update FlowEditor to version 2.6.2
+
+3.1.1
+----------
+* Update FlowEditor to version 2.6.1
+
+3.1.0
+----------
+* Fix CI
+* Update FlowEditor to version 2.6.0
+* Remove workspace edit and classifier delete
+* Redesign FlowEditor feedback
+
+3.0.1
+----------
+* Add INTENT_URL in environment and add classifier intention sync
+* Update version of weni-rp-apps to 2.7.8
+
+3.0.0
+----------
+* Add authorizations for users in project creation
+* Add get_or_create in project creation
+* Remove has issues in flows
+* Add handle consumers in event_driven handle
+* Create classifier consumer
+* Create ticketer consumer
+
+2.2.4
+----------
+* Update FlowEditor to version 2.5.2
+
+2.2.3
+----------
+* Update FlowEditor to version 2.5.1
+
+2.2.2
+----------
+* Update FlowEditor to version 2.5.0
+
+2.2.1
+----------
+* Update FlowEditor to version 2.4.1
+
+2.2.0
+----------
+* Update FlowEditor to version 2.4.0
+
+2.1.0
+----------
+* Create function to add integrations list to export flow
+* Create projets and template type consumers
+* Add project and template type handlers in event_driven
+* Update FlowEditor to version 2.3.0
+
+2.0.7
+----------
+⚠️ FlowEditor broken due to incorrect build
+* Update settings.dev to include weni.internal apps
+* Create integration request model
+* Update version of weni-rp-apps to 2.7.7
+* Create projects and TemplateType model
+
+2.0.6
+----------
+⚠️ FlowEditor broken due to incorrect build
+* Update FlowEditor to version 2.2.0
+
+2.0.5
+----------
+* Update FlowEditor to version 2.1.0
+
+2.0.4
+----------
+* Update FlowEditor to version 2.0.3
+
+2.0.3
+----------
+* Create and Setup event driven app
+* Checks if the user user_org exists before fetching triggers 
+
+2.0.2
+----------
+* Update FlowEditor to version 2.0.2
+* Add id prefix on jquery selectors to prevent css conflict with unnnic modals 
+* Remove delayed toggle and changed alert color
+
+2.0.1
+----------
+* Update FlowEditor to version 2.0.1
+
+2.0.0
+----------
+* Update FlowEditor to version 2.0.0
+* Modified trigger flow button text
+
 1.9.11-rapidpro-7.1.27
 ----------
 * Update version of weni-rp-apps to 2.7.6

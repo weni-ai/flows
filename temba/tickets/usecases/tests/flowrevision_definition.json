@@ -1,0 +1,81 @@
+{
+	"name": "Fluxo para liberar",
+	"uuid": "c5db9832-0fef-40f7-aa9a-e952e2de6b5a",
+	"spec_version": "13.1.0",
+	"language": "base",
+	"type": "messaging",
+	"nodes": [{
+		"uuid": "3464906e-42c6-4130-9fe8-ffc594ec8445",
+		"actions": [{
+			"uuid": "b66dd522-2bdf-406e-a14d-8d1d30e25929",
+			"type": "open_ticket",
+			"ticketer": {
+				"uuid": "a69844ab-b49f-4988-9e13-2d2a50ffb23f",
+				"name": "Setor teste EDA"
+			},
+			"body": "@results",
+			"topic": {
+				"name": "Queue 1",
+				"uuid": "de6d19af-a905-475e-b824-bf7fbca277fd",
+				"created_on": "2023-09-05T12:28:11.987898-03:00",
+				"value": "de6d19af-a905-475e-b824-bf7fbca277fd"
+			},
+			"assignee": null,
+			"result_name": "Result"
+		}],
+		"router": {
+			"type": "switch",
+			"operand": "@results.result",
+			"cases": [{
+				"uuid": "509752f9-7d18-4b09-9e79-4bf312dc4d35",
+				"type": "has_category",
+				"arguments": ["Success"],
+				"category_uuid": "b9e4dffe-bcbb-4419-8ac5-489c276866dc"
+			}],
+			"categories": [{
+				"uuid": "b9e4dffe-bcbb-4419-8ac5-489c276866dc",
+				"name": "Success",
+				"exit_uuid": "2eaad2c7-17c4-4be8-8402-2db774f6c9cf"
+			}, {
+				"uuid": "f5e42ba2-692f-406e-9cd8-1c9dda9cbf98",
+				"name": "Failure",
+				"exit_uuid": "bf145037-b490-4805-9ffb-a896ba1ff25d"
+			}],
+			"default_category_uuid": "f5e42ba2-692f-406e-9cd8-1c9dda9cbf98"
+		},
+		"exits": [{
+			"uuid": "2eaad2c7-17c4-4be8-8402-2db774f6c9cf",
+			"destination_uuid": "d815b68b-adbe-48ab-83f8-5fe915f5de9d"
+		}, {
+			"uuid": "bf145037-b490-4805-9ffb-a896ba1ff25d",
+			"destination_uuid": null
+		}]
+	}
+],
+	"_ui": {
+		"nodes": {
+			"3464906e-42c6-4130-9fe8-ffc594ec8445": {
+				"type": "split_by_ticket",
+				"position": {
+					"left": 260,
+					"top": 0
+				},
+				"config": {}
+			},
+			"d815b68b-adbe-48ab-83f8-5fe915f5de9d": {
+				"type": "split_by_ticket",
+				"position": {
+					"left": 0,
+					"top": 260
+				},
+				"config": {}
+			}
+		}
+	},
+	"revision": 6,
+	"expire_after_minutes": 10080,
+	"metadata": {
+		"expires": 10080
+	},
+	"localization": {}
+}

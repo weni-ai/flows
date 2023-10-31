@@ -3,54 +3,59 @@
 -block extra-style
   :css
     #floweditor-feedback {
-      display: flex;
-      gap: 12px;
-      flex-direction: column;
-      align-items: flex-end;
-      justify-content: flex-end;
       position: fixed;
-      bottom: 150px;
-      right: 16px;
+      bottom: -1px;
+      right: 90px;
       z-index: 9999;
     }
 
     #floweditor-feedback .launcher {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      align-items: center;
       position: relative;
-      border-radius: 600px;
+      color: #FFF;
       border: 1px solid #E2E6ED;
-      background: #FFF;
+      border-radius: 4px 4px 0px 0px;
+      background: var(--color-weni-600, #00A49F);
       box-shadow: 0px 12px 34px 0px rgba(0, 0, 0, 0.04);
-      width: 62px;
-      height: 62px;
+      width: 85px;
 
       -webkit-transition: all .2s ease-out;
       -moz-transition: all .2s ease-out;
       -o-transition: all .2s ease-out;
       transition: all .2s ease-out;;
+
+      font-family: Lato;
+      font-size: 12px;
     }
 
     #floweditor-feedback .launcher:hover {
       cursor: pointer;
-      background: #E2E6ED;
+      background: #028380;
+    }
+
+    #floweditor-feedback .launcher .material-symbols-outlined {
+      font-size: 20px;
     }
 
     #floweditor-feedback .launcher.alert-badge::before {
       content: '';
       position: absolute;
-      width: 12px;
-      height: 12px;
-      background-color: #009E96;
+      width: 10px;
+      height: 10px;
+      background-color: #E53E3E;
       border-radius: 600px;
-      right: 3px;
-      top: 3px;
-    }
-    
-    #floweditor-feedback .launcher img {
-      padding: 16px;
+      right: -2px;
+      top: -3px;
     }
 
     #floweditor-feedback .content {
-      width: 500px;
+      width: 326px;
+      position: fixed;
+      bottom: 40px;
+      right: 90px;
       padding: 16px;
       flex-direction: column;
       align-items: center;
@@ -64,7 +69,6 @@
     #floweditor-feedback .content .rating {
       display: flex;
       flex-direction: column;
-      align-items: center;
       gap: 16px;
     }
 
@@ -76,29 +80,23 @@
 
     #floweditor-feedback .content .rate-again {
       flex-direction: column;
-      align-items: center;
       gap: 16px;
     }
 
     #floweditor-feedback .content .rate-again .text {
       display: flex;
       flex-direction: column;
-      align-items: center;
-    }
-
-    #floweditor-feedback .content .rate-again .text img {
-      width: 48px;
-      height: 48px;
-      margin-bottom: 16px;
+      align-items: baseline;
     }
 
     #floweditor-feedback .content .rate-again .text span {
-      text-align: center;
       text-wrap: balance;
       color: #272B33;
 
       font-family: Lato;
       font-size: 14px;
+      font-style: normal;
+      font-weight: 700;
       line-height: 22px;
     }
 
@@ -108,52 +106,97 @@
 
     #floweditor-feedback .content .header {
       display: flex;
-      flex-direction: column;
-      justify-content: center;
+      flex-direction: row;
+      justify-content: space-between;
       width: 100%;
 
-      color: #3B414D;
-      text-align: center;
-      text-wrap: balance;
+      color: var(--neutral-darkest, #3B414D);
 
+      /* Lato / Regular / Body Greater */
       font-family: Lato;
-      font-size: 16px;
+      font-size: 14px;
       font-style: normal;
-      font-weight: 900;
-      line-height: 24px;
+      font-weight: 400;
+      line-height: 22px; /* 157.143% */
     }
 
     #floweditor-feedback .content .header .close-icon {
       background-color: #4E5666;
       opacity: 1;
       cursor: pointer;
-      align-self: flex-end;
+      margin-top: 3px;
+    }
+
+    #floweditor-feedback .content .header .text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    #floweditor-feedback .content .thanks {
+      color: var(--color-weni-600, #00A49F);
+      text-align: center;
+
+      /* Lato/Regular/Body Medium */
+      font-family: Lato;
+      font-size: 12px;
+      line-height: 20px; /* 166.667% */
+
+      -webkit-transition: all .3s ease-out;
+      -moz-transition: all .3s ease-out;
+      -o-transition: all .3s ease-out;
+      transition: all .3s ease-out;
+    }
+
+    #floweditor-feedback .content .options-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;      
+    }
+
+    #floweditor-feedback .content .phrase {
+      color: var(--neutral-darkest, #3B414D);
+
+      /* Lato / Bold / Body Greater */
+      font-family: Lato;
+      font-size: 14px;
+      font-style: normal;
+      font-weight: 700;
+      line-height: 22px; /* 157.143% */
     }
 
     #floweditor-feedback .content .options {
       display: flex;
-      gap: 8px;
+      justify-content: center;
+      align-items: center;
+      align-self: stretch;
+      border-radius: 4px;
+      border: 1px solid var(--color-neutral-cleanest, #D0D3D9);
+    }
+
+    #floweditor-feedback .content .options.colored {
+      padding: var(--spacing-xs, 8px) var(--spacing-sm, 16px);
+      border-radius: 4px;
+      border: 1px solid var(--color-weni-600, #00A49F);
+      background: var(--color-weni-50, #EEFFFC);
     }
 
     #floweditor-feedback .content .options .option {
       display: flex;
-      width: 67px;
-      height: 67px;
-      padding: 8px;
+      padding: 8px 16px;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       gap: 10px;
+      flex: 1 0 0;
+      width: 58px;
 
-      color: var(--neutral-black, #272B33);
-      text-align: center;
+      border-right: 1px solid var(--color-neutral-cleanest, #D0D3D9);
 
       font-family: Lato;
       font-size: 12px;
       font-style: normal;
       font-weight: 400;
       line-height: 20px;
-      border-radius: 4px;
       background: rgba(249, 249, 249, 1);
       -webkit-transition: all .3s ease-out;
       -moz-transition: all .3s ease-out;
@@ -161,19 +204,57 @@
       transition: all .3s ease-out;;
     }
 
+    #floweditor-feedback #feedback-option1 {
+      border-radius: 3px 0 0 3px;
+    }
+
+    #floweditor-feedback #feedback-option5 {
+      border-right: none;
+      border-radius: 0 3px 3px 0;
+    }
+
     #floweditor-feedback .content .options .option:hover {;
-      background: rgba(226, 230, 237, 1);
+      background: #F4F6F8;
       cursor: pointer;
     }
 
+    #floweditor-feedback .content .options .option:active {;
+      background: #D0D3D9;
+    }
+
     #floweditor-feedback .content .options .option.selected {
-      border: 1px solid #00A49F;
       background: #EEFFFC;
     }
 
     #floweditor-feedback .content .options img {
       width: 24px;
       height: 24px;
+    }
+
+    #floweditor-feedback .content .labels {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--spacing-xs, 8px);
+      align-self: stretch;
+    }
+
+    #floweditor-feedback .content .labels .text {
+      width: 58px;
+      color: var(--neutral-darkest, #3B414D);
+      font-family: Lato;
+      font-size: 12px;
+      font-style: normal;
+      font-weight: 400;
+      line-height: 16px; /* 133.333% */
+    }
+
+    #floweditor-feedback .content .labels .text.left {
+      text-align: left;
+    }
+
+    #floweditor-feedback .content .labels .text.right {
+      text-align: right;
     }
 
     #floweditor-feedback .content .opaque {
@@ -251,8 +332,8 @@
     }
     @-webkit-keyframes slide-in-left {
       0% {
-        -webkit-transform: translateX(-200px);
-                transform: translateX(-200px);
+        -webkit-transform: translateX(-100px);
+                transform: translateX(-100px);
         opacity: 0;
       }
       70% {
@@ -268,8 +349,8 @@
     }
     @keyframes slide-in-left {
       0% {
-        -webkit-transform: translateX(-200px);
-                transform: translateX(-200px);
+        -webkit-transform: translateX(-100px);
+                transform: translateX(-100px);
         opacity: 0;
       }
       70% {
@@ -328,7 +409,7 @@
 
     #success-toast {
       position: fixed;
-      bottom: 16px;
+      bottom: 40px;
       right: 16px;
       border-radius: 4px;
       background: #FFF;
@@ -375,75 +456,80 @@
   .content.hidden
     .rating
       .header
-        %span.close-icon.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{onclick: "toggleFeedback()"}
         %span.text
-          {{ _("How has your experience with the flow editor features been this week?") }}
-
-      .options
-        #option1.option{onclick:"saveRating(1)"}
-          %img{src:"{{STATIC_URL}}images/emoji/terrible.png"}
           %span
-            {{ _("Terrible") }}
-
-        #option2.option{onclick:"saveRating(2)"}
-          %img{src:"{{STATIC_URL}}images/emoji/bad.png"}
+            {{ _("Quick search!") }}
           %span
-            {{ _("Bad") }}
-        
-        #option3.option{onclick:"saveRating(3)"}
-          %img{src:"{{STATIC_URL}}images/emoji/satisfactory.png"}
-          %span
-            {{ _("Satisfactory") }}
+            {{ _("What do you think of this sentence:") }}
+        %span.close-icon.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{onclick: "toggleFeedback()"}
 
-        #option4.option{onclick:"saveRating(4)"}
-          %img{src:"{{STATIC_URL}}images/emoji/good.png"}
-          %span
-            {{ _("Good") }}
+      
+      %div.options-wrapper#options-wrapper
+        %span.phrase
+          {{ _("The Flow Editor is easy and enjoyable to use") }}
 
-        #option5.option{onclick:"saveRating(5)"}
-          %img{src:"{{STATIC_URL}}images/emoji/excellent.png"}
-          %span
-            {{ _("Excellent") }}
+        #options.options
+          #feedback-option1.option{onclick:"saveRating(1)"}
+            1
 
-      %span#rating-thanks.opaque.bottom
-        {{ _("Thank you for the review!") }}
+          #feedback-option2.option{onclick:"saveRating(2)"}
+            2
+          
+          #feedback-option3.option{onclick:"saveRating(3)"}
+            3
+
+          #feedback-option4.option{onclick:"saveRating(4)"}
+            4
+
+          #feedback-option5.option{onclick:"saveRating(5)"}
+            5
+
+          %span#rating-thanks.opaque.hidden.thanks
+            {{ _("Thank you!") }}
+
+      %div.labels
+        %span.text.left
+          {{ _("Strongly disagree") }}
+        %span.text.right
+          {{ _("Strongly agree") }}
 
     .feedback.hidden
       .header
-        %span.close-icon.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{onclick: "toggleFeedback()"}
         %span.text
-          {{ _("Want to add a comment to your review?") }}
+          {{ _("Want to add a comment?") }}
+        %span.close-icon.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{onclick: "toggleFeedback()"}
 
       {% translate "Write here..." as textarea_placeholder %}
       %textarea#feedback-textarea{placeholder:"{{ textarea_placeholder }}"}
 
       .buttons.w-full
-        #skip-feedback{class: "weni-unnnic-button weni-unnnic-button--terciary weni-unnnic-button--size-large w-full", onclick:"toggleFeedback()"}
-          {{ _("Ignore") }}
-        #send-feedback{class: "weni-unnnic-button weni-unnnic-button--primary weni-unnnic-button--size-large w-full", onclick:"sendFeedback()"}
+        #skip-feedback{class: "weni-unnnic-button weni-unnnic-button--terciary weni-unnnic-button--size-small w-full", onclick:"toggleFeedback()"}
+          {{ _("Close") }}
+        #send-feedback{class: "weni-unnnic-button weni-unnnic-button--primary weni-unnnic-button--size-small w-full", onclick:"sendFeedback()"}
           {{ _("Submit comment") }}
 
     .rate-again.hidden
       .header
-        %span.close-icon.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{onclick: "toggleFeedback()"}
         %span.text
           {{ _("Thank you!") }}
+        %span.close-icon.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{onclick: "toggleFeedback()"}
 
       .text
-        %img{src:"{{STATIC_URL}}images/emoji/excellent.png"}
         %span
           {{ _("You have already rated your experience this week,") }}
         %span
-           {{ _("would you like to rate it again?") }}
+          {{ _("would you like to rate it again?") }}
 
       .buttons.w-full
-        #skip-feedback{class: "weni-unnnic-button weni-unnnic-button--terciary weni-unnnic-button--size-large w-full", onclick:"toggleFeedback()"}
+        #skip-feedback{class: "weni-unnnic-button weni-unnnic-button--terciary weni-unnnic-button--size-small w-full", onclick:"toggleFeedback()"}
           {{ _("Close") }}
-        #send-feedback{class: "weni-unnnic-button weni-unnnic-button--primary weni-unnnic-button--size-large w-full", onclick:"restartRating()"}
+        #send-feedback{class: "weni-unnnic-button weni-unnnic-button--primary weni-unnnic-button--size-small w-full", onclick:"restartRating()"}
           {{ _("Rate again") }}
 
   %div.launcher.hidden{onclick: "toggleFeedback()"}
-    %img{src:"{{STATIC_URL}}images/emoji/man-detective.png"}
+    %span.material-symbols-outlined
+      add_comment
+    {{ _("Feedback") }}
 
 
 #success-toast.hidden
@@ -477,7 +563,6 @@
     const auth = getAuth();
 
     let lastRatingRef = null;
-    let toggleTimoutId = null;
 
     try {
       await signInAnonymously(auth)
@@ -603,6 +688,7 @@
 
   :javascript
     let showRateAgain = false;
+    let toggleTimeoutId = null;
 
     function debounce(func, timeout = 1000){
       let timer;
@@ -632,45 +718,46 @@
     }
 
     function delayedToggle() {
-      toggleTimoutId = setTimeout(() => {
+      const timeout = 10 * 60 * 1000;
+      toggleTimeoutId = setTimeout(() => {
         if ($('.content').hasClass('hidden')) {
           toggleFeedback();
         }
-      }, 120000)
+      }, timeout)
     }
 
     function clearDelayTimeout() {
-      if (toggleTimoutId) {
-        clearTimeout(toggleTimoutId);
-        toggleTimoutId = null;
+      if (toggleTimeoutId) {
+        clearTimeout(toggleTimeoutId);
+        toggleTimeoutId = null;
       }
     }
 
     function showAlertBadge() {
-      const launcher = $('.launcher');
+      const launcher = $('#floweditor-feedback .launcher');
       launcher.addClass('alert-badge');
     }
 
     function hideAlertBadge() {
-      const launcher = $('.launcher');
+      const launcher = $('#floweditor-feedback .launcher');
       launcher.removeClass('alert-badge');
     }
 
     function hideFeedbackLauncher() {
-      const launcher = $('.launcher');
+      const launcher = $('#floweditor-feedback .launcher');
       launcher.addClass('fade-out');
       launcher.addClass('hidden');
     }
 
     function showFeedbackLauncher() {
-      const launcher = $('.launcher');
+      const launcher = $('#floweditor-feedback .launcher');
       launcher.addClass('fade-in');
       launcher.removeClass('fade-out');
       launcher.removeClass('hidden');
     }
 
     const toggleFeedback = debounce(async () => {
-      const content = $('.content');
+      const content = $('#floweditor-feedback .content');
 
       if (content.hasClass('hidden')) {
         const userData = await getUserData();
@@ -696,28 +783,38 @@
     }, 250)
 
     function hideContent() {
-      const content = $('.content');
+      const content = $('#floweditor-feedback .content');
       content.removeClass('fade-out');
       content.addClass('hidden');
     }
 
     const saveRating = debounce((rating) => {
       function showOnlySelected() {
-        $("div[id^='option']").hide();
+        $("div[id^='feedback-option']").hide();
 
         option.show();
         option.addClass('slide-in-left');
         $("#rating-thanks").css('opacity', "1");
       }
 
+      function showThanks() {
+        $("div[id^='feedback-option']").hide();
+
+        $("#options").addClass('colored')
+        $("#rating-thanks").show();
+        $("#rating-thanks").css('display','flex');
+        $("#rating-thanks").css('opacity', "1");
+        $("#rating-thanks").addClass('slide-in-left');
+      }
+
       saveRatingResponse(rating);
-      const option = $(`#option${rating}`);
+      const option = $(`#feedback-option${rating}`);
       option.addClass('selected');
 
-      setTimeout(showOnlySelected, 250);
+      setTimeout(showThanks, 250);
 
       setTimeout(changeToFeedback, 2000);
-      $("div[id^='option']").removeClass('fade-out');
+      $("div[id^='feedback-option']").removeClass('fade-out');
       clearDelayTimeout();
     })
 
@@ -736,7 +833,9 @@
       const rating = $('.rating');
       const feedback = $('.feedback');
       const rateAgain = $('.rate-again');
+      const options = $('#options');
 
+      options.removeClass('colored');
       feedback.removeClass('fade-out');
       feedback.removeClass('fade-in');
       feedback.hide();
@@ -749,9 +848,11 @@
       rating.css('display','flex'); 
 
       $("#rating-thanks").css('opacity', "0");
-      $("div[id^='option']").show();
-      $("div[id^='option']").removeClass('selected');
-      $("div[id^='option']").removeClass('slide-in-left');
+      $("#rating-thanks").removeClass('slide-in-left');
+      $("#rating-thanks").hide();
+      $("div[id^='feedback-option']").removeClass('selected');
+      $("div[id^='feedback-option']").removeClass('slide-in-left');
+      $("div[id^='feedback-option']").show();
     }
 
     const sendFeedback = debounce(() => {
@@ -803,7 +904,7 @@
     }
 
     const restartRating = debounce(() => {
-      const rateAgain = $('.rate-again');
+      const rateAgain = $('#floweditor-feedback .rate-again');
       rateAgain.addClass('fade-out');
       showRateAgain = false;
 
