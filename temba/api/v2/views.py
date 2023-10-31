@@ -3980,6 +3980,7 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
         catalog = org.catalogs.exclude(is_active=False).first()
         if catalog:
             return catalog.products.all()
+        
         return []
 
     @classmethod
