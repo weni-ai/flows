@@ -587,16 +587,16 @@ class WhatsAppTypeTest(TembaTest):
 
         channel = self.create_channel(
             "WA",
-            "WhatsApp: 1234",
-            "1234",
+            "WhatsApp: 123456",
+            "123456",
             config={
-                Channel.CONFIG_BASE_URL: "https://nyaruka.com/whatsapp",
-                Channel.CONFIG_USERNAME: "temba",
-                Channel.CONFIG_PASSWORD: "tembapasswd",
-                Channel.CONFIG_AUTH_TOKEN: "authtoken123",
-                CONFIG_FB_BUSINESS_ID: "1234",
-                CONFIG_FB_ACCESS_TOKEN: "token123",
-                CONFIG_FB_NAMESPACE: "my-custom-app",
+                Channel.CONFIG_BASE_URL: "https://weni.ai/whatsapp",
+                Channel.CONFIG_USERNAME: "userTest",
+                Channel.CONFIG_PASSWORD: "userTespasswd",
+                Channel.CONFIG_AUTH_TOKEN: "authtoken123456",
+                CONFIG_FB_BUSINESS_ID: "123456",
+                CONFIG_FB_ACCESS_TOKEN: "token123456",
+                CONFIG_FB_NAMESPACE: "my-custom-app-123456",
                 CONFIG_FB_TEMPLATE_LIST_DOMAIN: "graph.facebook.com",
             },
         )
@@ -614,7 +614,7 @@ class WhatsAppTypeTest(TembaTest):
             MockResponse(200, '{"data": ["foo", "bar"]}'),
             MockResponse(
                 200,
-                '{"data": ["foo"], "paging": {"next": "https://graph.facebook.com/v16.0/1234/products?cursor=MjQZD"} }',
+                '{"data": ["foo"], "paging": {"next": "https://graph.facebook.com/v16.0/123456/products?cursor=MjQZD"} }',
             ),
             MockResponse(200, '{"data": ["bar"], "paging": {"next": null} }'),
         ]
@@ -634,7 +634,7 @@ class WhatsAppTypeTest(TembaTest):
 
         mock_get.assert_called_with(
             "https://graph.facebook.com/v16.0/12345/products",
-            params={"access_token": "token123", "limit": 255},
+            params={"access_token": "token123456", "limit": 255},
         )
 
         products_data, no_error = WhatsAppType().get_api_products(channel, catalog)

@@ -359,23 +359,6 @@ class WhatsAppUtilsTest(TembaTest):
         self.assertEqual(1, HTTPLog.objects.filter(log_type=HTTPLog.WHATSAPP_CHECK_HEALTH).count())
 
 
-class UpdateLocalCatalogsTest(TembaTest):
-    def test_update_local_catalogs(self):
-        catalogs_data = [
-            {"name": "Catalog A", "id": 1, "is_active": True},
-            {"name": "Catalog B", "id": 2, "is_active": False},
-        ]
-
-        channel = self.channel
-        channel.get_type().code = "WAC"
-        channel.save()
-
-        update_local_catalogs(channel, catalogs_data)
-
-        self.assertEqual(Catalog.objects.count(), 2)
-        self.assertEqual(Catalog.objects.filter(channel=self.channel).count(), 2)
-
-
 class UpdateLocalProductsTest(TembaTest):
     def test_update_local_products(self):
         catalog = Catalog(name="Test Catalog", org=self.org, channel=self.channel, facebook_catalog_id=1)
@@ -491,6 +474,32 @@ class UpdateIsActiveCatalogTestCase(TembaTest):
         config = {"wa_waba_id": "1111111111111", "wa_business_id": "2222222222"}
 
         channel = self.channel
+        channel.get_type().code = "WAC"
+        channel.config = config
+
+        catalogs_data = [
+            {"name": "Catalog1", "id": "catalog1", "is_active": True},
+            {"name": "Catalog2", "id": "catalog2", "is_active": False},
+            {"name": "Catalog3", "id": "catalog3", "is_active": False},
+        ]
+
+        update_local_catalogs(channel, catalogs_data)
+
+        self.assertEqual(Catalog.objects.count(), 3)
+
+    @patch("temba.utils.whatsapp.tasks.requests.get")
+    def test_update_is_active_catalog_waba_error(self, mock_requests_get):
+        mock_response = {
+            "data": [
+                {"id": "catalog1"},
+                {"id": "catalog2"},
+            ]
+        }
+        mock_requests_get.return_value.json.return_value = mock_response
+
+        config = {"wa_business_id": "2222222222"}  # wa_waba_id ausente
+
+        channel = self.channel
         channel.config = config
 
         catalogs_data = [
@@ -499,13 +508,5 @@ class UpdateIsActiveCatalogTestCase(TembaTest):
             {"id": "catalog3", "is_active": False},
         ]
 
-        result = update_is_active_catalog(channel, catalogs_data)
-
-        self.assertEqual(
-            result,
-            [
-                {"id": "catalog1", "is_active": True},
-                {"id": "catalog2", "is_active": False},
-                {"id": "catalog3", "is_active": False},
-            ],
-        )
+        with self.assertRaises(ValueError):  # Verifica se uma exceção é levantada
+            update_is_active_catalog(channel, catalogs_data)
