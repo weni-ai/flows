@@ -1,3 +1,32 @@
+3.2.0
+----------
+* Add filters in template.json endpoint
+* Fix error in import trigger
+* Chore: Update Floweditor to 2.7.0
+* Feat: Remove Helphero
+* Feat: Control tools guide and modal
+
+3.1.5
+----------
+* Update FlowEditor to version 2.6.5
+
+3.1.4
+----------
+* Update FlowEditor to version 2.6.4
+* Re-add feedback delayed toggle
+
+3.1.3
+----------
+* Update FlowEditor to version 2.6.3
+
+3.1.2
+----------
+* Update FlowEditor to version 2.6.2
+
+3.1.1
+----------
+* Update FlowEditor to version 2.6.1
+
 3.1.0
 ----------
 * Fix CI

@@ -1646,6 +1646,7 @@ class ProductReadSerializer(ReadSerializer):
     title = serializers.CharField()
     facebook_product_id = serializers.CharField()
     product_retailer_id = serializers.CharField()
+    created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
 
     class Meta:
         model = Product
@@ -1653,4 +1654,5 @@ class ProductReadSerializer(ReadSerializer):
             "title",
             "facebook_product_id",
             "product_retailer_id",
+            "created_on",
         )
