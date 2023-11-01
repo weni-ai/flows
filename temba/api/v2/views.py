@@ -3973,15 +3973,12 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
     permission = "templates.template_api"
     model = Product
     serializer_class = ProductReadSerializer
-    pagination_class = ModifiedOnCursorPagination
+    pagination_class = CreatedOnCursorPagination
 
     def get_queryset(self):
         org = self.request.user.get_org()
         catalog = org.catalogs.exclude(is_active=False).first()
-        if catalog:
-            return catalog.products.all()
-        
-        return []
+        return Product.objects.filter(catalog=catalog)
 
     @classmethod
     def get_read_explorer(cls):
