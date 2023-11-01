@@ -1,3 +1,7 @@
+3.2.1
+----------
+* Chore: Update Floweditor to 2.7.1
+
 3.2.0
 ----------
 * Add filters in template.json endpoint
