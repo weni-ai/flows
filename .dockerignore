@@ -8,3 +8,5 @@ temba/settings.py
 Dockerfile
 .dockerignore
 .gitignore
+usr
+venv

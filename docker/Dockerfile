@@ -72,13 +72,13 @@ ARG POETRY_VERSION
 ARG REQUESTS_VERSION
 ARG NODE_VERSION
 
-COPY pyproject.toml poetry.lock docker/pip-requires.txt .
+COPY pyproject.toml poetry.lock .
 
 RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip pip install --cache-dir /pip_cache -U poetry=="${POETRY_VERSION}" \
   && poetry cache clear -n --all pypi \
   && pip install --cache-dir /pip_cache requests=="${REQUESTS_VERSION}" \
-  && poetry add -n --lock $(cat pip-requires.txt) \
   && poetry export --without-hashes --output requirements.txt
+#  && poetry add -n --lock $(cat pip-requires.txt) \
 
 FROM base as build
 
@@ -105,16 +105,19 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   && apt-get install -y --no-install-recommends ${RUNTIME_DEPS} \
   && rm -rf /usr/share/man /usr/share/doc
 
-COPY --from=build /install /usr/local
-COPY --chown=${PROJECT_USER}:${PROJECT_GROUP} . $PROJECT_PATH
+COPY --chown=${PROJECT_USER}:${PROJECT_GROUP} package.json package-lock.json ${PROJECT_PATH}
 
 RUN --mount=type=cache,id=npm,target=/npm_cache \
   npm install --global --cache /npm_cache \
   coffeescript \
   less \
   yarn \
-  && npm install --cache /npm_cache \
-  && ln -s "${PROJECT_PATH}/temba/settings.py.prod" "${PROJECT_PATH}/temba/settings.py"
+  && npm install --cache /npm_cache
+
+COPY --from=build /install /usr/local
+COPY --chown=${PROJECT_USER}:${PROJECT_GROUP} . ${PROJECT_PATH}
+
+RUN ln -s "${PROJECT_PATH}/temba/settings.py.prod" "${PROJECT_PATH}/temba/settings.py"
 
 USER "${PROJECT_USER}:${PROJECT_USER}"
 EXPOSE 8001

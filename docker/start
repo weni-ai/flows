@@ -5,6 +5,9 @@ export GUNICORN_LOG_CONF=${GUNICORN_LOG_CONF:-"${PROJECT_PATH}/docker/gunicorn/g
 export GUNICORN_CONF=${GUNICORN_CONF:-"${PROJECT_PATH}/docker/gunicorn/gunicorn.conf.py"}
 export LOG_LEVEL=${LOG_LEVEL:-"INFO"}
 #export GUNICORN_CONF=${GUNICORN_CONF:-"python:flows.gunicorn"}
+export FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-'*'}
+export COMPRESS_ENABLED=${COMPRESS_ENABLED:-'true'}
+export BRANDING_ENABLED=${BRANDING_ENABLED:-'true'}
 
 #set -o errexit
 #set -o pipefail
