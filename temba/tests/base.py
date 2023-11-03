@@ -510,7 +510,7 @@ class TembaTestMixin:
             archive_type=archive_type,
             size=size,
             hash=md5,
-            url=f"http://{bucket}.aws.com/{key}",
+            url=f"https://{bucket}.aws.com/{key}",
             record_count=len(records),
             start_date=start_date,
             period=period,
