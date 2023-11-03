@@ -272,7 +272,7 @@ def _base_msg(obj) -> dict:
     if obj.attachments:
         d["attachments"] = obj.attachments
 
-    if obj.metadata.get("products", None):
+    if obj.metadata and obj.metadata.get("body", None):
         d["text"] = obj.metadata.get("body", None)
 
     return d
