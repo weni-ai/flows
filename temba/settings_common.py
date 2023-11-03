@@ -293,6 +293,7 @@ INSTALLED_APPS = (
     "temba.airtime",
     "temba.sql",
     "temba.externals",
+    "temba.wpp_products",
     "temba.projects",
     "temba.event_driven",
 )
