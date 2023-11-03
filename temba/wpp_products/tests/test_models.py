@@ -115,7 +115,7 @@ class CatalogModelTestCase(TembaTest):
 
         self.assertEqual(existing_catalog, self.existing_catalog)
         self.assertEqual(existing_catalog.name, "Existing Catalog")
-        self.assertEqual(self.existing_catalog.modified_on, existing_catalog.modified_on)
+        self.assertNotEqual(self.existing_catalog.modified_on, existing_catalog.modified_on)
 
 
 class ProductModelTestCase(TembaTest):

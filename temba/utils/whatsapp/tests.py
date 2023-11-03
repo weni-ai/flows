@@ -1,6 +1,9 @@
 from unittest.mock import patch
 
 import requests
+from django_redis import get_redis_connection
+
+from django.utils import timezone
 
 from temba.channels.models import Channel
 from temba.channels.types.whatsapp.type import (
@@ -13,9 +16,17 @@ from temba.request_logs.models import HTTPLog
 from temba.templates.models import Template, TemplateTranslation
 from temba.tests import TembaTest
 from temba.tests.requests import MockResponse
+from temba.wpp_products.models import Catalog, Product
 
 from . import update_api_version
-from .tasks import _calculate_variable_count, update_local_templates
+from .tasks import (
+    _calculate_variable_count,
+    refresh_whatsapp_catalog_and_products,
+    update_is_active_catalog,
+    update_local_catalogs,
+    update_local_products,
+    update_local_templates,
+)
 
 
 class WhatsAppUtilsTest(TembaTest):
@@ -346,3 +357,156 @@ class WhatsAppUtilsTest(TembaTest):
         mock_health.side_effect = [requests.RequestException(response=MockResponse(401, "{}"))]
         update_api_version(channel)
         self.assertEqual(1, HTTPLog.objects.filter(log_type=HTTPLog.WHATSAPP_CHECK_HEALTH).count())
+
+
+class UpdateLocalProductsTest(TembaTest):
+    def test_update_local_products(self):
+        catalog = Catalog(name="Test Catalog", org=self.org, channel=self.channel, facebook_catalog_id=1)
+
+        catalog.channel.get_type().code = "WAC"
+        catalog.save()
+
+        products_data = [
+            {"id": 1, "name": "Product A", "retailer_id": 123},
+            {"id": 2, "name": "Product B", "retailer_id": 456},
+        ]
+
+        update_local_products(catalog, products_data, self.channel)
+
+        self.assertEqual(Product.objects.count(), 2)
+        self.assertEqual(Product.objects.filter(catalog=catalog).count(), 2)
+
+
+class RefreshWhatsappCatalogAndProductsTestCase(TembaTest):
+    @patch("temba.utils.whatsapp.tasks.update_local_products")
+    @patch("temba.utils.whatsapp.tasks.update_local_catalogs")
+    @patch("temba.channels.types.whatsapp_cloud.type.WhatsAppCloudType.get_api_products")
+    @patch("temba.channels.types.whatsapp_cloud.type.WhatsAppCloudType.get_api_catalogs")
+    def test_refresh_catalogs_and_products_task(
+        self, mock_get_api_catalogs, mock_get_api_products, update_local_catalogs_mock, update_local_products_mock
+    ):
+        Catalog.objects.all().delete()
+        Product.objects.all().delete()
+        Channel.objects.all().delete()
+
+        channel = self.create_channel("WAC", "Test WAC Channel", "54764868534")
+
+        catalog = Catalog.objects.create(
+            facebook_catalog_id="123456789",
+            name="Catalog1",
+            org=self.org,
+            channel=channel,
+            created_on=timezone.now(),
+            modified_on=timezone.now(),
+            is_active=True,
+        )
+
+        self.login(self.admin)
+        mock_get_api_catalogs.side_effect = [
+            ([], False),
+            Exception("foo"),
+            ([{"name": "hello"}], True),
+            ([{"name": "hello"}], True),
+            ([{"name": "hello"}], True),
+        ]
+
+        mock_get_api_products.side_effect = [
+            ([], False),
+            ([], True),
+        ]
+
+        update_local_catalogs_mock.return_value = None
+        update_local_products_mock.return_value = None
+
+        r = get_redis_connection()
+        with r.lock("refresh_whatsapp_catalog_and_products", timeout=1800):
+            refresh_whatsapp_catalog_and_products()
+            self.assertEqual(0, mock_get_api_catalogs.call_count)
+            self.assertEqual(0, mock_get_api_products.call_count)
+            self.assertEqual(0, update_local_catalogs_mock.call_count)
+            self.assertEqual(0, update_local_products_mock.call_count)
+
+        refresh_whatsapp_catalog_and_products()
+
+        mock_get_api_catalogs.assert_called_with(channel)
+
+        self.assertEqual(1, mock_get_api_catalogs.call_count)
+        self.assertEqual(0, mock_get_api_products.call_count)
+        self.assertEqual(0, update_local_catalogs_mock.call_count)
+        self.assertEqual(0, update_local_products_mock.call_count)
+
+        # any exception
+        refresh_whatsapp_catalog_and_products()
+
+        mock_get_api_catalogs.assert_called_with(channel)
+        self.assertEqual(2, mock_get_api_catalogs.call_count)
+        self.assertEqual(0, mock_get_api_products.call_count)
+        self.assertEqual(0, update_local_catalogs_mock.call_count)
+        self.assertEqual(0, update_local_products_mock.call_count)
+
+        refresh_whatsapp_catalog_and_products()
+
+        mock_get_api_catalogs.assert_called_with(channel)
+        self.assertEqual(3, mock_get_api_catalogs.call_count)
+        update_local_catalogs_mock.assert_called_once_with(channel, [{"name": "hello"}])
+        mock_get_api_products.assert_called_with(channel, catalog)
+        self.assertEqual(0, update_local_products_mock.call_count)
+
+        refresh_whatsapp_catalog_and_products()
+
+        mock_get_api_catalogs.assert_called_with(channel)
+        self.assertEqual(4, mock_get_api_catalogs.call_count)
+        mock_get_api_products.assert_called_with(channel, catalog)
+        self.assertEqual(1, update_local_products_mock.call_count)
+
+
+class UpdateIsActiveCatalogTestCase(TembaTest):
+    @patch("temba.utils.whatsapp.tasks.requests.get")
+    def test_update_is_active_catalog(self, mock_requests_get):
+        mock_response = {
+            "data": [
+                {"id": "catalog1"},
+                {"id": "catalog2"},
+            ]
+        }
+        mock_requests_get.return_value.json.return_value = mock_response
+
+        config = {"wa_waba_id": "1111111111111", "wa_business_id": "2222222222"}
+
+        channel = self.channel
+        channel.get_type().code = "WAC"
+        channel.config = config
+
+        catalogs_data = [
+            {"name": "Catalog1", "id": "catalog1", "is_active": True},
+            {"name": "Catalog2", "id": "catalog2", "is_active": False},
+            {"name": "Catalog3", "id": "catalog3", "is_active": False},
+        ]
+
+        update_local_catalogs(channel, catalogs_data)
+
+        self.assertEqual(Catalog.objects.count(), 3)
+
+    @patch("temba.utils.whatsapp.tasks.requests.get")
+    def test_update_is_active_catalog_waba_error(self, mock_requests_get):
+        mock_response = {
+            "data": [
+                {"id": "catalog1"},
+                {"id": "catalog2"},
+            ]
+        }
+        mock_requests_get.return_value.json.return_value = mock_response
+
+        config = {"wa_business_id": "2222222222"}  # wa_waba_id ausente
+
+        channel = self.channel
+        channel.config = config
+
+        catalogs_data = [
+            {"id": "catalog1", "is_active": True},
+            {"id": "catalog2", "is_active": False},
+            {"id": "catalog3", "is_active": False},
+        ]
+
+        with self.assertRaises(ValueError):  # Verifica se uma exceção é levantada
+            update_is_active_catalog(channel, catalogs_data)

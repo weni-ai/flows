@@ -11,8 +11,8 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("orgs", "0090_auto_20211209_2120"),
         ("channels", "0135_alter_channellog_created_on"),
+        ("orgs", "0090_auto_20211209_2120"),
     ]
 
     operations = [
