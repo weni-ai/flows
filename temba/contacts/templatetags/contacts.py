@@ -146,6 +146,9 @@ def history_icon(event: dict) -> str:
     event_type = event["type"]
     variant = None
 
+    if event_type == Event.TYPE_PRODUCT_SENT:
+        return mark_safe(f'<span class="material-symbols-outlined fill">storefront</span>')
+
     if event_type == Event.TYPE_MSG_CREATED:
         if event["status"] in (Msg.STATUS_ERRORED, Msg.STATUS_FAILED):
             variant = "failed"
