@@ -809,7 +809,7 @@ class EventTest(TembaTest):
             "",
             channel=self.channel,
             status="E",
-            productMetadata={"products": [{"facebook_retailer_id": 1}], "body": "Product body text"},
+            product_metadata={"products": [{"facebook_retailer_id": 1}], "body": "Product body text"},
         )
         log2 = ChannelLog.objects.create(channel=self.channel, is_error=True, description="Boom", msg=msg_out3)
         msg_out3.refresh_from_db()
