@@ -291,7 +291,7 @@ class TembaTestMixin:
         high_priority=False,
         surveyor=False,
         next_attempt=None,
-        productMetadata=None
+        productMetadata=None,
     ):
         if status in (Msg.STATUS_WIRED, Msg.STATUS_SENT, Msg.STATUS_DELIVERED) and not sent_on:
             sent_on = timezone.now()
