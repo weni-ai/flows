@@ -107,7 +107,7 @@ class Event:
                 "recipient_count": obj.broadcast.get_message_count(),
                 "logs_url": logs_url,
             }
-        elif obj.metadata.get("products", None):
+        elif obj.metadata and "products" in obj.metadata:
             return {
                 "type": cls.TYPE_PRODUCT_SENT,
                 "created_on": get_event_time(obj).isoformat(),
