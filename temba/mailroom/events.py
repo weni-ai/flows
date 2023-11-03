@@ -45,6 +45,7 @@ class Event:
     TYPE_TICKET_OPENED = "ticket_opened"
     TYPE_TICKET_REOPENED = "ticket_reopened"
     TYPE_WEBHOOK_CALLED = "webhook_called"
+    TYPE_PRODUCT_SENT = "product_sent"
 
     # additional events
     TYPE_CALL_STARTED = "call_started"
@@ -104,6 +105,15 @@ class Event:
                 "msg": _msg_out(obj),
                 "status": obj.status,
                 "recipient_count": obj.broadcast.get_message_count(),
+                "logs_url": logs_url,
+            }
+        elif obj.metadata.get("products", None):
+            return {
+                "type": cls.TYPE_PRODUCT_SENT,
+                "created_on": get_event_time(obj).isoformat(),
+                # additional properties
+                "msg": _msg_out(obj),
+                "status": obj.status,
                 "logs_url": logs_url,
             }
         else:
@@ -260,6 +270,9 @@ def _base_msg(obj) -> dict:
         d["channel"] = {"uuid": str(obj.channel.uuid), "name": obj.channel.name}
     if obj.attachments:
         d["attachments"] = obj.attachments
+
+    if obj.metadata and obj.metadata.get("body", None):
+        d["text"] = obj.metadata.get("body", None)
 
     return d
 
