@@ -108,7 +108,6 @@ class Event:
                 "logs_url": logs_url,
             }
         elif obj.metadata.get("products", None):
-            print("From msg sending products", obj.metadata)
             return {
                 "type": cls.TYPE_PRODUCT_SENT,
                 "created_on": get_event_time(obj).isoformat(),
