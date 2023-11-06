@@ -1,3 +1,13 @@
+3.3.0
+----------
+* Update Floweditor to 2.8.0
+* Add models to wpp_product app
+* Create task to update catalog and product
+* Add endpoint to GET products
+* Implement SentenX in flows
+* Create endpoint to create/update catalog
+* Send product contact history event
+
 3.2.1
 ----------
 * Chore: Update Floweditor to 2.7.1
