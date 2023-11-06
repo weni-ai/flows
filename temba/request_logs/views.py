@@ -76,7 +76,7 @@ class HTTPLogCRUDL(SmartCRUDL):
             status_code = self.request.GET.get("status")
 
             if flow:
-                queryset = queryset.filter(flow__name=flow)
+                queryset = queryset.filter(flow__uuid=flow)
 
             if created_on:
                 time_range = timedelta(minutes=int(created_on))

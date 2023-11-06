@@ -225,3 +225,38 @@ class HTTPLogCRUDLTest(TembaTest, CRUDLTestMixin):
         self.login(self.admin2)
         response = self.client.get(log_url)
         self.assertLoginRedirect(response)
+
+
+class HTTPLogCRUDLQuerySetTest(TembaTest, CRUDLTestMixin):
+    def test_get_queryset_with_parameters(self):
+        HTTPLog.objects.create(
+            url="https://org2.bar/zap",
+            request="GET /zap",
+            response=" OK 200",
+            is_error=False,
+            log_type=HTTPLog.WEBHOOK_CALLED,
+            request_time=10,
+            org=self.org,
+        )
+
+        log2 = HTTPLog.objects.create(
+            url="https://org2.bar/zapzap",
+            request="GET /zap",
+            response=" OK 200",
+            is_error=False,
+            log_type=HTTPLog.WEBHOOK_CALLED,
+            request_time=10,
+            org=self.org,
+            flow=self.get_flow("dependencies"),
+        )
+
+        webhooks_url = reverse("request_logs.httplog_webhooks")
+        log_url = reverse("request_logs.httplog_read", args=[log2.id])
+
+        response = self.assertListFetch(webhooks_url, allow_viewers=False, allow_editors=True, context_objects=[log2])
+        self.assertContains(response, "Webhook Calls")
+        self.assertContains(response, log_url)
+
+        self.client.get(webhooks_url + "?flow=dependencies")
+        self.client.get(webhooks_url + "?time=5")
+        self.client.get(webhooks_url + "?status=200")
