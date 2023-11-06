@@ -108,11 +108,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 COPY --chown=${PROJECT_USER}:${PROJECT_GROUP} package.json package-lock.json ${PROJECT_PATH}
 
 RUN --mount=type=cache,id=npm,target=/npm_cache \
-  npm install --global --cache /npm_cache \
+  npm install --global --ignore-scripts --cache /npm_cache \
   coffeescript \
   less \
   yarn \
-  && npm install --cache /npm_cache
+  && npm install --ignore-scripts --cache /npm_cache
 
 COPY --from=build /install /usr/local
 COPY --chown=${PROJECT_USER}:${PROJECT_GROUP} . ${PROJECT_PATH}
