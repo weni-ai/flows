@@ -78,6 +78,16 @@ jobs:
         with:
           path: var-lib-apt
           key: var-lib-apt-${{ hashFiles('docker/Dockerfile') }}
+      - name: Cache pip
+        uses: actions/cache@v3
+        with:
+          path: cache-pip
+          key: cache-pip-${{ hashFiles('docker/Dockerfile') }}
+      - name: Cache npm
+        uses: actions/cache@v3
+        with:
+          path: cache-npm
+          key: cache-npm-${{ hashFiles('docker/Dockerfile') }}
 
       # Inject cache
       - name: inject var-cache-apt into docker
@@ -93,12 +103,12 @@ jobs:
       - name: inject pip cache into docker
         uses: reproducible-containers/buildkit-cache-dance@v2.1.3
         with:
-          cache-source: var-lib-apt
+          cache-source: cache-pip
           cache-target: /pip_cache
       - name: inject npm cache into docker
         uses: reproducible-containers/buildkit-cache-dance@v2.1.3
         with:
-          cache-source: var-lib-apt
+          cache-source: cache-npm
           cache-target: /npm_cache
 
       - name: Build and push - Flows Image
