@@ -362,23 +362,6 @@ class WhatsAppUtilsTest(TembaTest):
         self.assertEqual(1, HTTPLog.objects.filter(log_type=HTTPLog.WHATSAPP_CHECK_HEALTH).count())
 
 
-class UpdateLocalCatalogsTest(TembaTest):
-    def test_update_local_catalogs(self):
-        catalogs_data = [
-            {"name": "Catalog A", "id": 1, "is_active": True},
-            {"name": "Catalog B", "id": 2, "is_active": False},
-        ]
-
-        channel = self.channel
-        channel.get_type().code = "WAC"
-        channel.save()
-
-        update_local_catalogs(channel, catalogs_data)
-
-        self.assertEqual(Catalog.objects.count(), 2)
-        self.assertEqual(Catalog.objects.filter(channel=self.channel).count(), 2)
-
-
 class UpdateLocalProductsTest(TembaTest):
     def test_update_local_products(self):
         catalog = Catalog(name="Test Catalog", org=self.org, channel=self.channel, facebook_catalog_id=1)
@@ -494,6 +477,32 @@ class UpdateIsActiveCatalogTestCase(TembaTest):
         config = {"wa_waba_id": "1111111111111", "wa_business_id": "2222222222"}
 
         channel = self.channel
+        channel.get_type().code = "WAC"
+        channel.config = config
+
+        catalogs_data = [
+            {"name": "Catalog1", "id": "catalog1", "is_active": True},
+            {"name": "Catalog2", "id": "catalog2", "is_active": False},
+            {"name": "Catalog3", "id": "catalog3", "is_active": False},
+        ]
+
+        update_local_catalogs(channel, catalogs_data)
+
+        self.assertEqual(Catalog.objects.count(), 3)
+
+    @patch("temba.utils.whatsapp.tasks.requests.get")
+    def test_update_is_active_catalog_waba_error(self, mock_requests_get):
+        mock_response = {
+            "data": [
+                {"id": "catalog1"},
+                {"id": "catalog2"},
+            ]
+        }
+        mock_requests_get.return_value.json.return_value = mock_response
+
+        config = {"wa_business_id": "2222222222"}  # wa_waba_id ausente
+
+        channel = self.channel
         channel.config = config
 
         catalogs_data = [
@@ -502,16 +511,8 @@ class UpdateIsActiveCatalogTestCase(TembaTest):
             {"id": "catalog3", "is_active": False},
         ]
 
-        result = update_is_active_catalog(channel, catalogs_data)
-
-        self.assertEqual(
-            result,
-            [
-                {"id": "catalog1", "is_active": True},
-                {"id": "catalog2", "is_active": False},
-                {"id": "catalog3", "is_active": False},
-            ],
-        )
+        with self.assertRaises(ValueError):  # Verifica se uma exceção é levantada
+            update_is_active_catalog(channel, catalogs_data)
 
 
 class SentenxTestCase(TembaTest):
@@ -542,7 +543,7 @@ class SentenxTestCase(TembaTest):
         self.products = [self.product1, self.product2]
 
     def test_sent_products_to_sentenx_success(self):
-        settings.SENTENX_URL = "http://example.com"
+        settings.SENTENX_URL = "https://example.com"
         products = [{"product_id": 1, "name": "Product 1"}, {"product_id": 2, "name": "Product 2"}]
 
         def mock_requests_put(*args, **kwargs):
@@ -556,7 +557,7 @@ class SentenxTestCase(TembaTest):
         sent_products_to_sentenx(products)
 
     def test_sent_products_to_sentenx_failure(self):
-        settings.SENTENX_URL = "http://example.com"
+        settings.SENTENX_URL = "https://example.com"
         products = [{"product_id": 1, "name": "Product 1"}, {"product_id": 2, "name": "Product 2"}]
 
         def mock_requests_put(*args, **kwargs):
@@ -579,7 +580,7 @@ class SentenxTestCase(TembaTest):
         self.assertEqual(str(context.exception), "Not found SENTENX_URL")
 
     def test_sent_trim_products_to_sentenx_success(self):
-        settings.SENTENX_URL = "http://example.com"
+        settings.SENTENX_URL = "https://example.com"
 
         with patch("requests.delete") as mock_delete:
             mock_response = mock_delete.return_value
@@ -588,7 +589,7 @@ class SentenxTestCase(TembaTest):
             sent_trim_products_to_sentenx(self.catalog, self.products)
 
     def test_sent_trim_products_to_sentenx_no_products_to_delete(self):
-        settings.SENTENX_URL = "http://example.com"
+        settings.SENTENX_URL = "https://example.com"
 
         with patch("requests.delete") as mock_delete:
             mock_response = mock_delete.return_value
@@ -597,7 +598,7 @@ class SentenxTestCase(TembaTest):
             sent_trim_products_to_sentenx(self.catalog, [])
 
     def test_sent_trim_products_to_sentenx_failure(self):
-        settings.SENTENX_URL = "http://example.com"
+        settings.SENTENX_URL = "https://example.com"
         mock_response = Mock()
         mock_response.status_code = 400
 

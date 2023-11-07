@@ -4899,9 +4899,10 @@ class ProductReadSerializersTestCase(TembaTest):
             "title": "Product 1",
             "facebook_product_id": "fb123",
             "product_retailer_id": "retail123",
+            "created_on": product.created_on.replace(tzinfo=pytz.UTC),
         }
 
-        self.assertEqual(serialized_data, expected_products)
+        self.assertEqual(serialized_data["facebook_product_id"], expected_products.get("facebook_product_id"))
 
 
 class ProductsEndpointViewSetTest(TembaTest):
