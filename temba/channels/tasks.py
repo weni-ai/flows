@@ -25,7 +25,7 @@ def sync_channel_fcm_task(cloud_registration_id, channel_id=None):  # pragma: no
     Channel.sync_channel_fcm(cloud_registration_id, channel)
 
 
-@nonoverlapping_task(track_started=True, name="check_channels_task", lock_key="check_channels")
+@nonoverlapping_task(track_started=True)
 def check_channels_task():
     """
     Run every 30 minutes.  Checks if any channels who are active have not been seen in that
@@ -34,7 +34,7 @@ def check_channels_task():
     Alert.check_alerts()
 
 
-@nonoverlapping_task(track_started=True, name="sync_old_seen_channels_task", lock_key="sync_old_seen_channels")
+@nonoverlapping_task(track_started=True)
 def sync_old_seen_channels_task():
     from temba.channels.types.android import AndroidType
 
@@ -54,7 +54,7 @@ def send_alert_task(alert_id, resolved):
     alert.send_email(resolved)
 
 
-@nonoverlapping_task(track_started=True, name="trim_sync_events_task")
+@nonoverlapping_task(track_started=True)
 def trim_sync_events_task():
     """
     Trims old sync events
@@ -76,7 +76,7 @@ def trim_sync_events_task():
             event.release()
 
 
-@nonoverlapping_task(track_started=True, name="trim_channel_log_task")
+@nonoverlapping_task(track_started=True)
 def trim_channel_log_task():
     """
     Trims old channel logs
@@ -103,16 +103,12 @@ def trim_channel_log_task():
     logger.info(f"Deleted {num_deleted} channel logs in {timesince(start)}")
 
 
-@nonoverlapping_task(
-    track_started=True, name="squash_channelcounts", lock_key="squash_channelcounts", lock_timeout=7200
-)
+@nonoverlapping_task(track_started=True, lock_timeout=7200)
 def squash_channelcounts():
     ChannelCount.squash()
 
 
-@nonoverlapping_task(
-    track_started=True, name="track_org_channel_counts", lock_key="track_org_channel_counts", lock_timeout=7200
-)
+@nonoverlapping_task(track_started=True, lock_timeout=7200)
 def track_org_channel_counts(now=None):
     """
     Run daily, logs to our analytics the number of incoming and outgoing messages/ivr messages per org that had
