@@ -304,12 +304,12 @@ CELERY_BEAT_SCHEDULE["retry-errored-messages"] = {
 CELERY_BEAT_SCHEDULE["refresh-whatsapp-tokens"] = {"task": "refresh_whatsapp_tokens", "schedule": timedelta(hours=12)}
 CELERY_BEAT_SCHEDULE["refresh-whatsapp-templates"] = {
     "task": "refresh_whatsapp_templates",
-    "schedule": timedelta(minutes=env.int("REFRESH_WPP_TEMPLATES_TASK_TIME ", default=60)),
+    "schedule": timedelta(minutes=env.int("REFRESH_WPP_TEMPLATES_TASK_TIME", default=60)),
 }
 
 CELERY_BEAT_SCHEDULE["refresh-whatsapp-catalog-and-products"] = {
     "task": "refresh_whatsapp_catalog_and_products",
-    "schedule": timedelta(minutes=env.int("REFRESH_WPP_CATALOG_TASK_TIME ", default=60)),
+    "schedule": timedelta(minutes=env.int("REFRESH_WPP_CATALOG_TASK_TIME", default=60)),
 }
 
 # -----------------------------------------------------------------------------------
