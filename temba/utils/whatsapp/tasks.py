@@ -196,6 +196,14 @@ def update_channel_catalogs_status(channel, facebook_catalog_id):
     return True
 
 
+def set_false_is_active_catalog(channel, catalogs_data):
+    channel.config["catalog_id"] = ""
+    channel.save(update_fields=["config"])
+    for catalog in catalogs_data:
+        catalog["is_active"] = False
+    return catalogs_data
+
+
 def update_is_active_catalog(channel, catalogs_data):
     waba_id = channel.config.get("wa_waba_id", None)
 
@@ -206,17 +214,33 @@ def update_is_active_catalog(channel, catalogs_data):
 
     headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
     resp = requests.get(url, params=dict(limit=255), headers=headers)
-    actived_catalog = resp.json()["data"][0]["id"]
 
-    channel.config["catalog_id"] = actived_catalog
-    channel.save(update_fields=["config"])
+    if "error" in resp.json():
+        set_false_is_active_catalog(channel, catalogs_data)
+        logger.error(f"Error refreshing WhatsApp catalog and products: {str(resp.json())}", exc_info=True)
 
-    for catalog in catalogs_data:
-        if catalog.get("id") != actived_catalog:
-            catalog["is_active"] = False
+        return catalogs_data
 
-        else:
-            catalog["is_active"] = True
+    json_data = resp.json().get("data", [])
+    if json_data and json_data[0].get("id"):
+        actived_catalog = json_data[0]["id"]
+    else:
+        actived_catalog = None
+
+    if actived_catalog is None or len(actived_catalog) == 0:
+        set_false_is_active_catalog(channel, catalogs_data)
+        return catalogs_data
+
+    if actived_catalog:
+        channel.config["catalog_id"] = actived_catalog
+        channel.save(update_fields=["config"])
+
+        for catalog in catalogs_data:
+            if catalog.get("id") != actived_catalog:
+                catalog["is_active"] = False
+
+            else:
+                catalog["is_active"] = True
 
     return catalogs_data
 
