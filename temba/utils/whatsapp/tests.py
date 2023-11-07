@@ -491,6 +491,61 @@ class UpdateIsActiveCatalogTestCase(TembaTest):
         self.assertEqual(Catalog.objects.count(), 3)
 
     @patch("temba.utils.whatsapp.tasks.requests.get")
+    def test_update_is_active_catalog_with_error(self, mock_requests_get):
+        mock_response = {"error": "Error"}
+        mock_requests_get.return_value = Mock(status_code=500)
+        mock_requests_get.return_value.json.return_value = mock_response
+
+        config = {"wa_waba_id": "1111111111111", "wa_business_id": "2222222222"}
+
+        channel = self.channel
+        channel.get_type().code = "WAC"
+        channel.config = config
+
+        catalogs_data = [
+            {"name": "Catalog1", "id": "catalog1", "is_active": True},
+            {"name": "Catalog2", "id": "catalog2", "is_active": False},
+            {"name": "Catalog3", "id": "catalog3", "is_active": False},
+        ]
+
+        updated_catalogs_data = update_is_active_catalog(channel, catalogs_data)
+
+        self.assertEqual(updated_catalogs_data[0]["is_active"], False)
+        self.assertEqual(updated_catalogs_data[1]["is_active"], False)
+        self.assertEqual(updated_catalogs_data[2]["is_active"], False)
+
+    @patch("temba.utils.whatsapp.tasks.requests.get")
+    def test_update_is_active_catalog_no_data(self, mock_requests_get):
+        mock_response = {
+            "data": [
+                {"id": "catalog1"},
+                {"id": "catalog2"},
+            ]
+        }
+        mock_requests_get.return_value.json.return_value = mock_response
+
+        config = {"wa_waba_id": "1111111111111", "wa_business_id": "2222222222"}
+
+        channel = self.channel
+        channel.get_type().code = "WAC"
+        channel.config = config
+
+        catalogs_data = [
+            {"name": "Catalog1", "id": "catalog1", "is_active": True},
+            {"name": "Catalog2", "id": "catalog2", "is_active": False},
+            {"name": "Catalog3", "id": "catalog3", "is_active": False},
+        ]
+
+        # Simular que actived_catalog é None
+        mock_requests_get.return_value.json.return_value = {"data": []}
+
+        updated_catalogs_data = update_is_active_catalog(channel, catalogs_data)
+
+        self.assertEqual(updated_catalogs_data[0]["is_active"], False)
+        self.assertEqual(updated_catalogs_data[1]["is_active"], False)
+        self.assertEqual(updated_catalogs_data[2]["is_active"], False)
+
+    @patch("temba.utils.whatsapp.tasks.requests.get")
     def test_update_is_active_catalog_waba_error(self, mock_requests_get):
         mock_response = {
             "data": [
@@ -500,7 +555,7 @@ class UpdateIsActiveCatalogTestCase(TembaTest):
         }
         mock_requests_get.return_value.json.return_value = mock_response
 
-        config = {"wa_business_id": "2222222222"}  # wa_waba_id ausente
+        config = {"wa_business_id": "2222222222"}
 
         channel = self.channel
         channel.config = config
@@ -511,7 +566,7 @@ class UpdateIsActiveCatalogTestCase(TembaTest):
             {"id": "catalog3", "is_active": False},
         ]
 
-        with self.assertRaises(ValueError):  # Verifica se uma exceção é levantada
+        with self.assertRaises(ValueError):
             update_is_active_catalog(channel, catalogs_data)
 
 
