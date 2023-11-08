@@ -196,24 +196,51 @@ def update_channel_catalogs_status(channel, facebook_catalog_id):
     return True
 
 
+def set_false_is_active_catalog(channel, catalogs_data):
+    channel.config["catalog_id"] = ""
+    channel.save(update_fields=["config"])
+    for catalog in catalogs_data:
+        catalog["is_active"] = False
+    return catalogs_data
+
+
 def update_is_active_catalog(channel, catalogs_data):
     waba_id = channel.config.get("wa_waba_id", None)
 
     if not waba_id:
-        return catalogs_data
+        raise ValueError("Channel wa_waba_id not found")
 
     url = f"https://graph.facebook.com/v17.0/{waba_id}/product_catalogs"
 
     headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
     resp = requests.get(url, params=dict(limit=255), headers=headers)
-    actived_catalog = resp.json()["data"][0]["id"]
 
-    for catalog in catalogs_data:
-        if catalog.get("id") != actived_catalog:
-            catalog["is_active"] = False
+    if "error" in resp.json():
+        set_false_is_active_catalog(channel, catalogs_data)
+        logger.error(f"Error refreshing WhatsApp catalog and products: {str(resp.json())}", exc_info=True)
 
-        else:
-            catalog["is_active"] = True
+        return catalogs_data
+
+    json_data = resp.json().get("data", [])
+    if json_data and json_data[0].get("id"):
+        actived_catalog = json_data[0]["id"]
+    else:
+        actived_catalog = None
+
+    if actived_catalog is None or len(actived_catalog) == 0:
+        set_false_is_active_catalog(channel, catalogs_data)
+        return catalogs_data
+
+    if actived_catalog:
+        channel.config["catalog_id"] = actived_catalog
+        channel.save(update_fields=["config"])
+
+        for catalog in catalogs_data:
+            if catalog.get("id") != actived_catalog:
+                catalog["is_active"] = False
+
+            else:
+                catalog["is_active"] = True
 
     return catalogs_data
 
@@ -285,7 +312,8 @@ def refresh_whatsapp_catalog_and_products():
                 if not valid:
                     continue
 
-                update_local_catalogs(channel, catalog_data)
+                if len(catalog_data) > 0:
+                    update_local_catalogs(channel, catalog_data)
 
                 for catalog in Catalog.objects.filter(channel=channel):
                     # Fetch products for each catalog
@@ -326,7 +354,7 @@ def sent_trim_products_to_sentenx(catalog, products):
         url = sentenx_url + "/products/batch"
         ids = [tc.id for tc in products]
         products_to_delete_list = list(
-            Product.objects.filter(catalog=catalog).exclude(id__in=ids).values_list("product_retailer_id")
+            Product.objects.filter(catalog=catalog).exclude(id__in=ids).values_list("product_retailer_id", flat=True)
         )
 
         if products_to_delete_list:
@@ -337,7 +365,7 @@ def sent_trim_products_to_sentenx(catalog, products):
 
             resp = requests.delete(
                 url,
-                data=payload,
+                json=payload,
             )
 
             if resp.status_code == 200:

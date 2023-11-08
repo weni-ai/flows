@@ -2483,6 +2483,10 @@ class ContactTest(TembaTest):
         self.assertEqual(history_icon(item), '<span class="glyph icon-cash"></span>')
         self.assertEqual(history_class(item), "non-msg detail-event")
 
+        item = {"type": "product_sent"}
+        self.assertEqual(history_icon(item), '<span class="material-symbols-outlined fill">storefront</span>')
+        self.assertEqual(history_class(item), "msg detail-event")
+
     def test_get_scheduled_messages(self):
         self.just_joe = self.create_group("Just Joe", [self.joe])
 

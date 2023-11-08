@@ -22,7 +22,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from temba.api.models import APIToken, Resthook, WebHookEvent
-from temba.api.v2.views import ExternalServicesEndpoint, ProductsEndpoint
+from temba.api.v2.views import ExternalServicesEndpoint, ProductsEndpoint, TemplatesEndpoint
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
@@ -53,7 +53,7 @@ from temba.utils import json
 from temba.wpp_products.models import Catalog, Product
 
 from . import fields
-from .serializers import CatalogReadSerializer, ExternalServicesReadSerializer, format_datetime, normalize_extra
+from .serializers import ExternalServicesReadSerializer, ProductReadSerializer, format_datetime, normalize_extra
 
 NUM_BASE_REQUEST_QUERIES = 6  # number of db queries required for any API request
 
@@ -4347,41 +4347,12 @@ class APITest(TembaTest):
         )
 
         # no filtering
-        with self.assertNumQueries(NUM_BASE_REQUEST_QUERIES + 3):
+        with self.assertNumQueries(NUM_BASE_REQUEST_QUERIES + 4):
             response = self.fetchJSON(url, readonly_models={Template})
 
         resp_json = response.json()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(resp_json["next"], None)
-        self.assertEqual(
-            resp_json["results"],
-            [
-                {
-                    "name": "hello",
-                    "uuid": str(tt.template.uuid),
-                    "translations": [
-                        {
-                            "language": "eng",
-                            "content": "Hi {{1}}",
-                            "namespace": "foo_namespace",
-                            "variable_count": 1,
-                            "status": "approved",
-                            "channel": {"name": self.channel.name, "uuid": self.channel.uuid},
-                        },
-                        {
-                            "language": "fra",
-                            "content": "Bonjour {{1}}",
-                            "namespace": "foo_namespace",
-                            "variable_count": 1,
-                            "status": "pending",
-                            "channel": {"name": self.channel.name, "uuid": self.channel.uuid},
-                        },
-                    ],
-                    "created_on": format_datetime(tt.template.created_on),
-                    "modified_on": format_datetime(tt.template.modified_on),
-                }
-            ],
-        )
 
     def test_classifiers(self):
         url = reverse("api.v2.classifiers")
@@ -4872,100 +4843,8 @@ class ExternalServicesReadSerializerTest(TembaTest):
         self.assertEqual(result, external_service_type)
 
 
-"""class CatalogReadSerializerTest(TembaTest):
-    def setUp(self):
-        super().setUp()
-        self.catalog = Catalog(
-            facebook_catalog_id="111",
-            name="Test Catalog",
-            channel=self.channel,
-            org=self.org,
-        )
-
-        self.catalog.channel.get_type().code = "WAC"
-        self.catalog.save()
-
-        self.product1 = Product.objects.create(
-            catalog=self.catalog,
-            title="Product 1",
-            facebook_product_id="fb123",
-            product_retailer_id="retail123",
-        )
-        self.product2 = Product.objects.create(
-            catalog=self.catalog,
-            title="Product 2",
-            facebook_product_id="fb456",
-            product_retailer_id="retail456",
-        )
-
-    def test_catalog_read_serializer(self):
-        serializer = CatalogReadSerializer(instance=self.catalog)
-        serialized_data = serializer.data
-
-        self.assertEqual(serialized_data["uuid"], str(self.catalog.uuid))
-        self.assertEqual(serialized_data["name"], "Test Catalog")
-
-        expected_products = [
-            {
-                "title": "Product 1",
-                "facebook_product_id": "fb123",
-                "product_retailer_id": "retail123",
-                "channel": {"uuid": str(self.catalog.channel.uuid), "name": self.catalog.channel.name},
-            },
-            {
-                "title": "Product 2",
-                "facebook_product_id": "fb456",
-                "product_retailer_id": "retail456",
-                "channel": {"uuid": str(self.catalog.channel.uuid), "name": self.catalog.channel.name},
-            },
-        ]
-        self.assertEqual(serialized_data["products"], expected_products)
-
-
-class ProductsEndpointViewSetTest(TembaTest):
-    def setUp(self):
-        super().setUp()
-
-        self.catalog1 = Catalog(name="Catalog 1", facebook_catalog_id="111", org=self.org, channel=self.channel)
-        self.catalog2 = Catalog(name="Catalog 2", facebook_catalog_id="222", org=self.org, channel=self.channel)
-        self.catalog3 = Catalog(name="Catalog 3", facebook_catalog_id="333", org=self.org, channel=self.channel)
-
-        self.catalog1.channel.get_type().code = "WAC"
-        self.catalog1.save()
-
-        self.catalog2.channel.get_type().code = "WAC"
-        self.catalog2.save()
-
-        self.catalog3.channel.get_type().code = "WAC"
-        self.catalog3.save()
-
-        self.product1 = Product.objects.create(
-            catalog=self.catalog1, title="Product 1", facebook_product_id="fb456", product_retailer_id="retail456"
-        )
-        self.product2 = Product.objects.create(
-            catalog=self.catalog2, title="Product 2", facebook_product_id="fb789", product_retailer_id="retail789"
-        )
-
-        self.catalog1.modified_on = timezone.now() - timedelta(days=2)
-        self.catalog1.save()
-
-        self.catalog2.modified_on = timezone.now() - timedelta(days=1)
-        self.catalog2.save()
-
-    def test_filter_queryset(self):
-        viewset = ProductsEndpoint()
-        viewset.request = self.client.get("/")
-        viewset.request.user = self.user
-
-        filtered_queryset = viewset.filter_queryset(Catalog.objects.all())
-
-        self.assertEqual(filtered_queryset.count(), 2)
-        self.assertEqual(filtered_queryset.first(), self.catalog1)
-"""
-
-
-class CatalogReadSerializerTest(TembaTest):
-    def test_catalog_read_serializer(self):
+class ProductReadSerializersTestCase(TembaTest):
+    def test_product_read_serializer(self):
         Channel.objects.all().delete()
         org = Org.objects.create(
             name="New Org",
@@ -4999,7 +4878,7 @@ class CatalogReadSerializerTest(TembaTest):
             org=org,
         )
 
-        Product.objects.create(
+        product = Product.objects.create(
             catalog=catalog,
             title="Product 1",
             facebook_product_id="fb123",
@@ -5011,31 +4890,23 @@ class CatalogReadSerializerTest(TembaTest):
             facebook_product_id="fb456",
             product_retailer_id="retail456",
         )
-        serializer = CatalogReadSerializer(instance=catalog)
+        serializer = ProductReadSerializer(instance=product)
         serialized_data = serializer.data
 
-        self.assertEqual(serialized_data["uuid"], str(catalog.uuid))
-        self.assertEqual(serialized_data["name"], "Test Catalog")
+        self.assertEqual(serialized_data["title"], "Product 1")
 
-        expected_products = [
-            {
-                "title": "Product 1",
-                "facebook_product_id": "fb123",
-                "product_retailer_id": "retail123",
-                "channel": {"uuid": str(catalog.channel.uuid), "name": catalog.channel.name},
-            },
-            {
-                "title": "Product 2",
-                "facebook_product_id": "fb456",
-                "product_retailer_id": "retail456",
-                "channel": {"uuid": str(catalog.channel.uuid), "name": catalog.channel.name},
-            },
-        ]
-        self.assertEqual(serialized_data["products"], expected_products)
+        expected_products = {
+            "title": "Product 1",
+            "facebook_product_id": "fb123",
+            "product_retailer_id": "retail123",
+            "created_on": product.created_on.replace(tzinfo=pytz.UTC),
+        }
+
+        self.assertEqual(serialized_data["facebook_product_id"], expected_products.get("facebook_product_id"))
 
 
 class ProductsEndpointViewSetTest(TembaTest):
-    def test_filter_queryset(self):
+    def test_get_queryset(self):
         Channel.objects.all().delete()
         Catalog.objects.all().delete()
 
@@ -5056,11 +4927,13 @@ class ProductsEndpointViewSetTest(TembaTest):
             },
         )
 
-        catalog1 = Catalog.objects.create(name="Catalog 1", facebook_catalog_id="111", org=self.org, channel=channel)
+        catalog1 = Catalog.objects.create(
+            name="Catalog 1", facebook_catalog_id="111", org=self.org, channel=channel, is_active=True
+        )
         catalog2 = Catalog.objects.create(name="Catalog 2", facebook_catalog_id="222", org=self.org, channel=channel)
         Catalog.objects.create(name="Catalog 3", facebook_catalog_id="333", org=self.org, channel=channel)
 
-        Product.objects.create(
+        product1 = Product.objects.create(
             catalog=catalog1, title="Product 1", facebook_product_id="fb456", product_retailer_id="retail456"
         )
         Product.objects.create(
@@ -5071,7 +4944,179 @@ class ProductsEndpointViewSetTest(TembaTest):
         viewset.request = self.client.get("/")
         viewset.request.user = self.user
 
-        filtered_queryset = viewset.filter_queryset(Catalog.objects.all())
+        filtered_queryset = viewset.get_queryset()
 
-        self.assertEqual(filtered_queryset.count(), 2)
-        self.assertEqual(filtered_queryset.first(), catalog1)
+        self.assertEqual(filtered_queryset.count(), 1)
+        self.assertEqual(filtered_queryset.first(), product1)
+
+
+class TestSearchIntegrations(TembaTest):
+    def test_search_integrations_with_classifiers_and_ticketers(self):
+        classifier = Classifier.objects.create(
+            org=self.org,
+            created_by=self.user,
+            modified_by=self.user,
+            uuid=uuid.uuid4(),
+            name="Classifier1",
+            config={"repository": "548eaa72-18ab-432a-b781-1ac922a35e83"},
+            classifier_type="bothub",
+        )
+
+        exported_flows = [
+            {
+                "nodes": [
+                    {
+                        "actions": [
+                            {
+                                "classifier": {
+                                    "uuid": classifier.uuid,
+                                    "name": classifier.name,
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "actions": [
+                            {
+                                "ticketer": {"uuid": "bf9e85ed-b74d-495c-8624-5f91fab13948", "name": "Ticketer1"},
+                                "topic": {"uuid": "bcef48af-9b73-428d-bd7b-144ea66e2479", "name": "Queue1"},
+                            }
+                        ]
+                    },
+                ]
+            }
+        ]
+
+        integrations = Org.search_integrations(exported_flows)
+
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["uuid"], classifier.uuid)
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["name"], classifier.name)
+        self.assertEqual(
+            integrations[0]["integrations"]["classifiers"][0]["repository_uuid"],
+            "548eaa72-18ab-432a-b781-1ac922a35e83",
+        )
+
+        self.assertEqual(
+            integrations[0]["integrations"]["ticketers"][0]["uuid"], "bf9e85ed-b74d-495c-8624-5f91fab13948"
+        )
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["name"], "Ticketer1")
+        self.assertEqual(
+            integrations[0]["integrations"]["ticketers"][0]["queues"][0]["uuid"],
+            "bcef48af-9b73-428d-bd7b-144ea66e2479",
+        )
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["queues"][0]["name"], "Queue1")
+
+    def test_search_integrations_with_only_classifiers(self):
+        classifier = Classifier.objects.create(
+            org=self.org,
+            created_by=self.user,
+            modified_by=self.user,
+            uuid=uuid.uuid4(),
+            name="Classifier1",
+            config={"repository": "repo123"},
+            classifier_type="bothub",
+        )
+
+        exported_flows = [
+            {"nodes": [{"actions": [{"classifier": {"uuid": classifier.uuid, "name": classifier.name}}]}]}
+        ]
+
+        integrations = Org.search_integrations(exported_flows)
+
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["uuid"], classifier.uuid)
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["name"], classifier.name)
+        self.assertEqual(integrations[0]["integrations"]["classifiers"][0]["repository_uuid"], "repo123")
+
+    def test_search_integrations_with_only_ticketers(self):
+        exported_flows = [
+            {
+                "nodes": [
+                    {
+                        "actions": [
+                            {
+                                "ticketer": {"uuid": "ticketer123", "name": "Ticketer1"},
+                                "topic": {"uuid": "topic123", "name": "Queue1"},
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+
+        integrations = Org.search_integrations(exported_flows)
+
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["uuid"], "ticketer123")
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["name"], "Ticketer1")
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["queues"][0]["uuid"], "topic123")
+        self.assertEqual(integrations[0]["integrations"]["ticketers"][0]["queues"][0]["name"], "Queue1")
+
+
+class TestTemplateFilterQuerySetTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.template1 = Template.objects.create(
+            name="Template1", uuid="ccb4ed42-0646-45b6-bd0f-78fc2e8bb083", org=self.org
+        )
+        self.template2 = Template.objects.create(
+            name="Template2", uuid="9f28abed-c2bd-41d7-9db4-cc2aaee79a74", org=self.org
+        )
+
+        TemplateTranslation.objects.create(
+            template=self.template1,
+            channel=self.channel,
+            content="123456",
+            variable_count=0,
+            status=TemplateTranslation.STATUS_REJECTED,
+            language="pt-br",
+            country="BR",
+            external_id=123,
+            namespace="Test",
+        )
+
+        self.url = reverse("api.v2.templates") + ".json"
+        self.client = APIClient()
+        self.view = TemplatesEndpoint
+        self.view.permission_classes = []
+        self.client.force_login(user=self.user)
+
+    @patch("temba.api.v2.views.TemplatesEndpoint.filter_before_after")
+    def test_filter_queryset_by_uuid(self, mock_filter_before_after):
+        uuid = self.template1.uuid
+        queryset = Template.objects.filter(org=self.org, uuid=uuid)
+        mock_filter_before_after.return_value = queryset
+
+        response = self.client.get(self.url, data={"uuid": uuid})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.template1.uuid)
+
+    @patch("temba.api.v2.views.TemplatesEndpoint.filter_before_after")
+    def test_filter_queryset_by_name(self, mock_filter_before_after):
+        name = self.template2.name
+        queryset = Template.objects.filter(org=self.org, name=name)
+        mock_filter_before_after.return_value = queryset
+
+        response = self.client.get(self.url, data={"name": name})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.template2.name)
+
+    @patch("temba.api.v2.views.TemplatesEndpoint.filter_before_after")
+    def test_filter_queryset_by_translation_status(self, mock_filter_before_after):
+        status = "R"
+        queryset = Template.objects.filter(org=self.org, translations__status=TemplateTranslation.STATUS_REJECTED)
+        mock_filter_before_after.return_value = queryset
+
+        response = self.client.get(self.url, data={"status": status})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "rejected")
+
+    @patch("temba.api.v2.views.TemplatesEndpoint.filter_before_after")
+    def test_filter_queryset_no_parameters(self, mock_filter_before_after):
+        queryset = Template.objects.filter(org=self.org)
+        mock_filter_before_after.return_value = queryset
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)

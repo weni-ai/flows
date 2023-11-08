@@ -37,6 +37,7 @@ from temba.tickets.models import Ticketer
 from temba.triggers.models import Trigger
 from temba.utils import json
 from temba.utils.uuid import uuid4
+from temba.wpp_products.models import Catalog, Product
 
 from .checks import mailroom_url
 from .models import (
@@ -405,9 +406,42 @@ class FlowTest(TembaTest):
         )
         assert_features({"facebook", "airtime", "classifier", "resthook", "ticketer", "external_service"})
 
+        channel = self.channel
+        channel.get_type().code = "WAC"
+
+        catalog = Catalog.objects.create(
+            facebook_catalog_id="111",
+            name="Test Catalog",
+            channel=channel,
+            org=self.org,
+            is_active=True,
+        )
+
+        Product.objects.create(
+            catalog=catalog,
+            title="Product 1",
+            facebook_product_id="fb123",
+            product_retailer_id="retail123",
+        )
+
+        assert_features(
+            {"facebook", "airtime", "classifier", "resthook", "ticketer", "external_service", "whatsapp_catalog"}
+        )
+
         self.setUpLocations()
 
-        assert_features({"facebook", "airtime", "classifier", "resthook", "ticketer", "external_service", "locations"})
+        assert_features(
+            {
+                "facebook",
+                "airtime",
+                "classifier",
+                "resthook",
+                "ticketer",
+                "external_service",
+                "whatsapp_catalog",
+                "locations",
+            }
+        )
 
     def test_save_revision(self):
         self.login(self.admin)
