@@ -516,30 +516,30 @@ class UpdateIsActiveCatalogTestCase(TembaTest):
 
     @patch("temba.utils.whatsapp.tasks.requests.get")
     def test_update_is_active_catalog_no_data(self, mock_requests_get):
-        mock_response = {
+        mock_response_no_data = {
             "data": [
-                {"id": "catalog1"},
-                {"id": "catalog2"},
+                {"id": "catalog3"},
+                {"id": "catalog4"},
             ]
         }
-        mock_requests_get.return_value.json.return_value = mock_response
+        mock_requests_get.return_value.json.return_value = mock_response_no_data
 
-        config = {"wa_waba_id": "1111111111111", "wa_business_id": "2222222222"}
+        config = {"wa_waba_id": "3333333333333", "wa_business_id": "444444444444"}
 
-        channel = self.channel
-        channel.get_type().code = "WAC"
-        channel.config = config
+        channel2 = self.channel
+        channel2.get_type().code = "WAC"
+        channel2.config = config
 
         catalogs_data = [
-            {"name": "Catalog1", "id": "catalog1", "is_active": True},
-            {"name": "Catalog2", "id": "catalog2", "is_active": False},
-            {"name": "Catalog3", "id": "catalog3", "is_active": False},
+            {"name": "Catalog3", "id": "catalog3", "is_active": True},
+            {"name": "Catalog4", "id": "catalog4", "is_active": False},
+            {"name": "Catalog5", "id": "catalog5", "is_active": False},
         ]
 
-        # Simular que actived_catalog é None
+        # actived_catalog is None
         mock_requests_get.return_value.json.return_value = {"data": []}
 
-        updated_catalogs_data = update_is_active_catalog(channel, catalogs_data)
+        updated_catalogs_data = update_is_active_catalog(channel2, catalogs_data)
 
         self.assertEqual(updated_catalogs_data[0]["is_active"], False)
         self.assertEqual(updated_catalogs_data[1]["is_active"], False)

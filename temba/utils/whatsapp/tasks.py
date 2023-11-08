@@ -358,7 +358,7 @@ def sent_trim_products_to_sentenx(catalog, products):
         url = sentenx_url + "/products/batch"
         ids = [tc.id for tc in products]
         products_to_delete_list = list(
-            Product.objects.filter(catalog=catalog).exclude(id__in=ids).values_list("product_retailer_id")
+            Product.objects.filter(catalog=catalog).exclude(id__in=ids).values_list("product_retailer_id", flat=True)
         )
 
         if products_to_delete_list:
@@ -369,7 +369,7 @@ def sent_trim_products_to_sentenx(catalog, products):
 
             resp = requests.delete(
                 url,
-                data=payload,
+                json=payload,
             )
 
             if resp.status_code == 200:
