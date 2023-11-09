@@ -1,3 +1,9 @@
+3.3.2
+----------
+* Fix error when not exist an active catalog
+* Add catalogs in get_features flow view
+* Update Floweditor to 2.8.2
+
 3.3.1
 ----------
 * Update Floweditor to 2.8.1
