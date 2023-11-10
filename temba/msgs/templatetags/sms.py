@@ -118,9 +118,13 @@ def attachment_button(attachment: str) -> dict:
         category, sub_type = content_type, ""
 
     if category == "geo":
-        preview = url
+        if ";" in url:
+            preview = url.split(";")[0]
+            (lat, lng) = url.split(";")[0].split(",")
+        else:
+            preview = url
+            (lat, lng) = url.split(",")
 
-        (lat, lng) = url.split(",")
         url = "http://www.openstreetmap.org/?mlat=%(lat)s&mlon=%(lng)s#map=18/%(lat)s/%(lng)s" % {
             "lat": lat,
             "lng": lng,

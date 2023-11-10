@@ -55,6 +55,18 @@ class TestSMSTagLibrary(TembaTest):
             attachment_button("geo:-35.998287,26.478109"),
         )
 
+        # updated geo coordinates
+        self.assertEqual(
+            {
+                "content_type": "geo",
+                "category": "geo",
+                "preview": "-35.998287,26.478109",
+                "url": "http://www.openstreetmap.org/?mlat=-35.998287&mlon=26.478109#map=18/-35.998287/26.478109",
+                "is_playable": False,
+            },
+            attachment_button("geo:-35.998287,26.478109;name:Main Street Beach;address:Main Street Beach, Santa Cruz, CA"),
+        )
+
         context = Context(attachment_button("image/jpeg:https://example.com/test.jpg"))
         template = Template("""{% load sms %}{% attachment_button 'image/jpeg:https://example.com/test.jpg' %}""")
         self.assertIn("data-featherlight", template.render(context))
