@@ -1,3 +1,7 @@
+3.3.3
+----------
+* Handle updated geo attachments
+
 3.3.2
 ----------
 * Fix error when not exist an active catalog
