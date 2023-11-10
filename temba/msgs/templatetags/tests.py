@@ -49,7 +49,7 @@ class TestSMSTagLibrary(TembaTest):
                 "content_type": "geo",
                 "category": "geo",
                 "preview": "-35.998287,26.478109",
-                "url": "http://www.openstreetmap.org/?mlat=-35.998287&mlon=26.478109#map=18/-35.998287/26.478109",
+                "url": "https://www.openstreetmap.org/?mlat=-35.998287&mlon=26.478109#map=18/-35.998287/26.478109",
                 "is_playable": False,
             },
             attachment_button("geo:-35.998287,26.478109"),
