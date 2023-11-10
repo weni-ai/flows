@@ -125,7 +125,7 @@ def attachment_button(attachment: str) -> dict:
             preview = url
             (lat, lng) = url.split(",")
 
-        url = "http://www.openstreetmap.org/?mlat=%(lat)s&mlon=%(lng)s#map=18/%(lat)s/%(lng)s" % {
+        url = "https://www.openstreetmap.org/?mlat=%(lat)s&mlon=%(lng)s#map=18/%(lat)s/%(lng)s" % {
             "lat": lat,
             "lng": lng,
         }
