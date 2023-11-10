@@ -64,7 +64,9 @@ class TestSMSTagLibrary(TembaTest):
                 "url": "http://www.openstreetmap.org/?mlat=-35.998287&mlon=26.478109#map=18/-35.998287/26.478109",
                 "is_playable": False,
             },
-            attachment_button("geo:-35.998287,26.478109;name:Main Street Beach;address:Main Street Beach, Santa Cruz, CA"),
+            attachment_button(
+                "geo:-35.998287,26.478109;name:Main Street Beach;address:Main Street Beach, Santa Cruz, CA"
+            ),
         )
 
         context = Context(attachment_button("image/jpeg:https://example.com/test.jpg"))
