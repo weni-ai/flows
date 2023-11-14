@@ -1084,6 +1084,8 @@ class FlowCRUDL(SmartCRUDL):
                 features.append("external_service")
             if org.catalogs.filter(is_active=True, products__isnull=False).exists():
                 features.append("whatsapp_catalog")
+            if org.config.get("has_vtex"):
+                features.append("has_vtex")
 
             return features
 
