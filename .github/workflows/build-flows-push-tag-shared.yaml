@@ -12,10 +12,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: "${{env.GITHUB_SHA}}"
           token: ${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: push-backend
+        tags: |
+          type=semver,pattern={{version}}-develop
+          type=semver,pattern={{version}}-staging
+          type=semver,pattern={{version}}
 
       - name: Set variables
         run: |
