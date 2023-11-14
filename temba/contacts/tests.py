@@ -2226,7 +2226,7 @@ class ContactTest(TembaTest):
         self.assertContains(response, '<source type="video/mp4" src="http://blah/file.mp4" />')
         self.assertContains(
             response,
-            "http://www.openstreetmap.org/?mlat=47.5414799&amp;mlon=-122.6359908#map=18/47.5414799/-122.6359908",
+            "https://www.openstreetmap.org/?mlat=47.5414799&amp;mlon=-122.6359908#map=18/47.5414799/-122.6359908",
         )
         self.assertContains(response, reverse("channels.channellog_read", args=[log.channel.uuid, log.id]))
         self.assertContains(response, reverse("channels.channellog_connection", args=[call.id]))
