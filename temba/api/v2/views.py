@@ -42,6 +42,7 @@ from temba.orgs.models import OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.utils import splitting_getlist, str_to_bool
+from temba.wpp_products.models import Product
 
 from ..models import SSLPermission
 from ..support import InvalidQueryError
@@ -75,6 +76,7 @@ from .serializers import (
     LabelWriteSerializer,
     MsgBulkActionSerializer,
     MsgReadSerializer,
+    ProductReadSerializer,
     ResthookReadSerializer,
     ResthookSubscriberReadSerializer,
     ResthookSubscriberWriteSerializer,
@@ -115,6 +117,7 @@ class RootView(views.APIView):
      * [/api/v2/messages](/api/v2/messages) - to list messages
      * [/api/v2/message_actions](/api/v2/message_actions) - to perform bulk message actions
      * [/api/v2/runs](/api/v2/runs) - to list flow runs
+     * [/api/v2/products](/api/v2/products) - to list current WhatsApp products on your account
      * [/api/v2/resthooks](/api/v2/resthooks) - to list resthooks
      * [/api/v2/resthook_events](/api/v2/resthook_events) - to list resthook events
      * [/api/v2/resthook_subscribers](/api/v2/resthook_subscribers) - to list, create or delete subscribers on your resthooks
@@ -223,6 +226,7 @@ class RootView(views.APIView):
                 "labels": reverse("api.v2.labels", request=request),
                 "messages": reverse("api.v2.messages", request=request),
                 "message_actions": reverse("api.v2.message_actions", request=request),
+                "products": reverse("api.v2.products", request=request),
                 "resthooks": reverse("api.v2.resthooks", request=request),
                 "resthook_events": reverse("api.v2.resthook_events", request=request),
                 "resthook_subscribers": reverse("api.v2.resthook_subscribers", request=request),
@@ -280,6 +284,7 @@ class ExplorerView(SmartTemplateView):
             LabelsEndpoint.get_delete_explorer(),
             MessagesEndpoint.get_read_explorer(),
             MessageActionsEndpoint.get_write_explorer(),
+            ProductsEndpoint.get_read_explorer(),
             ResthooksEndpoint.get_read_explorer(),
             ResthookEventsEndpoint.get_read_explorer(),
             ResthookSubscribersEndpoint.get_read_explorer(),
@@ -3334,7 +3339,8 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
 
     Each template has the following attributes:
 
-     * **name** - the name of the template
+     * **uuid** - filterable as `uuid`.
+     * **name** - the name of the template, filterable as `name`
      * **translations** - a dictionary of the translations of the template with the key being an ISO639-3 code
 
      Each translation contains the following attributes:
@@ -3343,6 +3349,13 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
      * **content** - the content of the translation
      * **variable_count** - the count of variables in this template
      * **status** - the status of this translation, either `approved`, `pending`, `rejected` or `unsupported_language`
+
+     For filter translations by status, you can use **status** attribute as folow:
+
+     * **By default**, the endpoint bring status `approved`
+     * `pending` - Use **P** , like status=P.
+     * `rejected` - Use **R**, like status=R.
+     * `unsupported_language` - Use **U**, like status=U.
 
     Example:
 
@@ -3384,10 +3397,26 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
     pagination_class = ModifiedOnCursorPagination
 
     def filter_queryset(self, queryset):
+        params = self.request.query_params
         org = self.request.user.get_org()
         queryset = org.templates.exclude(translations=None).prefetch_related(
-            Prefetch("translations", TemplateTranslation.objects.filter(is_active=True))
+            Prefetch(
+                "translations",
+                TemplateTranslation.objects.filter(is_active=True),
+            )
         )
+
+        status = params.get("status", "A")
+        queryset = queryset.filter(translations__status=status)
+
+        uuid = params.get("uuid")
+        if uuid:
+            queryset = queryset.filter(uuid=uuid)
+
+        name = params.get("name")
+        if name:
+            queryset = queryset.filter(name=name)
+
         return self.filter_before_after(queryset, "modified_on")
 
     @classmethod
@@ -3397,7 +3426,19 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
             "title": "List Templates",
             "url": reverse("api.v2.templates"),
             "slug": "templates-list",
-            "params": [],
+            "params": [
+                {"name": "name", "required": False, "help": "A template name to filter by, ex: MyTemplate"},
+                {
+                    "name": "uuid",
+                    "required": False,
+                    "help": "Only return template with this UUID",
+                },
+                {
+                    "name": "status",
+                    "required": False,
+                    "help": "Only return templates with this status, ex: R",
+                },
+            ],
             "example": {},
         }
 
@@ -3866,4 +3907,86 @@ class WorkspaceEndpoint(BaseAPIView):
             "title": "View Workspace",
             "url": reverse("api.v2.workspace"),
             "slug": "workspace-read",
+        }
+
+
+class ProductsEndpoint(ListAPIMixin, BaseAPIView):
+    """
+    This endpoint allows you to fetch the WhatsApp catalogs that have been synced. Each catalog contains a
+    dictionary of the products.
+
+    ## Listing Products
+
+    A `GET` request returns the products for your organization.
+
+    Each catalog has the following attributes:
+
+     * **name** - the name of the catalog
+     * **products** - a dictionary of the products of the catalog with the key being an ISO639-3 code
+
+     Each product contains the following attributes:
+
+     * **name** - the name of the product
+     * **facebook_product_id** - the product id in facebook
+
+
+    Example:
+
+        GET /api/v2/products.json
+
+    Response is the list of products for your organization:
+
+        {
+            "next": "http://example.com/api/v2/products.json?cursor=cD0yMDE1LTExLTExKzExJTNBM40NjQlMkIwMCUzRv",
+            "previous": null,
+            "results": [
+            {
+            "uuid": "8d16f730-bc3f-4a11-9e1f-8c460fc0a692",
+            "name": "Catalog Test",
+            "products": [
+                {
+                    "title": "Dog Bowl In Blue",
+                    "facebook_product_id": "6498684463556034",
+                    "product_retailer_id": "DB_1",
+                    "channel": {
+                        "uuid": "2e925f75-e88a-4fae-a303-6988e30b49cc",
+                        "name": "Whatsapp"
+                    }
+                },
+                {
+                    "title": "Dog Bowl In Yellow",
+                    "facebook_product_id": "7442068949153493",
+                    "product_retailer_id": "DB_2",
+                    "channel": {
+                        "uuid": "2e925f75-e88a-4fae-a303-6988e30b49cc",
+                        "name": "Whatsapp"
+                    }
+                }
+            ],
+            "created_on": "2023-08-24T21:05:42.876148Z",
+            "modified_on": "2023-08-24T23:29:15.161065Z"
+        },
+            ...
+        }
+    """
+
+    permission = "templates.template_api"
+    model = Product
+    serializer_class = ProductReadSerializer
+    pagination_class = CreatedOnCursorPagination
+
+    def get_queryset(self):
+        org = self.request.user.get_org()
+        catalog = org.catalogs.exclude(is_active=False).first()
+        return Product.objects.filter(catalog=catalog)
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Products",
+            "url": reverse("api.v2.products"),
+            "slug": "products-list",
+            "params": [],
+            "example": {},
         }

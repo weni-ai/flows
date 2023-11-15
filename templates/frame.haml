@@ -51,9 +51,6 @@
       <script src="https://cdn.lr-in.com/LogRocket.min.js" crossorigin="anonymous"></script>
       <script>window.LogRocket && window.LogRocket.init("{{logrocket_id}}", {mergeIframes: true, parentDomain: "{{parent_iframe_domain}}"});</script>
 
-    -if use_weni_layout
-      <script defer src="//app.helphero.co/embed/m7dO0to4OK"></script>
-
     -compress js
       :javascript
         var static_url = '{{STATIC_URL}}';
@@ -99,7 +96,7 @@
 
     -block styles
       %link{rel:'stylesheet', href:'https://fonts.googleapis.com/css?family=Roboto+Mono:300|Roboto:200,300,400,500'}
-      %link{rel:'stylesheet', href:'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined'}
+      %link{rel:'stylesheet', href:'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0..1'}
 
       -compress css
         %link{type:'text/css', rel:'stylesheet', href:'{{ STATIC_URL }}bower/bootstrap-css/css/bootstrap.css',  media:'all' }
@@ -544,20 +541,6 @@
           inIframe();
 
           enableLinkTranslations();
-
-          HelpHero.anonymous();
-
-          HelpHero.on('tour_completed', function(event, info) {
-            // Weni Flows Guide Tour Identifier
-            if (info.tour.id === 'PBw8f8pZc2') {
-              // Start Integrations Menu selection Tour at Dash
-              window.parent.postMessage({ 
-                  event: 'startHelpHeroTour',
-                  tourId: 'huNqgL9PTP'
-              }, '*');
-            }
-          })
-
         {% endif %}
 
         function announcementCollapse() {

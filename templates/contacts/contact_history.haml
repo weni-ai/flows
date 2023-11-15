@@ -141,7 +141,7 @@
             -for attachment in event.msg.attachments
               {% attachment_button attachment %}
 
-      -elif event.type == 'msg_created' or event.type == 'msg_received' or event.type == "ivr_created"
+      -elif event.type == 'msg_created' or event.type == 'msg_received' or event.type == "ivr_created" or event.type == "product_sent"
         .activity-message
           .activity-body
             -if event.msg.text

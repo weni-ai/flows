@@ -7873,6 +7873,9 @@ msgstr "Cerrar"
 msgid "Rate again"
 msgstr "Evaluar de nuevo"
 
+msgid "Trigger Flow"
+msgstr "Desencadenar flujo"
+
 msgid "Quick search!"
 msgstr "¡Búsqueda rápida!"
 
