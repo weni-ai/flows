@@ -53,6 +53,7 @@ ACTIVITY_ICONS = {
     Event.TYPE_MSG_CREATED + ":delivered": "icon-bubble-check",
     Event.TYPE_MSG_RECEIVED: "icon-bubble-user",
     Event.TYPE_MSG_RECEIVED + ":voice": "icon-call-incoming",
+    Event.TYPE_PRODUCT_SENT: "storefront",
     Event.TYPE_RUN_RESULT_CHANGED: "icon-bars",
     Event.TYPE_TICKET_ASSIGNED: "icon-ticket",
     Event.TYPE_TICKET_REOPENED: "icon-ticket",
@@ -62,7 +63,13 @@ ACTIVITY_ICONS = {
     Event.TYPE_WEBHOOK_CALLED: "icon-cloud-upload",
 }
 
-MSG_EVENTS = {Event.TYPE_MSG_CREATED, Event.TYPE_MSG_RECEIVED, Event.TYPE_IVR_CREATED, Event.TYPE_BROADCAST_CREATED}
+MSG_EVENTS = {
+    Event.TYPE_MSG_CREATED,
+    Event.TYPE_MSG_RECEIVED,
+    Event.TYPE_IVR_CREATED,
+    Event.TYPE_BROADCAST_CREATED,
+    Event.TYPE_PRODUCT_SENT,
+}
 
 # events that are included in the summary view
 SUMMARY_EVENTS = {
@@ -138,6 +145,9 @@ def urn_icon(urn):
 def history_icon(event: dict) -> str:
     event_type = event["type"]
     variant = None
+
+    if event_type == Event.TYPE_PRODUCT_SENT:
+        return mark_safe(f'<span class="material-symbols-outlined fill">storefront</span>')
 
     if event_type == Event.TYPE_MSG_CREATED:
         if event["status"] in (Msg.STATUS_ERRORED, Msg.STATUS_FAILED):

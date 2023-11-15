@@ -804,6 +804,33 @@ class EventTest(TembaTest):
             Event.from_msg(self.org, self.admin, msg_out2),
         )
 
+        msg_out3 = self.create_outgoing_msg(
+            contact1,
+            "",
+            channel=self.channel,
+            status="E",
+            product_metadata={"products": [{"facebook_retailer_id": 1}], "body": "Product body text"},
+        )
+        log2 = ChannelLog.objects.create(channel=self.channel, is_error=True, description="Boom", msg=msg_out3)
+        msg_out3.refresh_from_db()
+
+        self.assertEqual(
+            {
+                "type": "product_sent",
+                "created_on": matchers.ISODate(),
+                "msg": {
+                    "uuid": str(msg_out3.uuid),
+                    "id": msg_out3.id,
+                    "urn": "tel:+250979111111",
+                    "text": "Product body text",
+                    "channel": {"uuid": str(self.channel.uuid), "name": "Test Channel"},
+                },
+                "status": "E",
+                "logs_url": f"/channels/channellog/read/{log2.channel.uuid}/{log2.id}/",
+            },
+            Event.from_msg(self.org, self.admin, msg_out3),
+        )
+
     def test_from_flow_run(self):
         contact = self.create_contact("Jim", phone="0979111111")
         flow = self.get_flow("color_v13")

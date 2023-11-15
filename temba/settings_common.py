@@ -293,6 +293,7 @@ INSTALLED_APPS = (
     "temba.airtime",
     "temba.sql",
     "temba.externals",
+    "temba.wpp_products",
     "temba.projects",
     "temba.event_driven",
 )
@@ -514,6 +515,7 @@ PERMISSIONS = {
     "msgs.label": ("api", "create_folder", "delete_folder"),
     "orgs.topup": ("manage",),
     "policies.policy": ("admin", "history", "give_consent"),
+    "products.product": ("api",),
     "request_logs.httplog": ("webhooks", "classifier", "ticketer"),
     "templates.template": ("api",),
     "tickets.ticket": ("api", "assign", "assignee", "menu", "note"),
@@ -703,6 +705,7 @@ GROUP_PERMISSIONS = {
         "policies.policy_read",
         "policies.policy_list",
         "policies.policy_give_consent",
+        "products.product_api",
         "request_logs.httplog_list",
         "request_logs.httplog_read",
         "request_logs.httplog_webhooks",
@@ -816,6 +819,7 @@ GROUP_PERMISSIONS = {
         "policies.policy_read",
         "policies.policy_list",
         "policies.policy_give_consent",
+        "products.product_api",
         "request_logs.httplog_webhooks",
         "templates.template_api",
         "tickets.ticket.*",
@@ -1025,6 +1029,10 @@ CELERY_BEAT_SCHEDULE = {
     "refresh-wechat-access-tokens": {"task": "refresh_wechat_access_tokens", "schedule": timedelta(seconds=3600)},
     "refresh-whatsapp-tokens": {"task": "refresh_whatsapp_tokens", "schedule": crontab(hour=6, minute=0)},
     "refresh-whatsapp-templates": {"task": "refresh_whatsapp_templates", "schedule": timedelta(seconds=900)},
+    "refresh-whatsapp-catalog-and-products": {
+        "task": "refresh_whatsapp_catalog_and_products",
+        "schedule": timedelta(seconds=900),
+    },
     "send-notification-emails": {"task": "send_notification_emails", "schedule": timedelta(seconds=60)},
     "squash-channelcounts": {"task": "squash_channelcounts", "schedule": timedelta(seconds=60)},
     "squash-contactgroupcounts": {"task": "squash_contactgroupcounts", "schedule": timedelta(seconds=60)},
@@ -1324,3 +1332,6 @@ MACHINE_HOSTNAME = socket.gethostname().split(".")[0]
 
 # ElasticSearch configuration (URL RFC-1738)
 ELASTICSEARCH_URL = os.environ.get("ELASTICSEARCH_URL", "http://localhost:9200")
+
+# SextenX url
+SENTENX_URL = os.environ.get("SENTENX_URL", default="")

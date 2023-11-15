@@ -10,6 +10,7 @@ from temba.request_logs.models import HTTPLog
 from temba.templates.models import TemplateTranslation
 from temba.tests import MockResponse, TembaTest
 from temba.utils.whatsapp.tasks import refresh_whatsapp_contacts, refresh_whatsapp_templates
+from temba.wpp_products.models import Catalog, Product
 
 from ...models import Channel
 from .tasks import refresh_whatsapp_tokens
@@ -263,7 +264,7 @@ class WhatsAppTypeTest(TembaTest):
             self.assertEqual(200, response.status_code)
             self.assertFalse(Channel.objects.all())
             mock_get.assert_called_with(
-                "https://example.org/v14.0/1234/message_templates", params={"access_token": "token123"}
+                "https://example.org/v16.0/1234/message_templates", params={"access_token": "token123"}
             )
 
             self.assertContains(response, "check user id and access token")
@@ -279,7 +280,7 @@ class WhatsAppTypeTest(TembaTest):
             response = self.client.post(url, post_data)
             self.assertEqual(302, response.status_code)
             mock_get.assert_called_with(
-                "https://example.org/v14.0/1234/message_templates", params={"access_token": "token123"}
+                "https://example.org/v16.0/1234/message_templates", params={"access_token": "token123"}
             )
 
         channel = Channel.objects.get()
@@ -323,7 +324,7 @@ class WhatsAppTypeTest(TembaTest):
             MockResponse(200, '{"data": ["foo", "bar"]}'),
             MockResponse(
                 200,
-                '{"data": ["foo"], "paging": {"next": "https://graph.facebook.com/v14.0/1234/message_templates?cursor=MjQZD"} }',
+                '{"data": ["foo"], "paging": {"next": "https://graph.facebook.com/v16.0/1234/message_templates?cursor=MjQZD"} }',
             ),
             MockResponse(200, '{"data": ["bar"], "paging": {"next": null} }'),
         ]
@@ -345,7 +346,7 @@ class WhatsAppTypeTest(TembaTest):
         self.assertEqual(["foo", "bar"], templates_data)
 
         mock_get.assert_called_with(
-            "https://graph.facebook.com/v14.0/1234/message_templates",
+            "https://graph.facebook.com/v16.0/1234/message_templates",
             params={"access_token": "token123", "limit": 255},
         )
 
@@ -357,11 +358,11 @@ class WhatsAppTypeTest(TembaTest):
         mock_get.assert_has_calls(
             [
                 call(
-                    "https://graph.facebook.com/v14.0/1234/message_templates",
+                    "https://graph.facebook.com/v16.0/1234/message_templates",
                     params={"access_token": "token123", "limit": 255},
                 ),
                 call(
-                    "https://graph.facebook.com/v14.0/1234/message_templates?cursor=MjQZD",
+                    "https://graph.facebook.com/v16.0/1234/message_templates?cursor=MjQZD",
                     params={"access_token": "token123", "limit": 255},
                 ),
             ]
@@ -510,3 +511,132 @@ class WhatsAppTypeTest(TembaTest):
             )
             with self.assertRaises(Exception):
                 channel.get_type().check_health(channel)
+
+    @patch("requests.get")
+    def test_get_api_catalogs(self, mock_get):
+        Catalog.objects.all().delete()
+        Channel.objects.all().delete()
+
+        channel = self.create_channel(
+            "WA",
+            "WhatsApp: 123456",
+            "123456",
+            config={
+                Channel.CONFIG_BASE_URL: "https://weni.ai/whatsapp",
+                Channel.CONFIG_USERNAME: "temba654321",
+                Channel.CONFIG_PASSWORD: "temba654321passwd",
+                Channel.CONFIG_AUTH_TOKEN: "authtoken654321",
+                CONFIG_FB_BUSINESS_ID: "654321",
+                CONFIG_FB_ACCESS_TOKEN: "token654321",
+                CONFIG_FB_NAMESPACE: "my-custom-app-test",
+                CONFIG_FB_TEMPLATE_LIST_DOMAIN: "graph.facebook.com",
+            },
+        )
+
+        mock_get.side_effect = [
+            RequestException("Network is unreachable", response=MockResponse(100, "")),
+            MockResponse(400, '{ "meta": { "success": false } }'),
+            MockResponse(200, '{"data": ["foo", "bar"]}'),
+            MockResponse(
+                200,
+                '{"data": ["foo"], "paging": {"next": "https://graph.facebook.com/v16.0/654321/owned_product_catalogs?cursor=MjQZD"} }',
+            ),
+            MockResponse(200, '{"data": ["bar"], "paging": {"next": null} }'),
+        ]
+
+        catalogs_data, no_error = WhatsAppType().get_api_catalogs(channel)
+        self.assertEqual(1, HTTPLog.objects.filter(log_type=HTTPLog.WHATSAPP_CATALOGS_SYNCED).count())
+        self.assertFalse(no_error)
+        self.assertEqual([], catalogs_data)
+
+        catalogs_data, no_error = WhatsAppType().get_api_catalogs(channel)
+        self.assertFalse(no_error)
+        self.assertEqual([], catalogs_data)
+
+        catalogs_data, no_error = WhatsAppType().get_api_catalogs(channel)
+        self.assertTrue(no_error)
+        self.assertEqual(["foo", "bar"], catalogs_data)
+
+        mock_get.assert_called_with(
+            "https://graph.facebook.com/v16.0/654321/owned_product_catalogs",
+            params={"access_token": "token654321", "limit": 255},
+        )
+
+        catalogs_data, no_error = WhatsAppType().get_api_catalogs(channel)
+        self.assertTrue(no_error)
+        self.assertEqual(["foo", "bar"], catalogs_data)
+
+        mock_get.assert_has_calls(
+            [
+                call(
+                    "https://graph.facebook.com/v16.0/654321/owned_product_catalogs",
+                    params={"access_token": "token654321", "limit": 255},
+                ),
+                call(
+                    "https://graph.facebook.com/v16.0/654321/owned_product_catalogs?cursor=MjQZD",
+                    params={"access_token": "token654321", "limit": 255},
+                ),
+            ]
+        )
+
+    @patch("requests.get")
+    def test_get_api_products(self, mock_get):
+        Product.objects.all().delete()
+        Catalog.objects.all().delete()
+        Channel.objects.all().delete()
+
+        channel = self.create_channel(
+            "WA",
+            "WhatsApp: 123456",
+            "123456",
+            config={
+                Channel.CONFIG_BASE_URL: "https://weni.ai/whatsapp",
+                Channel.CONFIG_USERNAME: "userTest",
+                Channel.CONFIG_PASSWORD: "userTespasswd",
+                Channel.CONFIG_AUTH_TOKEN: "authtoken123456",
+                CONFIG_FB_BUSINESS_ID: "123456",
+                CONFIG_FB_ACCESS_TOKEN: "token123456",
+                CONFIG_FB_NAMESPACE: "my-custom-app-123456",
+                CONFIG_FB_TEMPLATE_LIST_DOMAIN: "graph.facebook.com",
+            },
+        )
+
+        catalog = Catalog(
+            facebook_catalog_id="12345",
+            name="Test Catalog",
+            org=self.org,
+            channel=self.channel,
+        )
+
+        mock_get.side_effect = [
+            RequestException("Network is unreachable", response=MockResponse(100, "")),
+            MockResponse(400, '{ "meta": { "success": false } }'),
+            MockResponse(200, '{"data": ["foo", "bar"]}'),
+            MockResponse(
+                200,
+                '{"data": ["foo"], "paging": {"next": "https://graph.facebook.com/v16.0/123456/products?cursor=MjQZD"} }',
+            ),
+            MockResponse(200, '{"data": ["bar"], "paging": {"next": null} }'),
+        ]
+
+        products_data, no_error = WhatsAppType().get_api_products(channel, catalog)
+        self.assertEqual(1, HTTPLog.objects.filter(log_type=HTTPLog.WHATSAPP_PRODUCTS_SYNCED).count())
+        self.assertFalse(no_error)
+        self.assertEqual([], products_data)
+
+        products_data, no_error = WhatsAppType().get_api_products(channel, catalog)
+        self.assertFalse(no_error)
+        self.assertEqual([], products_data)
+
+        products_data, no_error = WhatsAppType().get_api_products(channel, catalog)
+        self.assertTrue(no_error)
+        self.assertEqual(["foo", "bar"], products_data)
+
+        mock_get.assert_called_with(
+            "https://graph.facebook.com/v16.0/12345/products",
+            params={"access_token": "token123456", "limit": 255},
+        )
+
+        products_data, no_error = WhatsAppType().get_api_products(channel, catalog)
+        self.assertTrue(no_error)
+        self.assertEqual(["foo", "bar"], products_data)
