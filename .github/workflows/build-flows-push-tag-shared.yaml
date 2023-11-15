@@ -1,4 +1,4 @@
-name: Build Flows in Shared (Push Tag)  
+name: Build Flows in Shared (Push Tag)
 
 on:
   push:
@@ -18,15 +18,15 @@ jobs:
           ref: "${{env.GITHUB_SHA}}"
           token: ${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}
 
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: push-backend
-        tags: |
-          type=semver,pattern={{version}}-develop
-          type=semver,pattern={{version}}-staging
-          type=semver,pattern={{version}}
+      #- name: Docker meta
+      #  id: meta
+      #  uses: docker/metadata-action@v5
+      #  with:
+      #    images: push-backend
+      #    tags: |
+      #      type=semver,pattern={{version}}-develop
+      #      type=semver,pattern={{version}}-staging
+      #      type=semver,pattern={{version}}
 
       - name: Set variables
         run: |
