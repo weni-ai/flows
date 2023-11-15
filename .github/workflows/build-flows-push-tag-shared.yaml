@@ -12,10 +12,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        if: github.event_name != 'pull_request'
         with:
           ref: "${{env.GITHUB_SHA}}"
           token: ${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: push-backend
+        tags: |
+          type=semver,pattern={{version}}-develop
+          type=semver,pattern={{version}}-staging
+          type=semver,pattern={{version}}
 
       - name: Set variables
         run: |
@@ -52,7 +63,6 @@ jobs:
             fi
             echo "FLOWEDITOR_BRANCH=$FLOWEDITOR_BRANCH" | tee -a "${GITHUB_ENV}"
 
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -61,6 +71,7 @@ jobs:
 
       - name: Login to ECR
         uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
         with:
           registry: ${{ secrets.ECR }}
           username: ${{ secrets.AWS_ACCESS_KEY_ID_SHARED }}
@@ -121,42 +132,15 @@ jobs:
             commit=${{env.COMMIT_SHA}}
             repository=${{env.IMAGE_SOURCE_URL}}
           file: docker/Dockerfile
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: "${{env.IMAGE_TAG}}"
+          #tags: ${{ steps.meta.outputs.tags }}
           #platforms: linux/amd64,linux/arm64,linux/arm/v7,darwin/amd64,linux/arm/v8
           #no-cache: true
           build-args: |
             FLOWEDITOR_VERSION=${{ env.FLOWEDITOR_VERSION }}
             FLOWEDITOR_REPO=${{ env.FLOWEDITOR_REPO }}
             FLOWEDITOR_BRANCH=${{ env.FLOWEDITOR_BRANCH }}
-
-      - name: Update WENI-CHANGELOG.md
-        if: ${{ !contains(env.TAG, 'develop') && !contains(env.TAG, 'staging') }}
-        run: |
-          git pull --tags origin main
-          TAG_ANT=$(git for-each-ref refs/tags --sort=-creatordate --format='%(refname)' --count=15 | egrep -v '(develop|staging)' | head -n3 | tail -n1 | cut -d'/' -f3)
-          pull_requests=$(curl -s -H "Authorization: Bearer ${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/pulls?state=closed&base=main&sort=created&direction=desc&per_page=15")
-          DATE_TAG=$(TZ=UTC0 git show --quiet --date='format-local:%Y-%m-%dT%H:%M:%SZ' --format="%cd" ${TAG_ANT} | tail -1)
-          echo "" >> temp.md
-          echo "${{ env.TAG }}" > temp.md  
-          echo "----------" >> temp.md
-          echo -E "$pull_requests" | jq -r --arg DATE_TAG "$DATE_TAG" 'map(select(.created_at > $DATE_TAG)) | .[].title' | while read title; do
-          url=$(echo -E "$pull_requests" | jq -r --arg title "$title" 'map(select(.title == $title)) | .[].html_url')
-          echo "* [$title]($url)" >> temp.md
-          done
-          echo "" >> temp.md
-          cat WENI-CHANGELOG.md >> temp.md  
-          mv temp.md WENI-CHANGELOG.md
-          cat WENI-CHANGELOG.md
-          
-      - name: Commit & Push (Update WENI-CHANGELOG.md) changes in repository
-        if: ${{ !contains(env.TAG, 'develop') && !contains(env.TAG, 'staging') }}
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email github-actions[bot]@users.noreply.github.com
-          git add WENI-CHANGELOG.md
-          git commit -m "Update WENI-CHANGELOG.md [actions skip]"
-          git push origin main
 
       - name: Check out Kubernetes Manifests
         uses: actions/checkout@master
@@ -218,5 +202,6 @@ jobs:
           github_token: "${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}"
           repository: "${{ env.MANIFESTS_REPOSITORY }}"
           directory: ./kubernetes-manifests/
-          branch: main
+          #branch: main
+          branch: feature/flows-cache
           message: "From Flows Build (Push Tag ${{ env.MANIFESTS_ENVIRONMENT }})"
