@@ -1,4 +1,4 @@
-name: Build Flows in Shared (Push Tag)  
+name: Build Flows in Shared (Push Tag)
 
 on:
   push:
