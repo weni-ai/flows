@@ -1,15 +1,19 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
+from io import BytesIO
+from unittest import TestCase
+from unittest.mock import Mock, patch
 
 from requests import RequestException
 
 from django.conf import settings
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from temba.classifiers.models import Classifier
 from temba.classifiers.types.wit import WitType
 from temba.contacts.models import ContactURN
+from temba.request_logs.views import HTTPLogCRUDL
 from temba.tests import CRUDLTestMixin, MockResponse, TembaTest
 from temba.tickets.models import Ticketer
 from temba.tickets.types.mailgun import MailgunType
@@ -260,3 +264,97 @@ class HTTPLogCRUDLQuerySetTest(TembaTest, CRUDLTestMixin):
         self.client.get(webhooks_url + "?flow=dependencies")
         self.client.get(webhooks_url + "?time=5")
         self.client.get(webhooks_url + "?status=200")
+
+
+class ExportTest(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    @patch("temba.request_logs.views.HTTPLogCRUDL.Export.send_file")
+    def test_invalid_json_format(self, mock_json_error):
+        export_instance = HTTPLogCRUDL.Export()
+
+        request = self.factory.post("/export/", data="invalid_json", content_type="application/json")
+        export_instance.request = request
+
+        response = export_instance.post(export_instance.request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.content, b'{"error": "Invalid JSON format"}')
+
+    @patch("temba.request_logs.views.openpyxl.Workbook")
+    @patch("temba.request_logs.views.BytesIO", side_effect=BytesIO)
+    def test_export_data_to_xls(self, mock_bytesio, mock_workbook):
+        mock_query = Mock()
+        mock_query.url = "https://example.com"
+
+        export_instance = HTTPLogCRUDL.Export()
+        export_instance.export_data_to_xls([mock_query])
+
+        mock_workbook.assert_called_once()
+        mock_bytesio.assert_called_once()
+
+    def test_process_queryset_results(self):
+        mock_http_log = Mock()
+        mock_http_log.url = "http://example.com"
+        mock_http_log.status_code = 200
+        mock_http_log.request = "mock_request"
+        mock_http_log.response = "mock_response"
+        mock_http_log.request_time = "2023-11-28T12:00:00Z"
+        mock_http_log.num_retries = 1
+        mock_http_log.created_on = datetime.strptime("2023-11-28T12:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+        mock_http_log.is_error = False
+        mock_http_log.flow = Mock(name="mock_flow")
+
+        mock_queryset = [mock_http_log]
+
+        export_instance = HTTPLogCRUDL.Export()
+
+        processed_data = export_instance.process_queryset_results(mock_queryset)
+
+        self.assertEqual(len(processed_data), 1)
+
+        expected_tuple = (
+            "http://example.com",
+            mock_http_log.status_code,
+            mock_http_log.request,
+            mock_http_log.response,
+            mock_http_log.request_time,
+            mock_http_log.num_retries,
+            mock_http_log.created_on.astimezone().replace(tzinfo=None),
+            mock_http_log.is_error,
+            mock_http_log.flow.name,
+        )
+        self.assertEqual(processed_data[0], expected_tuple)
+
+    @patch("temba.request_logs.views.smtplib.SMTP")
+    def test_send_file(self, mock_smtp):
+        export_instance = HTTPLogCRUDL.Export()
+
+        with patch("temba.request_logs.views.settings") as mock_settings, patch(
+            "temba.request_logs.views.render_to_string"
+        ) as mock_render_to_string:
+            mock_settings.EMAIL_HOST = "mock_host"
+            mock_settings.EMAIL_PORT = 587
+            mock_settings.EMAIL_HOST_USER = "mock_user"
+            mock_settings.EMAIL_HOST_PASSWORD = "mock_password"
+            mock_settings.EMAIL_USE_TLS = True
+            mock_settings.DEFAULT_FROM_EMAIL = "mock_from_email"
+
+            mock_render_to_string.return_value = "mock_email_body"
+
+            mock_file_stream = Mock()
+
+            export_instance.send_file(mock_file_stream, "test_file.xlsx", "test@example.com", "Test Project")
+
+            mock_render_to_string.assert_called_once_with(
+                "request_logs/httplog_mail_body.haml", {"project_name": "Test Project"}
+            )
+
+            mock_smtp.assert_called_once_with(host="mock_host", port=587)
+
+            mock_smtp_instance = mock_smtp.return_value
+            mock_smtp_instance.ehlo.assert_called_once()
+
+            mock_message_instance = mock_smtp_instance.return_value
+            mock_message_instance.attach.assert_called_once()
