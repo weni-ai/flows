@@ -12,21 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
-        if: github.event_name != 'pull_request'
+        uses: actions/checkout@v3
         with:
           ref: "${{env.GITHUB_SHA}}"
           token: ${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}
-
-      #- name: Docker meta
-      #  id: meta
-      #  uses: docker/metadata-action@v5
-      #  with:
-      #    images: push-backend
-      #    tags: |
-      #      type=semver,pattern={{version}}-develop
-      #      type=semver,pattern={{version}}-staging
-      #      type=semver,pattern={{version}}
 
       - name: Set variables
         run: |
@@ -52,7 +41,8 @@ jobs:
             echo "IMAGE_SOURCE_URL=https://github.com/weni-ai/flows" | tee -a "${GITHUB_ENV}"
             echo "MANIFESTS_REPOSITORY=weni-ai/kubernetes-manifests-platform" | tee -a "${GITHUB_ENV}"
             echo "MANIFESTS_APPLICATION=weni-flows/flows" | tee -a "${GITHUB_ENV}"
-            echo "MANIFESTS_PATCH_TARGET=deployment-flows-image.json" | tee -a "${GITHUB_ENV}"
+            echo "MANIFESTS_PATCH_TARGET=deployment-flows.json" | tee -a "${GITHUB_ENV}"
+            echo "MANIFESTS_PATCH_TARGET1=deployment-flows-image.json" | tee -a "${GITHUB_ENV}"
 
             FLOWEDITOR_VERSION=$(jq -r '.dependencies["@nyaruka/flow-editor"]' < package.json)
             echo "FLOWEDITOR_VERSION=${FLOWEDITOR_VERSION}" | tee -a "${GITHUB_ENV}"
@@ -63,90 +53,56 @@ jobs:
             fi
             echo "FLOWEDITOR_BRANCH=$FLOWEDITOR_BRANCH" | tee -a "${GITHUB_ENV}"
 
+
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v2
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v2
 
       - name: Login to ECR
-        uses: docker/login-action@v3
-        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
         with:
           registry: ${{ secrets.ECR }}
-          username: ${{ secrets.AWS_ACCESS_KEY_ID_SHARED }}
+          username: ${{ secrets.AWS_ACCESS_KEY_ID_SHARED }}      
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY_SHARED }}
 
-      # Cache
-      - name: Cache var-cache-apt
-        uses: actions/cache@v3
-        with:
-          path: var-cache-apt
-          key: var-cache-apt-${{ hashFiles('docker/Dockerfile') }}
-      - name: Cache var-lib-apt
-        uses: actions/cache@v3
-        with:
-          path: var-lib-apt
-          key: var-lib-apt-${{ hashFiles('docker/Dockerfile') }}
-      - name: Cache pip
-        uses: actions/cache@v3
-        with:
-          path: cache-pip
-          key: cache-pip-${{ hashFiles('docker/Dockerfile') }}
-      - name: Cache npm
-        uses: actions/cache@v3
-        with:
-          path: cache-npm
-          key: cache-npm-${{ hashFiles('docker/Dockerfile') }}
-
-      # Inject cache
-      - name: inject var-cache-apt into docker
-        uses: reproducible-containers/buildkit-cache-dance@v2.1.3
-        with:
-          cache-source: var-cache-apt
-          cache-target: /var/cache/apt
-      - name: inject var-lib-apt into docker
-        uses: reproducible-containers/buildkit-cache-dance@v2.1.3
-        with:
-          cache-source: var-lib-apt
-          cache-target: /var/lib/apt
-      - name: inject pip cache into docker
-        uses: reproducible-containers/buildkit-cache-dance@v2.1.3
-        with:
-          cache-source: cache-pip
-          cache-target: /pip_cache
-      - name: inject npm cache into docker
-        uses: reproducible-containers/buildkit-cache-dance@v2.1.3
-        with:
-          cache-source: cache-npm
-          cache-target: /npm_cache
-
       - name: Build and push - Flows Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v3
         with:
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           context: .
           labels: |
             tag=${{env.TAG}}
             commit=${{env.COMMIT_SHA}}
             repository=${{env.IMAGE_SOURCE_URL}}
           file: docker/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: "${{env.IMAGE_TAG}}"
-          #tags: ${{ steps.meta.outputs.tags }}
-          #platforms: linux/amd64,linux/arm64,linux/arm/v7,darwin/amd64,linux/arm/v8
-          #no-cache: true
+          no-cache: true
           build-args: |
             FLOWEDITOR_VERSION=${{ env.FLOWEDITOR_VERSION }}
             FLOWEDITOR_REPO=${{ env.FLOWEDITOR_REPO }}
             FLOWEDITOR_BRANCH=${{ env.FLOWEDITOR_BRANCH }}
+          
+      - name: Build and push - Flows Varnish Image
+        uses: docker/build-push-action@v3
+        with:
+          context: ./docker
+          labels: |
+            tag=${{env.TAG}}
+            commit=${{env.COMMIT_SHA}}
+            repository=${{env.IMAGE_SOURCE_URL}}
+          file: docker/Dockerfile.varnish
+          push: true
+          tags: "${{env.IMAGE_TAG}}-varnish"
+          no-cache: true
+          build-args: |
+            BACKEND_ADDRESS=flows:8000
 
       - name: Check out Kubernetes Manifests
         uses: actions/checkout@master
         with:
-          #ref: main
-          ref: feature/flows-cache
+          ref: main
           repository: "${{ env.MANIFESTS_REPOSITORY }}"
           token: "${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}"
           path: ./kubernetes-manifests/
@@ -184,13 +140,20 @@ jobs:
                 )
                 echo "Old image version to compare: ${OLD_VERSION}<=${{env.VERSION}}"
                 if verlte "${OLD_VERSION}" "${VERSION}" || [[ ! "${OLD_VERSION}" =~ [0-9]+\.[0-9]+\.[0-9]+ ]] ; then
-                  echo 'New configurations for image flows:'
+                  echo 'New configurations for varnish:'
                   new_configuration=$(
                     cat "${e}/${{ env.MANIFESTS_PATCH_TARGET }}" \
-                      | jq '(..|select(.path == "/spec/template/spec/containers/0/image")?) += {value: "'"${{env.IMAGE_TAG}}"'"}'
+                      | jq '(..|select(.path == "/spec/template/spec/containers/1/image")?) += {value: "'"${{env.IMAGE_TAG}}"'-varnish"}'
                   )
                   echo "${new_configuration}"
                   echo "${new_configuration}" > "${e}/${{ env.MANIFESTS_PATCH_TARGET }}"
+                  echo 'New configurations for image flows:'
+                  new_configuration=$(
+                    cat "${e}/${{ env.MANIFESTS_PATCH_TARGET1 }}" \
+                      | jq '(..|select(.path == "/spec/template/spec/containers/0/image")?) += {value: "'"${{env.IMAGE_TAG}}"'"}'
+                  )
+                  echo "${new_configuration}"
+                  echo "${new_configuration}" > "${e}/${{ env.MANIFESTS_PATCH_TARGET1 }}"
                 else
                   echo "Version in file is greater than build, skipping update yaml"
                 fi
@@ -203,6 +166,5 @@ jobs:
           github_token: "${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}"
           repository: "${{ env.MANIFESTS_REPOSITORY }}"
           directory: ./kubernetes-manifests/
-          #branch: main
-          branch: feature/flows-cache
+          branch: main
           message: "From Flows Build (Push Tag ${{ env.MANIFESTS_ENVIRONMENT }})"

@@ -603,40 +603,67 @@ class Org(SmartModel):
 
     @classmethod
     def search_integrations(cls, exported_flows):
+        for flow in exported_flows:
+            integrations = {"classifiers": [], "ticketers": []}
+
+            for node in flow.get("nodes", []):
+                actions = node.get("actions")
+
+                if not actions:
+                    continue
+
+                first_action = actions[0]
+
+                classifiers = cls.get_action_classifiers(first_action)
+                if classifiers:
+                    integrations["classifiers"].append(classifiers)
+
+                ticketers = cls.get_action_ticketers(first_action)
+                if ticketers:
+                    integrations["ticketers"].append(ticketers)
+
+            flow["integrations"] = integrations
+
+        return exported_flows
+
+    @classmethod
+    def get_action_ticketers(cls, action):
+        action_ticketer = action.get("ticketer")
+
+        if action_ticketer is not None:
+            ticketer = {"uuid": action_ticketer.get("uuid"), "name": action_ticketer.get("name"), "queues": []}
+
+            action_topic = action.get("topic")
+
+            if action_topic is not None:
+                queue = {
+                    "uuid": action_topic.get("uuid"),
+                    "name": action_topic.get("name"),
+                }
+                ticketer["queues"].append(queue)
+
+            return ticketer
+
+    @classmethod
+    def get_action_classifiers(cls, action: dict) -> dict:
         from temba.classifiers.models import Classifier
 
-        integrations = {"classifiers": [], "ticketers": []}
-        repository_uuid = None
+        action_classifier = action.get("classifier")
 
-        for node in exported_flows[0]["nodes"]:
-            if node["actions"]:
-                if "classifier" in node["actions"][0]:
-                    classifier_object = Classifier.objects.filter(uuid=node["actions"][0]["classifier"]["uuid"])
-                    if classifier_object:
-                        classifier_object = classifier_object.first()
-                        repository_uuid = classifier_object.config.get("repository_uuid", None)
-                    classifier = {
-                        "uuid": node["actions"][0]["classifier"]["uuid"],
-                        "name": node["actions"][0]["classifier"]["name"],
-                        "repository_uuid": repository_uuid,
-                    }
-                    integrations["classifiers"].append(classifier)
+        if action_classifier is not None:
+            classifier_uuid = action_classifier.get("uuid")
+            classifier_name = action_classifier.get("name")
 
-                if "ticketer" in node["actions"][0]:
-                    ticketer = {
-                        "uuid": node["actions"][0]["ticketer"]["uuid"],
-                        "name": node["actions"][0]["ticketer"]["name"],
-                        "queues": [],
-                    }
-                    if "topic" in node["actions"][0]:
-                        queue = {
-                            "uuid": node["actions"][0]["topic"]["uuid"],
-                            "name": node["actions"][0]["topic"]["name"],
-                        }
-                        ticketer["queues"].append(queue)
-                    integrations["ticketers"].append(ticketer)
+            classifier = Classifier.objects.filter(uuid=classifier_uuid)
+            repository_uuid = None
 
-        return integrations
+            if classifier:
+                classifier = classifier.first()
+                repository_uuid = classifier.config.get("repository", None)
+
+            classifier = {"uuid": classifier_uuid, "name": classifier_name, "repository_uuid": repository_uuid}
+
+            return classifier
 
     @classmethod
     def export_definitions(cls, site_link, components, include_fields=True, include_groups=True):
@@ -648,7 +675,6 @@ class Org(SmartModel):
         exported_flows = []
         exported_campaigns = []
         exported_triggers = []
-        integrations = []
 
         # users can't choose which fields/groups to export - we just include all the dependencies
         fields = set()
@@ -679,9 +705,6 @@ class Org(SmartModel):
                     exported_triggers.append(component.as_export_def())
                     if include_groups:
                         groups.update(component.groups.all())
-        
-        if exported_flows:
-            integrations = cls.search_integrations(exported_flows)
 
         if exported_flows:
             cls.search_integrations(exported_flows)
@@ -694,9 +717,7 @@ class Org(SmartModel):
             "triggers": exported_triggers,
             "fields": [f.as_export_def() for f in sorted(fields, key=lambda f: f.key)],
             "groups": [g.as_export_def() for g in sorted(groups, key=lambda g: g.name)],
-            "integrations": integrations,
         }
-
 
     def can_add_sender(self):  # pragma: needs cover
         """
