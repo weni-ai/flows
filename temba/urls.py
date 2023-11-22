@@ -4,6 +4,7 @@ from django.conf.urls.static import static
 from django.contrib.auth.models import AnonymousUser, User
 from django.views.generic import RedirectView
 from django.views.i18n import JavaScriptCatalog
+from django.views.static import serve
 
 from celery.signals import worker_process_init
 
@@ -52,7 +53,8 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
+else:
+    urlpatterns.append(url(r"^sitestatic/(?P<path>.*)$", serve,{"document_root": settings.STATIC_ROOT}))
 
 # import any additional urls
 for app in settings.APP_URLS:  # pragma: needs cover
