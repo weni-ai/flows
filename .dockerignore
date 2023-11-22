@@ -3,10 +3,3 @@ sitestatic
 env
 .env
 temba/settings.py
-.git
-.github
-Dockerfile
-.dockerignore
-.gitignore
-usr
-venv
