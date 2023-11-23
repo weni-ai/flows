@@ -1,3 +1,9 @@
+3.3.4
+----------
+* Change update_api_version method to save channel with update_fields
+* Fix duplicated registers in template.json endpoint
+* Add cycle attribute in request_logs sequence
+
 3.3.3
 ----------
 * Handle updated geo attachments
