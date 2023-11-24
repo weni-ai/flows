@@ -246,9 +246,10 @@ def update_is_active_catalog(channel, catalogs_data):
 
 
 def update_local_catalogs(channel, catalogs_data):
-    updated_catalogs = update_is_active_catalog(channel, catalogs_data)
+    # updated_catalogs = update_is_active_catalog(channel, catalogs_data)
     seen = []
-    for catalog in updated_catalogs:
+
+    for catalog in catalogs_data:
         new_catalog = Catalog.get_or_create(
             name=catalog["name"],
             channel=channel,
@@ -261,18 +262,25 @@ def update_local_catalogs(channel, catalogs_data):
     Catalog.trim(channel, seen)
 
 
-def update_local_products(catalog, products_data, channel):
+def update_local_products(products_data):
     seen = []
-    products_sentenx = {"catalog_id": catalog.facebook_catalog_id, "products": []}
+    catalog = products_data["catalog"]
+    channel = products_data["channel"]
+
+    catalog_object = Catalog.objects.filter(catalog_facebook_id=catalog).first()
+    channel_object = Channel.objects.filter(channel=channel)
+
+    products_sentenx = {"catalog_id": catalog, "products": []}
+
     for product in products_data:
         new_product = Product.get_or_create(
             facebook_product_id=product["id"],
             title=product["name"],
             product_retailer_id=product["retailer_id"],
-            catalog=catalog,
+            catalog=catalog_object,
             name=catalog.name,
-            channel=channel,
-            facebook_catalog_id=catalog.facebook_catalog_id,
+            channel=channel_object,
+            facebook_catalog_id=catalog,
         )
 
         seen.append(new_product)
@@ -281,18 +289,18 @@ def update_local_products(catalog, products_data, channel):
             "facebook_id": new_product.facebook_product_id,
             "title": new_product.title,
             "org_id": str(catalog.org_id),
-            "catalog_id": catalog.facebook_catalog_id,
+            "catalog_id": catalog,
             "product_retailer_id": new_product.product_retailer_id,
-            "channel_id": str(catalog.channel_id),
+            "channel_id": str(catalog_object.channel_id),
         }
 
         products_sentenx["products"].append(sentenx_object)
 
     if len(products_sentenx["products"]) > 0:
         sent_products_to_sentenx(products_sentenx)
-        sent_trim_products_to_sentenx(catalog, seen)
+        sent_trim_products_to_sentenx(catalog_object, seen)
 
-    Product.trim(catalog, seen)
+    Product.trim(catalog_object, seen)
 
 
 @shared_task(track_started=True, name="refresh_whatsapp_catalog_and_products")
