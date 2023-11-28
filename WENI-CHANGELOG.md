@@ -1,3 +1,19 @@
+3.3.4
+----------
+* Change update_api_version method to save channel with update_fields
+* Fix duplicated registers in template.json endpoint
+* Add cycle attribute in request_logs sequence
+
+3.3.3
+----------
+* Handle updated geo attachments
+
+3.3.2
+----------
+* Fix error when not exist an active catalog
+* Add catalogs in get_features flow view
+* Update Floweditor to 2.8.2
+
 3.3.1
 ----------
 * Update Floweditor to 2.8.1
