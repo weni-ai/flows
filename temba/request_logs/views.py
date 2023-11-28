@@ -1,7 +1,10 @@
+from datetime import timedelta
+
 from smartmin.views import SmartCRUDL, SmartListView, SmartReadView, smart_url
 
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.translation import ugettext_lazy as _
 
@@ -66,7 +69,24 @@ class HTTPLogCRUDL(SmartCRUDL):
             return [dict(title=_("Flows"), style="button-light", href=reverse("flows.flow_list"))]
 
         def get_queryset(self, **kwargs):
-            return super().get_queryset(**kwargs).filter(org=self.request.org, flow__isnull=False)
+            queryset = super().get_queryset(**kwargs).filter(org=self.request.org, flow__isnull=False)
+
+            flow = self.request.GET.get("flow")
+            created_on = self.request.GET.get("time")
+            status_code = self.request.GET.get("status")
+
+            if flow:
+                queryset = queryset.filter(flow__name=flow)
+
+            if created_on:
+                time_range = timedelta(minutes=int(created_on))
+                start_time = timezone.now() - time_range
+                queryset = queryset.filter(created_on__gte=start_time)
+
+            if status_code:
+                queryset = queryset.filter(status_code=status_code)
+
+            return queryset
 
         def has_permission(self, request, *args, **kwargs):
             if self.derive_org():
