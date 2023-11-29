@@ -1709,7 +1709,7 @@ protobuf = ">=3.17.3,<4.0.0"
 
 [[package]]
 name = "weni-rp-apps"
-version = "2.7.8"
+version = "2.7.8a6"
 description = "Weni apps for Rapidpro Platform"
 category = "main"
 optional = false
@@ -1774,7 +1774,7 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=4.6)", "pytest-black (
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "45b808c7aef116f546a72c2c15cc7be91defaf793b59a3061a4abb157adefe90"
+content-hash = "f65795c2ffb2b8a924d52ec7013dd3e194b0576455621b75bf705bc36721ed07"
 
 [metadata.files]
 amqp = [
@@ -2358,6 +2358,7 @@ psycopg2-binary = [
     {file = "psycopg2_binary-2.9.9-cp311-cp311-win32.whl", hash = "sha256:dc4926288b2a3e9fd7b50dc6a1909a13bbdadfc67d93f3374d984e56f885579d"},
     {file = "psycopg2_binary-2.9.9-cp311-cp311-win_amd64.whl", hash = "sha256:b76bedd166805480ab069612119ea636f5ab8f8771e640ae103e05a4aae3e417"},
     {file = "psycopg2_binary-2.9.9-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:8532fd6e6e2dc57bcb3bc90b079c60de896d2128c5d9d6f24a63875a95a088cf"},
+    {file = "psycopg2_binary-2.9.9-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:b0605eaed3eb239e87df0d5e3c6489daae3f7388d455d0c0b4df899519c6a38d"},
     {file = "psycopg2_binary-2.9.9-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8f8544b092a29a6ddd72f3556a9fcf249ec412e10ad28be6a0c0d948924f2212"},
     {file = "psycopg2_binary-2.9.9-cp312-cp312-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:2d423c8d8a3c82d08fe8af900ad5b613ce3632a1249fd6a223941d0735fce493"},
     {file = "psycopg2_binary-2.9.9-cp312-cp312-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:2e5afae772c00980525f6d6ecf7cbca55676296b580c0e6abb407f15f3706996"},
@@ -2734,8 +2735,8 @@ weni-protobuffers = [
     {file = "weni_protobuffers-1.2.18-py3-none-any.whl", hash = "sha256:f398af8de476d7d129a10fc677cb287623512775130b9ee15cc9953dbbd80807"},
 ]
 weni-rp-apps = [
-    {file = "weni_rp_apps-2.7.8-py3-none-any.whl", hash = "sha256:97f2d7b6b319ae39476d2a09451bca9861538b0b53bcfe68502394ea3a4e4192"},
-    {file = "weni_rp_apps-2.7.8.tar.gz", hash = "sha256:97683f2ae108f17413fc39e088bb87490c65254e455be10a521da6ba33b7b79a"},
+    {file = "weni_rp_apps-2.7.8a6-py3-none-any.whl", hash = "sha256:4b95286fa544a53e477148e3a00389dab7ce98a137d1d3b35601c4d908950440"},
+    {file = "weni_rp_apps-2.7.8a6.tar.gz", hash = "sha256:2b10c82f4ce4456bc7cb95d2ad1c29771e03a04aae029673539cdafbf5a240df"},
 ]
 wrapt = [
     {file = "wrapt-1.14.1-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:1b376b3f4896e7930f1f772ac4b064ac12598d1c38d04907e696cc4d794b43d3"},
