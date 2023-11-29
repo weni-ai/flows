@@ -44,11 +44,12 @@ do_gosu(){
 
 if [[ "start" == "$1" ]]; then
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" rm -rf "/tmp/${BRANDING_SLUG}/"
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" mkdir -p "${PROJECT_PATH}/static/brands/${BRANDING_SLUG}/"
     if [ -n "${BRANDING_FILES}" ]; then
         do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" git clone \
             -b "${BRANDING_BRANCH}" "${BRANDING_FILES}" "/tmp/${BRANDING_SLUG}/" \
             --single-branch --depth=1
-        do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" mv "/tmp/${BRANDING_SLUG}/${BRANDING_SLUG}/"* "${PROJECT_PATH}/static/brands/${BRANDING_SLUG}/"
+        do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" cp -rf "/tmp/${BRANDING_SLUG}/${BRANDING_SLUG}/"* "${PROJECT_PATH}/static/brands/${BRANDING_SLUG}/"
     fi
 
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" python manage.py collectstatic --noinput
