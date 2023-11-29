@@ -66,46 +66,54 @@
               .button-light{onclick:'{%if link.on_click%}{{link.on_click}}{% else %}goto(event){%endif%}', href:'{{link.href}}', class:'{{ link|gear_link_classes:True }}', data-success-url:'{{ link.success_url }}'}
                 {{link.title}}
 
-        .btn-group.gear-menu.ml-3
-          .button-light.p-icon.dropdown-toggle.text-center{ data-toggle:"dropdown" }
-            .icon-menu.text-gray-500(style="margin-left:-2px;margin-top:1px")
-          %ul.dropdown-menu.label-menu.rounded-lg.border-none.px-4.py-3{'role':'menu', 'aria-labelledby':'dlabel'}
+        -with last_link=gear_links|last 
+          -if last_link.button
             -for link in gear_links
               -if not forloop.first
-                -if link.divider
-                  %li.separator.-mx-4.border-b.my-3.border-gray-200
-                -else
-                  %li.py-1
-                    -if link.ngClick
-                      .hover-linked.font-normal{onclick:"goto(event);", href:'{{link.href}}', ng-click:'{{link.ngClick}}', class:'{{ link|gear_link_classes }}', data-success-url:'{{ link.success_url }}'}
-                        {{link.title}}
-                        .gear-flag
-                          {{link.flag}}
-                    -elif link.modax
-                      .hover-linked.font-normal{onclick:'javascript:showModax("{{link.id}}")', class:'{{ link|gear_link_classes }}', data-success-url:'{{ link.success_url }}'}
-                        {{link.title}}
-                        %span{class:'gear-flag'}
-                          {{link.flag}}
+                .button-light.ml-4{onclick:'{%if link.on_click%}{{link.on_click}}{% else %}goto(event){%endif%}', href:'{{link.href}}', class:'{{ link|gear_link_classes:True }}', data-success-url:'{{ link.success_url }}'}
+                  {{link.title}}
 
+          -else
+            .btn-group.gear-menu.ml-3
+              .button-light.p-icon.dropdown-toggle.text-center{ data-toggle:"dropdown" }
+                .icon-menu.text-gray-500(style="margin-left:-2px;margin-top:1px")
+              %ul.dropdown-menu.label-menu.rounded-lg.border-none.px-4.py-3{'role':'menu', 'aria-labelledby':'dlabel'}
+                -for link in gear_links
+                  -if not forloop.first
+                    -if link.divider
+                      %li.separator.-mx-4.border-b.my-3.border-gray-200
                     -else
-                      -if link.js_class
-                        .hover-linked.font-normal{onclick:'{%if link.on_click%}{{link.on_click}}{% else %}void(0);{%endif%}', class:'{{ link|gear_link_classes }}', href:'{{link.href}}', data-success-url:'{{ link.success_url }}'}
-                          {{link.title}}
-                          %span{class:'gear-flag'}
-                            {{link.flag}}
-                      -elif link.copyUuid
-                        .hover-linked.font-normal.copyUuid
-                          {{link.title}}
-                          %span{class:'gear-flag'}
-                            {{link.flag}}
-                      -else
-                        .hover-linked.font-normal{onclick:"{%if link.on_click%}{{link.on_click}}{% else %}goto(event){%endif%}", href:'{{link.href}}', class:'{{ link|gear_link_classes }}', data-success-url:'{{ link.success_url }}'}
-                          {{link.title}}
-                          %span{class:'gear-flag'}
-                            {{link.flag}}
+                      %li.py-1
+                        -if link.ngClick
+                          .hover-linked.font-normal{onclick:"goto(event);", href:'{{link.href}}', ng-click:'{{link.ngClick}}', class:'{{ link|gear_link_classes }}', data-success-url:'{{ link.success_url }}'}
+                            {{link.title}}
+                            .gear-flag
+                              {{link.flag}}
+                        -elif link.modax
+                          .hover-linked.font-normal{onclick:'javascript:showModax("{{link.id}}")', class:'{{ link|gear_link_classes }}', data-success-url:'{{ link.success_url }}'}
+                            {{link.title}}
+                            %span{class:'gear-flag'}
+                              {{link.flag}}
 
-          %temba-alert.alert-copy.mb-4(level="info")
-            -trans "UUID Copied!"
+                        -else
+                          -if link.js_class
+                            .hover-linked.font-normal{onclick:'{%if link.on_click%}{{link.on_click}}{% else %}void(0);{%endif%}', class:'{{ link|gear_link_classes }}', href:'{{link.href}}', data-success-url:'{{ link.success_url }}'}
+                              {{link.title}}
+                              %span{class:'gear-flag'}
+                                {{link.flag}}
+                          -elif link.copyUuid
+                            .hover-linked.font-normal.copyUuid
+                              {{link.title}}
+                              %span{class:'gear-flag'}
+                                {{link.flag}}
+                          -else
+                            .hover-linked.font-normal{onclick:"{%if link.on_click%}{{link.on_click}}{% else %}goto(event){%endif%}", href:'{{link.href}}', class:'{{ link|gear_link_classes }}', data-success-url:'{{ link.success_url }}'}
+                              {{link.title}}
+                              %span{class:'gear-flag'}
+                                {{link.flag}}
+
+              %temba-alert.alert-copy.mb-4(level="info")
+                -trans "UUID Copied!"
 
 
       :javascript

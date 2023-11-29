@@ -7890,3 +7890,30 @@ msgstr "Acuerdo"
 
 msgid "Want to add a comment?"
 msgstr "¿Quieres agregar un comentario?"
+
+msgid "None Value"
+msgstr "Ninguno"
+
+msgid "minutes"
+msgstr "minutos"
+
+msgid "hour"
+msgstr "hora"
+
+msgid "hours"
+msgstr "horas"
+
+msgid "day"
+msgstr "día"
+
+msgid "days"
+msgstr "días"
+
+msgid "Last"
+msgstr "Últimos"
+
+msgid "Webhook data will be sent to your Email address."
+msgstr "Los datos del webhook se enviarán a su dirección de correo electrónico."
+
+msgid "Failed to send webhook data to your Email address. Please try again later."
+msgstr "No se pudieron enviar los datos del webhook a su dirección de correo electrónico. Por favor, inténtelo de nuevo más tarde."
