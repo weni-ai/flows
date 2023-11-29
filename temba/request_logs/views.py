@@ -91,7 +91,7 @@ class HTTPLogCRUDL(SmartCRUDL):
             status_code = self.request.GET.get("status")
 
             if flow:
-                queryset = queryset.filter(flow__name=flow)
+                queryset = queryset.filter(flow__uuid=flow)
 
             if created_on:
                 time_range = timedelta(minutes=int(created_on))
@@ -167,7 +167,7 @@ class HTTPLogCRUDL(SmartCRUDL):
             queryset = HTTPLog.objects.filter(org=org, flow__isnull=False)
 
             if flow:
-                queryset = queryset.filter(flow__name=flow)
+                queryset = queryset.filter(flow__uuid=flow)
 
             if created_on:
                 time_range = timedelta(minutes=int(created_on))
@@ -185,6 +185,10 @@ class HTTPLogCRUDL(SmartCRUDL):
             except Exception as e:
                 logger.info(f"Fail to generate report: ORG {org.id}: {e}")
                 return HttpResponse(status=500)
+
+        @property
+        def permission(self):
+            return "request_logs.httplog_webhooks"
 
         def has_permission(self, request, *args, **kwargs):
             if self.derive_org():
