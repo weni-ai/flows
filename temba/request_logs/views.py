@@ -81,7 +81,8 @@ class HTTPLogCRUDL(SmartCRUDL):
         fields = ("flow", "url", "status_code", "request_time", "created_on")
 
         def get_gear_links(self):
-            return [dict(title=_("Flows"), style="button-light", href=reverse("flows.flow_list"))]
+            return [dict(title=_("Flows"), style="button-light", href=reverse("flows.flow_list")),
+                    dict(title=_("Export"), style="button-primary", button=True, on_click="exportLogs()")]
 
         def get_queryset(self, **kwargs):
             queryset = super().get_queryset(**kwargs).filter(org=self.request.org, flow__isnull=False)
@@ -91,7 +92,7 @@ class HTTPLogCRUDL(SmartCRUDL):
             status_code = self.request.GET.get("status")
 
             if flow:
-                queryset = queryset.filter(flow__name=flow)
+                queryset = queryset.filter(flow__uuid=flow)
 
             if created_on:
                 time_range = timedelta(minutes=int(created_on))
@@ -108,6 +109,12 @@ class HTTPLogCRUDL(SmartCRUDL):
                 if self.derive_org().config.get("can_view_httplogs"):  # pragma: no cover
                     return True
             return super().has_permission(request, *args, **kwargs)
+        
+        def get_context_data(self, **kwargs):
+            context = super().get_context_data(**kwargs)
+            context["flows"] = self.model.objects.filter(org=self.request.org, log_type=self.model.WEBHOOK_CALLED).values_list("flow__name", "flow__uuid", named=True).distinct()
+            context["status_codes"] = self.model.objects.filter(org=self.request.org, log_type=self.model.WEBHOOK_CALLED).values_list("status_code", flat=True).distinct()
+            return context
 
     class Classifier(BaseObjLogsView):
         source_field = "classifier"
@@ -167,7 +174,7 @@ class HTTPLogCRUDL(SmartCRUDL):
             queryset = HTTPLog.objects.filter(org=org, flow__isnull=False)
 
             if flow:
-                queryset = queryset.filter(flow__name=flow)
+                queryset = queryset.filter(flow__uuid=flow)
 
             if created_on:
                 time_range = timedelta(minutes=int(created_on))
@@ -180,7 +187,7 @@ class HTTPLogCRUDL(SmartCRUDL):
             try:
                 processed_data = self.process_queryset_results(queryset)
                 xls_file = self.export_data_to_xls(processed_data)
-                self.send_file(xls_file, filename, str(user), org.name)
+                self.send_file(xls_file, filename, str(user.email), org.name)
                 return HttpResponse(status=200)
             except Exception as e:
                 logger.info(f"Fail to generate report: ORG {org.id}: {e}")
@@ -216,12 +223,6 @@ class HTTPLogCRUDL(SmartCRUDL):
             workbook.save(output)
             output.seek(0)
 
-            # Verificar se o arquivo esta correto
-            """output_bytes = output.getvalue()
-            byte_stream = BytesIO(output_bytes)
-            dados_excel = pd.read_excel(byte_stream)
-            dados_excel.to_excel('/home/linhares/work/rapidpro/teste-xls.xlsx', index=False)
-            print(dados_excel)"""
             return output
 
         def process_queryset_results(self, data):
