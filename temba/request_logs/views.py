@@ -193,6 +193,10 @@ class HTTPLogCRUDL(SmartCRUDL):
                 logger.info(f"Fail to generate report: ORG {org.id}: {e}")
                 return HttpResponse(status=500)
 
+        @property
+        def permission(self):
+            return "request_logs.httplog_webhooks"
+
         def has_permission(self, request, *args, **kwargs):
             if self.derive_org():
                 if self.derive_org().config.get("can_view_httplogs"):  # pragma: no cover
