@@ -203,6 +203,6 @@ jobs:
           github_token: "${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}"
           repository: "${{ env.MANIFESTS_REPOSITORY }}"
           directory: ./kubernetes-manifests/
-          #branch: main
-          branch: feature/flows-cache
+          branch: main
+          #branch: feature/flows-cache
           message: "From Flows Build (Push Tag ${{ env.MANIFESTS_ENVIRONMENT }})"
