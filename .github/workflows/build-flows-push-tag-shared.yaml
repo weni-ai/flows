@@ -145,8 +145,8 @@ jobs:
       - name: Check out Kubernetes Manifests
         uses: actions/checkout@master
         with:
-          #ref: main
-          ref: feature/flows-cache
+          ref: main
+          #ref: feature/flows-cache
           repository: "${{ env.MANIFESTS_REPOSITORY }}"
           token: "${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}"
           path: ./kubernetes-manifests/
