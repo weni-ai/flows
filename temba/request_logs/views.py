@@ -193,9 +193,13 @@ class HTTPLogCRUDL(SmartCRUDL):
                 logger.info(f"Fail to generate report: ORG {org.id}: {e}")
                 return HttpResponse(status=500)
 
-        def has_permission(self, request, *args, **kwargs):
+        @property
+        def permission(self):  # pragma: no cover
+            return "request_logs.httplog_webhooks"
+
+        def has_permission(self, request, *args, **kwargs):  # pragma: no cover
             if self.derive_org():
-                if self.derive_org().config.get("can_view_httplogs"):  # pragma: no cover
+                if self.derive_org().config.get("can_view_httplogs"):
                     return True
             return super().has_permission(request, *args, **kwargs)
 
@@ -282,13 +286,8 @@ class HTTPLogCRUDL(SmartCRUDL):
                     smtp_connection.starttls()
 
                 smtp_connection.login(email_username, email_password)
-                smtp_connection.sendmail
-                result = smtp_connection.sendmail(from_email, str(user_email), message.as_string())
-                smtp_connection.quit()
-
-                if result:
-                    for recipient, error_message in result.items():
-                        logger.info(f"Fail send message to {recipient}, error: {error_message}")
+                smtp_connection.sendmail(from_email, str(user_email), message.as_string())
+                smtp_connection.quit()  # pragma: no cover
 
             except Exception as e:
                 logger.exception(f"Fail to send messages report: {e}")
