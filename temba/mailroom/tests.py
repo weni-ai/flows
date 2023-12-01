@@ -13,6 +13,7 @@ from temba.flows.models import FlowRun, FlowStart
 from temba.ivr.models import IVRCall
 from temba.mailroom.client import ContactSpec, MailroomException, get_client
 from temba.msgs.models import Broadcast, Msg
+from temba.request_logs.models import HTTPLog
 from temba.tests import MockResponse, TembaTest, matchers, mock_mailroom
 from temba.tests.engine import MockSessionWriter
 from temba.tickets.models import Ticketer, TicketEvent
@@ -1000,4 +1001,30 @@ class EventTest(TembaTest):
                 "logs_url": None,
             },
             Event.from_ivr_call(self.org, self.user, call2),
+        )
+
+    def test_from_http_log(self):
+        contact = self.create_contact("Jimmy", phone="0979111111")
+        httplog = HTTPLog.objects.create(
+            url="https://org2.bar/zapzap",
+            request="GET /zap",
+            response=" OK 200",
+            status_code=200,
+            is_error=False,
+            log_type=HTTPLog.WEBHOOK_CALLED,
+            request_time=10,
+            org=self.org,
+            flow=self.get_flow("dependencies"),
+            contact=contact,
+        )
+
+        self.assertEqual(
+            {
+                "type": "webhook_called",
+                "created_on": matchers.ISODate(),
+                "status": "success",
+                "url": httplog.url,
+                "logs_url": None,
+            },
+            Event.from_http_log(self.org, self.user, httplog),
         )
