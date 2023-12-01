@@ -13,6 +13,7 @@ from temba.flows.models import FlowExit, FlowRun
 from temba.ivr.models import IVRCall
 from temba.msgs.models import Msg
 from temba.orgs.models import Org
+from temba.request_logs.models import HTTPLog
 from temba.tickets.models import Ticket, TicketEvent, Topic
 
 
@@ -234,6 +235,18 @@ class Event:
             "duration": extra.get("duration"),
         }
 
+    @classmethod
+    def from_http_log(cls, org: Org, user: User, obj: HTTPLog) -> dict:
+        logs_url = _url_for_user(org, user, "request_logs.httplog_read", args=[obj.id])
+        return {
+            "type": cls.TYPE_WEBHOOK_CALLED,
+            "created_on": get_event_time(obj).isoformat(),
+            "status": "success" if obj.status_code < 400 and obj.status_code > 0 else "error",
+            # "status": "error" if obj.status_code >= 400 or obj.status_code == 0 or obj.is_error else "success",
+            "url": obj.url,
+            "logs_url": logs_url,
+        }
+
 
 def _url_for_user(org: Org, user: User, view_name: str, args: list) -> str:
     return reverse(view_name, args=args) if user.has_org_perm(org, view_name) else None
@@ -300,6 +313,7 @@ event_renderers = {
     IVRCall: Event.from_ivr_call,
     Msg: Event.from_msg,
     TicketEvent: Event.from_ticket_event,
+    HTTPLog: Event.from_http_log,
 }
 
 # map of history item types to a callable which can extract the event time from that type
