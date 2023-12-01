@@ -145,8 +145,8 @@ jobs:
       - name: Check out Kubernetes Manifests
         uses: actions/checkout@master
         with:
-          #ref: main
-          ref: feature/flows-cache
+          ref: main
+          #ref: feature/flows-cache
           repository: "${{ env.MANIFESTS_REPOSITORY }}"
           token: "${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}"
           path: ./kubernetes-manifests/
@@ -203,6 +203,6 @@ jobs:
           github_token: "${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}"
           repository: "${{ env.MANIFESTS_REPOSITORY }}"
           directory: ./kubernetes-manifests/
-          #branch: main
-          branch: feature/flows-cache
+          branch: main
+          #branch: feature/flows-cache
           message: "From Flows Build (Push Tag ${{ env.MANIFESTS_ENVIRONMENT }})"
