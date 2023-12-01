@@ -1,15 +1,19 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
+from io import BytesIO
+from unittest.mock import MagicMock, Mock, patch
 
 from requests import RequestException
 
 from django.conf import settings
-from django.test import override_settings
+from django.http import HttpResponse
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from temba.classifiers.models import Classifier
 from temba.classifiers.types.wit import WitType
 from temba.contacts.models import ContactURN
+from temba.request_logs.views import HTTPLogCRUDL
 from temba.tests import CRUDLTestMixin, MockResponse, TembaTest
 from temba.tickets.models import Ticketer
 from temba.tickets.types.mailgun import MailgunType
@@ -260,3 +264,135 @@ class HTTPLogCRUDLQuerySetTest(TembaTest, CRUDLTestMixin):
         self.client.get(webhooks_url + "?flow=dependencies")
         self.client.get(webhooks_url + "?time=5")
         self.client.get(webhooks_url + "?status=200")
+
+
+class ExportTest(TembaTest):
+    @patch("temba.request_logs.views.HTTPLogCRUDL.Export.send_file")
+    def test_invalid_json_format(self, mock_json_error):
+        export_instance = HTTPLogCRUDL.Export()
+        factory = RequestFactory()
+
+        request = factory.post("/export/", data="invalid_json", content_type="application/json")
+        export_instance.request = request
+
+        response = export_instance.post(export_instance.request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.content, b'{"error": "Invalid JSON format"}')
+
+    @patch("temba.request_logs.views.HTTPLogCRUDL.Export.process_queryset_results")
+    @patch("temba.request_logs.views.HTTPLogCRUDL.Export.export_data_to_xls")
+    @patch("temba.request_logs.views.HTTPLogCRUDL.Export.send_file")
+    def test_post_success(self, mock_send_file, mock_export_data_to_xls, mock_process_queryset_results):
+        mock_request = MagicMock()
+        mock_request.body.decode.return_value = '{"flow": "some_flow", "time": 10, "status": 200}'
+        mock_request.org = self.org
+        mock_request.user = MagicMock(email="test2@example.com")
+        mock_http_log = MagicMock()
+        mock_process_queryset_results.return_value = mock_http_log
+        mock_export_data_to_xls.return_value = "xls_content"
+
+        export_instance = HTTPLogCRUDL.Export()
+
+        export_instance.request = mock_request
+
+        response = export_instance.post(mock_request)
+
+        mock_process_queryset_results.assert_called_once()
+        mock_export_data_to_xls.assert_called_once_with(mock_http_log)
+        mock_send_file.assert_called_once_with("xls_content", "Chamadas Webhook.xlsx", "test2@example.com", "Temba")
+        self.assertIsInstance(response, HttpResponse)
+        self.assertEqual(response.status_code, 200)
+
+    @patch("temba.request_logs.views.HTTPLogCRUDL.Export.process_queryset_results")
+    @patch("temba.request_logs.views.HTTPLogCRUDL.Export.export_data_to_xls")
+    @patch("temba.request_logs.views.HTTPLogCRUDL.Export.send_file")
+    @patch("temba.request_logs.views.logger")
+    def test_post_exception_handling(
+        self, mock_logger, mock_send_file, mock_export_data_to_xls, mock_process_queryset_results
+    ):
+        mock_request = MagicMock()
+        mock_request.body.decode.return_value = '{"flow": "some_flow", "time": 10, "status": 200}'
+        mock_request.org = self.org
+        mock_request.user = MagicMock(email="test@example.com")
+        mock_process_queryset_results.side_effect = Exception("Some error message")
+
+        export_instance = HTTPLogCRUDL.Export()
+
+        export_instance.request = mock_request
+
+        response = export_instance.post(mock_request)
+
+        self.assertIsInstance(response, HttpResponse)
+        self.assertEqual(response.status_code, 500)
+
+    @patch("temba.request_logs.views.openpyxl.Workbook")
+    @patch("temba.request_logs.views.BytesIO", side_effect=BytesIO)
+    def test_export_data_to_xls(self, mock_bytesio, mock_workbook):
+        mock_query = Mock()
+        mock_query.url = "https://example.com"
+
+        export_instance = HTTPLogCRUDL.Export()
+        export_instance.export_data_to_xls([mock_query])
+
+        mock_workbook.assert_called_once()
+        mock_bytesio.assert_called_once()
+
+    def test_process_queryset_results(self):
+        mock_http_log = Mock()
+        mock_http_log.url = "https://example.com"
+        mock_http_log.status_code = 200
+        mock_http_log.request = "mock_request"
+        mock_http_log.response = "mock_response"
+        mock_http_log.request_time = "2023-11-28T12:00:00Z"
+        mock_http_log.num_retries = 1
+        mock_http_log.created_on = datetime.strptime("2023-11-28T12:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+        mock_http_log.is_error = False
+        mock_http_log.flow = Mock(name="mock_flow")
+
+        mock_queryset = [mock_http_log]
+
+        export_instance = HTTPLogCRUDL.Export()
+
+        processed_data = export_instance.process_queryset_results(mock_queryset)
+
+        self.assertEqual(len(processed_data), 1)
+
+        expected_tuple = (
+            "https://example.com",
+            mock_http_log.status_code,
+            mock_http_log.request,
+            mock_http_log.response,
+            mock_http_log.request_time,
+            mock_http_log.num_retries,
+            mock_http_log.created_on.astimezone().replace(tzinfo=None),
+            mock_http_log.is_error,
+            mock_http_log.flow.name,
+        )
+        self.assertEqual(processed_data[0], expected_tuple)
+
+    @patch("smtplib.SMTP")
+    def test_send_file_email(self, mock_smtp):
+        settings.EMAIL_HOST = "your_email_host"
+        settings.EMAIL_PORT = 587
+        settings.EMAIL_USE_TLS = True
+        settings.EMAIL_HOST_USER = "your_email_username"
+        settings.EMAIL_HOST_PASSWORD = "your_email_password"
+        settings.DEFAULT_FROM_EMAIL = "your_from_email"
+
+        view = HTTPLogCRUDL.Export()
+
+        file_stream = BytesIO(b"Test file content")
+        file_name = "example.xlsx"
+        user_email = "user@example.com"
+        project_name = "Test Project"
+
+        mock_sendmail = MagicMock()
+        mock_smtp.return_value.sendmail = mock_sendmail
+
+        view.send_file(file_stream, file_name, [user_email], project_name)
+
+        mock_connection = mock_smtp.return_value
+        mock_connection.ehlo.assert_called_once()
+        mock_connection.starttls.assert_called_once_with()
+        mock_connection.login.assert_called_once_with("your_email_username", "your_email_password")
