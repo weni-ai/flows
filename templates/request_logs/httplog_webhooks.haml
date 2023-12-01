@@ -8,6 +8,46 @@
   {{ title }}
 
 -block content
+
+  %temba-alert#sucess-alert.hidden.mb-6(level="info")
+    -blocktrans trimmed
+      Webhook data will be sent to your Email address.
+
+  %temba-alert#error-alert.hidden.mb-6(level="error")
+    -blocktrans trimmed
+      Failed to send webhook data to your Email address. Please try again later.
+
+  %div.flex.gap-4.mb-6
+    %temba-select#flows.flex-grow(name="flow" label='{{_("Flow")|escapejs}}' searchable="true" onchange="handleSelectChange(this, `flow`)" value="{{ request.GET.flow }}" style="flex-grow: 4;")
+      %temba-option(name='{{_("None Value")}}' value="")
+      -for flow in flows
+        %temba-option(name="{{flow.flow__name}}" value="{{flow.flow__uuid}}")
+
+    %temba-select#status.flex-grow(name="status" label='{{_("Status")|escapejs}}' searchable="true" onchange="handleSelectChange(this, `status`)" value="{{ request.GET.status }}")
+      %temba-option(name='{{_("None Value")}}' value="")
+      -for status in status_codes
+        %temba-option(name="{{status}}" value="{{status}}")
+
+    %temba-select#time.flex-grow(name="time" label='{{_("Time")|escapejs}}' searchable="true" onchange="handleSelectChange(this, `time`)" value="{{ request.GET.time }}")
+      %temba-option(name='{{_("None Value")}}' value="")
+      %temba-option(name='{{_("Last minute")}}' value="1")
+      %temba-option(name='2 {{_("minutes")}}' value="2")
+      %temba-option(name='3 {{_("minutes")}}' value="3")
+      %temba-option(name='4 {{_("minutes")}}' value="4")
+      %temba-option(name='5 {{_("minutes")}}' value="5")
+      %temba-option(name='10 {{_("minutes")}}' value="10")
+      %temba-option(name='15 {{_("minutes")}}' value="15")
+      %temba-option(name='30 {{_("minutes")}}' value="30")
+      %temba-option(name='45 {{_("minutes")}}' value="45")
+      %temba-option(name='1 {{_("hour")}}' value="60")
+      %temba-option(name='3 {{_("hours")}}' value="180")
+      %temba-option(name='8 {{_("hours")}}' value="480")
+      %temba-option(name='12 {{_("hours")}}' value="720")
+      %temba-option(name='1 {{_("day")}}' value="1440")
+      %temba-option(name='2 {{_("days")}}' value="2880")
+      %temba-option(name='{{_("Last")}} 3 {{_("days")}}' value="4320")
+
+
   %table.list.object-list.lined
     %thead
       %tr
@@ -45,3 +85,51 @@
   -block paginator
     -if object_list.count
       -include "includes/pagination.haml"
+
+
+-block extra-script
+  {{ block.super }}
+
+  :javascript
+
+    function handleSelectChange(event, name) {
+      if (event.values.length) {
+        const value = event.values[0].value;
+        if (value) {
+          const params = new URLSearchParams(window.location.search);
+          params.set(name, value);
+          window.location.search = params.toString();
+        } else {
+          const params = new URLSearchParams(window.location.search);
+          if(params.has(name)) {
+            params.delete(name);
+            window.location.search = params.toString();
+          }
+        }
+      }
+    }
+
+    function exportLogs() {
+      const params = new URLSearchParams(window.location.search);
+
+      const payload = {}
+
+      for (const key of params.keys()) {
+        payload[key] = params.get(key)
+      };
+
+      $.ajax({
+        url: "{% url 'request_logs.httplog_export' %}",
+        type: "POST",
+        data: JSON.stringify(payload),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function(data) {
+          $('#sucess-alert').removeClass('hidden');
+        },
+        error: function(data) {
+          $('#error-alert').removeClass('hidden');
+        }
+      });
+
+    }
