@@ -3407,7 +3407,7 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
         )
 
         status = params.get("status", "A")
-        queryset = queryset.filter(translations__status=status)
+        queryset = queryset.filter(translations__status=status).distinct()
 
         uuid = params.get("uuid")
         if uuid:
