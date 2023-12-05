@@ -1,3 +1,16 @@
+3.3.5
+----------
+* Add filters to Webhook view
+* Create endpoint to export webhook and send email
+* Filters and export in webhook page
+* Update floweditor to 2.9.0
+
+3.3.4
+----------
+* Change update_api_version method to save channel with update_fields
+* Fix duplicated registers in template.json endpoint
+* Add cycle attribute in request_logs sequence
+
 3.3.3
 ----------
 * Handle updated geo attachments
