@@ -241,8 +241,8 @@ class Event:
         return {
             "type": cls.TYPE_WEBHOOK_CALLED,
             "created_on": get_event_time(obj).isoformat(),
-            "status": "success" if obj.status_code < 400 and obj.status_code > 0 else "error",
-            # "status": "error" if obj.status_code >= 400 or obj.status_code == 0 or obj.is_error else "success",
+            "status": "success" if obj.status_code < 400 and obj.status_code > 0 and not obj.is_error else "error",
+            #"status": "error" if obj.status_code >= 400 or obj.status_code == 0 or obj.is_error else "success",
             "url": obj.url,
             "logs_url": logs_url,
         }
