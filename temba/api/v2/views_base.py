@@ -274,3 +274,8 @@ class ModifiedOnCursorPagination(CursorPagination):
 class DateJoinedCursorPagination(CursorPagination):
     ordering = ("-date_joined", "-id")
     offset_cutoff = 1000000
+
+
+class NameCursorPagination(CursorPagination):
+    ordering = ("name", "-id")
+    offset_cutoff = 1000000
