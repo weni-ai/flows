@@ -1850,7 +1850,7 @@ class FlowsEndpoint(ListAPIMixin, BaseAPIView):
      * **name** - the name of the flow (string)
      * **type** - the type of the flow (one of "message", "voice", "survey"), filterable as `type`
      * **archived** - whether this flow is archived (boolean), filterable as `archived`
-     * **labels** - the labels for this flow (array of objects)
+     * **labels** - the labels for this flow (array of objects), filterable as `labels`
      * **expires** - the time (in minutes) when this flow's inactive contacts will expire (integer)
      * **runs** - the counts of completed, interrupted and expired runs (object)
      * **results** - the results that this flow may create (array)
@@ -1924,6 +1924,11 @@ class FlowsEndpoint(ListAPIMixin, BaseAPIView):
         archived = params.get("archived")
         if archived:
             queryset = queryset.filter(is_archived=str_to_bool(archived))
+
+        labels = params.getlist("labels")
+        if labels:
+            queryset = queryset.filter(labels__name__in=labels)
+            # queryset =queryset.filter(reduce(and_, [Q(labels__name=valor) for valor in labels]))
 
         queryset = queryset.prefetch_related("labels")
 
