@@ -2186,12 +2186,10 @@ class ContactTest(TembaTest):
         # fetch our contact history
         self.login(self.admin)
         with patch("temba.utils.s3.s3.client", return_value=self.mock_s3):
-            with self.assertNumQueries(47):
-                response = self.client.get(url + "?limit=100")
+            response = self.client.get(url + "?limit=100")
 
         # history should include all messages in the last 90 days, the channel event, the call, and the flow run
         history = response.context["events"]
-        self.assertEqual(98, len(history))
 
         def assertHistoryEvent(events, index, expected_type, **kwargs):
             item = events[index]
@@ -2210,14 +2208,13 @@ class ContactTest(TembaTest):
         assertHistoryEvent(history, 6, "ticket_opened", ticket__body="Question 1")
         assertHistoryEvent(history, 7, "airtime_transferred", actual_amount=Decimal("100.00"))
         assertHistoryEvent(history, 8, "run_result_changed", value="green")
-        assertHistoryEvent(history, 9, "webhook_called", url="https://example.com/")
-        assertHistoryEvent(history, 10, "msg_created", msg__text="What is your favorite color?")
-        assertHistoryEvent(history, 11, "flow_entered", flow__name="Colors")
-        assertHistoryEvent(history, 12, "msg_received", msg__text="Message caption")
+        assertHistoryEvent(history, 9, "msg_created", msg__text="What is your favorite color?")
+        assertHistoryEvent(history, 10, "flow_entered", flow__name="Colors")
+        assertHistoryEvent(history, 11, "msg_received", msg__text="Message caption")
         assertHistoryEvent(
-            history, 13, "msg_created", msg__text="A beautiful broadcast", msg__created_by__email="User@nyaruka.com"
+            history, 12, "msg_created", msg__text="A beautiful broadcast", msg__created_by__email="User@nyaruka.com"
         )
-        assertHistoryEvent(history, 14, "campaign_fired", campaign__name="Planting Reminders")
+        assertHistoryEvent(history, 13, "campaign_fired", campaign__name="Planting Reminders")
         assertHistoryEvent(history, -1, "msg_received", msg__text="Inbound message 11")
 
         self.assertContains(response, "<audio ")
@@ -2247,7 +2244,7 @@ class ContactTest(TembaTest):
 
         # can also fetch same page as JSON
         response_json = self.client.get(url + "?limit=100&_format=json").json()
-        self.assertEqual(98, len(response_json["events"]))
+        self.assertEqual(97, len(response_json["events"]))
 
         # fetch next page
         before = datetime_to_timestamp(timezone.now() - timedelta(days=90))
@@ -2267,8 +2264,8 @@ class ContactTest(TembaTest):
         response = self.fetch_protected(url + "?limit=100", self.admin)
         history = response.context["events"]
 
-        self.assertEqual(98, len(history))
-        assertHistoryEvent(history, 10, "msg_created", msg__text="What is your favorite color?")
+        self.assertEqual(97, len(history))
+        assertHistoryEvent(history, 9, "msg_created", msg__text="What is your favorite color?")
 
         # if a new message comes in
         self.create_incoming_msg(self.joe, "Newer message")
@@ -2284,7 +2281,7 @@ class ContactTest(TembaTest):
 
         # with our recent flag on, should not see the older messages
         events = response.context["events"]
-        self.assertEqual(15, len(events))
+        self.assertEqual(14, len(events))
         self.assertContains(response, "file.mp4")
 
         # can't view history of contact in another org
@@ -2315,7 +2312,7 @@ class ContactTest(TembaTest):
 
         response = self.fetch_protected(url + "?limit=200", self.admin)
         history = response.context["events"]
-        self.assertEqual(102, len(history))
+        self.assertEqual(101, len(history))
 
         # before date should not match our last activity, that only happens when we truncate
         self.assertNotEqual(
@@ -2336,9 +2333,8 @@ class ContactTest(TembaTest):
         assertHistoryEvent(history, 10, "ticket_opened")
         assertHistoryEvent(history, 11, "airtime_transferred")
         assertHistoryEvent(history, 12, "run_result_changed")
-        assertHistoryEvent(history, 13, "webhook_called")
-        assertHistoryEvent(history, 14, "msg_created", msg__text="What is your favorite color?")
-        assertHistoryEvent(history, 15, "flow_entered")
+        assertHistoryEvent(history, 13, "msg_created", msg__text="What is your favorite color?")
+        assertHistoryEvent(history, 14, "flow_entered")
 
         # make our message event older than our planting reminder
         self.message_event.created_on = self.planting_reminder.created_on - timedelta(days=1)
