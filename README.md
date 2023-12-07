@@ -2,7 +2,7 @@
 
 Flows module allows organizations to visually build scalable interactive dialogs in the Weni Platform.
 
-### Stable Versions
+### Microservices Stable Versions
 
 The set of versions that make up the latest stable release are:
 
