@@ -1,3 +1,10 @@
+from unittest.mock import patch
+
+from rest_framework import status
+
+from django.urls import reverse
+
+from temba.templates.views import TemplateViewSet
 from temba.tests import TembaTest
 
 from .models import Template, TemplateTranslation
@@ -38,3 +45,35 @@ class TemplateTest(TembaTest):
         # tt2 should be inactive now
         tt2.refresh_from_db()
         self.assertFalse(tt2.is_active)
+
+
+class TemplateViewSetTests(TembaTest):
+    view_class = TemplateViewSet
+    view_class.permission_classes = []
+
+    def test_partial_update(self):
+        # client = APIClient()
+        url = reverse("template-detail", args=[self.channel.uuid])
+        # client.force_login(self.admin)
+        self.login(self.admin)
+
+        with patch("temba.utils.whatsapp.tasks.update_local_templates") as mock_update_local_templates:
+            mock_update_local_templates.return_value = None
+
+            data = {
+                "data": [
+                    {
+                        "name": "model body",
+                        "previous_category": "OTP",
+                        "components": [
+                            {"type": "BODY", "text": "A normal body: {{1}}.", "example": {"body_text": [["12345"]]}}
+                        ],
+                        "language": "pt_PT",
+                        "status": "APPROVED",
+                        "category": "AUTHENTICATION",
+                        "id": "123456",
+                    }
+                ]
+            }
+            response = self.client.patch(url, data, content_type="application/json")
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
