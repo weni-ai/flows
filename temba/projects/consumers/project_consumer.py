@@ -20,6 +20,7 @@ class ProjectConsumer(EDAConsumer):
                 date_format=body.get("date_format"),
                 template_type_uuid=body.get("template_type_uuid"),
                 timezone=body.get("timezone"),
+                description=body.get("description"),
             )
 
             flow_setup_handler = FlowSetupHandlerUseCase()
