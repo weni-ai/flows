@@ -28,5 +28,6 @@ class TemplateTypeIntegrationUseCase(TemplateTypeIntegrationInterface):
             raise InvalidTemplateTypeData(f"Template Type with uuid `{template_type_uuid}` does not exists!")
 
         self.__flow_setup_handler.setup_flows_in_project(project, template_type, user)
-        project.config = {"template_type": str(template_type.uuid)}
+
+        project.config["template_type"] = str(template_type.uuid)
         project.save()
