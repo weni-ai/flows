@@ -41,6 +41,7 @@ urlpatterns = [
     url(r"^", include("temba.orgs.urls")),
     url(r"^", include("temba.externals.urls")),
     url(r"^", include("temba.wpp_products.urls")),
+    url(r"^", include("temba.templates.urls")),
     url(r"^relayers/relayer/sync/(\d+)/$", sync, {}, "sync"),
     url(r"^relayers/relayer/register/$", register, {}, "register"),
     url(r"users/user/forget/", RedirectView.as_view(pattern_name="orgs.user_forget", permanent=True)),
@@ -54,7 +55,7 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 else:
-    urlpatterns.append(url(r"^sitestatic/(?P<path>.*)$", serve,{"document_root": settings.STATIC_ROOT}))
+    urlpatterns.append(url(r"^sitestatic/(?P<path>.*)$", serve, {"document_root": settings.STATIC_ROOT}))
 
 # import any additional urls
 for app in settings.APP_URLS:  # pragma: needs cover
