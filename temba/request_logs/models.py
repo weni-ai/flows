@@ -12,7 +12,7 @@ from django.utils.translation import ugettext_lazy as _
 from temba.airtime.models import AirtimeTransfer
 from temba.channels.models import Channel
 from temba.classifiers.models import Classifier
-from temba.contacts.models import ContactURN
+from temba.contacts.models import Contact, ContactURN
 from temba.flows.models import Flow
 from temba.orgs.models import Org
 from temba.tickets.models import Ticketer
@@ -88,6 +88,7 @@ class HTTPLog(models.Model):
         AirtimeTransfer, related_name="http_logs", on_delete=models.PROTECT, null=True
     )
     channel = models.ForeignKey(Channel, related_name="http_logs", on_delete=models.PROTECT, null=True)
+    contact = models.ForeignKey(Contact, related_name="http_logs", on_delete=models.PROTECT, null=True)
 
     @cached_property
     def method(self):
@@ -95,9 +96,9 @@ class HTTPLog(models.Model):
 
     @classmethod
     def create_from_response(
-        cls, log_type, url, response, classifier=None, channel=None, ticketer=None, request_time=None
+        cls, log_type, url, response, classifier=None, channel=None, ticketer=None, contact=None, request_time=None
     ):
-        org = (classifier or channel or ticketer).org
+        org = (classifier or channel or ticketer or contact).org
 
         is_error = response.status_code >= 400
         data = dump.dump_response(
@@ -131,11 +132,14 @@ class HTTPLog(models.Model):
             classifier=classifier,
             channel=channel,
             ticketer=ticketer,
+            contact=contact,
         )
 
     @classmethod
-    def create_from_exception(cls, log_type, url, exception, start, classifier=None, channel=None, ticketer=None):
-        org = (classifier or channel or ticketer).org
+    def create_from_exception(
+        cls, log_type, url, exception, start, classifier=None, channel=None, ticketer=None, contact=None
+    ):
+        org = (classifier or channel or ticketer or contact).org
 
         data = bytearray()
         prefixes = dump.PrefixSettings(cls.REQUEST_DELIM, cls.RESPONSE_DELIM)
@@ -157,6 +161,7 @@ class HTTPLog(models.Model):
             channel=channel,
             classifier=classifier,
             ticketer=ticketer,
+            contact=contact,
         )
 
     def get_url_display(self):
