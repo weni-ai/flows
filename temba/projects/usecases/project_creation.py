@@ -21,6 +21,7 @@ class ProjectCreationDTO:
     date_format: str
     timezone: str
     template_type_uuid: str
+    description: str
 
 
 class ProjectCreationUseCase:
@@ -42,6 +43,7 @@ class ProjectCreationUseCase:
                 plan="infinity",
                 config={
                     "is_template": project_dto.is_template,
+                    "description": project_dto.description,
                 },
             ),
         )

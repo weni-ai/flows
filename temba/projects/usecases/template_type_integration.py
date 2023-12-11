@@ -29,5 +29,5 @@ class TemplateTypeIntegrationUseCase(TemplateTypeIntegrationInterface):
 
         self.__flow_setup_handler.setup_flows_in_project(project, template_type, user)
 
-        project.config = {"template_type": str(template_type.uuid)}
+        project.config["template_type"] = str(template_type.uuid)
         project.save()

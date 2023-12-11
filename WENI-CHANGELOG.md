@@ -1,3 +1,15 @@
+3.4.1
+----------
+* Fix error when project is template
+
+3.4.0
+----------
+* Add contact foreign key in httplog model
+* Add log url button in contact history
+* Add description in create project and create update project queue
+* Dockerfile refactoring and add cache for build
+* Bump floweditor version to 2.9.1
+
 3.3.5
 ----------
 * Add filters to Webhook view
