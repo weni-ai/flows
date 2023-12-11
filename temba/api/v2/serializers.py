@@ -19,7 +19,7 @@ from temba.channels.models import Channel, ChannelEvent
 from temba.classifiers.models import Classifier
 from temba.contacts.models import Contact, ContactField, ContactGroup
 from temba.externals.models import ExternalService
-from temba.flows.models import Flow, FlowRun, FlowStart
+from temba.flows.models import Flow, FlowLabel, FlowRun, FlowStart
 from temba.globals.models import Global
 from temba.locations.models import AdminBoundary
 from temba.mailroom import modifiers
@@ -1655,4 +1655,25 @@ class ProductReadSerializer(ReadSerializer):
             "facebook_product_id",
             "product_retailer_id",
             "created_on",
+        )
+
+
+class FlowsLabelsReadSerializer(ReadSerializer):
+    project_uuid = serializers.SerializerMethodField()
+    flows = serializers.SerializerMethodField()
+
+    def get_project_uuid(self, obj):
+        return obj.org.project.project_uuid
+
+    def get_flows(self, obj):
+        return [{"uuid": l.uuid, "name": l.name} for l in obj.get_flows()]
+
+    class Meta:
+        model = FlowLabel
+        fields = (
+            "uuid",
+            "name",
+            "project_uuid",
+            "parent",
+            "flows",
         )
