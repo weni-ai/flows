@@ -1418,7 +1418,16 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
         # filter by URN (optional)
         urn = params.get("urn")
         if urn:
-            queryset = queryset.filter(urns__identity=self.normalize_urn(urn))
+            queryset = queryset.filter(urns__identity__icontains=self.normalize_urn(urn))
+
+        # filter by search (optional)
+        search = params.get("search")
+        if search:
+            try:
+                urn_search = Q(urns__identity__icontains=self.normalize_urn(search))
+            except InvalidQueryError:
+                urn_search = Q()
+            queryset = queryset.filter(urn_search | Q(name__icontains=search))
 
         # filter by contact name (optional)
         name = params.get("name")
@@ -1480,6 +1489,11 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
                     "help": "A contact UUID to filter by. ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
                 },
                 {"name": "urn", "required": False, "help": "A contact URN to filter by. ex: tel:+250788123123"},
+                {
+                    "name": "search",
+                    "required": False,
+                    "help": "A contact URN to filter by. ex: tel:+250788123123 or by a contact name",
+                },
                 {"name": "group", "required": False, "help": "A group name or UUID to filter by. ex: Customers"},
                 {"name": "deleted", "required": False, "help": "Whether to return only deleted contacts. ex: false"},
                 {
