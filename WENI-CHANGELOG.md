@@ -1,3 +1,7 @@
+3.4.1
+----------
+* Fix error when project is template
+
 3.4.0
 ----------
 * Add contact foreign key in httplog model
