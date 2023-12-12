@@ -236,6 +236,38 @@ class URN:
         return True
 
     @classmethod
+    def process_ddd_number(cls, urn, scheme, norm_path):
+        # List with DDD that not need to remove 9 before personal number
+        list_ddd = ["11", "12", "13", "14", "15", "16", "17", "18", "19", "21", "22", "23", "24", "27", "28"]
+        ddd = norm_path[2:4]
+
+        # When the len of norm_path = 13, it means that this number has a 9 before the personal number
+        if ddd not in list_ddd and len(norm_path) == 13:
+            norm_path = norm_path[:4] + norm_path[5:]
+            try:
+                with transaction.atomic():
+                    update_contact_urn = ContactURN.objects.filter(identity=urn).first()
+                    if update_contact_urn:
+                        update_contact_urn.path = norm_path
+                        update_contact_urn.scheme = scheme
+                        update_contact_urn.identity = scheme + ":" + norm_path
+                        if ContactURN.objects.filter(identity=update_contact_urn.identity):
+                            ContactURN.objects.filter(identity=urn).first().delete()
+
+                        update_contact_urn.save(
+                            update_fields=(
+                                "path",
+                                "scheme",
+                                "identity",
+                            )
+                        )
+
+            except Exception as e:
+                print(f"Error during update: {e}")
+
+        return norm_path
+
+    @classmethod
     def normalize(cls, urn, country_code=None):
         """
         Normalizes the path of a URN string. Should be called anytime looking for a URN match.
@@ -261,6 +293,9 @@ class URN:
 
         elif scheme == cls.EMAIL_SCHEME:
             norm_path = norm_path.lower()
+
+        elif scheme == cls.WHATSAPP_SCHEME and norm_path[0:2] == "55":
+            norm_path = cls.process_ddd_number(urn, scheme, norm_path)
 
         return cls.from_parts(scheme, norm_path, query, display)
 
@@ -2201,7 +2236,6 @@ class ContactImport(SmartModel):
             raise ValidationError(_("Import file doesn't contain any records."))
 
         file.seek(0)  # seek back to beginning so subsequent reads work
-
         return mappings, num_records
 
     @staticmethod
@@ -2211,6 +2245,7 @@ class ContactImport(SmartModel):
         """
         uuid = ""
         urns = []
+
         for value, item in zip(row, mappings):
             mapping = item["mapping"]
             if mapping["type"] == "attribute" and mapping["name"] == "uuid":
@@ -2320,7 +2355,7 @@ class ContactImport(SmartModel):
         """
         Starts this import, creating batches to be handled by mailroom
         """
-
+        print("HAHAHA")
         assert self.status == self.STATUS_PENDING, "trying to start an already started import"
 
         # mark us as processing to prevent double starting
