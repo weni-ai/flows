@@ -18,8 +18,10 @@ def update_api_version(channel):
         version = api_status["meta"]["version"]
         if not version.startswith("v"):
             version = "v" + version
-        channel.config.update(version=version)
-        channel.save()
+
+        channel.config["version"] = version
+        channel.save(update_fields=["config"])
+
     except requests.RequestException as e:
         HTTPLog.create_from_exception(
             HTTPLog.WHATSAPP_CHECK_HEALTH,

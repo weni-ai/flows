@@ -46,7 +46,6 @@ class Policy(SmartModel):
 
 
 class Consent(models.Model):
-
     user = models.ForeignKey(User, on_delete=models.PROTECT, help_text="The user consenting to this policy")
 
     policy = models.ForeignKey(

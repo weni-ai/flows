@@ -847,6 +847,8 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
 
         session_events = self.get_session_events(after, before, include_event_types)
 
+        httplog_events = self.get_httplog_events(after, before, include_event_types, limit)
+
         # chain all items together, sort by their event time, and slice
         items = chain(
             msgs,
@@ -858,10 +860,23 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
             calls,
             transfers,
             session_events,
+            httplog_events,
         )
 
         # sort and slice
         return sorted(items, key=get_event_time, reverse=True)[:limit]
+
+    def get_httplog_events(self, after: datetime, before: datetime, include_event_types: set, limit: int) -> list:
+        """
+        Gets this contact's history of webhook events in the given time window
+        """
+        from temba.request_logs.models import HTTPLog
+
+        httplog_events = HTTPLog.objects.filter(created_on__gte=after, created_on__lt=before, contact=self).order_by(
+            "-created_on"
+        )[:limit]
+
+        return httplog_events
 
     def get_session_events(self, after: datetime, before: datetime, types: set) -> list:
         """
@@ -1173,7 +1188,6 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
 
             # any urns currently owned by us
             for urn in self.urns.all():
-
                 # release any messages attached with each urn,
                 # these could include messages that began life
                 # on a different contact

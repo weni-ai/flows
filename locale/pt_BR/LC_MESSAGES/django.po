@@ -7759,3 +7759,105 @@ msgstr ""
 
 msgid "No synced templates at this time."
 msgstr "Sem templates sincronizados neste momento."
+
+msgid "Trigger Flow"
+msgstr "Disparar Fluxo"
+
+msgid "How has your experience with the flow editor features been this week?"
+msgstr "Como está sendo sua experiência com as funcionalidades do editor de fluxos nesta semana?"
+
+msgid "Terrible"
+msgstr "Terrível"
+
+msgid "Bad"
+msgstr "Ruim"
+
+msgid "Satisfactory"
+msgstr "Satisfatória"
+
+msgid "Good"
+msgstr "Boa"
+
+msgid "Excellent"
+msgstr "Excelente"
+
+msgid "Thank you for the review!"
+msgstr "Muito obrigado pela avaliação!"
+
+msgid "Want to add a comment to your review?"
+msgstr "Quer adicionar um comentário a sua avaliação?"
+
+msgid "Ignore"
+msgstr "Ignorar"
+
+msgid "Submit comment"
+msgstr "Enviar comentário"
+
+msgid "Write here..."
+msgstr "Escreva aqui..."
+
+msgid "Your review has been submitted! Thank you."
+msgstr "Sua avaliação foi enviada! Muito obrigado."
+
+msgid "CLOSE"
+msgstr "FECHAR"
+
+msgid "Thank you!"
+msgstr "Muito Obrigado!"
+
+msgid "You have already rated your experience this week,"
+msgstr "Você já avaliou sua experiência nesta semana,"
+
+msgid "would you like to rate it again?"
+msgstr "gostaria de avaliar novamente?"
+
+msgid "Close"
+msgstr "Fechar"
+
+msgid "Rate again"
+msgstr "Avaliar novamente"
+
+msgid "Quick search!"
+msgstr "Pesquisa rápida!"
+
+msgid "What do you think of this sentence:"
+msgstr "O que você acha dessa frase:"
+
+msgid "The Flow Editor is easy and enjoyable to use"
+msgstr "O Editor de Fluxos é fácil e agradável de usar"
+
+msgid "Strongly disagree"
+msgstr "Discordo muito"
+
+msgid "Strongly agree"
+msgstr "Concordo muito"
+
+msgid "Want to add a comment?"
+msgstr "Quer adicionar um comentário?"
+
+msgid "None Value"
+msgstr "Nenhum"
+
+msgid "minutes"
+msgstr "minutos"
+
+msgid "hour"
+msgstr "hora"
+
+msgid "hours"
+msgstr "horas"
+
+msgid "day"
+msgstr "dia"
+
+msgid "days"
+msgstr "dias"
+
+msgid "Last"
+msgstr "Últimos"
+
+msgid "Webhook data will be sent to your Email address."
+msgstr "Os dados do webhook serão enviados para o seu endereço de e-mail."
+
+msgid "Failed to send webhook data to your Email address. Please try again later."
+msgstr "Falha ao enviar dados do webhook para seu endereço de e-mail. Por favor, tente novamente mais tarde."

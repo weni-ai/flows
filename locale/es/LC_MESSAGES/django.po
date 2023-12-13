@@ -7815,3 +7815,105 @@ msgstr "Las plantillas se sincronizan desde su cuenta cada 15 minutos."
 
 msgid "No synced templates at this time."
 msgstr "No hay plantillas sincronizadas en este momento."
+
+msgid "Trigger Flow"
+msgstr "Desencadenar flujo"
+
+msgid "How has your experience with the flow editor features been this week?"
+msgstr "¿Cómo ha sido tu experiencia con las funciones del editor de flujo esta semana?"
+
+msgid "Terrible"
+msgstr "Horrible"
+
+msgid "Bad"
+msgstr "Malo"
+
+msgid "Satisfactory"
+msgstr "Satisfactorio"
+
+msgid "Good"
+msgstr "Bien"
+
+msgid "Excellent"
+msgstr "Excelente"
+
+msgid "Thank you for the review!"
+msgstr "¡Muchas gracias por la reseña!"
+
+msgid "Want to add a comment to your review?"
+msgstr "¿Quieres añadir un comentario a tu reseña?"
+
+msgid "Ignore"
+msgstr "Ignorar"
+
+msgid "Submit comment"
+msgstr "Enviar comentario"
+
+msgid "Write here..."
+msgstr "Escribe aquí..."
+
+msgid "Your review has been submitted! Thank you."
+msgstr "¡Tu reseña ha sido enviada! Muchas gracias."
+
+msgid "CLOSE"
+msgstr "CERRAR"
+
+msgid "Thank you!"
+msgstr "¡Muchas gracias!"
+
+msgid "You have already rated your experience this week,"
+msgstr "Ya ha evaluado su experiencia de esta semana,"
+
+msgid "would you like to rate it again?"
+msgstr "¿desea evaluar de nuevo?"
+
+msgid "Close"
+msgstr "Cerrar"
+
+msgid "Rate again"
+msgstr "Evaluar de nuevo"
+
+msgid "Quick search!"
+msgstr "¡Búsqueda rápida!"
+
+msgid "What do you think of this sentence:"
+msgstr "¿Qué opinas de esta frase?"
+
+msgid "The Flow Editor is easy and enjoyable to use"
+msgstr "El Editor de Flujos es fácil y divertido de usar"
+
+msgid "Strongly disagree"
+msgstr "Desacuerdo"
+
+msgid "Strongly agree"
+msgstr "Acuerdo"
+
+msgid "Want to add a comment?"
+msgstr "¿Quieres agregar un comentario?"
+
+msgid "None Value"
+msgstr "Ninguno"
+
+msgid "minutes"
+msgstr "minutos"
+
+msgid "hour"
+msgstr "hora"
+
+msgid "hours"
+msgstr "horas"
+
+msgid "day"
+msgstr "día"
+
+msgid "days"
+msgstr "días"
+
+msgid "Last"
+msgstr "Últimos"
+
+msgid "Webhook data will be sent to your Email address."
+msgstr "Los datos del webhook se enviarán a su dirección de correo electrónico."
+
+msgid "Failed to send webhook data to your Email address. Please try again later."
+msgstr "No se pudieron enviar los datos del webhook a su dirección de correo electrónico. Por favor, inténtelo de nuevo más tarde."

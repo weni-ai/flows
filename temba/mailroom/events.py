@@ -13,6 +13,7 @@ from temba.flows.models import FlowExit, FlowRun
 from temba.ivr.models import IVRCall
 from temba.msgs.models import Msg
 from temba.orgs.models import Org
+from temba.request_logs.models import HTTPLog
 from temba.tickets.models import Ticket, TicketEvent, Topic
 
 
@@ -45,6 +46,7 @@ class Event:
     TYPE_TICKET_OPENED = "ticket_opened"
     TYPE_TICKET_REOPENED = "ticket_reopened"
     TYPE_WEBHOOK_CALLED = "webhook_called"
+    TYPE_PRODUCT_SENT = "product_sent"
 
     # additional events
     TYPE_CALL_STARTED = "call_started"
@@ -104,6 +106,15 @@ class Event:
                 "msg": _msg_out(obj),
                 "status": obj.status,
                 "recipient_count": obj.broadcast.get_message_count(),
+                "logs_url": logs_url,
+            }
+        elif obj.metadata and "products" in obj.metadata:
+            return {
+                "type": cls.TYPE_PRODUCT_SENT,
+                "created_on": get_event_time(obj).isoformat(),
+                # additional properties
+                "msg": _msg_out(obj),
+                "status": obj.status,
                 "logs_url": logs_url,
             }
         else:
@@ -224,6 +235,17 @@ class Event:
             "duration": extra.get("duration"),
         }
 
+    @classmethod
+    def from_http_log(cls, org: Org, user: User, obj: HTTPLog) -> dict:
+        logs_url = _url_for_user(org, user, "request_logs.httplog_read", args=[obj.id])
+        return {
+            "type": cls.TYPE_WEBHOOK_CALLED,
+            "created_on": get_event_time(obj).isoformat(),
+            "status": "success" if obj.status_code < 400 and obj.status_code > 0 and not obj.is_error else "error",
+            "url": obj.url,
+            "logs_url": logs_url,
+        }
+
 
 def _url_for_user(org: Org, user: User, view_name: str, args: list) -> str:
     return reverse(view_name, args=args) if user.has_org_perm(org, view_name) else None
@@ -261,6 +283,9 @@ def _base_msg(obj) -> dict:
     if obj.attachments:
         d["attachments"] = obj.attachments
 
+    if obj.metadata and obj.metadata.get("body", None):
+        d["text"] = obj.metadata.get("body", None)
+
     return d
 
 
@@ -287,6 +312,7 @@ event_renderers = {
     IVRCall: Event.from_ivr_call,
     Msg: Event.from_msg,
     TicketEvent: Event.from_ticket_event,
+    HTTPLog: Event.from_http_log,
 }
 
 # map of history item types to a callable which can extract the event time from that type

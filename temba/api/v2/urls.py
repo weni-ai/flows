@@ -16,6 +16,7 @@ from .views import (
     ContactsEndpoint,
     DefinitionsEndpoint,
     ExplorerView,
+    ExternalServicesEndpoint,
     FieldsEndpoint,
     FlowsEndpoint,
     FlowStartsEndpoint,
@@ -25,6 +26,7 @@ from .views import (
     MediaEndpoint,
     MessageActionsEndpoint,
     MessagesEndpoint,
+    ProductsEndpoint,
     ResthookEventsEndpoint,
     ResthooksEndpoint,
     ResthookSubscribersEndpoint,
@@ -37,7 +39,6 @@ from .views import (
     TopicsEndpoint,
     UsersEndpoint,
     WorkspaceEndpoint,
-    ExternalServicesEndpoint,
 )
 
 urlpatterns = [
@@ -66,6 +67,7 @@ urlpatterns = [
     url(r"^messages$", MessagesEndpoint.as_view(), name="api.v2.messages"),
     url(r"^message_actions$", MessageActionsEndpoint.as_view(), name="api.v2.message_actions"),
     url(r"^org$", WorkspaceEndpoint.as_view(), name="api.v2.org"),  # deprecated
+    url(r"^products$", ProductsEndpoint.as_view(), name="api.v2.products"),
     url(r"^resthooks$", ResthooksEndpoint.as_view(), name="api.v2.resthooks"),
     url(r"^resthook_events$", ResthookEventsEndpoint.as_view(), name="api.v2.resthook_events"),
     url(r"^resthook_subscribers$", ResthookSubscribersEndpoint.as_view(), name="api.v2.resthook_subscribers"),

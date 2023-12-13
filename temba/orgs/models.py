@@ -602,6 +602,70 @@ class Org(SmartModel):
             Trigger.validate_import_def(trigger_def)
 
     @classmethod
+    def search_integrations(cls, exported_flows):
+        for flow in exported_flows:
+            integrations = {"classifiers": [], "ticketers": []}
+
+            for node in flow.get("nodes", []):
+                actions = node.get("actions")
+
+                if not actions:
+                    continue
+
+                first_action = actions[0]
+
+                classifiers = cls.get_action_classifiers(first_action)
+                if classifiers:
+                    integrations["classifiers"].append(classifiers)
+
+                ticketers = cls.get_action_ticketers(first_action)
+                if ticketers:
+                    integrations["ticketers"].append(ticketers)
+
+            flow["integrations"] = integrations
+
+        return exported_flows
+
+    @classmethod
+    def get_action_ticketers(cls, action):
+        action_ticketer = action.get("ticketer")
+
+        if action_ticketer is not None:
+            ticketer = {"uuid": action_ticketer.get("uuid"), "name": action_ticketer.get("name"), "queues": []}
+
+            action_topic = action.get("topic")
+
+            if action_topic is not None:
+                queue = {
+                    "uuid": action_topic.get("uuid"),
+                    "name": action_topic.get("name"),
+                }
+                ticketer["queues"].append(queue)
+
+            return ticketer
+
+    @classmethod
+    def get_action_classifiers(cls, action: dict) -> dict:
+        from temba.classifiers.models import Classifier
+
+        action_classifier = action.get("classifier")
+
+        if action_classifier is not None:
+            classifier_uuid = action_classifier.get("uuid")
+            classifier_name = action_classifier.get("name")
+
+            classifier = Classifier.objects.filter(uuid=classifier_uuid)
+            repository_uuid = None
+
+            if classifier:
+                classifier = classifier.first()
+                repository_uuid = classifier.config.get("repository", None)
+
+            classifier = {"uuid": classifier_uuid, "name": classifier_name, "repository_uuid": repository_uuid}
+
+            return classifier
+
+    @classmethod
     def export_definitions(cls, site_link, components, include_fields=True, include_groups=True):
         from temba.contacts.models import ContactField
         from temba.campaigns.models import Campaign
@@ -641,6 +705,9 @@ class Org(SmartModel):
                     exported_triggers.append(component.as_export_def())
                     if include_groups:
                         groups.update(component.groups.all())
+
+        if exported_flows:
+            cls.search_integrations(exported_flows)
 
         return {
             "version": Org.CURRENT_EXPORT_VERSION,
@@ -1144,13 +1211,10 @@ class Org(SmartModel):
         """
         if org.parent == self or self.parent == org.parent or self.parent == org:
             if self.get_credits_remaining() >= amount:
-
                 with self.lock_on(OrgLock.credits):
-
                     # now debit our account
                     debited = None
                     while amount or debited == 0:
-
                         # remove the credits from ourselves
                         (topup_id, debited) = self.select_most_recent_topup(amount)
 
@@ -1360,7 +1424,6 @@ class Org(SmartModel):
 
         # for our purposes, #1 and #2 are treated the same, we just always update the default card
         try:
-
             if not customer or customer.email != user.email:
                 # then go create a customer object for this user
                 customer = stripe.Customer.create(card=token, email=user.email, description="{ org: %d }" % self.pk)
@@ -2186,7 +2249,6 @@ class TopUp(SmartModel):
         return topup
 
     def release(self):
-
         # clear us off any debits we are connected to
         Debit.objects.filter(topup=self).update(topup=None)
 

@@ -7407,3 +7407,33 @@ msgstr ""
 
 msgid "No synced templates at this time."
 msgstr ""
+
+msgid "Trigger Flow"
+msgstr ""
+
+msgid "None Value"
+msgstr "None"
+
+msgid "minutes"
+msgstr "minutes"
+
+msgid "hour"
+msgstr "hour"
+
+msgid "hours"
+msgstr "hours"
+
+msgid "day"
+msgstr "day"
+
+msgid "days"
+msgstr "days"
+
+msgid "Last"
+msgstr "Last"
+
+msgid "Webhook data will be sent to your Email address."
+msgstr "Webhook data will be sent to your Email address."
+
+msgid "Failed to send webhook data to your Email address. Please try again later."
+msgstr "Failed to send webhook data to your Email address. Please try again later."

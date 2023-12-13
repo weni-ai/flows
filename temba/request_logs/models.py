@@ -12,7 +12,7 @@ from django.utils.translation import ugettext_lazy as _
 from temba.airtime.models import AirtimeTransfer
 from temba.channels.models import Channel
 from temba.classifiers.models import Classifier
-from temba.contacts.models import ContactURN
+from temba.contacts.models import Contact, ContactURN
 from temba.flows.models import Flow
 from temba.orgs.models import Org
 from temba.tickets.models import Ticketer
@@ -42,6 +42,8 @@ class HTTPLog(models.Model):
     WHATSAPP_TOKENS_SYNCED = "whatsapp_tokens_synced"
     WHATSAPP_CONTACTS_REFRESHED = "whatsapp_contacts_refreshed"
     WHATSAPP_CHECK_HEALTH = "whataspp_check_health"
+    WHATSAPP_CATALOGS_SYNCED = "whatsapp_catalogs_synced"
+    WHATSAPP_PRODUCTS_SYNCED = "whatsapp_products_synced"
     TEAMS_TOKENS_SYNCED = "teams_tokens_synced"
 
     # possible log type choices and descriptive names
@@ -55,6 +57,8 @@ class HTTPLog(models.Model):
         (WHATSAPP_TOKENS_SYNCED, _("WhatsApp Tokens Synced")),
         (WHATSAPP_CONTACTS_REFRESHED, _("WhatsApp Contacts Refreshed")),
         (WHATSAPP_CHECK_HEALTH, _("WhatsApp Health Check")),
+        (WHATSAPP_CATALOGS_SYNCED, _("WhatsApp Catalogs Synced")),
+        (WHATSAPP_PRODUCTS_SYNCED, _("WhatsApp Products Synced")),
         (TEAMS_TOKENS_SYNCED, _("Teams Tokens Synced")),
     )
 
@@ -84,6 +88,7 @@ class HTTPLog(models.Model):
         AirtimeTransfer, related_name="http_logs", on_delete=models.PROTECT, null=True
     )
     channel = models.ForeignKey(Channel, related_name="http_logs", on_delete=models.PROTECT, null=True)
+    contact = models.ForeignKey(Contact, related_name="http_logs", on_delete=models.PROTECT, null=True)
 
     @cached_property
     def method(self):
@@ -91,9 +96,9 @@ class HTTPLog(models.Model):
 
     @classmethod
     def create_from_response(
-        cls, log_type, url, response, classifier=None, channel=None, ticketer=None, request_time=None
+        cls, log_type, url, response, classifier=None, channel=None, ticketer=None, contact=None, request_time=None
     ):
-        org = (classifier or channel or ticketer).org
+        org = (classifier or channel or ticketer or contact).org
 
         is_error = response.status_code >= 400
         data = dump.dump_response(
@@ -127,11 +132,14 @@ class HTTPLog(models.Model):
             classifier=classifier,
             channel=channel,
             ticketer=ticketer,
+            contact=contact,
         )
 
     @classmethod
-    def create_from_exception(cls, log_type, url, exception, start, classifier=None, channel=None, ticketer=None):
-        org = (classifier or channel or ticketer).org
+    def create_from_exception(
+        cls, log_type, url, exception, start, classifier=None, channel=None, ticketer=None, contact=None
+    ):
+        org = (classifier or channel or ticketer or contact).org
 
         data = bytearray()
         prefixes = dump.PrefixSettings(cls.REQUEST_DELIM, cls.RESPONSE_DELIM)
@@ -153,6 +161,7 @@ class HTTPLog(models.Model):
             channel=channel,
             classifier=classifier,
             ticketer=ticketer,
+            contact=contact,
         )
 
     def get_url_display(self):
@@ -174,7 +183,6 @@ class HTTPLog(models.Model):
         return self._get_display_value(self.response, ContactURN.ANON_MASK)
 
     def _get_display_value(self, original, mask):
-
         secrets = [settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN]
 
         for secret in secrets:

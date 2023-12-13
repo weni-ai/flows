@@ -1,7 +1,10 @@
 from unittest.mock import patch
 
+from django import forms
+from django.test import RequestFactory
 from django.urls import reverse
 
+from temba.channels.types.teams.views import ClaimView
 from temba.request_logs.models import HTTPLog
 from temba.tests import MockResponse, TembaTest
 from temba.utils import json
@@ -81,7 +84,6 @@ class TeamsTypeTest(TembaTest):
         self.assertEqual(channel.address, "45612")
 
     def test_refresh_tokens(self):
-
         Channel.objects.all().delete()
 
         channel = self.create_channel(
@@ -137,3 +139,21 @@ class TeamsTypeTest(TembaTest):
             channel2.refresh_from_db()
             self.assertEqual("abc345", channel.config[Channel.CONFIG_AUTH_TOKEN])
             self.assertEqual("abc098", channel2.config[Channel.CONFIG_AUTH_TOKEN])
+
+    def test_exception_handling(self):
+        form_data = {
+            "bot_name": "my_bot",
+            "bot_id": "one_bot_id",
+            "app_id": "one_app_id",
+            "app_password": "one_app_password",
+            "tenant_id": "one_tenant_id",
+        }
+
+        factory = RequestFactory()
+        request = factory.get("/")
+
+        form = ClaimView.Form(data=form_data, request=request, channel_type="teams")
+        form.is_valid()
+
+        with self.assertRaises(forms.ValidationError):
+            form.clean()

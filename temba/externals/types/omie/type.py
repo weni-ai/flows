@@ -1,11 +1,11 @@
 from django.utils.translation import ugettext_lazy as _
 
-from temba.externals.models import ExternalServiceType
-from .views import ConnectView
+from temba.externals.models import ExternalServiceType, ExternalServiceTypeInterface
+
 from .serializers import OmieSerializer
 
 
-class OmieType(ExternalServiceType):
+class OmieType(ExternalServiceType, ExternalServiceTypeInterface):
     """
     Type for using omie as a external service
     """
@@ -19,7 +19,6 @@ class OmieType(ExternalServiceType):
     slug = "omie"
     icon = "icon-power-cord"
 
-    connect_view = ConnectView
     connect_blurb = _("omie external service")
 
     def is_available_to(self, user):

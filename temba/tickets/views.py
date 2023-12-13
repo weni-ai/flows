@@ -185,7 +185,6 @@ class TicketCRUDL(SmartCRUDL):
             return TicketFolder.from_slug(self.kwargs["folder"])
 
         def get_queryset(self, **kwargs):
-
             user = self.request.user
             status = Ticket.STATUS_OPEN if self.kwargs["status"] == "open" else Ticket.STATUS_CLOSED
             uuid = self.kwargs.get("uuid", None)

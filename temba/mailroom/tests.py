@@ -13,6 +13,7 @@ from temba.flows.models import FlowRun, FlowStart
 from temba.ivr.models import IVRCall
 from temba.mailroom.client import ContactSpec, MailroomException, get_client
 from temba.msgs.models import Broadcast, Msg
+from temba.request_logs.models import HTTPLog
 from temba.tests import MockResponse, TembaTest, matchers, mock_mailroom
 from temba.tests.engine import MockSessionWriter
 from temba.tickets.models import Ticketer, TicketEvent
@@ -804,6 +805,33 @@ class EventTest(TembaTest):
             Event.from_msg(self.org, self.admin, msg_out2),
         )
 
+        msg_out3 = self.create_outgoing_msg(
+            contact1,
+            "",
+            channel=self.channel,
+            status="E",
+            product_metadata={"products": [{"facebook_retailer_id": 1}], "body": "Product body text"},
+        )
+        log2 = ChannelLog.objects.create(channel=self.channel, is_error=True, description="Boom", msg=msg_out3)
+        msg_out3.refresh_from_db()
+
+        self.assertEqual(
+            {
+                "type": "product_sent",
+                "created_on": matchers.ISODate(),
+                "msg": {
+                    "uuid": str(msg_out3.uuid),
+                    "id": msg_out3.id,
+                    "urn": "tel:+250979111111",
+                    "text": "Product body text",
+                    "channel": {"uuid": str(self.channel.uuid), "name": "Test Channel"},
+                },
+                "status": "E",
+                "logs_url": f"/channels/channellog/read/{log2.channel.uuid}/{log2.id}/",
+            },
+            Event.from_msg(self.org, self.admin, msg_out3),
+        )
+
     def test_from_flow_run(self):
         contact = self.create_contact("Jim", phone="0979111111")
         flow = self.get_flow("color_v13")
@@ -973,4 +1001,30 @@ class EventTest(TembaTest):
                 "logs_url": None,
             },
             Event.from_ivr_call(self.org, self.user, call2),
+        )
+
+    def test_from_http_log(self):
+        contact = self.create_contact("Jimmy", phone="0979111111")
+        httplog = HTTPLog.objects.create(
+            url="https://org2.bar/zapzap",
+            request="GET /zap",
+            response=" OK 200",
+            status_code=200,
+            is_error=False,
+            log_type=HTTPLog.WEBHOOK_CALLED,
+            request_time=10,
+            org=self.org,
+            flow=self.get_flow("dependencies"),
+            contact=contact,
+        )
+
+        self.assertEqual(
+            {
+                "type": "webhook_called",
+                "created_on": matchers.ISODate(),
+                "status": "success",
+                "url": httplog.url,
+                "logs_url": None,
+            },
+            Event.from_http_log(self.org, self.user, httplog),
         )

@@ -228,7 +228,6 @@ class FlowCRUDL(SmartCRUDL):
             return r"^%s/%s/((?P<submenu>[A-z]+)/)?$" % (path, action)
 
         def derive_menu(self):
-
             labels = FlowLabel.objects.filter(org=self.request.user.get_org(), parent=None)
 
             menu = []
@@ -1026,7 +1025,6 @@ class FlowCRUDL(SmartCRUDL):
                     data = json.load(json_file)
 
             for key, filename in data.get("files").items():
-
                 # tack on our prefix for dev mode
                 filename = prefix + filename
 
@@ -1084,6 +1082,8 @@ class FlowCRUDL(SmartCRUDL):
                 features.append("locations")
             if org.external_services.filter(is_active=True).exists():
                 features.append("external_service")
+            if org.catalogs.filter(is_active=True, products__isnull=False).exists():
+                features.append("whatsapp_catalog")
 
             return features
 
@@ -1098,10 +1098,10 @@ class FlowCRUDL(SmartCRUDL):
                 links.append(
                     dict(
                         id="start-flow",
-                        title=_("Start Flow"),
+                        title=_("Trigger Flow"),
                         style="button-primary",
                         href=f"{reverse('flows.flow_broadcast', args=[self.object.pk])}",
-                        modax=_("Start Flow"),
+                        modax=_("Trigger Flow"),
                     )
                 )
 
@@ -1574,7 +1574,6 @@ class FlowCRUDL(SmartCRUDL):
         }
 
         def get_context_data(self, *args, **kwargs):
-
             total_responses = 0
             context = super().get_context_data(*args, **kwargs)
 
@@ -1936,7 +1935,7 @@ class FlowCRUDL(SmartCRUDL):
 
         form_class = Form
         success_message = ""
-        submit_button_name = _("Start Flow")
+        submit_button_name = _("Trigger Flow")
         success_url = "uuid@flows.flow_editor"
 
         blockers = {

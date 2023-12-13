@@ -18,6 +18,7 @@ from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
 from temba.classifiers.models import Classifier
 from temba.contacts.models import Contact, ContactField, ContactGroup
+from temba.externals.models import ExternalService
 from temba.flows.models import Flow, FlowRun, FlowStart
 from temba.globals.models import Global
 from temba.locations.models import AdminBoundary
@@ -26,8 +27,8 @@ from temba.msgs.models import Broadcast, Label, Msg
 from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
-from temba.externals.models import ExternalService
 from temba.utils import extract_constants, json, on_transaction_commit
+from temba.wpp_products.models import Product
 
 from . import fields
 from .validators import UniqueForOrgValidator
@@ -66,7 +67,7 @@ def _normalize_extra(extra, count):
     elif isinstance(extra, dict):
         count += 1
         normalized = OrderedDict()
-        for (k, v) in extra.items():
+        for k, v in extra.items():
             (normalized[normalize_key(k)], count) = _normalize_extra(v, count)
 
             if count >= settings.FLOW_START_PARAMS_SIZE:
@@ -77,7 +78,7 @@ def _normalize_extra(extra, count):
     elif isinstance(extra, list):
         count += 1
         normalized = OrderedDict()
-        for (i, v) in enumerate(extra):
+        for i, v in enumerate(extra):
             (normalized[str(i)], count) = _normalize_extra(v, count)
 
             if count >= settings.FLOW_START_PARAMS_SIZE:
@@ -380,7 +381,6 @@ class CampaignEventWriteSerializer(WriteSerializer):
         flow = self.validated_data.get("flow")
 
         if self.instance:
-
             # we dont update, we only create
             self.instance = self.instance.recreate()
 
@@ -1446,6 +1446,7 @@ class TicketerReadSerializer(ReadSerializer):
         model = Ticketer
         fields = ("uuid", "name", "type", "created_on")
 
+
 class ExternalServicesReadSerializer(ReadSerializer):
     external_service_type = serializers.SerializerMethodField()
     created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
@@ -1455,7 +1456,7 @@ class ExternalServicesReadSerializer(ReadSerializer):
 
     class Meta:
         model = ExternalService
-        fields = ("uuid", "name", "external_service_type", "created_on")
+        fields = ("uuid", "name", "external_service_type", "created_on", "actions")
 
 
 class TicketReadSerializer(ReadSerializer):
@@ -1638,4 +1639,20 @@ class WorkspaceReadSerializer(ReadSerializer):
             "date_style",
             "credits",
             "anon",
+        )
+
+
+class ProductReadSerializer(ReadSerializer):
+    title = serializers.CharField()
+    facebook_product_id = serializers.CharField()
+    product_retailer_id = serializers.CharField()
+    created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+
+    class Meta:
+        model = Product
+        fields = (
+            "title",
+            "facebook_product_id",
+            "product_retailer_id",
+            "created_on",
         )

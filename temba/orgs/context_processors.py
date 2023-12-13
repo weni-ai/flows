@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+from django.contrib.auth.models import Permission
+
 from .models import get_stripe_credentials
 
 
@@ -8,8 +10,9 @@ class GroupPermWrapper:
     Provides access in templates to the permissions granted to an auth group.
     """
 
-    def __init__(self, group):
+    def __init__(self, group, org):
         self.group = group
+        self.org = org
         self.empty = defaultdict(lambda: False)
         self.apps = dict()
 
@@ -22,6 +25,17 @@ class GroupPermWrapper:
                 self.apps[app_name] = app_perms
 
             app_perms[perm.codename] = True
+
+        if self.org and self.org.config.get("can_view_httplogs"):
+            permission = Permission.objects.get(codename="httplog_webhooks")
+            app_name = permission.content_type.app_label
+            app_perms = self.apps.get(app_name, None)
+
+            if not app_perms:
+                app_perms = defaultdict(lambda: False)
+                self.apps[app_name] = app_perms
+
+            app_perms[permission.codename] = True
 
     def __getitem__(self, module_name):
         return self.apps.get(module_name, self.empty)
@@ -53,7 +67,7 @@ def user_group_perms_processor(request):
             org = request.user.get_org()
 
     if group:
-        context = dict(org_perms=GroupPermWrapper(group))
+        context = dict(org_perms=GroupPermWrapper(group, org))
     else:
         context = dict()
 

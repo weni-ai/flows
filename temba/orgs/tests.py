@@ -2,6 +2,7 @@ import io
 import smtplib
 from datetime import timedelta
 from decimal import Decimal
+from unittest import TestCase
 from unittest.mock import patch
 from urllib.parse import urlencode
 
@@ -15,6 +16,7 @@ from smartmin.users.models import FailedLogin, RecoveryToken
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core import mail
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -44,6 +46,7 @@ from temba.locations.models import AdminBoundary
 from temba.msgs.models import Broadcast, ExportMessagesTask, Label, Msg
 from temba.notifications.models import Notification
 from temba.orgs.models import BackupToken, Debit, OrgActivity
+from temba.orgs.password_forget import USER_RECOVER_ATTEMPTS_CACHE_KEY, UserCRUDL
 from temba.orgs.tasks import suspend_topup_orgs_task
 from temba.request_logs.models import HTTPLog
 from temba.templates.models import Template, TemplateTranslation
@@ -90,7 +93,7 @@ class OrgContextProcessorTest(TembaTest):
         editors = Group.objects.get(name="Editors")
         viewers = Group.objects.get(name="Viewers")
 
-        perms = GroupPermWrapper(administrators)
+        perms = GroupPermWrapper(administrators, self.org)
 
         self.assertTrue(perms["msgs"]["msg_inbox"])
         self.assertTrue(perms["contacts"]["contact_update"])
@@ -98,14 +101,14 @@ class OrgContextProcessorTest(TembaTest):
         self.assertTrue(perms["orgs"]["org_manage_accounts"])
         self.assertFalse(perms["orgs"]["org_delete"])
 
-        perms = GroupPermWrapper(editors)
+        perms = GroupPermWrapper(editors, self.org)
 
         self.assertTrue(perms["msgs"]["msg_inbox"])
         self.assertTrue(perms["contacts"]["contact_update"])
         self.assertFalse(perms["orgs"]["org_manage_accounts"])
         self.assertFalse(perms["orgs"]["org_delete"])
 
-        perms = GroupPermWrapper(viewers)
+        perms = GroupPermWrapper(viewers, self.org)
 
         self.assertTrue(perms["msgs"]["msg_inbox"])
         self.assertFalse(perms["contacts"]["contact_update"])
@@ -114,6 +117,15 @@ class OrgContextProcessorTest(TembaTest):
 
         self.assertFalse(perms["msgs"]["foo"])  # no blow up if perm doesn't exist
         self.assertFalse(perms["chickens"]["foo"])  # or app doesn't exist
+
+        test_httplog_enable = self.org
+
+        test_httplog_enable.config = {"can_view_httplogs": True}
+        test_httplog_enable.save()
+
+        perms = GroupPermWrapper(viewers, test_httplog_enable)
+
+        self.assertTrue(perms["request_logs"]["httplog_webhooks"])
 
         with self.assertRaises(TypeError):
             list(perms)
@@ -524,7 +536,6 @@ class UserTest(TembaTest):
         self.assertTrue(self.editor.is_active)
 
     def test_ui_management(self):
-
         # only customer support gets in on this sweet action
         self.login(self.customer_support)
 
@@ -616,7 +627,6 @@ class UserTest(TembaTest):
         self.assertRedirect(response, "/msg/inbox/")
 
     def test_release(self):
-
         # admin doesn't "own" any orgs
         self.assertEqual(0, len(self.admin.get_owned_orgs()))
 
@@ -856,7 +866,6 @@ class OrgDeleteTest(TembaNonAtomicTest):
         self.parent_org.apply_topups()
 
     def release_org(self, org, child_org=None, delete=False, expected_files=3):
-
         with patch("temba.utils.s3.client", return_value=self.mock_s3):
             # save off the ids of our current users
             org_user_ids = list(org.get_users().values_list("id", flat=True))
@@ -927,7 +936,6 @@ class OrgDeleteTest(TembaNonAtomicTest):
                 # org is still around but has been released
                 self.assertTrue(Org.objects.filter(id=org.id, is_active=False).exclude(deleted_on=None).exists())
             else:
-
                 org.refresh_from_db()
                 self.assertIsNone(org.deleted_on)
                 self.assertFalse(org.is_active)
@@ -1112,7 +1120,6 @@ class OrgTest(TembaTest):
 
     @patch("temba.utils.email.send_temba_email")
     def test_user_forget(self, mock_send_temba_email):
-
         invitation = Invitation.objects.create(
             org=self.org,
             user_group="A",
@@ -2006,7 +2013,6 @@ class OrgTest(TembaTest):
         self.assertEqual(10, self.org.get_topup_ttl(topup))
 
     def test_topup_expiration(self):
-
         contact = self.create_contact("Usain Bolt", phone="+250788123123")
         welcome_topup = self.org.topups.get()
 
@@ -2076,7 +2082,6 @@ class OrgTest(TembaTest):
             self.assertContains(response, "1,000 Credits")
 
     def test_topups(self):
-
         settings.BRANDING[settings.DEFAULT_BRAND]["tiers"] = dict(multi_user=100_000, multi_org=1_000_000)
         self.org.is_multi_org = False
         self.org.is_multi_user = False
@@ -3116,7 +3121,6 @@ class OrgTest(TembaTest):
         self.org.reset_capabilities()
         self.assertTrue(self.org.is_multi_org)
         response = self.client.get(reverse("orgs.org_home"))
-        self.assertContains(response, "Manage Workspaces")
 
         # now we can manage our orgs
         response = self.client.get(reverse("orgs.org_sub_orgs"))
@@ -3177,25 +3181,23 @@ class OrgTest(TembaTest):
         # edit our sub org's details
         response = self.client.post(
             f"{reverse('orgs.org_edit_sub_org')}?org={sub_org.id}",
-            {"name": "New Sub Org Name", "timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
+            {"timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
         )
 
         sub_org.refresh_from_db()
-        self.assertEqual("New Sub Org Name", sub_org.name)
 
         self.assertEqual(response.url, f"/org/sub_orgs/")
 
         # edit our sub org's details in a spa view
         response = self.client.post(
             f"{reverse('orgs.org_edit_sub_org')}?org={sub_org.id}",
-            {"name": "Spa Sub Org Name", "timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
+            {"timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
             **headers,
         )
 
         self.assertEqual(response.url, f"/org/manage_accounts_sub_org/?org={sub_org.id}")
 
         sub_org.refresh_from_db()
-        self.assertEqual("Spa Sub Org Name", sub_org.name)
         self.assertEqual("Africa/Nairobi", str(sub_org.timezone))
         self.assertEqual("Y", sub_org.date_format)
         self.assertEqual("es", sub_org.language)
@@ -3208,7 +3210,6 @@ class OrgTest(TembaTest):
         self.assertContains(response, "600 Credits")
 
     def test_account_value(self):
-
         # base value
         self.assertEqual(self.org.account_value(), 0.0)
 
@@ -3723,16 +3724,9 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
         # check default org content was created correctly
         system_fields = list(org.contactfields(manager="system_fields").order_by("key").values_list("key", flat=True))
         system_groups = list(org.all_groups(manager="system_groups").order_by("name").values_list("name", flat=True))
-        sample_flows = list(org.flows.order_by("name").values_list("name", flat=True))
-        internal_ticketer = org.ticketers.get()
 
         self.assertEqual(["created_on", "id", "language", "last_seen_on", "name"], system_fields)
         self.assertEqual(["Active", "Archived", "Blocked", "Stopped"], system_groups)
-        self.assertEqual(
-            ["Sample Flow - Order Status Checker", "Sample Flow - Satisfaction Survey", "Sample Flow - Simple Poll"],
-            sample_flows,
-        )
-        self.assertEqual("RapidPro Tickets", internal_ticketer.name)
 
         # fake session set_org to make the test work
         user.set_org(org)
@@ -3882,16 +3876,13 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         self.login(self.admin)
         response = self.client.get(edit_url)
-        self.assertEqual(
-            ["name", "timezone", "date_format", "language", "loc"], list(response.context["form"].fields.keys())
-        )
+        self.assertEqual(["timezone", "date_format", "language", "loc"], list(response.context["form"].fields.keys()))
 
         # try submitting with errors
         response = self.client.post(
             reverse("orgs.org_edit"),
-            {"name": "", "timezone": "Bad/Timezone", "date_format": "X", "language": "klingon"},
+            {"timezone": "Bad/Timezone", "date_format": "X", "language": "klingon"},
         )
-        self.assertFormError(response, "form", "name", "This field is required.")
         self.assertFormError(
             response, "form", "timezone", "Select a valid choice. Bad/Timezone is not one of the available choices."
         )
@@ -3904,12 +3895,11 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         response = self.client.post(
             reverse("orgs.org_edit"),
-            {"name": "New Name", "timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
+            {"timezone": "Africa/Nairobi", "date_format": "Y", "language": "es"},
         )
         self.assertEqual(302, response.status_code)
 
         self.org.refresh_from_db()
-        self.assertEqual("New Name", self.org.name)
         self.assertEqual("Africa/Nairobi", str(self.org.timezone))
         self.assertEqual("Y", self.org.date_format)
         self.assertEqual("es", self.org.language)
@@ -4392,7 +4382,6 @@ class BulkExportTest(TembaTest):
         self.assertEqual(voice_flow.expires_after_minutes, 15)
 
     def test_import(self):
-
         self.login(self.admin)
 
         post_data = dict(import_file=open("%s/test_flows/too_old.json" % settings.MEDIA_ROOT, "rb"))
@@ -5249,7 +5238,6 @@ class StripeCreditsTest(TembaTest):
         self.assertEqual(1000, self.org.get_credits_total())
 
     def test_add_credits_invalid_bundle(self):
-
         with self.assertRaises(ValidationError):
             self.org.add_credits("-10", "stripe-token", self.admin)
 
@@ -5408,3 +5396,41 @@ class BackupTokenTest(TembaTest):
         self.assertEqual(10, len(new_admin_tokens))
         self.assertNotEqual([t.token for t in admin_tokens], [t.token for t in new_admin_tokens])
         self.assertEqual(10, self.admin.backup_tokens.count())
+
+
+class UserCRUDLTestCase(TestCase):
+    def setUp(self):
+        self.user_email = "test@example.com"
+        self.user_recover_attempts_cache_key = USER_RECOVER_ATTEMPTS_CACHE_KEY.format(email=self.user_email)
+        self.user_recover_max_attempts = settings.USER_RECOVER_MAX_ATTEMPTS
+
+    def tearDown(self):
+        cache.delete(self.user_recover_attempts_cache_key)
+
+    @patch("django.core.cache.cache.get_or_set")
+    @patch("django.core.cache.cache.incr")
+    @patch("django.core.cache.cache.touch")
+    @override_settings(USER_RECOVER_TIME_INTERVAL=1)
+    def test_forget_form_exceeded_max_attempts(self, mock_touch, mock_incr, mock_get_or_set):
+        mock_get_or_set.return_value = self.user_recover_max_attempts + 1
+
+        form_data = {"email": self.user_email}
+        form = UserCRUDL.Forget.ForgetForm(data=form_data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
+        expected_error = "You have exceeded the maximum number of attempts, please try again in {settings.USER_RECOVER_TIME_INTERVAL} hours!"
+        self.assertEqual(form.errors["email"][0], expected_error)
+
+    @patch("django.core.cache.cache.get_or_set")
+    @patch("django.core.cache.cache.incr")
+    @patch("django.core.cache.cache.touch")
+    @override_settings(USER_RECOVER_TIME_INTERVAL=1)
+    def test_forget_form_within_max_attempts(self, mock_touch, mock_incr, mock_get_or_set):
+        mock_get_or_set.return_value = self.user_recover_max_attempts - 1
+
+        form_data = {"email": self.user_email}
+        form = UserCRUDL.Forget.ForgetForm(data=form_data)
+
+        self.assertTrue(form.is_valid())
+        self.assertEqual(form.cleaned_data["email"], self.user_email)

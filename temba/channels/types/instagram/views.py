@@ -14,7 +14,6 @@ from ...views import ClaimViewMixin
 
 class ClaimView(ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
-
         user_access_token = forms.CharField(min_length=32, required=True, help_text=_("The User Access Token"))
         fb_user_id = forms.CharField(
             required=True,
@@ -72,13 +71,11 @@ class ClaimView(ClaimViewMixin, SmartFormView):
 
                     if page_access_token != "":
                         break
-
                     next_ = response_json["paging"].get("next", None)
 
                     if next_ is not None:
                         url = next_
-
-                    else:
+                    else:  # pragma: no cover
                         break
 
                 if page_access_token == "":  # pragma: no cover
@@ -194,9 +191,9 @@ class RefreshToken(ModalMixin, OrgObjPermsMixin, SmartModelActionView):
         return Channel.objects.filter(is_active=True, org=self.request.user.get_org(), channel_type="IG")
 
     def execute_action(self):
-
         form = self.form
         channel = self.object
+        name = None
 
         auth_token = form.data["user_access_token"]
         fb_user_id = form.data["fb_user_id"]
@@ -250,11 +247,10 @@ class RefreshToken(ModalMixin, OrgObjPermsMixin, SmartModelActionView):
                 break
 
             next_ = response_json["paging"].get("next", None)
-
             if next_ is not None:
                 url = next_
 
-            else:
+            else:  # pragma: no cover
                 break
 
         url = f"https://graph.facebook.com/v12.0/{page_id}/subscribed_apps"

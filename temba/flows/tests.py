@@ -3,6 +3,7 @@ import decimal
 import io
 import os
 import re
+import uuid
 from datetime import timedelta
 from unittest.mock import PropertyMock, patch
 
@@ -24,6 +25,7 @@ from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.classifiers.models import Classifier
 from temba.contacts.models import URN, Contact, ContactField, ContactGroup
+from temba.externals.models import ExternalService
 from temba.globals.models import Global
 from temba.mailroom import FlowValidationException
 from temba.orgs.integrations.dtone import DTOneType
@@ -35,6 +37,7 @@ from temba.tickets.models import Ticketer
 from temba.triggers.models import Trigger
 from temba.utils import json
 from temba.utils.uuid import uuid4
+from temba.wpp_products.models import Catalog, Product
 
 from .checks import mailroom_url
 from .models import (
@@ -367,34 +370,78 @@ class FlowTest(TembaTest):
             response = self.client.get(reverse("flows.flow_editor", args=[flow.uuid]))
             self.assertEqual(features, set(json.loads(response.context["feature_filters"])))
 
-        # every org has a ticketer now...
-        assert_features({"ticketer"})
-
         # add a resthook
         Resthook.objects.create(org=flow.org, created_by=self.admin, modified_by=self.admin)
-        assert_features({"ticketer", "resthook"})
+        assert_features({"resthook"})
 
         # add an NLP classifier
         Classifier.objects.create(org=flow.org, config="", created_by=self.admin, modified_by=self.admin)
-        assert_features({"classifier", "ticketer", "resthook"})
+        assert_features({"classifier", "resthook"})
 
         # add a DT One integration
         DTOneType().connect(flow.org, self.admin, "login", "token")
-        assert_features({"airtime", "classifier", "ticketer", "resthook"})
+        assert_features({"airtime", "classifier", "resthook"})
 
         # change our channel to use a whatsapp scheme
         self.channel.schemes = [URN.WHATSAPP_SCHEME]
         self.channel.save()
-        assert_features({"whatsapp", "airtime", "classifier", "ticketer", "resthook"})
+        assert_features({"whatsapp", "airtime", "classifier", "resthook"})
 
         # change our channel to use a facebook scheme
         self.channel.schemes = [URN.FACEBOOK_SCHEME]
         self.channel.save()
-        assert_features({"facebook", "airtime", "classifier", "ticketer", "resthook"})
+        assert_features({"facebook", "airtime", "classifier", "resthook"})
+
+        Ticketer.create(self.org, self.user, "mailgun", "Email (bob@acme.com)", {})
+        assert_features({"facebook", "airtime", "classifier", "resthook", "ticketer"})
+
+        ExternalService.objects.create(
+            uuid=uuid.uuid4(),
+            external_service_type="chatgpt",
+            name="test_chatgpt",
+            config={},
+            org=self.org,
+            created_by=self.user,
+            modified_by=self.user,
+        )
+        assert_features({"facebook", "airtime", "classifier", "resthook", "ticketer", "external_service"})
+
+        channel = self.channel
+        channel.get_type().code = "WAC"
+
+        catalog = Catalog.objects.create(
+            facebook_catalog_id="111",
+            name="Test Catalog",
+            channel=channel,
+            org=self.org,
+            is_active=True,
+        )
+
+        Product.objects.create(
+            catalog=catalog,
+            title="Product 1",
+            facebook_product_id="fb123",
+            product_retailer_id="retail123",
+        )
+
+        assert_features(
+            {"facebook", "airtime", "classifier", "resthook", "ticketer", "external_service", "whatsapp_catalog"}
+        )
 
         self.setUpLocations()
 
-        assert_features({"facebook", "airtime", "classifier", "ticketer", "resthook", "locations"})
+        assert_features(
+            {
+                "facebook",
+                "airtime",
+                "classifier",
+                "resthook",
+                "ticketer",
+                "external_service",
+                "whatsapp_catalog",
+                "locations",
+            }
+        )
 
     def test_save_revision(self):
         self.login(self.admin)

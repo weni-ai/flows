@@ -1,3 +1,285 @@
+3.4.1
+----------
+* Fix error when project is template
+
+3.4.0
+----------
+* Add contact foreign key in httplog model
+* Add log url button in contact history
+* Add description in create project and create update project queue
+* Dockerfile refactoring and add cache for build
+* Bump floweditor version to 2.9.1
+
+3.3.5
+----------
+* Add filters to Webhook view
+* Create endpoint to export webhook and send email
+* Filters and export in webhook page
+* Update floweditor to 2.9.0
+
+3.3.4
+----------
+* Change update_api_version method to save channel with update_fields
+* Fix duplicated registers in template.json endpoint
+* Add cycle attribute in request_logs sequence
+
+3.3.3
+----------
+* Handle updated geo attachments
+
+3.3.2
+----------
+* Fix error when not exist an active catalog
+* Add catalogs in get_features flow view
+* Update Floweditor to 2.8.2
+
+3.3.1
+----------
+* Update Floweditor to 2.8.1
+
+3.3.0
+----------
+* Update Floweditor to 2.8.0
+* Add models to wpp_product app
+* Create task to update catalog and product
+* Add endpoint to GET products
+* Implement SentenX in flows
+* Create endpoint to create/update catalog
+* Send product contact history event
+
+3.2.1
+----------
+* Chore: Update Floweditor to 2.7.1
+
+3.2.0
+----------
+* Add filters in template.json endpoint
+* Fix error in import trigger
+* Chore: Update Floweditor to 2.7.0
+* Feat: Remove Helphero
+* Feat: Control tools guide and modal
+
+3.1.5
+----------
+* Update FlowEditor to version 2.6.5
+
+3.1.4
+----------
+* Update FlowEditor to version 2.6.4
+* Re-add feedback delayed toggle
+
+3.1.3
+----------
+* Update FlowEditor to version 2.6.3
+
+3.1.2
+----------
+* Update FlowEditor to version 2.6.2
+
+3.1.1
+----------
+* Update FlowEditor to version 2.6.1
+
+3.1.0
+----------
+* Fix CI
+* Update FlowEditor to version 2.6.0
+* Remove workspace edit and classifier delete
+* Redesign FlowEditor feedback
+
+3.0.1
+----------
+* Add INTENT_URL in environment and add classifier intention sync
+* Update version of weni-rp-apps to 2.7.8
+
+3.0.0
+----------
+* Add authorizations for users in project creation
+* Add get_or_create in project creation
+* Remove has issues in flows
+* Add handle consumers in event_driven handle
+* Create classifier consumer
+* Create ticketer consumer
+
+2.2.4
+----------
+* Update FlowEditor to version 2.5.2
+
+2.2.3
+----------
+* Update FlowEditor to version 2.5.1
+
+2.2.2
+----------
+* Update FlowEditor to version 2.5.0
+
+2.2.1
+----------
+* Update FlowEditor to version 2.4.1
+
+2.2.0
+----------
+* Update FlowEditor to version 2.4.0
+
+2.1.0
+----------
+* Create function to add integrations list to export flow
+* Create projets and template type consumers
+* Add project and template type handlers in event_driven
+* Update FlowEditor to version 2.3.0
+
+2.0.7
+----------
+⚠️ FlowEditor broken due to incorrect build
+* Update settings.dev to include weni.internal apps
+* Create integration request model
+* Update version of weni-rp-apps to 2.7.7
+* Create projects and TemplateType model
+
+2.0.6
+----------
+⚠️ FlowEditor broken due to incorrect build
+* Update FlowEditor to version 2.2.0
+
+2.0.5
+----------
+* Update FlowEditor to version 2.1.0
+
+2.0.4
+----------
+* Update FlowEditor to version 2.0.3
+
+2.0.3
+----------
+* Create and Setup event driven app
+* Checks if the user user_org exists before fetching triggers 
+
+2.0.2
+----------
+* Update FlowEditor to version 2.0.2
+* Add id prefix on jquery selectors to prevent css conflict with unnnic modals 
+* Remove delayed toggle and changed alert color
+
+2.0.1
+----------
+* Update FlowEditor to version 2.0.1
+
+2.0.0
+----------
+* Update FlowEditor to version 2.0.0
+* Modified trigger flow button text
+
+1.9.11-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.6
+
+1.9.10-rapidpro-7.1.27
+----------
+* Add tests to tickets model
+* Add test to instagram
+* Add test to legacy/migrations file
+
+1.9.9-rapidpro-7.1.27
+----------
+* Add tests to Templatetag
+* Add test to Teams channel
+* Add tests to api app
+
+1.9.8-rapidpro-7.1.27
+----------
+* Feat: Added new rate again step into floweditor feedback
+
+1.9.7-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.5
+
+1.9.6-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.4
+
+1.9.5-rapidpro-7.1.27
+----------
+* Add test to Twilio Flex
+* Add test to RocketChat
+* Add tests to Weni Chats
+* Add tests to ChatGPT
+* Add tests to org app
+* Add tests for flows views
+* Refact externals model to not use ConnectViewBase
+* update floweditor to 1.3.1
+* Feat: FlowEditor Feedback component
+* Remove Org name edit option
+
+1.9.4-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.3
+* Add mail_base.html and msg_mail_body.haml 
+
+1.9.3-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.2
+* Remove weni.internal.msgs module import from INSTALLED_APPS
+
+1.9.2-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.1
+* Add task generate_sent_report_messages
+* Change staging build
+
+1.9.1-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.7.0
+
+1.9.0-rapidpro-7.1.27
+----------
+* Implement tests for context_processors_weni
+* Add tests to middleware
+* Add tests to omie type
+* Update python version in docker file
+* External service chatgpt
+* remove migration 0091 org plan
+* Create action endpoint to chatgpt
+* Update version of weni-rp-apps to 2.6.0
+* Update FlowEditor to 1.3.0
+
+1.8.10-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.5.0
+
+1.8.9-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.4.4
+
+1.8.8-rapidpro-7.1.27
+----------
+* Change in CI, from './manage.py' to 'python manage.py'
+* Update verion of weni-rp-apps to 2.4.3
+
+1.8.7-rapidpro-7.1.27
+----------
+* Add a condition to enable httplog_webhook to a org
+* New trigger onboard modal
+
+1.8.6-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.4.2
+
+1.8.5-rapidpro-7.1.27
+----------
+* Update version of weni-rp-apps to 2.4.1
+* Chore: Update FlowEditor to 1.2.1
+* fix: add weni prefix to css classes
+* Remove iso-639 lib from pip-requires and lock in CI
+
+1.8.4-rapidpro-7.1.27
+----------
+* Update README to flows build status
+* Adjust ticketers errors tests
+* Adjust tests in flows
+* Resolve errors in flows CI
+* Run black in flows
+* Update Dockerfile to lock requests version
+
 1.8.3-rapidpro-7.1.27
 ----------
 * Update weni-rp-apps from 2.3.4 to 2.4.0

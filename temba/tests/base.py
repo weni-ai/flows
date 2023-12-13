@@ -291,6 +291,7 @@ class TembaTestMixin:
         high_priority=False,
         surveyor=False,
         next_attempt=None,
+        product_metadata=None,
     ):
         if status in (Msg.STATUS_WIRED, Msg.STATUS_SENT, Msg.STATUS_DELIVERED) and not sent_on:
             sent_on = timezone.now()
@@ -298,6 +299,9 @@ class TembaTestMixin:
         metadata = {}
         if quick_replies:
             metadata["quick_replies"] = quick_replies
+        if product_metadata:
+            metadata["products"] = product_metadata["products"]
+            metadata["body"] = product_metadata["body"]
 
         return self._create_msg(
             contact,
@@ -506,7 +510,7 @@ class TembaTestMixin:
             archive_type=archive_type,
             size=size,
             hash=md5,
-            url=f"http://{bucket}.aws.com/{key}",
+            url=f"https://{bucket}.aws.com/{key}",
             record_count=len(records),
             start_date=start_date,
             period=period,

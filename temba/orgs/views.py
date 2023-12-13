@@ -141,7 +141,6 @@ class OrgPermsMixin:
         return self.has_org_perm(self.permission)
 
     def dispatch(self, request, *args, **kwargs):
-
         # non admin authenticated users without orgs get the org chooser
         user = self.get_user()
         if user.is_authenticated and not (user.is_superuser or user.is_staff):
@@ -743,7 +742,6 @@ class UserCRUDL(SmartCRUDL):
         fields = ("email",)
 
         def form_valid(self, form):
-
             email = form.cleaned_data["email"]
             user = User.objects.filter(email__iexact=email).first()
 
@@ -1034,7 +1032,6 @@ class MenuMixin(OrgPermsMixin):
         items=[],
         inline=False,
     ):
-
         if perm and not self.has_org_perm(perm):  # pragma: no cover
             return
 
@@ -1123,7 +1120,6 @@ class OrgCRUDL(SmartCRUDL):
             return r"^%s/%s/((?P<submenu>[A-z]+)/)?$" % (path, action)
 
         def derive_menu(self):
-
             submenu = self.kwargs.get("submenu")
             org = self.request.user.get_org()
 
@@ -1240,7 +1236,6 @@ class OrgCRUDL(SmartCRUDL):
                 return menu
 
             else:
-
                 return [
                     self.create_menu_item(name=_("Messages"), icon="message-square", endpoint="msgs.msg_menu"),
                     self.create_menu_item(name=_("Contacts"), icon="contact", endpoint="contacts.contact_menu"),
@@ -1670,7 +1665,6 @@ class OrgCRUDL(SmartCRUDL):
         success_message = "Plivo credentials verified. You can now add a Plivo channel."
 
         def form_valid(self, form):
-
             auth_id = form.cleaned_data["auth_id"]
             auth_token = form.cleaned_data["auth_token"]
 
@@ -2863,7 +2857,6 @@ class OrgCRUDL(SmartCRUDL):
 
         def form_valid(self, form):
             if self.get_step() == 1:
-
                 org = self.form.cleaned_data.get("org", None)
 
                 context = self.get_context_data()
@@ -3151,7 +3144,6 @@ class OrgCRUDL(SmartCRUDL):
             return links
 
         def derive_formax_sections(self, formax, context):
-
             # add the channel option if we have one
             user = self.request.user
             org = user.get_org()
@@ -3199,8 +3191,6 @@ class OrgCRUDL(SmartCRUDL):
             if self.has_org_perm("tickets.ticketer_connect"):
                 links.append(dict(title=_("Add Ticketing Service"), href=reverse("tickets.ticketer_connect")))
 
-            links.append(dict(title=_("Add External Service"), href=reverse("externals.externalservice_connect")))
-
             if len(links) > 0:
                 links.append(dict(divider=True))
 
@@ -3237,7 +3227,6 @@ class OrgCRUDL(SmartCRUDL):
             return context
 
         def add_channel_section(self, formax, channel):
-
             if self.has_org_perm("channels.channel_read"):
                 from temba.channels.views import get_channel_read_url
 
@@ -3246,7 +3235,6 @@ class OrgCRUDL(SmartCRUDL):
                 )
 
         def add_classifier_section(self, formax, classifier):
-
             if self.has_org_perm("classifiers.classifier_read"):
                 formax.add_section(
                     "classifier",
@@ -3256,13 +3244,9 @@ class OrgCRUDL(SmartCRUDL):
                 )
 
         def derive_formax_sections(self, formax, context):
-
             # add the channel option if we have one
             user = self.request.user
             org = user.get_org()
-
-            if self.has_org_perm("orgs.org_edit"):
-                formax.add_section("org", reverse("orgs.org_edit"), icon="icon-office")
 
             # if we are on the topups plan, show our usual credits view
             if org.plan == settings.TOPUP_PLAN:
@@ -3367,7 +3351,6 @@ class OrgCRUDL(SmartCRUDL):
             formax.add_section("archives", reverse("archives.archive_message"), icon="icon-box", action="link")
 
     class TwilioAccount(ComponentFormMixin, InferOrgMixin, OrgPermsMixin, SmartUpdateView):
-
         success_message = ""
 
         class TwilioKeys(forms.ModelForm):
@@ -3441,14 +3424,13 @@ class OrgCRUDL(SmartCRUDL):
 
     class Edit(InferOrgMixin, OrgPermsMixin, SmartUpdateView):
         class Form(forms.ModelForm):
-            name = forms.CharField(max_length=128, label=_("Workspace Name"), help_text="", widget=InputWidget())
             timezone = TimeZoneFormField(
                 label=_("Timezone"), help_text="", widget=SelectWidget(attrs={"searchable": True})
             )
 
             class Meta:
                 model = Org
-                fields = ("name", "timezone", "date_format", "language")
+                fields = ("timezone", "date_format", "language")
                 widgets = {"date_format": SelectWidget(), "language": SelectWidget()}
 
         success_message = ""
@@ -3469,7 +3451,6 @@ class OrgCRUDL(SmartCRUDL):
         success_url = "@orgs.org_sub_orgs"
 
         def get_success_url(self):
-
             if self.is_spa():
                 org_id = self.request.GET.get("org")
                 return f"{reverse('orgs.org_manage_accounts_sub_org')}?org={org_id}"
@@ -3725,7 +3706,6 @@ class TopUpCRUDL(SmartCRUDL):
             topups = list(self.get_queryset())
 
             def compare(topup1, topup2):  # pragma: no cover
-
                 # non expired first
                 now = timezone.now()
                 if topup1.expires_on > now and topup2.expires_on <= now:

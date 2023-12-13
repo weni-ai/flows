@@ -89,7 +89,6 @@ class ExpressionsTest(TembaTest):
 
 class FlowMigrationTest(TembaTest):
     def migrate_flow(self, flow, to_version=None):
-
         if not to_version:
             to_version = Flow.FINAL_LEGACY_VERSION
 
@@ -112,7 +111,6 @@ class FlowMigrationTest(TembaTest):
         return Flow.objects.get(pk=flow.pk)
 
     def test_migrate_malformed_single_message_flow(self):
-
         flow = Flow.objects.create(
             name="Single Message Flow",
             org=self.org,
@@ -237,7 +235,6 @@ class FlowMigrationTest(TembaTest):
         self.assertEqual(len(migrated["action_sets"]), 3)
 
     def test_migrate_to_11_12_with_one_node(self):
-
         flow = self.get_flow("migrate_to_11_12_one_node")
         flow_json = self.get_flow_json("migrate_to_11_12_one_node")
         migrated = migrate_to_version_11_12(flow_json, flow)
@@ -267,7 +264,6 @@ class FlowMigrationTest(TembaTest):
         self.assertEqual(flow.channel_dependencies.count(), 1)
 
     def test_migrate_to_11_11(self):
-
         flow = self.get_flow("migrate_to_11_11")
         flow_json = self.get_flow_json("migrate_to_11_11")
 
@@ -380,7 +376,6 @@ class FlowMigrationTest(TembaTest):
         self.assertEqual(len(migrated["rule_sets"]), 6)
 
     def test_migrate_to_11_6(self):
-
         flow = self.get_flow("migrate_to_11_6")
         flow_json = self.get_flow_json("migrate_to_11_6")
 
@@ -713,6 +708,32 @@ class FlowMigrationTest(TembaTest):
 
         self.assertEqual(migrated, definition)
 
+    def test_migrate_to_11_0_with_rs_type(self):
+        flow = self.get_flow("migrate_to_11_0")
+        definition = {
+            "rule_sets": [
+                {
+                    "uuid": "9ed4a233-c737-4f46-9b0a-de6e88134e14",
+                    "rules": [
+                        {"test": {"type": "true"}},
+                        {"test": {"type": "D"}},
+                        {"test": {"type": "S"}},
+                        {"test": {"type": "W"}},
+                    ],
+                    "ruleset_type": "wait_message",
+                    "label": None,
+                    "operand": None,
+                    "finished_key": None,
+                    "y": 180,
+                    "x": 179,
+                }
+            ]
+        }
+
+        migrated = migrate_to_version_11_0(definition, flow)
+
+        self.assertEqual(migrated, definition)
+
     def test_migrate_to_11_0_with_null_msg_text(self):
         flow = self.get_flow("migrate_to_11_0")
         definition = {
@@ -948,7 +969,6 @@ class FlowMigrationTest(TembaTest):
         self.assertEqual("V", flow_json.get("flow_type"))
 
     def test_migrate_to_6(self):
-
         # file format is old non-localized format
         voice_json = self.get_flow_json("ivr_v3")
         definition = voice_json.get("definition")
@@ -983,7 +1003,6 @@ class FlowMigrationTest(TembaTest):
         self.assertNotIn("recording", definition["action_sets"][0]["actions"][0])
 
     def test_migrate_to_5_language(self):
-
         flow_json = self.get_flow_json("multi_language_flow")
         ruleset = flow_json["definition"]["rule_sets"][0]
         ruleset["operand"] = "@step.value|lower_case"
@@ -1055,13 +1074,13 @@ class FlowMigrationTest(TembaTest):
         webhook_node = order_checker.get_definition()["nodes"][3]
         webhook_action = webhook_node["actions"][0]
 
-        self.assertEqual("https://app.rapidpro.io/demo/status/", webhook_action["url"])
+        self.assertEqual("https://new.push.al/demo/status/", webhook_action["url"])
 
         # our test user doesn't use an email address, check for Administrator for the email
         email_node = order_checker.get_definition()["nodes"][10]
         email_action = email_node["actions"][1]
 
-        self.assertEqual(["Administrator"], email_action["addresses"])
+        self.assertEqual(["ilanna.lins@weni.ai"], email_action["addresses"])
 
     def test_migrate_bad_group_names(self):
         # This test makes sure that bad contact groups (< 25, etc) are migrated forward properly.
