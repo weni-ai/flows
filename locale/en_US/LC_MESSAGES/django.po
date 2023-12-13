@@ -7437,3 +7437,9 @@ msgstr "Webhook data will be sent to your Email address."
 
 msgid "Failed to send webhook data to your Email address. Please try again later."
 msgstr "Failed to send webhook data to your Email address. Please try again later."
+
+msgid "Data in Excel spreadsheet about Project Webhooks:"
+msgstr "Data in Excel spreadsheet about Project Webhooks:"
+
+msgid "Data in the Excel spreadsheet about Project template messages:"
+msgstr "Data in the Excel spreadsheet about Project template messages:"
