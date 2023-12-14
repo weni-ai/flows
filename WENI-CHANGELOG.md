@@ -1,3 +1,14 @@
+3.4.2
+----------
+* Update contact URN filter to icontains
+* Endpoint to get flows labels
+* Add labels parameter in flow endpoint
+* Remove empty body in 204 status return
+* Add user_email in update project config
+* Add translations in template and webhook emails
+* Add search parameter in contact endpoint
+* Bump floweditor to version 2.9.2 
+
 3.4.1
 ----------
 * Fix error when project is template
