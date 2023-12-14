@@ -26,6 +26,7 @@ from temba.api.v2.views_base import (
     DeleteAPIMixin,
     ListAPIMixin,
     ModifiedOnCursorPagination,
+    NameCursorPagination,
     WriteAPIMixin,
 )
 from temba.archives.models import Archive
@@ -34,7 +35,7 @@ from temba.channels.models import Channel, ChannelEvent
 from temba.classifiers.models import Classifier
 from temba.contacts.models import Contact, ContactField, ContactGroup, ContactGroupCount, ContactURN
 from temba.externals.models import ExternalService
-from temba.flows.models import Flow, FlowRun, FlowStart
+from temba.flows.models import Flow, FlowLabel, FlowRun, FlowStart
 from temba.globals.models import Global
 from temba.locations.models import AdminBoundary, BoundaryAlias
 from temba.msgs.models import Broadcast, Label, LabelCount, Msg, SystemLabel
@@ -68,6 +69,7 @@ from .serializers import (
     ExternalServicesReadSerializer,
     FlowReadSerializer,
     FlowRunReadSerializer,
+    FlowsLabelsReadSerializer,
     FlowStartReadSerializer,
     FlowStartWriteSerializer,
     GlobalReadSerializer,
@@ -272,6 +274,7 @@ class ExplorerView(SmartTemplateView):
             FieldsEndpoint.get_read_explorer(),
             FieldsEndpoint.get_write_explorer(),
             FlowsEndpoint.get_read_explorer(),
+            FlowsLabelsEndpoint.get_read_explorer(),
             FlowStartsEndpoint.get_read_explorer(),
             FlowStartsEndpoint.get_write_explorer(),
             GlobalsEndpoint.get_read_explorer(),
@@ -1953,6 +1956,59 @@ class FlowsEndpoint(ListAPIMixin, BaseAPIView):
                     "help": "Only return flows modified after this date, ex: 2017-01-28T18:00:00.000",
                 },
             ],
+        }
+
+
+class FlowsLabelsEndpoint(ListAPIMixin, BaseAPIView):
+    """
+    This endpoint allows you to list labels of the flows in your account.
+
+    ## Listing Labels Flows
+
+    A **GET** returns the list of labels of the flows for your organization, in the order of last created.
+
+     * **uuid** - the UUID of the label (string)
+     * **name** - the name of the label (string)
+     * **parents** - the parent label of the label, if exists
+
+
+    Example:
+
+        GET /api/v2/flows_labels.json
+
+    Response containing the labels for your organization:
+
+        {
+            "next": null,
+            "previous": null,
+            "results": [
+                {
+                    "uuid": "5f05311e-8f81-4a67-a5b5-1501b6d6496a",
+                    "name": "Survey",
+                    "parent": null,
+                },
+                ...
+            ]
+        }
+    """
+
+    permission = "flows.flow_api"
+    model = FlowLabel
+    serializer_class = FlowsLabelsReadSerializer
+    pagination_class = NameCursorPagination
+
+    def filter_queryset(self, queryset):
+        org = self.request.user.get_org()
+        return org.flow_labels.all()
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Flows Labels",
+            "url": reverse("api.v2.flows_labels"),
+            "slug": "flow-label-list",
+            "params": [],
         }
 
 

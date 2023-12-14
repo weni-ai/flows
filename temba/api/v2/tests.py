@@ -22,7 +22,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from temba.api.models import APIToken, Resthook, WebHookEvent
-from temba.api.v2.views import ExternalServicesEndpoint, ProductsEndpoint, TemplatesEndpoint
+from temba.api.v2.views import ExternalServicesEndpoint, FlowsLabelsEndpoint, ProductsEndpoint, TemplatesEndpoint
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
@@ -5120,3 +5120,34 @@ class TestTemplateFilterQuerySetTest(TembaTest):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, 200)
+
+
+class FlowsLabelsEndpointTest(TembaTest):
+    @patch("temba.api.v2.views.FlowsLabelsEndpoint.get_queryset")
+    def test_flows_labels_endpoint(self, mock_get_queryset):
+        client = APIClient()
+        view = FlowsLabelsEndpoint
+        view.permission_classes = []
+
+        client.force_login(self.user)
+        org = self.user.get_org()
+
+        label = FlowLabel.objects.create(org=org, name="Important", parent=None)
+
+        url = reverse("api.v2.flows_labels") + ".json"
+        response = client.get(url, data={})
+
+        self.assertEqual(response.status_code, 200)
+
+        expected_result = {
+            "next": None,
+            "previous": None,
+            "results": [
+                {
+                    "uuid": label.uuid,
+                    "name": "Important",
+                    "parent": None,
+                }
+            ],
+        }
+        self.assertEqual(response.json(), expected_result)
