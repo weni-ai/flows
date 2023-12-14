@@ -21,9 +21,15 @@ class TestUpdateProjectConfig(TembaTest):
             config={"description": "Old description"},
         )
 
-        updated_project = update_project_config(project.project_uuid, "New description")
+        updated_project = update_project_config(project.project_uuid, "New description", self.user.email)
         reloaded_project = Project.objects.get(project_uuid=project.project_uuid)
 
         self.assertEqual(reloaded_project.config["description"], "New description")
 
         self.assertEqual(updated_project, reloaded_project)
+
+        updated_project_without_user_email = update_project_config(project.project_uuid, "New description 2")
+        reloaded_project = Project.objects.get(project_uuid=project.project_uuid)
+
+        self.assertEqual(reloaded_project.config["description"], "New description 2")
+        self.assertEqual(updated_project_without_user_email, reloaded_project)
