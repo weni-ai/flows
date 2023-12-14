@@ -1749,6 +1749,14 @@ class APITest(TembaTest):
         response = self.fetchJSON(url, "urn=%s" % quote_plus("tel:078-8000004"))
         self.assertResultsByUUID(response, [contact4])
 
+        # filter by seacrh
+        response = self.fetchJSON(url, "search=%s" % quote_plus("tel:078-8000004"))
+        self.assertResultsByUUID(response, [contact4])
+
+        # filter by search without urn
+        response = self.fetchJSON(url, "search=%s" % contact2.name)
+        self.assertResultsByUUID(response, [contact2])
+
         # filter by Name
         response = self.fetchJSON(url, "name=%s" % contact2.name)
         self.assertResultsByUUID(response, [contact2])
