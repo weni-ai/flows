@@ -15,6 +15,36 @@ class Template(models.Model):
     are currently only used for WhatsApp channels.
     """
 
+    CATEGORY_CHOICES = (
+        ("ACCOUNT_UPDATE", "account_update"),
+        ("PAYMENT_UPDATE", "payment_update"),
+        (
+            "PERSONAL_FINANCE_UPDATE",
+            "personal_finance_update",
+        ),
+        ("SHIPPING_UPDATE", "shipping_update"),
+        ("RESERVATION_UPDATE", "reservation_update"),
+        ("ISSUE_RESOLUTION", "issue_resolution"),
+        ("APPOINTMENT_UPDATE", "appointment_update"),
+        (
+            "TRANSPORTATION_UPDATE",
+            "transportation_update",
+        ),
+        ("TICKET_UPDATE", "ticket_update"),
+        ("ALERT_UPDATE", "alert_update"),
+        ("AUTO_REPLY", "auto_reply"),
+        ("TRANSACTIONAL", "transactional"),
+        ("MARKETING", "marketing"),
+        ("OTP", "otp"),
+        ("UTILITY", "utility"),
+        ("AUTHENTICATION", "authentication"),
+    )
+
+    TEMPLATE_TYPES_CHOICES = (
+        ("MEDIA", "media"),
+        ("INTERACTIVE", "interactive"),
+        ("TEXT", "text"),
+    )
     # the uuid for this template
     uuid = models.UUIDField(default=uuid.uuid4)
 
@@ -26,6 +56,10 @@ class Template(models.Model):
 
     # when this template was last modified
     modified_on = models.DateTimeField(default=timezone.now)
+
+    template_type = models.CharField(max_length=100, choices=TEMPLATE_TYPES_CHOICES, null=True)
+
+    category = models.CharField(max_length=200, choices=CATEGORY_CHOICES, null=True)
 
     # when this template was created
     created_on = models.DateTimeField(default=timezone.now)
@@ -94,6 +128,8 @@ class TemplateTranslation(models.Model):
 
     # whether this channel template is active
     is_active = models.BooleanField(default=True)
+
+    message_template_id = models.CharField(max_length=20, unique=True, null=True, blank=True)
 
     @classmethod
     def trim(cls, channel, existing):
@@ -167,3 +203,35 @@ class TemplateTranslation(models.Model):
 
     def __str__(self):
         return f"{self.template.name} ({self.language} [{self.country}]) {self.status}: {self.content}"
+
+
+class TemplateButton(models.Model):
+    BUTTON_TYPE_CHOICES = (
+        ("QUICK_REPLY", "quick_reply"),
+        ("PHONE_NUMBER", "phone_number"),
+        ("URL", "url"),
+    )
+
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+
+    translation = models.ForeignKey(TemplateTranslation, on_delete=models.CASCADE, related_name="buttons")
+
+    type = models.CharField(max_length=20, choices=BUTTON_TYPE_CHOICES)
+    text = models.CharField(max_length=30, null=True)
+    country_code = models.IntegerField(null=True)
+    phone_number = models.CharField(max_length=20, null=True)
+    url = models.CharField(max_length=2000, null=True)
+
+
+class TemplateHeader(models.Model):
+    HEADER_TYPE_CHOICES = (
+        ("TEXT", "text"),
+        ("IMAGE", "image"),
+        ("DOCUMENT", "document"),
+        ("VIDEO", "video"),
+    )
+
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    translation = models.ForeignKey(TemplateTranslation, on_delete=models.CASCADE, related_name="headers")
+    type = models.CharField(max_length=20, choices=HEADER_TYPE_CHOICES)
+    text = models.CharField(max_length=60, default=None, null=True)
