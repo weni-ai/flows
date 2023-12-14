@@ -1418,7 +1418,7 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
         # filter by URN (optional)
         urn = params.get("urn")
         if urn:
-            queryset = queryset.filter(urns__identity=self.normalize_urn(urn))
+            queryset = queryset.filter(urns__identity__icontains=self.normalize_urn(urn))
 
         # filter by contact name (optional)
         name = params.get("name")
