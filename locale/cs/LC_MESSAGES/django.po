@@ -7880,3 +7880,9 @@ msgstr "Šablony jsou z vašeho účtu synchronizovány každých 15 minut."
 
 msgid "No synced templates at this time."
 msgstr "V současné době nejsou k dispozici žádné synchronizované šablony."
+
+msgid "Data in Excel spreadsheet about Project Webhooks:"
+msgstr "Data v excelové tabulce o Project Webhoocích:"
+
+msgid "Data in the Excel spreadsheet about Project template messages:"
+msgstr "Data v excelové tabulce o zprávách šablony projektu:"
