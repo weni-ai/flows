@@ -7827,3 +7827,9 @@ msgstr "Les modèles sont synchronisés à partir de votre compte toutes les 15 
 
 msgid "No synced templates at this time."
 msgstr "Aucun modèle synchronisé pour le moment."
+
+msgid "Data in Excel spreadsheet about Project Webhooks:"
+msgstr "Données dans une feuille de calcul Excel sur les Webhooks du projet:"
+
+msgid "Data in the Excel spreadsheet about Project template messages:"
+msgstr "Données dans la feuille de calcul Excel sur les messages du modèle de projet :"
