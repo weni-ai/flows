@@ -1421,16 +1421,16 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
         # filter by URN (optional)
         urn = params.get("urn")
         if urn:
-            queryset = queryset.filter(urns__identity__icontains=self.normalize_urn(urn))
+            queryset = queryset.filter(urns__identity=self.normalize_urn(urn))
 
         # filter by search (optional)
         search = params.get("search")
         if search:
             try:
-                urn_search = Q(urns__identity__icontains=self.normalize_urn(search))
+                urn_search = Q(urns__identity=self.normalize_urn(search))
             except InvalidQueryError:
                 urn_search = Q()
-            queryset = queryset.filter(urn_search | Q(name__icontains=search))
+            queryset = queryset.filter(urn_search | Q(name=search))
 
         # filter by contact name (optional)
         name = params.get("name")
