@@ -1,3 +1,7 @@
+3.4.3
+----------
+* Hotfix: Remove icontains in contacts endpoint
+
 3.4.2
 ----------
 * Update contact URN filter to icontains
