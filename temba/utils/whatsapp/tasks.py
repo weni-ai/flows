@@ -245,23 +245,21 @@ def update_is_active_catalog(channel, catalogs_data):
     return catalogs_data
 
 
-def update_local_catalogs(catalogs_data):
-    channel = catalogs_data["channel"]
-    channel_object = Channel.objects.filter(channel=channel)
-    updated_catalogs = update_is_active_catalog(channel_object, catalogs_data)
+def update_local_catalogs(channel, catalogs_data):
+    # updated_catalogs = update_is_active_catalog(channel, catalogs_data)
     seen = []
 
-    for catalog in updated_catalogs:
+    for catalog in catalogs_data:
         new_catalog = Catalog.get_or_create(
             name=catalog["name"],
-            channel=channel_object,
+            channel=channel,
             is_active=catalog["is_active"],
             facebook_catalog_id=catalog["id"],
         )
 
         seen.append(new_catalog)
 
-    Catalog.trim(channel_object, seen)
+    Catalog.trim(channel, seen)
 
 
 def update_local_products(products_data):

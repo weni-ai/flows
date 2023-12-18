@@ -14,8 +14,8 @@ class CatalogViewSet(viewsets.ViewSet, InternalGenericViewSet):
         channel_uuid = self.request.data.get("channel")
         return get_object_or_404(Channel, uuid=channel_uuid)
 
-    @action(detail=False, methods=["POST"], url_path="update-catalog")
-    def update_catalog(self, request, *args, **kwargs):
+    @action(detail=False, methods=["POST"], url_path="update-active-catalog")
+    def update__active_catalog(self, request, *args, **kwargs):
         serializer = UpdateCatalogSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -23,11 +23,9 @@ class CatalogViewSet(viewsets.ViewSet, InternalGenericViewSet):
         update_channel_catalogs_status(self.get_object(), validated_data.get("facebook_catalog_id"))
         return Response(status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["POST"], url_path="create-catalog")
-    def create_catalog(self, request, *args, **kwargs):
-        catalogs = request.data.get("catalogs")
-        for catalog in catalogs:
-            update_local_catalogs(catalog)
+    @action(detail=False, methods=["POST"], url_path="update-catalog")
+    def update_catalog(self, request, *args, **kwargs):
+        update_local_catalogs(self.get_object(), request.data.get("data"))
         return Response(status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"], url_path="create-product")
