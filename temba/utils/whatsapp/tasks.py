@@ -246,10 +246,10 @@ def update_is_active_catalog(channel, catalogs_data):
 
 
 def update_local_catalogs(channel, catalogs_data):
-    # updated_catalogs = update_is_active_catalog(channel, catalogs_data)
+    updated_catalogs = update_is_active_catalog(channel, catalogs_data)
     seen = []
 
-    for catalog in catalogs_data:
+    for catalog in updated_catalogs:
         new_catalog = Catalog.get_or_create(
             name=catalog["name"],
             channel=channel,
