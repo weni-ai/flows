@@ -14,7 +14,7 @@ from celery import shared_task
 from temba.channels.models import Channel
 from temba.contacts.models import URN, Contact, ContactURN
 from temba.request_logs.models import HTTPLog
-from temba.templates.models import TemplateTranslation
+from temba.templates.models import Template, TemplateTranslation
 from temba.utils import chunk_list
 from temba.wpp_products.models import Catalog, Product
 
@@ -155,6 +155,7 @@ def update_local_templates(channel, templates_data):
 
     # trim any translations we didn't see
     TemplateTranslation.trim(channel, seen)
+    Template.trim(channel)
 
 
 @shared_task(track_started=True, name="refresh_whatsapp_templates")
