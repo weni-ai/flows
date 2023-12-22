@@ -40,11 +40,6 @@ class Template(models.Model):
         ("AUTHENTICATION", "authentication"),
     )
 
-    TEMPLATE_TYPES_CHOICES = (
-        ("MEDIA", "media"),
-        ("INTERACTIVE", "interactive"),
-        ("TEXT", "text"),
-    )
     # the uuid for this template
     uuid = models.UUIDField(default=uuid.uuid4)
 
@@ -56,8 +51,6 @@ class Template(models.Model):
 
     # when this template was last modified
     modified_on = models.DateTimeField(default=timezone.now)
-
-    template_type = models.CharField(max_length=100, choices=TEMPLATE_TYPES_CHOICES, null=True)
 
     category = models.CharField(max_length=200, choices=CATEGORY_CHOICES, null=True)
 
