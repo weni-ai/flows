@@ -145,14 +145,20 @@ class TemplateTranslation(models.Model):
         TemplateTranslation.objects.filter(channel=channel, id__in=ids, is_active=False).update(is_active=True)
 
     @classmethod
-    def get_or_create(cls, channel, name, language, country, content, variable_count, status, external_id, namespace):
+    def get_or_create(
+        cls, channel, name, language, country, content, variable_count, status, external_id, namespace, category
+    ):
         existing = TemplateTranslation.objects.filter(channel=channel, external_id=external_id).first()
 
         if not existing:
-            template = Template.objects.filter(org=channel.org, name=name).first()
+            template = Template.objects.filter(org=channel.org, name=name, category=category).first()
             if not template:
                 template = Template.objects.create(
-                    org=channel.org, name=name, created_on=timezone.now(), modified_on=timezone.now()
+                    org=channel.org,
+                    name=name,
+                    created_on=timezone.now(),
+                    modified_on=timezone.now(),
+                    category=category,
                 )
             else:
                 template.modified_on = timezone.now()
