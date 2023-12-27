@@ -60,7 +60,8 @@ class Template(models.Model):
     @classmethod
     def trim(cls, channel):
         org = channel.org
-        Template.objects.filter(org=org, translation=None).delete()
+        templates = org.templates.filter(translation=None)
+        templates.delete()
 
     def is_approved(self):
         """
