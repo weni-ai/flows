@@ -14,7 +14,7 @@ from celery import shared_task
 from temba.channels.models import Channel
 from temba.contacts.models import URN, Contact, ContactURN
 from temba.request_logs.models import HTTPLog
-from temba.templates.models import Template, TemplateTranslation
+from temba.templates.models import Template, TemplateButton, TemplateHeader, TemplateTranslation
 from temba.utils import chunk_list
 from temba.wpp_products.models import Catalog, Product
 
@@ -149,7 +149,24 @@ def update_local_templates(channel, templates_data):
             status=status,
             external_id=template.get("id", missing_external_id),
             namespace=template.get("namespace", channel_namespace),
+            category=template["category"],
         )
+
+        for component in template["components"]:
+            if component["type"] == "HEADER":
+                TemplateHeader.objects.get_or_create(
+                    translation=translation, type=component.get("format"), text=component.get("text", None)
+                )
+
+            if component["type"] == "BUTTONS":
+                for button in component.get("buttons"):
+                    TemplateButton.objects.get_or_create(
+                        translation=translation,
+                        type=button.get("type"),
+                        url=button.get("url", None),
+                        text=button.get("text", None),
+                        phone_number=button.get("phone_number", None),
+                    )
 
         seen.append(translation)
 
