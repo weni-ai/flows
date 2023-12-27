@@ -127,8 +127,6 @@ class TemplateTranslation(models.Model):
     # whether this channel template is active
     is_active = models.BooleanField(default=True)
 
-    message_template_id = models.CharField(max_length=20, unique=True, null=True, blank=True)
-
     @classmethod
     def trim(cls, channel, existing):
         """
