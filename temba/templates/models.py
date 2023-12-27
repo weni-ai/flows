@@ -142,7 +142,7 @@ class TemplateTranslation(models.Model):
         existing = TemplateTranslation.objects.filter(channel=channel, external_id=external_id).first()
 
         if not existing:
-            template = Template.objects.filter(org=channel.org, name=name, category=category).first()
+            template = Template.objects.filter(org=channel.org, name=name).first()
             if not template:
                 template = Template.objects.create(
                     org=channel.org,
@@ -153,7 +153,8 @@ class TemplateTranslation(models.Model):
                 )
             else:
                 template.modified_on = timezone.now()
-                template.save(update_fields=["modified_on"])
+                template.category = category
+                template.save(update_fields=["modified_on", "category"])
 
             existing = TemplateTranslation.objects.create(
                 template=template,
