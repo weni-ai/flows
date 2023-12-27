@@ -969,9 +969,9 @@ TEST_EXCLUDE = ("smartmin",)
 # -----------------------------------------------------------------------------------
 _default_database_config = {
     "ENGINE": "django.contrib.gis.db.backends.postgis",
-    "NAME": "temba",
-    "USER": "temba",
-    "PASSWORD": "temba",
+    "NAME": "rapidpro",
+    "USER": "rapidpro",
+    "PASSWORD": "rapidpro",
     "HOST": "localhost",
     "PORT": "5432",
     "ATOMIC_REQUESTS": True,
@@ -1335,3 +1335,8 @@ ELASTICSEARCH_URL = os.environ.get("ELASTICSEARCH_URL", "http://localhost:9200")
 
 # SextenX url
 SENTENX_URL = os.environ.get("SENTENX_URL", default="")
+
+# Intelligence Token
+INTELLIGENCES_TOKEN = os.environ.get("INTELLIGENCES_TOKEN", default="")
+
+NEXUS_BASE_URL = os.environ.get("NEXUS_BASE_URL", default="https://nexus.dev.cloud.weni.ai")
