@@ -60,7 +60,8 @@ class Template(models.Model):
     @classmethod
     def trim(cls, channel):
         org = channel.org
-        Template.objects.filter(org=org, translation=None).delete()
+        templates = org.templates.filter(translations=None)
+        templates.delete()
 
     def is_approved(self):
         """
@@ -134,7 +135,6 @@ class TemplateTranslation(models.Model):
         """
         ids = [tc.id for tc in existing]
 
-        # mark any that weren't included as inactive
         TemplateTranslation.objects.filter(channel=channel).exclude(id__in=ids).delete()
 
     @classmethod
