@@ -11,7 +11,11 @@ class UpdateProjectConsumer(EDAConsumer):
         print(f"[UpdateProjectConsumer] - Consuming a message. Body: {message.body}")
         try:
             body = JSONParser.parse(message.body)
-            update_project_config(project_uuid=body.get("project_uuid"), description=body.get("description"))
+            update_project_config(
+                project_uuid=body.get("project_uuid"),
+                description=body.get("description"),
+                user_email=body.get("user_email"),
+            )
 
             message.channel.basic_ack(message.delivery_tag)
 

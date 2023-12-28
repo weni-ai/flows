@@ -7643,3 +7643,9 @@ msgstr ""
 
 msgid "No synced templates at this time."
 msgstr "На данный момент синхронизированные шаблоны отсутствуют."
+
+msgid "Data in Excel spreadsheet about Project Webhooks:"
+msgstr "Данные в таблице Excel о веб-перехватчиках проекта:"
+
+msgid "Data in the Excel spreadsheet about Project template messages:"
+msgstr "Данные в таблице Excel о сообщениях шаблона проекта:"

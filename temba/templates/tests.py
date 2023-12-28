@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from rest_framework import status
 
+from django.test import override_settings
 from django.urls import reverse
 
 from temba.templates.views import TemplateViewSet
@@ -51,10 +52,12 @@ class TemplateViewSetTests(TembaTest):
     view_class = TemplateViewSet
     view_class.permission_classes = []
 
+    @override_settings(OIDC_OP_TOKEN_ENDPOINT="ExampleEndpointToken")
+    @override_settings(OIDC_OP_USER_ENDPOINT="ExampleUser")
+    @override_settings(OIDC_RP_CLIENT_ID="ExampleID")
+    @override_settings(OIDC_RP_CLIENT_SECRET="ExampleSecret")
     def test_partial_update(self):
-        # client = APIClient()
         url = reverse("template-detail", args=[self.channel.uuid])
-        # client.force_login(self.admin)
         self.login(self.admin)
 
         with patch("temba.utils.whatsapp.tasks.update_local_templates") as mock_update_local_templates:
