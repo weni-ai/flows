@@ -4296,6 +4296,7 @@ class APITest(TembaTest):
             TemplateTranslation.STATUS_APPROVED,
             "1234",
             "foo_namespace",
+            "AUTHENTICATION",
         )
         TemplateTranslation.get_or_create(
             self.channel,
@@ -4307,6 +4308,7 @@ class APITest(TembaTest):
             TemplateTranslation.STATUS_PENDING,
             "5678",
             "foo_namespace",
+            "AUTHENTICATION",
         )
         tt = TemplateTranslation.get_or_create(
             self.channel,
@@ -4318,6 +4320,7 @@ class APITest(TembaTest):
             TemplateTranslation.STATUS_APPROVED,
             "9012",
             "foo_namespace",
+            "AUTHENTICATION",
         )
         tt.is_active = False
         tt.save()
@@ -4333,6 +4336,7 @@ class APITest(TembaTest):
             TemplateTranslation.STATUS_APPROVED,
             "1234",
             "bar_namespace",
+            "AUTHENTICATION",
         )
         TemplateTranslation.get_or_create(
             self.org2channel,
@@ -4344,6 +4348,7 @@ class APITest(TembaTest):
             TemplateTranslation.STATUS_PENDING,
             "5678",
             "bar_namespace",
+            "AUTHENTICATION",
         )
 
         # no filtering

@@ -456,6 +456,7 @@ class WhatsAppTypeTest(TembaTest):
             TemplateTranslation.STATUS_APPROVED,
             "1234",
             "foo_namespace",
+            "AUTHENTICATION",
         )
 
         self.login(self.admin)

@@ -192,16 +192,6 @@ def refresh_whatsapp_templates():
             if channel.config.get("version"):
                 # fetches API version and saves on channel.config
                 update_api_version(channel)
-            # fetch all our templates
-            try:
-                templates_data, valid = channel.get_type().get_api_templates(channel)
-                if not valid:
-                    continue
-
-                update_local_templates(channel, templates_data)
-
-            except Exception as e:
-                logger.error(f"Error refreshing whatsapp templates: {str(e)}", exc_info=True)
 
 
 def update_channel_catalogs_status(channel, facebook_catalog_id):
