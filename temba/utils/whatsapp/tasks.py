@@ -172,6 +172,7 @@ def update_local_templates(channel, templates_data):
 
     # trim any translations we didn't see
     TemplateTranslation.trim(channel, seen)
+    Template.trim(channel)
 
 
 @shared_task(track_started=True, name="refresh_whatsapp_templates")

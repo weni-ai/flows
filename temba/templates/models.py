@@ -57,6 +57,12 @@ class Template(models.Model):
     # when this template was created
     created_on = models.DateTimeField(default=timezone.now)
 
+    @classmethod
+    def trim(cls, channel):
+        org = channel.org
+        templates = org.templates.filter(translations=None)
+        templates.delete()
+
     def is_approved(self):
         """
         Returns whether this template has at least one translation and all are approved
@@ -129,11 +135,7 @@ class TemplateTranslation(models.Model):
         """
         ids = [tc.id for tc in existing]
 
-        # mark any that weren't included as inactive
-        TemplateTranslation.objects.filter(channel=channel).exclude(id__in=ids).update(is_active=False)
-
-        # Make sure the seen one are active
-        TemplateTranslation.objects.filter(channel=channel, id__in=ids, is_active=False).update(is_active=True)
+        TemplateTranslation.objects.filter(channel=channel).exclude(id__in=ids).delete()
 
     @classmethod
     def get_or_create(
