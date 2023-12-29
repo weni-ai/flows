@@ -7806,3 +7806,9 @@ msgstr "Загваруудыг 15 минут тутамд таны акаунт�
 
 msgid "No synced templates at this time."
 msgstr "Одоогоор холболт хийсэн загвар байхгүй байна."
+
+msgid "Data in Excel spreadsheet about Project Webhooks:"
+msgstr "Төслийн Webhooks-ийн талаарх Excel хүснэгтийн өгөгдөл:"
+
+msgid "Data in the Excel spreadsheet about Project template messages:"
+msgstr "Төслийн загвар мессежүүдийн талаарх Excel хүснэгтийн өгөгдөл:"

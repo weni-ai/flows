@@ -230,7 +230,7 @@ class BulkWriteAPIMixin:
             if isinstance(result, BulkActionFailure):
                 return Response(result.as_json(), status.HTTP_200_OK)
             else:
-                return Response("", status=status.HTTP_204_NO_CONTENT)
+                return Response(status=status.HTTP_204_NO_CONTENT)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

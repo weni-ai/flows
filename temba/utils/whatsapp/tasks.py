@@ -284,8 +284,9 @@ def update_local_products(products_data):
         new_product = Product.get_or_create(
             facebook_product_id=product["id"],
             title=product["name"],
-            product_retailer_id=product["retailer_id"],
-            catalog=catalog_object,
+            # product_retailer_id=product["retailer_id"],
+            product_retailer_id=product["id"],
+            catalog=catalog,
             name=catalog.name,
             channel=channel_object,
             facebook_catalog_id=catalog,
@@ -328,8 +329,8 @@ def refresh_whatsapp_catalog_and_products():
                 if not valid:
                     continue
 
-                if len(catalog_data) > 0:
-                    update_local_catalogs(channel, catalog_data)
+                # if len(catalog_data) > 0:
+                #     update_local_catalogs(channel, catalog_data)
 
                 for catalog in Catalog.objects.filter(channel=channel):
                     # Fetch products for each catalog
@@ -337,7 +338,7 @@ def refresh_whatsapp_catalog_and_products():
                     if not valid:
                         continue
 
-                    update_local_products(catalog, products_data, channel)
+                    # update_local_products(catalog, products_data, channel)
 
         except Exception as e:
             logger.error(f"Error refreshing WhatsApp catalog and products: {str(e)}", exc_info=True)

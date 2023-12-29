@@ -6,6 +6,7 @@ from weni.internal.views import InternalGenericViewSet
 
 from temba.channels.models import Channel
 from temba.utils.whatsapp.tasks import update_channel_catalogs_status, update_local_catalogs, update_local_products
+from temba.wpp_products.models import Catalog
 from temba.wpp_products.serializers import UpdateCatalogSerializer
 
 
@@ -36,9 +37,17 @@ class CatalogViewSet(viewsets.ViewSet, InternalGenericViewSet):
         update_local_catalogs(channel, request.data.get("data"))
         return Response(status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["POST"], url_path="create-product")
-    def create_product(self, request, *args, **kwargs):
-        products = request.data.get("products")
-        for product in products:
-            update_local_products(product)
+
+class ProductViewSet(viewsets.ViewSet, InternalGenericViewSet):
+    def get_object(self) -> Channel:
+        channel_uuid = self.request.data.get("channel")
+        return get_object_or_404(Channel, uuid=channel_uuid)
+
+    @action(detail=False, methods=["POST"], url_path="update-products")
+    def update_products(self, request, *args, **kwargs):
+        list_products = request.data
+        for products in list_products:
+            catalog = Catalog.objects.get(facebook_catalog_id=products.get("catalog"))
+            update_local_products(catalog, products, self.get_object())
+
         return Response(status=status.HTTP_200_OK)

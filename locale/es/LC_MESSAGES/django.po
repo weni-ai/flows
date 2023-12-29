@@ -7920,3 +7920,9 @@ msgstr "Los datos del webhook se enviarán a su dirección de correo electrónic
 
 msgid "Failed to send webhook data to your Email address. Please try again later."
 msgstr "No se pudieron enviar los datos del webhook a su dirección de correo electrónico. Por favor, inténtelo de nuevo más tarde."
+
+msgid "Data in Excel spreadsheet about Project Webhooks:"
+msgstr "Datos en hoja de cálculo de Excel sobre Project Webhooks:"
+
+msgid "Data in the Excel spreadsheet about Project template messages:"
+msgstr "Datos en la hoja de cálculo de Excel sobre mensajes de plantilla de Proyecto:"
