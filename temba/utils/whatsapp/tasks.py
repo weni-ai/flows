@@ -262,24 +262,18 @@ def update_local_catalogs(channel, catalogs_data):
     Catalog.trim(channel, seen)
 
 
-def update_local_products(products_data):
+def update_local_products(catalog, products_data, channel):
     seen = []
-    catalog = products_data["catalog"]
-    channel = products_data["channel"]
-
-    catalog_object = Catalog.objects.filter(catalog_facebook_id=catalog).first()
-    channel_object = Channel.objects.filter(channel=channel)
-
-    products_sentenx = {"catalog_id": catalog, "products": []}
+    products_sentenx = {"catalog_id": catalog.facebook_catalog_id, "products": []}
 
     for product in products_data:
         new_product = Product.get_or_create(
             facebook_product_id=product["id"],
             title=product["name"],
             product_retailer_id=product["retailer_id"],
-            catalog=catalog_object,
+            catalog=catalog,
             name=catalog.name,
-            channel=channel_object,
+            channel=channel,
             facebook_catalog_id=catalog,
         )
 
@@ -291,16 +285,16 @@ def update_local_products(products_data):
             "org_id": str(catalog.org_id),
             "catalog_id": catalog,
             "product_retailer_id": new_product.product_retailer_id,
-            "channel_id": str(catalog_object.channel_id),
+            "channel_id": str(catalog.channel_id),
         }
 
         products_sentenx["products"].append(sentenx_object)
 
     if len(products_sentenx["products"]) > 0:
         sent_products_to_sentenx(products_sentenx)
-        sent_trim_products_to_sentenx(catalog_object, seen)
+        sent_trim_products_to_sentenx(catalog, seen)
 
-    Product.trim(catalog_object, seen)
+    Product.trim(catalog, seen)
 
 
 @shared_task(track_started=True, name="refresh_whatsapp_catalog_and_products")

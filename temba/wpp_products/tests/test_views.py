@@ -9,11 +9,11 @@ from temba.wpp_products.serializers import UpdateCatalogSerializer
 from temba.wpp_products.views import CatalogViewSet
 
 
-class UpdateCatalogViewTest(TembaTest):
+class UpdateActiveCatalogViewTest(TembaTest):
     def setUp(self):
         super().setUp()
 
-        self.url = reverse("catalog-update-catalog")
+        self.url = reverse("catalog-update-active-catalog")
 
         self.new_channel = self.create_channel("WAC", "Test WAC Channel", "54764868534")
 
