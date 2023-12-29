@@ -82,7 +82,7 @@ class WhatsAppUtilsTest(TembaTest):
             {
                 "name": "workout_activity",
                 "components": [
-                    {"type": "HEADER", "text": "Workout challenge week extra points!"},
+                    {"type": "HEADER", "format": "text", "text": "Workout challenge week extra points!"},
                     {
                         "type": "BODY",
                         "text": "Hey {{1}}, Week {{2}} workout is out now. Get your discount of {{3}} for the next workout by sharing this program to 3 people.",
@@ -103,6 +103,13 @@ class WhatsAppUtilsTest(TembaTest):
                         "text": "Hey {{1}}, Week {{2}} workout is out now. Get your discount of {{3}} for the next workout by sharing this program to 3 people.",
                     },
                     {"type": "FOOTER", "text": "Remember to drink water."},
+                    {
+                        "type": "BUTTONS",
+                        "buttons": [
+                            {"type": "QUICK_REPLY", "text": "Clique aqui - Segunda via"},
+                            {"type": "QUICK_REPLY", "text": "Tirth", "url": "https://example.com"},
+                        ],
+                    },
                 ],
                 "language": "en",
                 "status": "PENDING",
@@ -111,7 +118,16 @@ class WhatsAppUtilsTest(TembaTest):
             },
             {
                 "name": "missing_text_component",
-                "components": [{"type": "HEADER", "format": "IMAGE", "example": {"header_handle": ["FOO"]}}],
+                "components": [
+                    {"type": "HEADER", "format": "IMAGE", "example": {"header_handle": ["FOO"]}},
+                    {
+                        "type": "BUTTONS",
+                        "buttons": [
+                            {"type": "QUICK_REPLY", "text": "Clique aqui - Segunda via"},
+                            {"type": "QUICK_REPLY", "text": "Tirth", "url": "https://example.com"},
+                        ],
+                    },
+                ],
                 "language": "en",
                 "status": "APPROVED",
                 "category": "ISSUE_RESOLUTION",
@@ -219,7 +235,7 @@ class WhatsAppUtilsTest(TembaTest):
             {
                 "name": "workout_activity",
                 "components": [
-                    {"type": "HEADER", "text": "Workout challenge week extra points!"},
+                    {"type": "HEADER", "format": "text", "text": "Workout challenge week extra points!"},
                     {
                         "type": "BODY",
                         "text": "Hey {{1}}, Week {{2}} workout is out now. Get your discount of {{3}} for the next workout by sharing this program to 3 people.",
@@ -235,12 +251,19 @@ class WhatsAppUtilsTest(TembaTest):
             {
                 "name": "workout_activity_with_unsuported_variablet",
                 "components": [
-                    {"type": "HEADER", "text": "Workout challenge week {{2}}, {{4}} extra points!"},
+                    {"type": "HEADER", "format": "text", "text": "Workout challenge week {{2}}, {{4}} extra points!"},
                     {
                         "type": "BODY",
                         "text": "Hey {{1}}, Week {{2}} workout is out now. Get your discount of {{3}} for the next workout by sharing this program to 3 people.",
                     },
                     {"type": "FOOTER", "text": "Remember to drink water."},
+                    {
+                        "type": "BUTTONS",
+                        "buttons": [
+                            {"type": "QUICK_REPLY", "text": "Clique aqui - Segunda via"},
+                            {"type": "QUICK_REPLY", "text": "Tirth", "url": "https://example.com"},
+                        ],
+                    },
                 ],
                 "language": "en",
                 "status": "PENDING",
@@ -250,7 +273,16 @@ class WhatsAppUtilsTest(TembaTest):
             },
             {
                 "name": "missing_text_component",
-                "components": [{"type": "HEADER", "format": "IMAGE", "example": {"header_handle": ["FOO"]}}],
+                "components": [
+                    {"type": "HEADER", "format": "IMAGE", "example": {"header_handle": ["FOO"]}},
+                    {
+                        "type": "BUTTONS",
+                        "buttons": [
+                            {"type": "QUICK_REPLY", "text": "Clique aqui - Segunda via"},
+                            {"type": "QUICK_REPLY", "text": "Tirth", "url": "https://example.com"},
+                        ],
+                    },
+                ],
                 "language": "en",
                 "status": "APPROVED",
                 "namespace": "xxxxxxxx_xxxx_xxxx_xxxx_xxxxxxxxxxxx",
