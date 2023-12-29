@@ -246,19 +246,18 @@ def update_is_active_catalog(channel, catalogs_data):
 
 
 def update_local_catalogs(channel, catalogs_data):
-    print('entrou em update_local_catalogs')
-    if len(catalogs_data)>0:
-        updated_catalogs = update_is_active_catalog(channel, catalogs_data)
-        seen = []
-        for catalog in updated_catalogs:
-            new_catalog = Catalog.get_or_create(
-                name=catalog["name"],
-                channel=channel,
-                is_active=catalog["is_active"],
-                facebook_catalog_id=catalog["id"],
-            )
+    updated_catalogs = update_is_active_catalog(channel, catalogs_data)
+    seen = []
 
-            seen.append(new_catalog)
+    for catalog in updated_catalogs:
+        new_catalog = Catalog.get_or_create(
+            name=catalog["name"],
+            channel=channel,
+            is_active=catalog["is_active"],
+            facebook_catalog_id=catalog["id"],
+        )
+
+        seen.append(new_catalog)
 
         Catalog.trim(channel, seen)
 
@@ -267,6 +266,7 @@ def update_local_products(catalog, products_data, channel):
     print('entrou em update_local_products')
     seen = []
     products_sentenx = {"catalog_id": catalog.facebook_catalog_id, "products": []}
+
     for product in products_data:
         new_product = Product.get_or_create(
             facebook_product_id=product["id"],
@@ -275,7 +275,7 @@ def update_local_products(catalog, products_data, channel):
             catalog=catalog,
             name=catalog.name,
             channel=channel,
-            facebook_catalog_id=catalog.facebook_catalog_id,
+            facebook_catalog_id=catalog,
         )
 
         seen.append(new_product)
@@ -284,7 +284,7 @@ def update_local_products(catalog, products_data, channel):
             "facebook_id": new_product.facebook_product_id,
             "title": new_product.title,
             "org_id": str(catalog.org_id),
-            "catalog_id": catalog.facebook_catalog_id,
+            "catalog_id": catalog,
             "product_retailer_id": new_product.product_retailer_id,
             "channel_id": str(catalog.channel_id),
         }
