@@ -32,9 +32,9 @@ class CatalogViewSet(viewsets.ViewSet, InternalGenericViewSet):
         *args,
         **kwargs,
     ):
-
         channel = get_object_or_404(Channel, uuid=pk, is_active=True)
-        update_local_catalogs(channel, request.data.get("data"))
+        if request.data:
+            update_local_catalogs(channel, request.data.get("data"))
         return Response(status=status.HTTP_200_OK)
 
 
@@ -50,4 +50,3 @@ class ProductViewSet(viewsets.ViewSet, InternalGenericViewSet):
             catalog = Catalog.objects.get(facebook_catalog_id=products.get("catalog"))
             update_local_products(catalog, products, self.get_object())
 
-        return Response(status=status.HTTP_200_OK)
