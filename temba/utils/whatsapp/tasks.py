@@ -186,12 +186,14 @@ def refresh_whatsapp_templates():
                 logger.error(f"Error refreshing whatsapp templates: {str(e)}", exc_info=True)
 
 
-def update_channel_catalogs_status(channel, facebook_catalog_id):
-    channel.config["catalog_id"] = facebook_catalog_id
+def update_channel_catalogs_status(channel, facebook_catalog_id, is_active):
+    channel.config["catalog_id"] = facebook_catalog_id if is_active else None
     channel.save(update_fields=["config"])
 
-    Catalog.objects.filter(channel=channel).update(is_active=False)
-    Catalog.objects.filter(channel=channel, facebook_catalog_id=facebook_catalog_id).update(is_active=True)
+    Catalog.objects.filter(channel=channel, is_active=True).update(is_active=False)
+
+    if is_active:
+        Catalog.objects.filter(channel=channel, facebook_catalog_id=facebook_catalog_id).update(is_active=True)
 
     return True
 
