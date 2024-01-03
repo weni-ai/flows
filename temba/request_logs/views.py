@@ -1,21 +1,11 @@
 import json
 import logging
-import smtplib
 from datetime import timedelta
-from email import encoders
-from email.mime.base import MIMEBase
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from io import BytesIO
 
-import openpyxl
-import pytz
 from smartmin.views import SmartCRUDL, SmartListView, SmartReadView, SmartXlsView, smart_url
 
-from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
-from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -23,6 +13,7 @@ from django.utils.translation import ugettext_lazy as _
 
 from temba.classifiers.models import Classifier
 from temba.orgs.views import OrgObjPermsMixin, OrgPermsMixin
+from temba.request_logs.tasks import send_webhook_data
 from temba.tickets.models import Ticketer
 
 from .models import HTTPLog
@@ -179,8 +170,6 @@ class HTTPLogCRUDL(SmartCRUDL):
             org = self.request.org
             user = self.request.user
 
-            filename = "Chamadas Webhook.xlsx"
-
             queryset = HTTPLog.objects.filter(org=org, flow__isnull=False)
 
             if flow:
@@ -194,14 +183,8 @@ class HTTPLogCRUDL(SmartCRUDL):
             if status_code:
                 queryset = queryset.filter(status_code=status_code)
 
-            try:
-                processed_data = self.process_queryset_results(queryset)
-                xls_file = self.export_data_to_xls(processed_data)
-                self.send_file(xls_file, filename, str(user.email), org.name)
-                return HttpResponse(status=200)
-            except Exception as e:
-                logger.info(f"Fail to generate report: ORG {org.id}: {e}")
-                return HttpResponse(status=500)
+            send_webhook_data(queryset, str(user.email), org)
+            return HttpResponse(status=200)
 
         @property
         def permission(self):  # pragma: no cover
@@ -213,91 +196,112 @@ class HTTPLogCRUDL(SmartCRUDL):
                     return True
             return super().has_permission(request, *args, **kwargs)
 
-        def export_data_to_xls(self, queryset):
-            workbook = openpyxl.Workbook()
-            sheet = workbook.active
+        #     try:
+        #         redis_client = get_redis_connection()
+        #         processed_data = self.process_queryset_results(queryset)
+        #         xls_file = self.export_data_to_xls(processed_data)
+        #         self.send_file(xls_file, filename, str(user.email), org.name)
+        #         return HttpResponse(status=200)
+        #     except Exception as e:
+        #         logger.info(f"Fail to generate report: ORG {org.id}: {e}")
+        #     finally:
+        #         redis_client.delete(f"webhook-lock:{org.uuid}")
 
-            header = [
-                "URL",
-                "Status",
-                "Request",
-                "Response",
-                "Request Time",
-                "Num Retries",
-                "Created On",
-                "Is Error",
-                "Flow",
-            ]
-            sheet.append(header)
+        # @property
+        # def permission(self):  # pragma: no cover
+        #     return "request_logs.httplog_webhooks"
 
-            for row in queryset:
-                sheet.append(row)
+        # def has_permission(self, request, *args, **kwargs):  # pragma: no cover
+        #     if self.derive_org():
+        #         if self.derive_org().config.get("can_view_httplogs"):
+        #             return True
+        #     return super().has_permission(request, *args, **kwargs)
 
-            output = BytesIO()
-            workbook.save(output)
-            output.seek(0)
+        # def export_data_to_xls(self, queryset):
+        #     workbook = openpyxl.Workbook()
+        #     sheet = workbook.active
 
-            return output
+        #     header = [
+        #         "URL",
+        #         "Status",
+        #         "Request",
+        #         "Response",
+        #         "Request Time",
+        #         "Num Retries",
+        #         "Created On",
+        #         "Is Error",
+        #         "Flow",
+        #     ]
+        #     sheet.append(header)
 
-        def process_queryset_results(self, data):
-            processed_data = []
+        #     for row in queryset:
+        #         sheet.append(row)
 
-            for row in data:
-                processed_data.append(
-                    (
-                        row.url,
-                        row.status_code,
-                        row.request,
-                        row.response,
-                        row.request_time,
-                        row.num_retries,
-                        row.created_on.astimezone(pytz.utc).replace(tzinfo=None),
-                        row.is_error,
-                        row.flow.name if row.flow else "",
-                    )
-                )
+        #     output = BytesIO()
+        #     workbook.save(output)
+        #     output.seek(0)
 
-            return processed_data
+        #     return output
 
-        # Exist a code in rp-apps that do almost the same thig. Refact to use the same code in future
-        def send_file(self, file_stream, file_name, user_email, project_name):
-            email_subject = "Exportação de dados de Webhooks"
+        # def process_queryset_results(self, data):
+        #     processed_data = []
 
-            email_host = settings.EMAIL_HOST
-            email_port = settings.EMAIL_PORT
-            email_username = settings.EMAIL_HOST_USER
-            email_password = settings.EMAIL_HOST_PASSWORD
-            email_use_tls = settings.EMAIL_USE_TLS
-            from_email = settings.DEFAULT_FROM_EMAIL
+        #     for row in data:
+        #         processed_data.append(
+        #             (
+        #                 row.url,
+        #                 row.status_code,
+        #                 row.request,
+        #                 row.response,
+        #                 row.request_time,
+        #                 row.num_retries,
+        #                 row.created_on.astimezone(pytz.utc).replace(tzinfo=None),
+        #                 row.is_error,
+        #                 row.flow.name if row.flow else "",
+        #             )
+        #         )
 
-            email_body = render_to_string(
-                "request_logs/httplog_mail_body.haml",
-                {"project_name": project_name},
-            )
-            try:
-                message = MIMEMultipart()
-                message["Subject"] = email_subject
-                message["From"] = from_email
-                message["To"] = user_email
+        #     return processed_data
 
-                body = MIMEText(email_body, "html", "utf-8")
-                message.attach(body)
+        # # Exist a code in rp-apps that do almost the same thig. Refact to use the same code in future
+        # def send_file(self, file_stream, file_name, user_email, project_name):
+        #     email_subject = "Exportação de dados de Webhooks"
 
-                attachment = MIMEBase("application", "vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                attachment.set_payload(file_stream.getvalue())
-                encoders.encode_base64(attachment)
-                attachment.add_header("Content-Disposition", f"attachment; filename={file_name}")
-                message.attach(attachment)
+        #     email_host = settings.EMAIL_HOST
+        #     email_port = settings.EMAIL_PORT
+        #     email_username = settings.EMAIL_HOST_USER
+        #     email_password = settings.EMAIL_HOST_PASSWORD
+        #     email_use_tls = settings.EMAIL_USE_TLS
+        #     from_email = settings.DEFAULT_FROM_EMAIL
 
-                smtp_connection = smtplib.SMTP(host=email_host, port=email_port)
-                smtp_connection.ehlo()
+        #     email_body = render_to_string(
+        #         "request_logs/httplog_mail_body.haml",
+        #         {"project_name": project_name},
+        #     )
+        #     try:
+        #         message = MIMEMultipart()
+        #         message["Subject"] = email_subject
+        #         message["From"] = from_email
+        #         message["To"] = user_email
 
-                if email_use_tls:
-                    smtp_connection.starttls()
+        #         body = MIMEText(email_body, "html", "utf-8")
+        #         message.attach(body)
 
-                smtp_connection.login(email_username, email_password)
-                smtp_connection.sendmail(from_email, str(user_email), message.as_string())
-                smtp_connection.quit()  # pragma: no cover
+        #         attachment = MIMEBase("application", "vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        #         attachment.set_payload(file_stream.getvalue())
+        #         encoders.encode_base64(attachment)
+        #         attachment.add_header("Content-Disposition", f"attachment; filename={file_name}")
+        #         message.attach(attachment)
 
-            except Exception as e:
-                logger.exception(f"Fail to send messages report: {e}")
+        #         smtp_connection = smtplib.SMTP(host=email_host, port=email_port)
+        #         smtp_connection.ehlo()
+
+        #         if email_use_tls:
+        #             smtp_connection.starttls()
+
+        #         smtp_connection.login(email_username, email_password)
+        #         smtp_connection.sendmail(from_email, str(user_email), message.as_string())
+        #         smtp_connection.quit()  # pragma: no cover
+
+        #     except Exception as e:
+        #         logger.exception(f"Fail to send messages report: {e}")
