@@ -10,6 +10,7 @@ from io import BytesIO
 
 import openpyxl
 import pytz
+from django_redis import get_redis_connection
 from smartmin.views import SmartCRUDL, SmartListView, SmartReadView, SmartXlsView, smart_url
 
 from django.conf import settings
@@ -23,6 +24,7 @@ from django.utils.translation import ugettext_lazy as _
 
 from temba.classifiers.models import Classifier
 from temba.orgs.views import OrgObjPermsMixin, OrgPermsMixin
+from temba.request_logs.tasks import send_webhook_data
 from temba.tickets.models import Ticketer
 
 from .models import HTTPLog
@@ -168,6 +170,7 @@ class HTTPLogCRUDL(SmartCRUDL):
             return links
 
     class Export(OrgPermsMixin, SmartXlsView, SmartListView):
+        # @shared_task(name="generate_sent_webhook_data")
         def post(self, request, *args, **kwargs):
             try:
                 data = json.loads(request.body.decode("utf-8"))
@@ -195,13 +198,16 @@ class HTTPLogCRUDL(SmartCRUDL):
                 queryset = queryset.filter(status_code=status_code)
 
             try:
+                redis_client = get_redis_connection()
                 processed_data = self.process_queryset_results(queryset)
                 xls_file = self.export_data_to_xls(processed_data)
-                self.send_file(xls_file, filename, str(user.email), org.name)
+                # self.send_file(xls_file, filename, str(user.email), org.name)
+                send_webhook_data(xls_file, filename, str(user.email), org.name)
                 return HttpResponse(status=200)
             except Exception as e:
                 logger.info(f"Fail to generate report: ORG {org.id}: {e}")
-                return HttpResponse(status=500)
+            finally:
+                redis_client.delete(f"webhook-lock:{org.uuid}")
 
         @property
         def permission(self):  # pragma: no cover
