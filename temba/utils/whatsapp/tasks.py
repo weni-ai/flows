@@ -14,7 +14,7 @@ from celery import shared_task
 from temba.channels.models import Channel
 from temba.contacts.models import URN, Contact, ContactURN
 from temba.request_logs.models import HTTPLog
-from temba.templates.models import TemplateButton, TemplateHeader, TemplateTranslation
+from temba.templates.models import Template, TemplateButton, TemplateHeader, TemplateTranslation
 from temba.utils import chunk_list
 from temba.wpp_products.models import Catalog, Product
 
