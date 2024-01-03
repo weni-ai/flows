@@ -207,14 +207,14 @@ def update_channel_catalogs_status(channel, facebook_catalog_id):
 def set_false_is_active_catalog(channel, catalogs_data):
     channel.config["catalog_id"] = ""
     channel.save(update_fields=["config"])
+
     for catalog in catalogs_data:
-        catalog["is_active"] = False
+        catalog.is_active = False
     return catalogs_data
 
 
 def update_is_active_catalog(channel, catalogs_data):
     waba_id = channel.config.get("wa_waba_id", None)
-
     if not waba_id:
         raise ValueError("Channel wa_waba_id not found")
 
@@ -244,34 +244,32 @@ def update_is_active_catalog(channel, catalogs_data):
         channel.save(update_fields=["config"])
 
         for catalog in catalogs_data:
-            if catalog.get("id") != actived_catalog:
-                catalog["is_active"] = False
+            if catalog.facebook_catalog_id != actived_catalog:
+                catalog.is_active = False
 
             else:
-                catalog["is_active"] = True
+                catalog.is_active = True
 
     return catalogs_data
 
 
 def update_local_catalogs(channel, catalogs_data):
-    updated_catalogs = update_is_active_catalog(channel, catalogs_data)
     seen = []
-
-    for catalog in updated_catalogs:
+    for catalog in catalogs_data:
         new_catalog = Catalog.get_or_create(
-            name=catalog["name"],
+            name=catalog.get("name"),
             channel=channel,
-            is_active=catalog["is_active"],
+            is_active=False,
             facebook_catalog_id=catalog["id"],
         )
 
         seen.append(new_catalog)
-
-        Catalog.trim(channel, seen)
+    print("SEEN", seen)
+    update_is_active_catalog(channel, seen)
+    Catalog.trim(channel, seen)
 
 
 def update_local_products(catalog, products_data, channel):
-    print('entrou em update_local_products')
     seen = []
     products_sentenx = {"catalog_id": catalog.facebook_catalog_id, "products": []}
 

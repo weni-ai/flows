@@ -32,5 +32,7 @@ class CatalogViewSet(viewsets.ViewSet, InternalGenericViewSet):
         **kwargs,
     ):
         channel = get_object_or_404(Channel, uuid=pk, is_active=True)
-        update_local_catalogs(channel, request.data.get("data"))
+
+        if request.data:
+            update_local_catalogs(channel, request.data.get("data"))
         return Response(status=status.HTTP_200_OK)
