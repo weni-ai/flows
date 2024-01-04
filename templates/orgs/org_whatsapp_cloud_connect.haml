@@ -26,24 +26,18 @@
         %li
           -trans "Approve the permissions, these are required for us to access the API on your behalf."
 
-    #fb-app-connect.flex.mt-4
-      .button-primary.connect-facebook
+    #fb-app-connect.flex.mt-4      .button-primary(onclick="launchWhatsAppSignup()")
         -trans "Add Facebook Business"
 
     %form#claim-form(style="display:none;" method="POST" action="{{ connect_url }}")
       {% csrf_token %}
-      %input#user-access-token(type="text" name="user_access_token")
+      %input#user-access-code(type="text" name="user_access_code")
 
 -block extra-script
   {{ block.super }}
 
   :javascript
     $(document).ready(function(){
-      $(".connect-facebook").click(function(evt){
-        location.replace("https://www.facebook.com/v13.0/dialog/oauth?client_id={{ facebook_app_id }}&redirect_uri=" + window.location.origin + window.location.pathname + "&scope=business_management,whatsapp_business_management,whatsapp_business_messaging&response_type=token")
-
-      });
-
       var hash = window.location.hash.substring(1)
       var result = hash.split('&').reduce(function (res, item) {
         var parts = item.split('=');
@@ -57,3 +51,48 @@
         $("#claim-form").submit();
       }
     });
+
+
+    window.fbAsyncInit = function () {
+      // JavaScript SDK configuration and setup
+      FB.init({
+        appId:    '{{ whatsapp_app_id }}', // Meta App ID
+        cookie:   true, // enable cookies
+        xfbml:    true, // parse social plugins on this page
+        version:  'v18.0' //Graph API version
+      });
+    };
+
+    // Load the JavaScript SDK asynchronously
+    (function (d, s, id) {
+      var js, fjs = d.getElementsByTagName(s)[0];
+      if (d.getElementById(id)) return;
+      js = d.createElement(s); js.id = id;
+      js.src = "https://connect.facebook.net/en_US/sdk.js";
+      fjs.parentNode.insertBefore(js, fjs);
+    }(document, 'script', 'facebook-jssdk'));
+
+    // Facebook Login with JavaScript SDK
+    function launchWhatsAppSignup() {
+      // Conversion tracking code
+      fbq && fbq('trackCustom', 'WhatsAppOnboardingStart', {appId: 'your-facebook-app-id', feature: 'whatsapp_embedded_signup'});
+    
+      // Launch Facebook login
+      FB.login(function (response) {
+        if (response.authResponse) {
+          const code = response.authResponse.code;
+          console.log('Codigo:', code);
+          if (code) {
+            $("#user-access-code").val(code);
+            $("#claim-form").submit();
+          }
+          //Use this token to call the debug_token API and get the shared WABA's ID
+        } else {
+          console.log('User cancelled login or did not fully authorize.');
+        }
+      }, {
+        config_id: '214298878415794', // configuration ID goes here
+        response_type: 'code',    // must be set to 'code' for System User access token
+        override_default_response_type: true, // when true, any response types passed in the "response_type" will take precedence over the default types
+      });
+  }
