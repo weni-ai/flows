@@ -27,7 +27,7 @@ from .tasks import (
     sent_trim_products_to_sentenx,
     update_is_active_catalog,
     update_local_catalogs,
-    update_local_products,
+    update_local_products_non_vtex,
     update_local_templates,
 )
 
@@ -363,7 +363,7 @@ class WhatsAppUtilsTest(TembaTest):
 
 
 class UpdateLocalProductsTest(TembaTest):
-    def test_update_local_products(self):
+    def test_update_local_products_non_vtex(self):
         catalog = Catalog(name="Test Catalog", org=self.org, channel=self.channel, facebook_catalog_id=1)
 
         catalog.channel.get_type().code = "WAC"
@@ -374,14 +374,14 @@ class UpdateLocalProductsTest(TembaTest):
             {"id": 2, "name": "Product B", "retailer_id": 456},
         ]
 
-        update_local_products(catalog, products_data, self.channel)
+        update_local_products_non_vtex(catalog, products_data, self.channel)
 
         self.assertEqual(Product.objects.count(), 2)
         self.assertEqual(Product.objects.filter(catalog=catalog).count(), 2)
 
 
 class RefreshWhatsappCatalogAndProductsTestCase(TembaTest):
-    @patch("temba.utils.whatsapp.tasks.update_local_products")
+    @patch("temba.utils.whatsapp.tasks.update_local_products_non_vtex")
     @patch("temba.utils.whatsapp.tasks.update_local_catalogs")
     @patch("temba.channels.types.whatsapp_cloud.type.WhatsAppCloudType.get_api_products")
     @patch("temba.channels.types.whatsapp_cloud.type.WhatsAppCloudType.get_api_catalogs")

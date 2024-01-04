@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from weni.internal.views import InternalGenericViewSet
 
 from temba.channels.models import Channel
-from temba.utils.whatsapp.tasks import update_channel_catalogs_status, update_local_products
+from temba.utils.whatsapp.tasks import update_channel_catalogs_status, update_local_products_vtex
 from temba.wpp_products.models import Catalog
 from temba.wpp_products.serializers import UpdateCatalogSerializer
 
@@ -27,14 +27,20 @@ class CatalogViewSet(viewsets.ViewSet, InternalGenericViewSet):
 
 class ProductViewSet(viewsets.ViewSet, InternalGenericViewSet):
     def get_object(self) -> Channel:
-        channel_uuid = self.request.data.get("channel")
+        channel_uuid = self.request.data.get("channel_uuid")
         return get_object_or_404(Channel, uuid=channel_uuid)
 
     @action(detail=False, methods=["POST"], url_path="update-products")
     def update_products(self, request, *args, **kwargs):
-        list_products = request.data
-        for products in list_products:
-            catalog = Catalog.objects.get(facebook_catalog_id=products.get("catalog"))
-            update_local_products(catalog, products, self.get_object())
+        catalog = request.data.get("catalog")
+        products = request.data.get("products")
+
+        catalog_object = Catalog.objects.filter(facebook_catalog_id=catalog.get("facebook_catalog_id")).first()
+        if not catalog_object:
+            catalog_object = Catalog.get_or_create(
+                catalog.get("name"), self.get_object(), False, catalog.get("facebook_catalog_id")
+            )
+
+        update_local_products_vtex(catalog_object, products, self.get_object())
 
         return Response(status=status.HTTP_200_OK)
