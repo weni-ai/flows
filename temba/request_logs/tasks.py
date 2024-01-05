@@ -4,8 +4,14 @@ from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from io import BytesIO
+
+import openpyxl
+import pytz
+from django_redis import get_redis_connection
 
 from django.conf import settings
+from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.timesince import timesince
@@ -43,7 +49,70 @@ def trim_http_logs_task():
 
 
 @shared_task(track_started=True, name="generate_sent_webhook_data")
-def send_webhook_data(file_stream, file_name, user_email, project_name):
+def send_webhook_data(queryset, user_email, project):
+    filename = "Chamadas Webhook.xlsx"
+    try:
+        redis_client = get_redis_connection()
+        processed_data = process_queryset_results(queryset)
+        xls_file = export_data_to_xls(processed_data)
+        send_file(xls_file, filename, user_email, project.name)
+        return HttpResponse(status=200)
+    except Exception as e:
+        logger.info(f"Fail to generate report: ORG {project.id}: {e}")
+    finally:
+        redis_client.delete(f"webhook-lock:{project.uuid}")
+
+
+def export_data_to_xls(queryset):
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+
+    header = [
+        "URL",
+        "Status",
+        "Request",
+        "Response",
+        "Request Time",
+        "Num Retries",
+        "Created On",
+        "Is Error",
+        "Flow",
+    ]
+    sheet.append(header)
+
+    for row in queryset:
+        sheet.append(row)
+
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+
+    return output
+
+
+def process_queryset_results(data):
+    processed_data = []
+
+    for row in data:
+        processed_data.append(
+            (
+                row.url,
+                row.status_code,
+                row.request,
+                row.response,
+                row.request_time,
+                row.num_retries,
+                row.created_on.astimezone(pytz.utc).replace(tzinfo=None),
+                row.is_error,
+                row.flow.name if row.flow else "",
+            )
+        )
+
+    return processed_data
+
+
+# Exist a code in rp-apps that do almost the same thig. Refact to use the same code in future
+def send_file(file_stream, file_name, user_email, project_name):
     email_subject = "Exportação de dados de Webhooks"
 
     email_host = settings.EMAIL_HOST
