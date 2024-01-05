@@ -138,18 +138,25 @@ class TemplateTranslation(models.Model):
         TemplateTranslation.objects.filter(channel=channel).exclude(id__in=ids).delete()
 
     @classmethod
-    def get_or_create(cls, channel, name, language, country, content, variable_count, status, external_id, namespace):
+    def get_or_create(
+        cls, channel, name, language, country, content, variable_count, status, external_id, namespace, category
+    ):
         existing = TemplateTranslation.objects.filter(channel=channel, external_id=external_id).first()
 
         if not existing:
             template = Template.objects.filter(org=channel.org, name=name).first()
             if not template:
                 template = Template.objects.create(
-                    org=channel.org, name=name, created_on=timezone.now(), modified_on=timezone.now()
+                    org=channel.org,
+                    name=name,
+                    created_on=timezone.now(),
+                    modified_on=timezone.now(),
+                    category=category,
                 )
             else:
                 template.modified_on = timezone.now()
-                template.save(update_fields=["modified_on"])
+                template.category = category
+                template.save(update_fields=["modified_on", "category"])
 
             existing = TemplateTranslation.objects.create(
                 template=template,
