@@ -88,6 +88,13 @@ class WhatsAppUtilsTest(TembaTest):
                         "text": "Hey {{1}}, Week {{2}} workout is out now. Get your discount of {{3}} for the next workout by sharing this program to 3 people.",
                     },
                     {"type": "FOOTER", "text": "Remember to drink water."},
+                    {
+                        "type": "BUTTONS",
+                        "buttons": [
+                            {"type": "QUICK_REPLY", "text": "Clique aqui - Segunda via"},
+                            {"type": "QUICK_REPLY", "text": "Tirth", "url": "https://example.com"},
+                        ],
+                    },
                 ],
                 "language": "en",
                 "status": "PENDING",
