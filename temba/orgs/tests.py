@@ -888,6 +888,7 @@ class OrgDeleteTest(TembaNonAtomicTest):
                 TemplateTranslation.STATUS_APPROVED,
                 "1234",
                 "foo_namespace",
+                "AUTHENTICATION",
             )
 
             # release our primary org
