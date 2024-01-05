@@ -21,7 +21,9 @@ class CatalogViewSet(viewsets.ViewSet, InternalGenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
-        update_channel_catalogs_status(self.get_object(), validated_data.get("facebook_catalog_id"))
+        update_channel_catalogs_status(
+            self.get_object(), validated_data.get("facebook_catalog_id"), validated_data.get("is_active")
+        )
         return Response(status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["POST"], url_path="update-catalog")
