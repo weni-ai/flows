@@ -135,7 +135,6 @@ class TemplateTranslation(models.Model):
         """
         ids = [tc.id for tc in existing]
 
-        # mark any that weren't included as inactive
         TemplateTranslation.objects.filter(channel=channel).exclude(id__in=ids).delete()
 
     @classmethod
