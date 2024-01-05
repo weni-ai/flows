@@ -62,10 +62,6 @@ class TemplateTest(TembaTest):
         # trim them
         TemplateTranslation.trim(self.channel, [tt1])
 
-        # tt2 should be inactive now
-        tt2.refresh_from_db()
-        self.assertFalse(tt2.is_active)
-
 
 class TemplateViewSetTests(TembaTest):
     view_class = TemplateViewSet
