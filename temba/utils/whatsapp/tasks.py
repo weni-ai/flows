@@ -284,7 +284,7 @@ def update_local_products(catalog, products_data, channel):
             catalog=catalog,
             name=catalog.name,
             channel=channel,
-            facebook_catalog_id=catalog,
+            facebook_catalog_id=catalog.facebook_catalog_id,
         )
 
         seen.append(new_product)
@@ -293,7 +293,7 @@ def update_local_products(catalog, products_data, channel):
             "facebook_id": new_product.facebook_product_id,
             "title": new_product.title,
             "org_id": str(catalog.org_id),
-            "catalog_id": catalog,
+            "catalog_id": catalog.facebook_catalog_id,
             "product_retailer_id": new_product.product_retailer_id,
             "channel_id": str(catalog.channel_id),
         }
@@ -305,6 +305,30 @@ def update_local_products(catalog, products_data, channel):
         sent_trim_products_to_sentenx(catalog, seen)
 
     Product.trim(catalog, seen)
+
+
+@shared_task(track_started=True, name="refresh_whatsapp_catalog_and_products")
+def refresh_whatsapp_catalog_and_products():
+    """
+    Fetches catalog data and associated products from Facebook's Graph API and syncs them to the local database.
+    """
+    r = get_redis_connection()
+    if r.get("refresh_whatsapp_catalog_and_products"):  # pragma: no cover
+        return
+
+    with r.lock("refresh_whatsapp_catalog_and_products", 1800):
+        try:
+            for channel in Channel.objects.filter(is_active=True, channel_type="WAC"):
+                for catalog in Catalog.objects.filter(channel=channel):
+                    # Fetch products for each catalog
+                    products_data, valid = channel.get_type().get_api_products(channel, catalog)
+                    if not valid:
+                        continue
+
+                    update_local_products(catalog, products_data, channel)
+
+        except Exception as e:
+            logger.error(f"Error refreshing WhatsApp catalog and products: {str(e)}", exc_info=True)
 
 
 def sent_products_to_sentenx(products):
