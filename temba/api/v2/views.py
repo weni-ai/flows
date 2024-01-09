@@ -92,6 +92,7 @@ from .serializers import (
     WebHookEventReadSerializer,
     WorkspaceReadSerializer,
 )
+from .wenigpt.views import IntelligencesEndpoint
 
 
 class RootView(views.APIView):
@@ -130,6 +131,7 @@ class RootView(views.APIView):
      * [/api/v2/topics](/api/v2/topics) - to list and create topics
      * [/api/v2/users](/api/v2/users) - to list user logins
      * [/api/v2/workspace](/api/v2/workspace) - to view your workspace
+     * [/api/v2/intelligences](/api/v2/intelligences) - to view your intelligences
 
     To use the endpoint simply append _.json_ to the URL. For example [/api/v2/flows](/api/v2/flows) will return the
     documentation for that endpoint but a request to [/api/v2/flows.json](/api/v2/flows.json) will return a JSON list of
@@ -302,6 +304,7 @@ class ExplorerView(SmartTemplateView):
             TopicsEndpoint.get_write_explorer(),
             UsersEndpoint.get_read_explorer(),
             WorkspaceEndpoint.get_read_explorer(),
+            IntelligencesEndpoint.get_read_explorer(),
             ExternalServicesEndpoint.get_read_explorer(),
         ]
         return context
