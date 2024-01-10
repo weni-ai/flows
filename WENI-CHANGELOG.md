@@ -1,3 +1,15 @@
+3.5.1
+----------
+* Update active catalog endpoint
+
+3.5.0
+----------
+* Add endpoint to receive templates from integrations
+* Refact Templates models
+* Add endpoints to create catalog
+* Update task according to new templates models
+* Add trim template method to delete template
+
 3.4.3
 ----------
 * Hotfix: Remove icontains in contacts endpoint

@@ -14,7 +14,7 @@ from celery import shared_task
 from temba.channels.models import Channel
 from temba.contacts.models import URN, Contact, ContactURN
 from temba.request_logs.models import HTTPLog
-from temba.templates.models import TemplateTranslation
+from temba.templates.models import Template, TemplateButton, TemplateHeader, TemplateTranslation
 from temba.utils import chunk_list
 from temba.wpp_products.models import Catalog, Product
 
@@ -149,12 +149,30 @@ def update_local_templates(channel, templates_data):
             status=status,
             external_id=template.get("id", missing_external_id),
             namespace=template.get("namespace", channel_namespace),
+            category=template["category"],
         )
+
+        for component in template["components"]:
+            if component["type"] == "HEADER":
+                TemplateHeader.objects.get_or_create(
+                    translation=translation, type=component.get("format"), text=component.get("text", None)
+                )
+
+            if component["type"] == "BUTTONS":
+                for button in component.get("buttons"):
+                    TemplateButton.objects.get_or_create(
+                        translation=translation,
+                        type=button.get("type"),
+                        url=button.get("url", None),
+                        text=button.get("text", None),
+                        phone_number=button.get("phone_number", None),
+                    )
 
         seen.append(translation)
 
     # trim any translations we didn't see
     TemplateTranslation.trim(channel, seen)
+    Template.trim(channel)
 
 
 @shared_task(track_started=True, name="refresh_whatsapp_templates")
@@ -174,24 +192,16 @@ def refresh_whatsapp_templates():
             if channel.config.get("version"):
                 # fetches API version and saves on channel.config
                 update_api_version(channel)
-            # fetch all our templates
-            try:
-                templates_data, valid = channel.get_type().get_api_templates(channel)
-                if not valid:
-                    continue
-
-                update_local_templates(channel, templates_data)
-
-            except Exception as e:
-                logger.error(f"Error refreshing whatsapp templates: {str(e)}", exc_info=True)
 
 
-def update_channel_catalogs_status(channel, facebook_catalog_id):
-    channel.config["catalog_id"] = facebook_catalog_id
+def update_channel_catalogs_status(channel, facebook_catalog_id, is_active):
+    channel.config["catalog_id"] = facebook_catalog_id if is_active else None
     channel.save(update_fields=["config"])
 
-    Catalog.objects.filter(channel=channel).update(is_active=False)
-    Catalog.objects.filter(channel=channel, facebook_catalog_id=facebook_catalog_id).update(is_active=True)
+    Catalog.objects.filter(channel=channel, is_active=True).update(is_active=False)
+
+    if is_active:
+        Catalog.objects.filter(channel=channel, facebook_catalog_id=facebook_catalog_id).update(is_active=True)
 
     return True
 
@@ -199,14 +209,14 @@ def update_channel_catalogs_status(channel, facebook_catalog_id):
 def set_false_is_active_catalog(channel, catalogs_data):
     channel.config["catalog_id"] = ""
     channel.save(update_fields=["config"])
+
     for catalog in catalogs_data:
-        catalog["is_active"] = False
+        catalog.is_active = False
     return catalogs_data
 
 
 def update_is_active_catalog(channel, catalogs_data):
     waba_id = channel.config.get("wa_waba_id", None)
-
     if not waba_id:
         raise ValueError("Channel wa_waba_id not found")
 
@@ -236,34 +246,35 @@ def update_is_active_catalog(channel, catalogs_data):
         channel.save(update_fields=["config"])
 
         for catalog in catalogs_data:
-            if catalog.get("id") != actived_catalog:
-                catalog["is_active"] = False
+            if catalog.facebook_catalog_id != actived_catalog:
+                catalog.is_active = False
 
             else:
-                catalog["is_active"] = True
+                catalog.is_active = True
 
     return catalogs_data
 
 
 def update_local_catalogs(channel, catalogs_data):
-    updated_catalogs = update_is_active_catalog(channel, catalogs_data)
     seen = []
-    for catalog in updated_catalogs:
+    for catalog in catalogs_data:
         new_catalog = Catalog.get_or_create(
-            name=catalog["name"],
+            name=catalog.get("name"),
             channel=channel,
-            is_active=catalog["is_active"],
+            is_active=False,
             facebook_catalog_id=catalog["id"],
         )
 
         seen.append(new_catalog)
 
+    update_is_active_catalog(channel, seen)
     Catalog.trim(channel, seen)
 
 
 def update_local_products(catalog, products_data, channel):
     seen = []
     products_sentenx = {"catalog_id": catalog.facebook_catalog_id, "products": []}
+
     for product in products_data:
         new_product = Product.get_or_create(
             facebook_product_id=product["id"],
@@ -307,14 +318,6 @@ def refresh_whatsapp_catalog_and_products():
     with r.lock("refresh_whatsapp_catalog_and_products", 1800):
         try:
             for channel in Channel.objects.filter(is_active=True, channel_type="WAC"):
-                # Fetch catalog data
-                catalog_data, valid = channel.get_type().get_api_catalogs(channel)
-                if not valid:
-                    continue
-
-                if len(catalog_data) > 0:
-                    update_local_catalogs(channel, catalog_data)
-
                 for catalog in Catalog.objects.filter(channel=channel):
                     # Fetch products for each catalog
                     products_data, valid = channel.get_type().get_api_products(channel, catalog)

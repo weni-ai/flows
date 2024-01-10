@@ -15,6 +15,31 @@ class Template(models.Model):
     are currently only used for WhatsApp channels.
     """
 
+    CATEGORY_CHOICES = (
+        ("ACCOUNT_UPDATE", "account_update"),
+        ("PAYMENT_UPDATE", "payment_update"),
+        (
+            "PERSONAL_FINANCE_UPDATE",
+            "personal_finance_update",
+        ),
+        ("SHIPPING_UPDATE", "shipping_update"),
+        ("RESERVATION_UPDATE", "reservation_update"),
+        ("ISSUE_RESOLUTION", "issue_resolution"),
+        ("APPOINTMENT_UPDATE", "appointment_update"),
+        (
+            "TRANSPORTATION_UPDATE",
+            "transportation_update",
+        ),
+        ("TICKET_UPDATE", "ticket_update"),
+        ("ALERT_UPDATE", "alert_update"),
+        ("AUTO_REPLY", "auto_reply"),
+        ("TRANSACTIONAL", "transactional"),
+        ("MARKETING", "marketing"),
+        ("OTP", "otp"),
+        ("UTILITY", "utility"),
+        ("AUTHENTICATION", "authentication"),
+    )
+
     # the uuid for this template
     uuid = models.UUIDField(default=uuid.uuid4)
 
@@ -27,8 +52,16 @@ class Template(models.Model):
     # when this template was last modified
     modified_on = models.DateTimeField(default=timezone.now)
 
+    category = models.CharField(max_length=200, choices=CATEGORY_CHOICES, null=True)
+
     # when this template was created
     created_on = models.DateTimeField(default=timezone.now)
+
+    @classmethod
+    def trim(cls, channel):
+        org = channel.org
+        templates = org.templates.filter(translations=None)
+        templates.delete()
 
     def is_approved(self):
         """
@@ -102,25 +135,28 @@ class TemplateTranslation(models.Model):
         """
         ids = [tc.id for tc in existing]
 
-        # mark any that weren't included as inactive
-        TemplateTranslation.objects.filter(channel=channel).exclude(id__in=ids).update(is_active=False)
-
-        # Make sure the seen one are active
-        TemplateTranslation.objects.filter(channel=channel, id__in=ids, is_active=False).update(is_active=True)
+        TemplateTranslation.objects.filter(channel=channel).exclude(id__in=ids).delete()
 
     @classmethod
-    def get_or_create(cls, channel, name, language, country, content, variable_count, status, external_id, namespace):
+    def get_or_create(
+        cls, channel, name, language, country, content, variable_count, status, external_id, namespace, category
+    ):
         existing = TemplateTranslation.objects.filter(channel=channel, external_id=external_id).first()
 
         if not existing:
             template = Template.objects.filter(org=channel.org, name=name).first()
             if not template:
                 template = Template.objects.create(
-                    org=channel.org, name=name, created_on=timezone.now(), modified_on=timezone.now()
+                    org=channel.org,
+                    name=name,
+                    created_on=timezone.now(),
+                    modified_on=timezone.now(),
+                    category=category,
                 )
             else:
                 template.modified_on = timezone.now()
-                template.save(update_fields=["modified_on"])
+                template.category = category
+                template.save(update_fields=["modified_on", "category"])
 
             existing = TemplateTranslation.objects.create(
                 template=template,
@@ -167,3 +203,35 @@ class TemplateTranslation(models.Model):
 
     def __str__(self):
         return f"{self.template.name} ({self.language} [{self.country}]) {self.status}: {self.content}"
+
+
+class TemplateButton(models.Model):
+    BUTTON_TYPE_CHOICES = (
+        ("QUICK_REPLY", "quick_reply"),
+        ("PHONE_NUMBER", "phone_number"),
+        ("URL", "url"),
+    )
+
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+
+    translation = models.ForeignKey(TemplateTranslation, on_delete=models.CASCADE, related_name="buttons")
+
+    type = models.CharField(max_length=20, choices=BUTTON_TYPE_CHOICES)
+    text = models.CharField(max_length=30, null=True)
+    country_code = models.IntegerField(null=True)
+    phone_number = models.CharField(max_length=20, null=True)
+    url = models.CharField(max_length=2000, null=True)
+
+
+class TemplateHeader(models.Model):
+    HEADER_TYPE_CHOICES = (
+        ("TEXT", "text"),
+        ("IMAGE", "image"),
+        ("DOCUMENT", "document"),
+        ("VIDEO", "video"),
+    )
+
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    translation = models.ForeignKey(TemplateTranslation, on_delete=models.CASCADE, related_name="headers")
+    type = models.CharField(max_length=20, choices=HEADER_TYPE_CHOICES)
+    text = models.CharField(max_length=60, default=None, null=True)
