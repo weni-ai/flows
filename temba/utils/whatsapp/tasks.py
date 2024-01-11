@@ -266,7 +266,7 @@ def update_local_catalogs(channel, catalogs_data):
         )
 
         seen.append(new_catalog)
-    print("SEEN", seen)
+
     update_is_active_catalog(channel, seen)
     Catalog.trim(channel, seen)
 
@@ -283,7 +283,7 @@ def update_local_products(catalog, products_data, channel):
             catalog=catalog,
             name=catalog.name,
             channel=channel,
-            facebook_catalog_id=catalog,
+            facebook_catalog_id=catalog.facebook_catalog_id,
         )
 
         seen.append(new_product)
@@ -292,7 +292,7 @@ def update_local_products(catalog, products_data, channel):
             "facebook_id": new_product.facebook_product_id,
             "title": new_product.title,
             "org_id": str(catalog.org_id),
-            "catalog_id": catalog,
+            "catalog_id": catalog.facebook_catalog_id,
             "product_retailer_id": new_product.product_retailer_id,
             "channel_id": str(catalog.channel_id),
         }
@@ -318,14 +318,6 @@ def refresh_whatsapp_catalog_and_products():
     with r.lock("refresh_whatsapp_catalog_and_products", 1800):
         try:
             for channel in Channel.objects.filter(is_active=True, channel_type="WAC"):
-                # Fetch catalog data
-                catalog_data, valid = channel.get_type().get_api_catalogs(channel)
-                if not valid:
-                    continue
-
-                if len(catalog_data) > 0:
-                    update_local_catalogs(channel, catalog_data)
-
                 for catalog in Catalog.objects.filter(channel=channel):
                     # Fetch products for each catalog
                     products_data, valid = channel.get_type().get_api_products(channel, catalog)

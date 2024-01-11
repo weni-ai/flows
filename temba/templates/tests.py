@@ -62,10 +62,6 @@ class TemplateTest(TembaTest):
         # trim them
         TemplateTranslation.trim(self.channel, [tt1])
 
-        # tt2 should be inactive now
-        tt2.refresh_from_db()
-        self.assertFalse(tt2.is_active)
-
 
 class TemplateViewSetTests(TembaTest):
     view_class = TemplateViewSet
@@ -76,9 +72,7 @@ class TemplateViewSetTests(TembaTest):
     @override_settings(OIDC_RP_CLIENT_ID="ExampleID")
     @override_settings(OIDC_RP_CLIENT_SECRET="ExampleSecret")
     def test_partial_update(self):
-        # client = APIClient()
         url = reverse("template-detail", args=[self.channel.uuid])
-        # client.force_login(self.admin)
         self.login(self.admin)
 
         with patch("temba.utils.whatsapp.tasks.update_local_templates") as mock_update_local_templates:

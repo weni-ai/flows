@@ -52,10 +52,10 @@ class CatalogViewTest(TembaTest):
         view_class.authentication_classes = []
 
     def test_update_active_catalog(self):
-        url = reverse("catalog-update-active-catalog")
+        url = reverse("catalog-update-status-catalog", args=[self.new_channel.uuid])
         self.client.force_login(self.user)
 
-        data = {"facebook_catalog_id": "112233445", "channel": self.new_channel.uuid}
+        data = {"facebook_catalog_id": "112233445", "is_active": True}
 
         serializer = UpdateCatalogSerializer(data=data)
         self.assertTrue(serializer.is_valid(), "Serializer is not valid.")

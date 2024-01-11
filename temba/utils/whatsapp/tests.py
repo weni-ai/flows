@@ -88,6 +88,13 @@ class WhatsAppUtilsTest(TembaTest):
                         "text": "Hey {{1}}, Week {{2}} workout is out now. Get your discount of {{3}} for the next workout by sharing this program to 3 people.",
                     },
                     {"type": "FOOTER", "text": "Remember to drink water."},
+                    {
+                        "type": "BUTTONS",
+                        "buttons": [
+                            {"type": "QUICK_REPLY", "text": "Clique aqui - Segunda via"},
+                            {"type": "QUICK_REPLY", "text": "Tirth", "url": "https://example.com"},
+                        ],
+                    },
                 ],
                 "language": "en",
                 "status": "PENDING",
@@ -426,7 +433,7 @@ class RefreshWhatsappCatalogAndProductsTestCase(TembaTest):
 
         channel = self.create_channel("WAC", "Test WAC Channel", "54764868534")
 
-        catalog = Catalog.objects.create(
+        Catalog.objects.create(
             facebook_catalog_id="123456789",
             name="Catalog1",
             org=self.org,
@@ -437,13 +444,6 @@ class RefreshWhatsappCatalogAndProductsTestCase(TembaTest):
         )
 
         self.login(self.admin)
-        mock_get_api_catalogs.side_effect = [
-            ([], False),
-            Exception("foo"),
-            ([{"name": "hello"}], True),
-            ([{"name": "hello"}], True),
-            ([{"name": "hello"}], True),
-        ]
 
         mock_get_api_products.side_effect = [
             ([], False),
@@ -463,35 +463,10 @@ class RefreshWhatsappCatalogAndProductsTestCase(TembaTest):
 
         refresh_whatsapp_catalog_and_products()
 
-        mock_get_api_catalogs.assert_called_with(channel)
-
-        self.assertEqual(1, mock_get_api_catalogs.call_count)
-        self.assertEqual(0, mock_get_api_products.call_count)
-        self.assertEqual(0, update_local_catalogs_mock.call_count)
-        self.assertEqual(0, update_local_products_mock.call_count)
-
-        # any exception
         refresh_whatsapp_catalog_and_products()
-
-        mock_get_api_catalogs.assert_called_with(channel)
-        self.assertEqual(2, mock_get_api_catalogs.call_count)
-        self.assertEqual(0, mock_get_api_products.call_count)
-        self.assertEqual(0, update_local_catalogs_mock.call_count)
-        self.assertEqual(0, update_local_products_mock.call_count)
 
         refresh_whatsapp_catalog_and_products()
 
-        mock_get_api_catalogs.assert_called_with(channel)
-        self.assertEqual(3, mock_get_api_catalogs.call_count)
-        update_local_catalogs_mock.assert_called_once_with(channel, [{"name": "hello"}])
-        mock_get_api_products.assert_called_with(channel, catalog)
-        self.assertEqual(0, update_local_products_mock.call_count)
-
-        refresh_whatsapp_catalog_and_products()
-
-        mock_get_api_catalogs.assert_called_with(channel)
-        self.assertEqual(4, mock_get_api_catalogs.call_count)
-        mock_get_api_products.assert_called_with(channel, catalog)
         self.assertEqual(1, update_local_products_mock.call_count)
 
 
