@@ -278,8 +278,9 @@ def update_local_products(catalog, products_data, channel):
     for product in products_data:
         new_product = Product.get_or_create(
             facebook_product_id=product["id"],
-            title=product["name"],
-            product_retailer_id=product["retailer_id"],
+            title=product["title"],
+            # product_retailer_id=product["retailer_id"],
+            product_retailer_id=product["id"],
             catalog=catalog,
             name=catalog.name,
             channel=channel,
@@ -304,30 +305,6 @@ def update_local_products(catalog, products_data, channel):
         sent_trim_products_to_sentenx(catalog, seen)
 
     Product.trim(catalog, seen)
-
-
-@shared_task(track_started=True, name="refresh_whatsapp_catalog_and_products")
-def refresh_whatsapp_catalog_and_products():
-    """
-    Fetches catalog data and associated products from Facebook's Graph API and syncs them to the local database.
-    """
-    r = get_redis_connection()
-    if r.get("refresh_whatsapp_catalog_and_products"):  # pragma: no cover
-        return
-
-    with r.lock("refresh_whatsapp_catalog_and_products", 1800):
-        try:
-            for channel in Channel.objects.filter(is_active=True, channel_type="WAC"):
-                for catalog in Catalog.objects.filter(channel=channel):
-                    # Fetch products for each catalog
-                    products_data, valid = channel.get_type().get_api_products(channel, catalog)
-                    if not valid:
-                        continue
-
-                    update_local_products(catalog, products_data, channel)
-
-        except Exception as e:
-            logger.error(f"Error refreshing WhatsApp catalog and products: {str(e)}", exc_info=True)
 
 
 def sent_products_to_sentenx(products):
