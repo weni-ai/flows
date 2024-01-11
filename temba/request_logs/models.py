@@ -136,6 +136,45 @@ class HTTPLog(models.Model):
         )
 
     @classmethod
+    def create_from_integrations_response(
+        cls,
+        log_type,
+        url,
+        response,
+        status_code,
+        classifier=None,
+        channel=None,
+        ticketer=None,
+        contact=None,
+        request_time=None,
+    ):
+        org = (classifier or channel or ticketer or contact).org
+
+        is_error = status_code >= 400
+        # data = dump.dump_response(
+        #     response,
+        #     request_prefix=cls.REQUEST_DELIM.encode("utf-8"),
+        #     response_prefix=cls.RESPONSE_DELIM.encode("utf-8"),
+        # ).decode("utf-8")
+
+        # first build our array of request lines, our last item will also contain our response lines
+
+        return cls.objects.create(
+            org=org,
+            log_type=log_type,
+            url=url,
+            request=response,
+            response=response,
+            is_error=is_error,
+            created_on=timezone.now(),
+            request_time=request_time,
+            classifier=classifier,
+            channel=channel,
+            ticketer=ticketer,
+            contact=contact,
+        )
+
+    @classmethod
     def create_from_exception(
         cls, log_type, url, exception, start, classifier=None, channel=None, ticketer=None, contact=None
     ):
