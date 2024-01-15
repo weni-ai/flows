@@ -62,7 +62,20 @@ class IntelligencesEndpoint(BaseAPIView, BaseInternalClient):
             headers=headers,
         )
 
-        return Response(response.json())
+        intelligences = response.json()
+
+        results = []
+        for intelligence in intelligences:
+            for content_base in intelligence.get("content_bases", []):
+                results.append(
+                    {
+                        "id": content_base.get("uuid"),
+                        "name": content_base.get("content_base_name"),
+                        "intelligence": intelligence.get("intelligence_name"),
+                    }
+                )
+
+        return Response({"results": results})
 
     @classmethod
     def get_read_explorer(cls):

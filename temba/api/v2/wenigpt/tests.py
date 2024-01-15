@@ -11,20 +11,14 @@ class TestIntelligencesEndpoint(TembaTest):
         mock_response = MagicMock()
         mock_response.json.return_value = [
             {
-                "intelligence_name": "name",
+                "intelligence_name": "Test Intelligence 0",
                 "content_bases": [
-                    {"uuid": "123", "content_base_name": "1234"},
-                    {"uuid": "456", "content_base_name": "4321"},
-                ],
-            },
-            {
-                "intelligence_name": "name 2",
-                "content_bases": [
-                    {"uuid": "789", "content_base_name": "12345"},
-                    {"uuid": "012", "content_base_name": "43215"},
+                    {"uuid": "123456", "content_base_name": "Test Content Base 0"},
+                    {"uuid": "654321", "content_base_name": "Test Content Base 1"},
                 ],
             },
         ]
+
         mock_requests_get.return_value = mock_response
 
         url = reverse("api.v2.intelligences") + ".json"
@@ -35,20 +29,11 @@ class TestIntelligencesEndpoint(TembaTest):
 
         self.assertEqual(response.status_code, 200)
 
-        expected_data = [
-            {
-                "intelligence_name": "name",
-                "content_bases": [
-                    {"uuid": "123", "content_base_name": "1234"},
-                    {"uuid": "456", "content_base_name": "4321"},
-                ],
-            },
-            {
-                "intelligence_name": "name 2",
-                "content_bases": [
-                    {"uuid": "789", "content_base_name": "12345"},
-                    {"uuid": "012", "content_base_name": "43215"},
-                ],
-            },
-        ]
-        self.assertEqual(response.data, expected_data)
+        expected_data = {
+            "results": [
+                {"id": "123456", "name": "Test Content Base 0", "intelligence": "Test Intelligence 0"},
+                {"id": "654321", "name": "Test Content Base 1", "intelligence": "Test Intelligence 0"},
+            ]
+        }
+
+        self.assertEqual(response.json(), expected_data)
