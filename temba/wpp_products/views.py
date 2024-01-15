@@ -12,7 +12,7 @@ from temba.wpp_products.serializers import UpdateCatalogSerializer
 
 class CatalogViewSet(viewsets.ViewSet, InternalGenericViewSet):
     @action(detail=True, methods=["POST"], url_path="update-status-catalog")
-    def update_active_catalog(self, request, pk, *args, **kwargs):
+    def update_status_catalog(self, request, pk, *args, **kwargs):
         serializer = UpdateCatalogSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data

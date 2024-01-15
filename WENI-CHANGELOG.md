@@ -1,3 +1,7 @@
+3.5.1
+----------
+* Update active catalog endpoint
+
 3.5.0
 ----------
 * Add endpoint to receive templates from integrations
