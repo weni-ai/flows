@@ -1,4 +1,6 @@
-workers = 1
+import multiprocessing
+
+workers = multiprocessing.cpu_count() * 2 + 1
 proc_name = 'rapidpro'
 default_proc_name = proc_name
 accesslog = 'gunicorn.access'
