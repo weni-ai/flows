@@ -45,7 +45,7 @@ def fail_old_messages():  # pragma: needs cover
     Msg.fail_old_messages()
 
 
-@nonoverlapping_task(track_started=True, name="collect_message_metrics_task", time_limit=900)
+@nonoverlapping_task(track_started=True, time_limit=900)
 def collect_message_metrics_task():  # pragma: needs cover
     """
     Collects message metrics and sends them to our analytics.
@@ -119,7 +119,7 @@ def export_messages_task(export_id):
     ExportMessagesTask.objects.select_related("org", "created_by").get(id=export_id).perform()
 
 
-@nonoverlapping_task(track_started=True, name="squash_msgcounts", lock_timeout=7200)
+@nonoverlapping_task(track_started=True, lock_timeout=7200)
 def squash_msgcounts():
     SystemLabelCount.squash()
     LabelCount.squash()
