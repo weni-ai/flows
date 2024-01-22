@@ -55,12 +55,12 @@ def normalize_contact_tels_task(org_id):
             urn.ensure_number_normalization(org.default_country_code)
 
 
-@nonoverlapping_task(track_started=True, lock_timeout=7200)
+@nonoverlapping_task(track_started=True, name="squash_topupcredits", lock_key="squash_topupcredits", lock_timeout=7200)
 def squash_topupcredits():
     TopUpCredits.squash()
 
 
-@nonoverlapping_task(track_started=True, lock_timeout=7200)
+@nonoverlapping_task(track_started=True, name="resume_failed_tasks", lock_key="resume_failed_tasks", lock_timeout=7200)
 def resume_failed_tasks():
     now = timezone.now()
     window = now - timedelta(hours=1)
@@ -84,13 +84,15 @@ def resume_failed_tasks():
         export_messages_task.delay(msg_export.pk)
 
 
-@nonoverlapping_task(track_started=True)
+@nonoverlapping_task(track_started=True, name="update_org_activity_task")
 def update_org_activity(now=None):
     now = now if now else timezone.now()
     OrgActivity.update_day(now)
 
 
-@nonoverlapping_task(track_started=True, lock_timeout=7200)
+@nonoverlapping_task(
+    track_started=True, name="suspend_topup_orgs_task", lock_key="suspend_topup_orgs_task", lock_timeout=7200
+)
 def suspend_topup_orgs_task():
     # for every org on a topup plan that isn't suspended, check they have credits, if not, suspend them
     for org in Org.objects.filter(uses_topups=True, is_active=True, is_suspended=False):
@@ -102,7 +104,7 @@ def suspend_topup_orgs_task():
                 org.save(update_fields=["is_suspended", "plan_end"])
 
 
-@nonoverlapping_task(track_started=True, lock_timeout=7200)
+@nonoverlapping_task(track_started=True, name="delete_orgs_task", lock_key="delete_orgs_task", lock_timeout=7200)
 def delete_orgs_task():
     # for each org that was released over 7 days ago, delete it for real
     week_ago = timezone.now() - timedelta(days=Org.DELETE_DELAY_DAYS)

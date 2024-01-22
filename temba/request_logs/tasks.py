@@ -25,7 +25,7 @@ from .models import HTTPLog
 logger = logging.getLogger(__name__)
 
 
-@nonoverlapping_task(track_started=True)
+@nonoverlapping_task(track_started=True, name="trim_http_logs_task")
 def trim_http_logs_task():
     trim_before = timezone.now() - settings.RETENTION_PERIODS["httplog"]
     num_deleted = 0
