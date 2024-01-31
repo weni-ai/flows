@@ -212,6 +212,7 @@ def set_false_is_active_catalog(channel, catalogs_data):
 
     for catalog in catalogs_data:
         catalog.is_active = False
+        catalog.save(update_fields=["is_active"])
     return catalogs_data
 
 
@@ -242,15 +243,21 @@ def update_is_active_catalog(channel, catalogs_data):
         return catalogs_data
 
     if actived_catalog:
-        channel.config["catalog_id"] = actived_catalog
-        channel.save(update_fields=["config"])
-
         for catalog in catalogs_data:
             if catalog.facebook_catalog_id != actived_catalog:
                 catalog.is_active = False
 
             else:
                 catalog.is_active = True
+            catalog.save(update_fields=["is_active"])
+
+        verify_has_catalog_active = channel.catalogs.filter(is_active=True)
+        if verify_has_catalog_active:
+            channel.config["catalog_id"] = actived_catalog
+            channel.save(update_fields=["config"])
+        else:
+            channel.config["catalog_id"] = ""
+            channel.save(update_fields=["config"])
 
     return catalogs_data
 
@@ -318,7 +325,7 @@ def refresh_whatsapp_catalog_and_products():
     with r.lock("refresh_whatsapp_catalog_and_products", 1800):
         try:
             for channel in Channel.objects.filter(is_active=True, channel_type="WAC"):
-                for catalog in Catalog.objects.filter(channel=channel):
+                for catalog in Catalog.objects.filter(channel=channel, is_active=True):
                     # Fetch products for each catalog
                     products_data, valid = channel.get_type().get_api_products(channel, catalog)
                     if not valid:
