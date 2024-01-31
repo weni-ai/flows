@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytz
 import redis
 from smartmin.tests import SmartminTest, SmartminTestMixin
+from weni.internal.models import Project
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
@@ -58,13 +59,15 @@ class TembaTestMixin:
         self.surveyor = self.create_user("Surveyor")
         self.customer_support = self.create_user("support", ("Customer Support",))
 
-        self.org = Org.objects.create(
+        self.project = Project.objects.create(
             name="Temba",
             timezone=pytz.timezone("Africa/Kigali"),
             brand=settings.DEFAULT_BRAND,
             created_by=self.user,
             modified_by=self.user,
         )
+
+        self.org = self.project.org
         self.org.initialize(topup_size=1000)
 
         # add users to the org
