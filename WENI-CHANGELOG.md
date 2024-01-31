@@ -1,3 +1,7 @@
+3.5.3
+----------
+* Fix error when nexus return 500
+
 3.5.2
 ----------
 * Sync products for only active_catalog
