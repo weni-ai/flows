@@ -62,6 +62,9 @@ class IntelligencesEndpoint(BaseAPIView, BaseInternalClient):
             headers=headers,
         )
 
+        if response.status_code >= 400:
+            return Response({"results": []})
+
         intelligences = response.json()
 
         results = []
