@@ -16,9 +16,11 @@ from temba.contacts.models import URN, Contact, ContactURN
 from temba.request_logs.models import HTTPLog
 from temba.templates.models import Template, TemplateButton, TemplateHeader, TemplateTranslation
 from temba.utils import chunk_list
+from temba.utils.whatsapp.interfaces import FacebookCatalog
 from temba.wpp_products.models import Catalog, Product
 
 from . import update_api_version
+from .clients import get_actived_catalog
 from .constants import LANGUAGE_MAPPING, STATUS_MAPPING
 
 logger = logging.getLogger(__name__)
@@ -212,30 +214,24 @@ def set_false_is_active_catalog(channel, catalogs_data):
 
     for catalog in catalogs_data:
         catalog.is_active = False
+        catalog.save(update_fields=["is_active"])
     return catalogs_data
 
 
-def update_is_active_catalog(channel, catalogs_data):
+def update_is_active_catalog(facebook_catalog: FacebookCatalog, channel: Channel, catalogs_data: list):
     waba_id = channel.config.get("wa_waba_id", None)
     if not waba_id:
         raise ValueError("Channel wa_waba_id not found")
 
-    url = f"https://graph.facebook.com/v17.0/{waba_id}/product_catalogs"
+    response = facebook_catalog.get_facebook_catalogs(waba_id)
 
-    headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
-    resp = requests.get(url, params=dict(limit=255), headers=headers)
-
-    if "error" in resp.json():
+    if "error" in response:
         set_false_is_active_catalog(channel, catalogs_data)
-        logger.error(f"Error refreshing WhatsApp catalog and products: {str(resp.json())}", exc_info=True)
+        logger.error(f"Error refreshing WhatsApp catalog and products: {str(response())}", exc_info=True)
 
         return catalogs_data
 
-    json_data = resp.json().get("data", [])
-    if json_data and json_data[0].get("id"):
-        actived_catalog = json_data[0]["id"]
-    else:
-        actived_catalog = None
+    actived_catalog = get_actived_catalog(response)
 
     if actived_catalog is None or len(actived_catalog) == 0:
         set_false_is_active_catalog(channel, catalogs_data)
@@ -251,11 +247,12 @@ def update_is_active_catalog(channel, catalogs_data):
 
             else:
                 catalog.is_active = True
+            catalog.save(update_fields=["is_active"])
 
     return catalogs_data
 
 
-def update_local_catalogs(channel, catalogs_data):
+def update_local_catalogs(facebook_catalog: FacebookCatalog, channel: Channel, catalogs_data: list):
     seen = []
     for catalog in catalogs_data:
         new_catalog = Catalog.get_or_create(
@@ -267,7 +264,7 @@ def update_local_catalogs(channel, catalogs_data):
 
         seen.append(new_catalog)
 
-    update_is_active_catalog(channel, seen)
+    update_is_active_catalog(facebook_catalog, channel, seen)
     Catalog.trim(channel, seen)
 
 
@@ -318,7 +315,7 @@ def refresh_whatsapp_catalog_and_products():
     with r.lock("refresh_whatsapp_catalog_and_products", 1800):
         try:
             for channel in Channel.objects.filter(is_active=True, channel_type="WAC"):
-                for catalog in Catalog.objects.filter(channel=channel):
+                for catalog in Catalog.objects.filter(channel=channel, is_active=True):
                     # Fetch products for each catalog
                     products_data, valid = channel.get_type().get_api_products(channel, catalog)
                     if not valid:
