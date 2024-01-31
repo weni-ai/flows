@@ -1,3 +1,10 @@
+3.5.2
+----------
+* Sync products for only active_catalog
+* Create endpoint to get project intelligences
+* feat: add knowledge bases endpoint for the floweditor
+* feat: update floweditor to 2.10.0
+
 3.5.1
 ----------
 * Update active catalog endpoint
