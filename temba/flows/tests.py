@@ -271,6 +271,7 @@ class FlowTest(TembaTest):
             TemplateTranslation.STATUS_REJECTED,
             "id1",
             "foo_namespace",
+            "AUTHENTICATION",
         )
 
         response = self.client.get(reverse("flows.flow_broadcast", args=[flow.id]))
