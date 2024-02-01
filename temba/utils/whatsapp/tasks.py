@@ -194,16 +194,39 @@ def refresh_whatsapp_templates():
                 update_api_version(channel)
 
 
-def update_channel_catalogs_status(channel, facebook_catalog_id, is_active):
+def update_channel_catalogs_status(channel, facebook_catalog_id, is_active, catalog_name):
     channel.config["catalog_id"] = facebook_catalog_id if is_active else None
     channel.save(update_fields=["config"])
 
+    filter_catalog = Catalog.objects.filter(channel=channel, facebook_catalog_id=facebook_catalog_id)
     Catalog.objects.filter(channel=channel, is_active=True).update(is_active=False)
 
     if is_active:
-        Catalog.objects.filter(channel=channel, facebook_catalog_id=facebook_catalog_id).update(is_active=True)
+        if filter_catalog:
+            filter_catalog.update(is_active=True)
+        else:
+            Catalog.objects.create(
+                facebook_catalog_id=facebook_catalog_id,
+                name=catalog_name,
+                channel=channel,
+                org=channel.org,
+                is_active=is_active,
+            )
+
+    sync_products_catalogs(channel, facebook_catalog_id)
 
     return True
+
+
+def sync_products_catalogs(channel, facebook_catalog_id):
+    try:
+        products_data, valid = channel.get_type().get_api_products(channel, facebook_catalog_id)
+        catalog = Catalog.objects.filter(channel=channel, facebook_catalog_id=facebook_catalog_id).first()
+
+        update_local_products(catalog, products_data, channel)
+
+    except Exception as e:
+        logger.error(f"Error refreshing WhatsApp catalog and products: {str(e)}", exc_info=True)
 
 
 def set_false_is_active_catalog(channel, catalogs_data):
@@ -327,7 +350,7 @@ def refresh_whatsapp_catalog_and_products():
             for channel in Channel.objects.filter(is_active=True, channel_type="WAC"):
                 for catalog in Catalog.objects.filter(channel=channel, is_active=True):
                     # Fetch products for each catalog
-                    products_data, valid = channel.get_type().get_api_products(channel, catalog)
+                    products_data, valid = channel.get_type().get_api_products(channel, catalog.facebook_catalog_id)
                     if not valid:
                         continue
 
