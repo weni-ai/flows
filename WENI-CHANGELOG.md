@@ -1,3 +1,7 @@
+3.5.4
+----------
+* Chore: Bump floweditor to 2.10.1
+
 3.5.3
 ----------
 * Fix error when nexus return 500
