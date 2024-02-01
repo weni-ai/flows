@@ -1,3 +1,30 @@
+3.5.4
+----------
+* Chore: Bump floweditor to 2.10.1
+
+3.5.3
+----------
+* Fix error when nexus return 500
+
+3.5.2
+----------
+* Sync products for only active_catalog
+* Create endpoint to get project intelligences
+* feat: add knowledge bases endpoint for the floweditor
+* feat: update floweditor to 2.10.0
+
+3.5.1
+----------
+* Update active catalog endpoint
+
+3.5.0
+----------
+* Add endpoint to receive templates from integrations
+* Refact Templates models
+* Add endpoints to create catalog
+* Update task according to new templates models
+* Add trim template method to delete template
+
 3.4.3
 ----------
 * Hotfix: Remove icontains in contacts endpoint
