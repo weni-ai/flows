@@ -238,9 +238,6 @@ def update_is_active_catalog(facebook_catalog: FacebookCatalog, channel: Channel
         return catalogs_data
 
     if actived_catalog:
-        channel.config["catalog_id"] = actived_catalog
-        channel.save(update_fields=["config"])
-
         for catalog in catalogs_data:
             if catalog.facebook_catalog_id != actived_catalog:
                 catalog.is_active = False
@@ -248,6 +245,14 @@ def update_is_active_catalog(facebook_catalog: FacebookCatalog, channel: Channel
             else:
                 catalog.is_active = True
             catalog.save(update_fields=["is_active"])
+
+        verify_has_catalog_active = channel.catalogs.filter(is_active=True)
+        if verify_has_catalog_active:
+            channel.config["catalog_id"] = actived_catalog
+            channel.save(update_fields=["config"])
+        else:
+            channel.config["catalog_id"] = ""
+            channel.save(update_fields=["config"])
 
     return catalogs_data
 
@@ -268,15 +273,13 @@ def update_local_catalogs(facebook_catalog: FacebookCatalog, channel: Channel, c
     Catalog.trim(channel, seen)
 
 
-def update_local_products(catalog, products_data, channel):
+def update_local_products_vtex(catalog, products_data, channel):
     seen = []
     products_sentenx = {"catalog_id": catalog.facebook_catalog_id, "products": []}
-
     for product in products_data:
         new_product = Product.get_or_create(
             facebook_product_id=product["id"],
             title=product["title"],
-            # product_retailer_id=product["retailer_id"],
             product_retailer_id=product["id"],
             catalog=catalog,
             name=catalog.name,
@@ -303,6 +306,63 @@ def update_local_products(catalog, products_data, channel):
 
     Product.trim(catalog, seen)
 
+
+def update_local_products_non_vtex(catalog, products_data, channel):
+    seen = []
+    products_sentenx = {"catalog_id": catalog.facebook_catalog_id, "products": []}
+
+    for product in products_data:
+        new_product = Product.get_or_create(
+            facebook_product_id=product["id"],
+            title=product["name"],
+            product_retailer_id=product["retailer_id"],
+            catalog=catalog,
+            name=catalog.name,
+            channel=channel,
+            facebook_catalog_id=catalog.facebook_catalog_id,
+        )
+
+        seen.append(new_product)
+
+        sentenx_object = {
+            "facebook_id": new_product.facebook_product_id,
+            "title": new_product.title,
+            "org_id": str(catalog.org_id),
+            "catalog_id": catalog.facebook_catalog_id,
+            "product_retailer_id": new_product.product_retailer_id,
+            "channel_id": str(catalog.channel_id),
+        }
+
+        products_sentenx["products"].append(sentenx_object)
+
+    if len(products_sentenx["products"]) > 0:
+        sent_products_to_sentenx(products_sentenx)
+        sent_trim_products_to_sentenx(catalog, seen)
+
+    Product.trim(catalog, seen)
+
+@shared_task(track_started=True, name="refresh_whatsapp_catalog_and_products")
+def refresh_whatsapp_catalog_and_products():
+    """
+    Fetches catalog data and associated products from Facebook's Graph API and syncs them to the local database.
+    """
+    r = get_redis_connection()
+    if r.get("refresh_whatsapp_catalog_and_products"):  # pragma: no cover
+        return
+
+    with r.lock("refresh_whatsapp_catalog_and_products", 1800):
+        try:
+            for channel in Channel.objects.filter(is_active=True, channel_type="WAC"):
+                for catalog in Catalog.objects.filter(channel=channel, is_active=True):
+                    # Fetch products for each catalog
+                    products_data, valid = channel.get_type().get_api_products(channel, catalog)
+                    if not valid:
+                        continue
+
+                    update_local_products_non_vtex(catalog, products_data, channel)
+
+        except Exception as e:
+            logger.error(f"Error refreshing WhatsApp catalog and products: {str(e)}", exc_info=True)
 
 def sent_products_to_sentenx(products):
     sentenx_url = settings.SENTENX_URL
