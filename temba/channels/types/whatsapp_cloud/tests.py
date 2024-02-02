@@ -428,7 +428,7 @@ class WhatsAppCloudTypeTest(TembaTest):
 
     @override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="WA_ADMIN_TOKEN")
     @patch("requests.get")
-    def test_get_api_produtcs(self, mock_get):
+    def test_get_api_products(self, mock_get):
         Product.objects.all().delete()
         Catalog.objects.all().delete()
         Channel.objects.all().delete()
@@ -462,18 +462,18 @@ class WhatsAppCloudTypeTest(TembaTest):
         ]
 
         # RequestException check HTTPLog
-        products_data, no_error = WhatsAppCloudType().get_api_products(channel, catalog)
+        products_data, no_error = WhatsAppCloudType().get_api_products(channel, catalog.facebook_catalog_id)
         self.assertEqual(1, HTTPLog.objects.filter(log_type=HTTPLog.WHATSAPP_PRODUCTS_SYNCED).count())
         self.assertFalse(no_error)
         self.assertEqual([], products_data)
 
         # should be empty list with an error flag if fail with API
-        products_data, no_error = WhatsAppCloudType().get_api_products(channel, catalog)
+        products_data, no_error = WhatsAppCloudType().get_api_products(channel, catalog.facebook_catalog_id)
         self.assertFalse(no_error)
         self.assertEqual([], products_data)
 
         # success no error and list
-        products_data, no_error = WhatsAppCloudType().get_api_products(channel, catalog)
+        products_data, no_error = WhatsAppCloudType().get_api_products(channel, catalog.facebook_catalog_id)
         self.assertTrue(no_error)
         self.assertEqual(["foo", "bar"], products_data)
 
@@ -484,7 +484,7 @@ class WhatsAppCloudTypeTest(TembaTest):
         )
 
         # success no error and pagination
-        products_data, no_error = WhatsAppCloudType().get_api_products(channel, catalog)
+        products_data, no_error = WhatsAppCloudType().get_api_products(channel, catalog.facebook_catalog_id)
         self.assertTrue(no_error)
         self.assertEqual(["foo", "bar"], products_data)
 
