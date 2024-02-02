@@ -583,16 +583,16 @@ class WhatsAppTypeTest(TembaTest):
             MockResponse(200, '{"data": ["bar"], "paging": {"next": null} }'),
         ]
 
-        products_data, no_error = WhatsAppType().get_api_products(channel, catalog)
+        products_data, no_error = WhatsAppType().get_api_products(channel, catalog.facebook_catalog_id)
         self.assertEqual(1, HTTPLog.objects.filter(log_type=HTTPLog.WHATSAPP_PRODUCTS_SYNCED).count())
         self.assertFalse(no_error)
         self.assertEqual([], products_data)
 
-        products_data, no_error = WhatsAppType().get_api_products(channel, catalog)
+        products_data, no_error = WhatsAppType().get_api_products(channel, catalog.facebook_catalog_id)
         self.assertFalse(no_error)
         self.assertEqual([], products_data)
 
-        products_data, no_error = WhatsAppType().get_api_products(channel, catalog)
+        products_data, no_error = WhatsAppType().get_api_products(channel, catalog.facebook_catalog_id)
         self.assertTrue(no_error)
         self.assertEqual(["foo", "bar"], products_data)
 
@@ -601,6 +601,6 @@ class WhatsAppTypeTest(TembaTest):
             params={"access_token": "token123456", "limit": 255},
         )
 
-        products_data, no_error = WhatsAppType().get_api_products(channel, catalog)
+        products_data, no_error = WhatsAppType().get_api_products(channel, catalog.facebook_catalog_id)
         self.assertTrue(no_error)
         self.assertEqual(["foo", "bar"], products_data)

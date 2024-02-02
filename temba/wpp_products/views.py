@@ -19,7 +19,10 @@ class CatalogViewSet(viewsets.ViewSet, InternalGenericViewSet):
         channel = get_object_or_404(Channel, uuid=pk, is_active=True)
 
         update_channel_catalogs_status(
-            channel, validated_data.get("facebook_catalog_id"), validated_data.get("is_active")
+            channel,
+            validated_data.get("facebook_catalog_id"),
+            validated_data.get("is_active"),
+            validated_data.get("name"),
         )
         return Response(status=status.HTTP_200_OK)
 
