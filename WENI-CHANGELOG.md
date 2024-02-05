@@ -1,3 +1,7 @@
+3.5.8
+----------
+* Chore: Bump floweditor to 2.10.4
+
 3.5.7
 ----------
 * Chore: Bump floweditor to 2.10.3
