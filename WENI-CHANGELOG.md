@@ -1,3 +1,7 @@
+3.5.7
+----------
+* Chore: Bump floweditor to 2.10.3
+
 3.5.6
 ----------
 * Add test for intelligence endpoint
