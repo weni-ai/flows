@@ -9,7 +9,7 @@
     ]
   },
   "dependencies": {
-    "@weni/flow-editor": "2.10.3",
+    "@weni/flow-editor": "2.10.4",
     "@nyaruka/temba-components": "0.23.0",
     "colorette": "1.2.2",
     "fa-icons": "0.2.0",
