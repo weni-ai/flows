@@ -65,6 +65,7 @@ from .serializers import (
     ContactGroupReadSerializer,
     ContactGroupWriteSerializer,
     ContactReadSerializer,
+    ContactTemplateSerializer,
     ContactWriteSerializer,
     ExternalServicesReadSerializer,
     FlowReadSerializer,
@@ -272,6 +273,7 @@ class ExplorerView(SmartTemplateView):
             ContactsEndpoint.get_write_explorer(),
             ContactsEndpoint.get_delete_explorer(),
             ContactActionsEndpoint.get_write_explorer(),
+            ContactsTemplatesEndpoint.get_read_explorer(),
             DefinitionsEndpoint.get_read_explorer(),
             FieldsEndpoint.get_read_explorer(),
             FieldsEndpoint.get_write_explorer(),
@@ -1602,6 +1604,106 @@ class ContactActionsEndpoint(BulkWriteAPIMixin, BaseAPIView):
                 {"name": "contacts", "required": True, "help": "The UUIDs of the contacts to update"},
                 {"name": "action", "required": True, "help": "One of the following strings: " + ", ".join(actions)},
                 {"name": "group", "required": False, "help": "The UUID or name of a contact group"},
+            ],
+        }
+
+
+class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
+    """
+    This endpoint allows you to list contacts with templates in your account.
+
+    ## Listing Contacts
+
+    A **GET** returns the list of contacts whti templates for your organization, in the order of last activity date. The endpoin
+    will return only with the contact that has template called in Msg.
+
+     * **uuid** - the UUID of the contact (string), filterable as `uuid`.
+     * **name** - the name of the contact (string), filterable as `name`.
+     * **urns** - the URNs associated with the contact (string array), filterable as `urn`.
+     * **groups** - the UUIDs of any groups the contact is part of (array of objects), filterable as `group` with group name or UUID.
+     * **templates** - the templates the contact messages receive
+     * **created_on** - when this contact was created (datetime).
+
+
+    Example:
+
+        GET /api/v2/contact_templates.json
+
+    Response containing the contacts for your organization:
+
+        {
+            "next": null,
+            "previous": null,
+            "results": [
+            {
+                "uuid": "09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                "name": "Ben Haggerty",
+                "language": null,
+                "urns": ["tel:+250788123123"],
+                "groups": [{"name": "Customers", "uuid": "5a4eb79e-1b1f-4ae3-8700-09384cca385f"}],
+                "fields": {
+                  "nickname": "Macklemore",
+                  "side_kick": "Ryan Lewis"
+                }
+                "blocked": false,
+                "stopped": false,
+                "created_on": "2015-11-11T13:05:57.457742Z",
+                "modified_on": "2020-08-11T13:05:57.576056Z",
+                "last_seen_on": "2020-07-11T13:05:57.576056Z"
+            }]
+        }
+
+    """
+
+    permission = "contacts.contact_api"
+    model = Contact
+    serializer_class = ContactTemplateSerializer
+    pagination_class = NameCursorPagination
+
+    def filter_queryset(self, queryset):
+        params = self.request.query_params
+        org = self.request.user.get_org()
+
+        queryset = queryset.filter(org=org, is_active=True)
+
+        contact = params.get("contact")
+        if contact:
+            queryset = queryset.filter(uuid=contact)
+
+        group_ref = params.get("group")
+        if group_ref:
+            group = ContactGroup.user_groups.filter(org=org).filter(Q(uuid=group_ref) | Q(name=group_ref)).first()
+
+            if group:
+                queryset = queryset.filter(all_groups=group)
+            else:
+                queryset = queryset.filter(pk=-1)
+
+        return self.filter_before_after(queryset, "name")
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Templates for contacts",
+            "url": reverse("api.v2.contacts-templates"),
+            "slug": "contacts-templates-list",
+            "params": [
+                {
+                    "name": "uuid",
+                    "required": False,
+                    "help": "A classifier UUID to filter by. ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                },
+                {
+                    "name": "before",
+                    "required": False,
+                    "help": "Only return classifiers created before this date, ex: 2015-01-28T18:00:00.000",
+                },
+                {
+                    "name": "after",
+                    "required": False,
+                    "help": "Only return classifiers created after this date, ex: 2015-01-28T18:00:00.000",
+                },
             ],
         }
 
