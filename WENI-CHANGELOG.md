@@ -1,3 +1,21 @@
+3.5.8
+----------
+* Chore: Bump floweditor to 2.10.4
+
+3.5.7
+----------
+* Chore: Bump floweditor to 2.10.3
+
+3.5.6
+----------
+* Add test for intelligence endpoint
+* Add endpoint to update products by integrations
+* Update rp-apps from 2.7.8 to 2.7.9
+
+3.5.5
+----------
+* Chore: Bump floweditor to 2.10.2
+
 3.5.4
 ----------
 * Chore: Bump floweditor to 2.10.1

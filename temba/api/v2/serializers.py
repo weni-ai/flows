@@ -856,6 +856,59 @@ class ContactBulkActionSerializer(WriteSerializer):
                 contact.release(user)
 
 
+class ContactTemplateSerializer(ReadSerializer):
+    urns = serializers.SerializerMethodField()
+    urns = serializers.SerializerMethodField()
+    templates = serializers.SerializerMethodField()
+    created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    modified_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    last_seen_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+
+    def get_urns(self, obj):
+        if not obj.is_active:
+            return []
+
+        return [urn.api_urn() for urn in obj.get_urns()]
+
+    def alias_in_status(self, status):
+        for code, label in Msg.STATUS_CHOICES:
+            if status == code:
+                return label
+
+        return "Unknown"
+
+    def get_templates(self, obj):
+        if not obj.is_active:
+            return []
+
+        templates = obj.msg.filter(metadata__contains="Templating")
+        return [
+            {
+                "uuid": t.metadata["templating"]["template"]["uuid"],
+                "name": t.metadata["templating"]["template"]["name"],
+                "text": t.text,
+                "created_on": t.created_on,
+                "sent_on": t.sent_on,
+                "direction": "Out" if t.direction == "Outgoing" else "Incoming",
+                "status": self.alias_in_status(t.status),
+            }
+            for t in templates
+        ]
+
+    class Meta:
+        model = Contact
+        fields = (
+            "uuid",
+            "id",
+            "name",
+            "urns",
+            "templates",
+            "created_on",
+            "modified_on",
+            "last_seen_on",
+        )
+
+
 class FlowReadSerializer(ReadSerializer):
     FLOW_TYPES = {
         Flow.TYPE_MESSAGE: "message",
