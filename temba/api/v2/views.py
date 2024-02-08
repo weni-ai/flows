@@ -1686,7 +1686,7 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
         return {
             "method": "GET",
             "title": "List Templates for contacts",
-            "url": reverse("api.v2.contacts-templates"),
+            "url": reverse("api.v2.contact_templates"),
             "slug": "contacts-templates-list",
             "params": [
                 {
