@@ -22,7 +22,13 @@ from django.urls import reverse
 from django.utils import timezone
 
 from temba.api.models import APIToken, Resthook, WebHookEvent
-from temba.api.v2.views import ExternalServicesEndpoint, FlowsLabelsEndpoint, ProductsEndpoint, TemplatesEndpoint
+from temba.api.v2.views import (
+    ContactsTemplatesEndpoint,
+    ExternalServicesEndpoint,
+    FlowsLabelsEndpoint,
+    ProductsEndpoint,
+    TemplatesEndpoint,
+)
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
@@ -5162,6 +5168,68 @@ class FlowsLabelsEndpointTest(TembaTest):
             "results": [
                 {
                     "uuid": label.uuid,
+                    "name": "Important",
+                    "parent": None,
+                }
+            ],
+        }
+        self.assertEqual(response.json(), expected_result)
+
+
+class ContactsTemplatesEndpointTest(TembaTest):
+    def test_contacts_templates(self):
+        contact1 = self.create_contact(name="Josefina")
+        self.create_group("Customers", [contact1])
+
+        metadata = {
+            "templating": {
+                "template": {"uuid": "44019537-9afe-4898-9626-a5c724d169ef", "name": "template_test"},
+                "language": "por",
+                "country": "PT",
+                "variables": ["123"],
+                "namespace": "",
+            },
+            "text_language": "pt-BR",
+        }
+
+        Msg.objects.create(
+            org=self.org,
+            direction="O",
+            contact=contact1,
+            contact_urn=None,
+            text="Hello",
+            channel=self.channel,
+            topup_id=None,
+            status="S",
+            msg_type="",
+            attachments=None,
+            visibility="V",
+            external_id=None,
+            high_priority=None,
+            created_on=timezone.now(),
+            sent_on=timezone.now(),
+            broadcast=None,
+            metadata=metadata,
+            next_attempt=None,
+        )
+
+        client = APIClient()
+        view = ContactsTemplatesEndpoint
+        view.permission_classes = []
+
+        client.force_login(self.user)
+
+        url = reverse("api.v2.contact_templates") + ".json"
+        response = client.get(url, data={})
+
+        self.assertEqual(response.status_code, 200)
+
+        expected_result = {
+            "next": None,
+            "previous": None,
+            "results": [
+                {
+                    "uuid": contact1.uuid,
                     "name": "Important",
                     "parent": None,
                 }
