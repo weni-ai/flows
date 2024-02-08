@@ -111,6 +111,7 @@ class RootView(views.APIView):
      * [/api/v2/classifiers](/api/v2/classifiers) - to list classifiers
      * [/api/v2/contacts](/api/v2/contacts) - to list, create, update or delete contacts
      * [/api/v2/contact_actions](/api/v2/contact_actions) - to perform bulk contact actions
+     * [/api/v2/contact_templates](/api/v2/contact_templates) - to list contact data with templates messages
      * [/api/v2/definitions](/api/v2/definitions) - to export flow definitions, campaigns, and triggers
      * [/api/v2/fields](/api/v2/fields) - to list, create or update contact fields
      * [/api/v2/flow_starts](/api/v2/flow_starts) - to list flow starts and start contacts in flows
@@ -222,6 +223,7 @@ class RootView(views.APIView):
                 "classifiers": reverse("api.v2.classifiers", request=request),
                 "contacts": reverse("api.v2.contacts", request=request),
                 "contact_actions": reverse("api.v2.contact_actions", request=request),
+                "contact_templates": reverse("api.v2.contact_templates", request=request),
                 "definitions": reverse("api.v2.definitions", request=request),
                 "fields": reverse("api.v2.fields", request=request),
                 "flow_starts": reverse("api.v2.flow_starts", request=request),
@@ -1623,6 +1625,9 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
      * **groups** - the UUIDs of any groups the contact is part of (array of objects), filterable as `group` with group name or UUID.
      * **templates** - the templates the contact messages receive
      * **created_on** - when this contact was created (datetime).
+     * **modified_on** - when this contact was last modified (datetime).
+     * **last_seen_on** - when this contact last communicated with us (datetime).
+
 
 
     Example:
@@ -1636,21 +1641,28 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
             "previous": null,
             "results": [
             {
-                "uuid": "09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
-                "name": "Ben Haggerty",
-                "language": null,
-                "urns": ["tel:+250788123123"],
-                "groups": [{"name": "Customers", "uuid": "5a4eb79e-1b1f-4ae3-8700-09384cca385f"}],
-                "fields": {
-                  "nickname": "Macklemore",
-                  "side_kick": "Ryan Lewis"
+            "uuid": "0fcbfa94-abbe-436a-867a-d8b3e6da6b83",
+            "id": 123546,
+            "name": "Jimmy",
+            "urns": [
+                "whatsapp:5555555555"
+            ],
+            "templates": [
+                {
+                    "uuid": "44019537-9afe-4898-9626-a5c724d169ef",
+                    "name": "template_test",
+                    "text": "Hello teste! I'm Doris, Weni's virtual assistant.",
+                    "created_on": "2023-11-01T18:35:52.690932Z",
+                    "sent_on": "2023-11-01T18:36:02.590312Z",
+                    "direction": "Incoming",
+                    "status": "wired"
                 }
-                "blocked": false,
-                "stopped": false,
-                "created_on": "2015-11-11T13:05:57.457742Z",
-                "modified_on": "2020-08-11T13:05:57.576056Z",
-                "last_seen_on": "2020-07-11T13:05:57.576056Z"
-            }]
+            ],
+            "created_on": "2023-02-24T14:23:11.058607Z",
+            "modified_on": "2024-02-08T14:05:51.711344Z",
+            "last_seen_on": "2023-12-08T14:10:48.490004Z"
+        }
+                ]
         }
 
     """
@@ -1660,11 +1672,12 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
     serializer_class = ContactTemplateSerializer
     pagination_class = CreatedOnCursorPagination
 
+    def get_queryset(self):
+        return self.model.objects.filter(org=self.request.user.get_org(), is_active=True)
+
     def filter_queryset(self, queryset):
         params = self.request.query_params
         org = self.request.user.get_org()
-
-        queryset = queryset.filter(org=org, is_active=True)
 
         contact = params.get("contact")
         if contact:
@@ -1676,10 +1689,8 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
 
             if group:
                 queryset = queryset.filter(all_groups=group)
-            else:
-                queryset = queryset.filter(pk=-1)
 
-        return self.filter_before_after(queryset, "name")
+        return self.filter_before_after(queryset, "created_on")
 
     @classmethod
     def get_read_explorer(cls):
