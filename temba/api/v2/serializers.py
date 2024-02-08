@@ -881,7 +881,7 @@ class ContactTemplateSerializer(ReadSerializer):
         if not obj.is_active:
             return []
 
-        templates = obj.msgs.filter(metadata__contains="Templating")
+        templates = obj.msgs.filter(metadata__contains="templating")
         return [
             {
                 "uuid": t.metadata["templating"]["template"]["uuid"],
