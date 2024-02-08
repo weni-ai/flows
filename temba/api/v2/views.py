@@ -1660,11 +1660,12 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
     serializer_class = ContactTemplateSerializer
     pagination_class = CreatedOnCursorPagination
 
+    def get_queryset(self):
+        return self.model.objects.filter(org=self.request.user.get_org(), is_active=True)
+
     def filter_queryset(self, queryset):
         params = self.request.query_params
         org = self.request.user.get_org()
-
-        queryset = queryset.filter(org=org, is_active=True)
 
         contact = params.get("contact")
         if contact:
@@ -1676,10 +1677,8 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
 
             if group:
                 queryset = queryset.filter(all_groups=group)
-            else:
-                queryset = queryset.filter(pk=-1)
 
-        return self.filter_before_after(queryset, "name")
+        return self.filter_before_after(queryset, "created_on")
 
     @classmethod
     def get_read_explorer(cls):

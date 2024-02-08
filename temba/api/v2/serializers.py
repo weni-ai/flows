@@ -864,9 +864,6 @@ class ContactTemplateSerializer(ReadSerializer):
     last_seen_on = serializers.DateTimeField(default_timezone=pytz.UTC)
 
     def get_urns(self, obj):
-        if not obj.is_active:
-            return []
-
         return [urn.api_urn() for urn in obj.get_urns()]
 
     def alias_in_status(self, status):
@@ -877,9 +874,6 @@ class ContactTemplateSerializer(ReadSerializer):
         return "Unknown"
 
     def get_templates(self, obj):
-        if not obj.is_active:
-            return []
-
         templates = obj.msgs.filter(metadata__contains="templating")
         return [
             {
