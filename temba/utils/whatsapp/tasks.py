@@ -221,9 +221,12 @@ def update_is_active_catalog(channel, catalogs_data):
     if not waba_id:
         raise ValueError("Channel wa_waba_id not found")
 
-    url = f"https://graph.facebook.com/v17.0/{waba_id}/product_catalogs"
+    wa_user_token = channel.config.get("wa_user_token")
+    token = wa_user_token if wa_user_token else settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN
 
-    headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
+    url = f"{settings.WHATSAPP_API_URL}/{waba_id}/product_catalogs"
+
+    headers = {"Authorization": f"Bearer {token}"}
     resp = requests.get(url, params=dict(limit=255), headers=headers)
 
     if "error" in resp.json():
