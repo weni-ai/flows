@@ -1,6 +1,7 @@
 import os
 import socket
 import sys
+import urllib
 from datetime import timedelta
 
 import iptools
@@ -1278,6 +1279,11 @@ WHATSAPP_FACEBOOK_BUSINESS_ID = os.environ.get("WHATSAPP_FACEBOOK_BUSINESS_ID", 
 WHATSAPP_APPLICATION_ID = os.environ.get("WHATSAPP_APPLICATION_ID", "")
 WHATSAPP_APPLICATION_SECRET = os.environ.get("WHATSAPP_APPLICATION_SECRET", "")
 WHATSAPP_WEBHOOK_SECRET = os.environ.get("WHATSAPP_WEBHOOK_SECRET", "")
+
+WHATSAPP_VERSION = os.environ.get("WHATSAPP_VERSION", default="v16.0")
+WHATSAPP_API_URL = urllib.parse.urljoin(
+    os.environ.get("WHATSAPP_API_URL", default="https://graph.facebook.com/"), WHATSAPP_VERSION
+)
 
 
 # -----------------------------------------------------------------------------------

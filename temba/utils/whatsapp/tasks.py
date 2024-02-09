@@ -223,7 +223,7 @@ def update_is_active_catalog(facebook_catalog: FacebookCatalog, channel: Channel
     if not waba_id:
         raise ValueError("Channel wa_waba_id not found")
 
-    response = facebook_catalog.get_facebook_catalogs(waba_id)
+    response = facebook_catalog.get_facebook_catalogs(channel)
 
     if "error" in response:
         set_false_is_active_catalog(channel, catalogs_data)
