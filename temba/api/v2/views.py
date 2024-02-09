@@ -1658,7 +1658,7 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
     permission = "contacts.contact_api"
     model = Contact
     serializer_class = ContactTemplateSerializer
-    pagination_class = NameCursorPagination
+    pagination_class = CreatedOnCursorPagination
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
@@ -1690,19 +1690,14 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
             "slug": "contacts-templates-list",
             "params": [
                 {
-                    "name": "uuid",
+                    "name": "contact",
                     "required": False,
-                    "help": "A classifier UUID to filter by. ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                    "help": "A Contact UUID to filter by. ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
                 },
                 {
-                    "name": "before",
+                    "name": "group",
                     "required": False,
-                    "help": "Only return classifiers created before this date, ex: 2015-01-28T18:00:00.000",
-                },
-                {
-                    "name": "after",
-                    "required": False,
-                    "help": "Only return classifiers created after this date, ex: 2015-01-28T18:00:00.000",
+                    "help": "A Group UUID to filter by. ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
                 },
             ],
         }

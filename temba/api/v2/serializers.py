@@ -858,7 +858,6 @@ class ContactBulkActionSerializer(WriteSerializer):
 
 class ContactTemplateSerializer(ReadSerializer):
     urns = serializers.SerializerMethodField()
-    urns = serializers.SerializerMethodField()
     templates = serializers.SerializerMethodField()
     created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
     modified_on = serializers.DateTimeField(default_timezone=pytz.UTC)
