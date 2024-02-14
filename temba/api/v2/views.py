@@ -1440,6 +1440,15 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
         if name:
             queryset = queryset.filter(name__icontains=name)
 
+        # order by a field, default modified_on (optional)
+        # order_field = params.get("order_by")
+        # if order_field not in [field.name for field in self.model._meta.get_fields()]:
+        #     raise InvalidQueryError(f"{order_field} is not a valid field to filter")
+
+        limit = params.get("limit")
+        if limit:
+            self.pagination_class.page_size = int(limit)
+
         # filter by group name/uuid (optional)
         group_ref = params.get("group")
         if group_ref:
@@ -1511,6 +1520,16 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
                     "name": "after",
                     "required": False,
                     "help": "Only return contacts modified after this date, ex: 2015-01-28T18:00:00.000",
+                },
+                {
+                    "name": "order_by",
+                    "required": False,
+                    "help": "Expect a date field (created_on or modified_on) to filter, ex: order_by=created_on",
+                },
+                {
+                    "name": "limit",
+                    "required": False,
+                    "help": "Return objects numbers according to limit, ex: limit=50",
                 },
             ],
             "example": {"query": "urn=tel%3A%2B250788123123"},
