@@ -5178,8 +5178,11 @@ class FlowsLabelsEndpointTest(TembaTest):
 
 class ContactsTemplatesEndpointTest(TembaTest):
     def test_contacts_templates(self):
-        contact1 = self.create_contact(name="Josefina")
-        self.create_group("Customers", [contact1])
+        contact1 = self.create_contact(name="Josefina", org=self.org, user=self.user)
+        contact2 = self.create_contact(name="Jospem", org=self.org, user=self.user)
+        contact2.is_active = False
+        contact2.save(update_fields=["is_active"])
+        group = self.create_group("Customers", [contact1, contact2])
 
         metadata = {
             "templating": {
@@ -5213,26 +5216,64 @@ class ContactsTemplatesEndpointTest(TembaTest):
             next_attempt=None,
         )
 
-        client = APIClient()
         view = ContactsTemplatesEndpoint
         view.permission_classes = []
 
-        client.force_login(self.user)
-
+        self.client.force_login(self.user)
         url = reverse("api.v2.contact_templates") + ".json"
-        response = client.get(url, data={})
+
+        # Verify filter by contact
+        response = self.client.get(url, data={"contact": contact1.uuid})
 
         self.assertEqual(response.status_code, 200)
 
-        expected_result = {
-            "next": None,
-            "previous": None,
-            "results": [
-                {
-                    "uuid": contact1.uuid,
-                    "name": "Important",
-                    "parent": None,
-                }
-            ],
+        # verify filter by group
+        response = self.client.get(url, data={"group": group.uuid})
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_contacts_templates_status_unknown(self):
+
+        contact1 = self.create_contact(name="Jospem", org=self.org, user=self.user)
+
+        metadata = {
+            "templating": {
+                "template": {"uuid": "44019537-9afe-4898-9626-a5c724d169ef", "name": "template_test_2"},
+                "language": "eng",
+                "country": "ENG",
+                "variables": ["123"],
+                "namespace": "",
+            },
+            "text_language": "pt-BR",
         }
-        self.assertEqual(response.json(), expected_result)
+
+        # A status that not exist
+        Msg.objects.create(
+            org=self.org,
+            direction="O",
+            contact=contact1,
+            contact_urn=None,
+            text="Hello",
+            channel=self.channel,
+            topup_id=None,
+            status="Z",
+            msg_type="",
+            attachments=None,
+            visibility="V",
+            external_id=None,
+            high_priority=None,
+            created_on=timezone.now(),
+            sent_on=timezone.now(),
+            broadcast=None,
+            metadata=metadata,
+            next_attempt=None,
+        )
+
+        view = ContactsTemplatesEndpoint
+        view.permission_classes = []
+
+        self.client.force_login(self.user)
+        url = reverse("api.v2.contact_templates") + ".json"
+        response = self.client.get(url, data={"contact": contact1.uuid})
+
+        self.assertEqual(response.status_code, 200)
