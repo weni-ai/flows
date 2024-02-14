@@ -1440,6 +1440,15 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
         if name:
             queryset = queryset.filter(name__icontains=name)
 
+        # order by a field, default modified_on (optional)
+        # order_field = params.get("order_by")
+        # if order_field not in [field.name for field in self.model._meta.get_fields()]:
+        #     raise InvalidQueryError(f"{order_field} is not a valid field to filter")
+
+        limit = params.get("limit")
+        if limit:
+            self.pagination_class.page_size = int(limit)
+
         # filter by group name/uuid (optional)
         group_ref = params.get("group")
         if group_ref:
