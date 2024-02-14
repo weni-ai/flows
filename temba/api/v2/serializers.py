@@ -857,6 +857,20 @@ class ContactBulkActionSerializer(WriteSerializer):
 
 
 class ContactTemplateSerializer(ReadSerializer):
+    STATUSES = {
+        Msg.STATUS_INITIALIZING: "initializing",
+        Msg.STATUS_PENDING: "queued",  # same as far as users are concerned
+        Msg.STATUS_QUEUED: "queued",
+        Msg.STATUS_WIRED: "wired",
+        Msg.STATUS_SENT: "sent",
+        Msg.STATUS_DELIVERED: "delivered",
+        Msg.STATUS_HANDLED: "handled",
+        Msg.STATUS_ERRORED: "errored",
+        Msg.STATUS_FAILED: "failed",
+        Msg.STATUS_RESENT: "resent",
+        Msg.STATUS_READ: "read",
+    }
+
     urns = serializers.SerializerMethodField()
     templates = serializers.SerializerMethodField()
     created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
@@ -865,13 +879,6 @@ class ContactTemplateSerializer(ReadSerializer):
 
     def get_urns(self, obj):
         return [urn.api_urn() for urn in obj.get_urns()]
-
-    def alias_in_status(self, status):
-        for code, label in Msg.STATUS_CHOICES:
-            if status == code:
-                return label
-
-        return "Unknown"
 
     def get_templates(self, obj):
         templates = obj.msgs.filter(metadata__contains="templating")
@@ -883,7 +890,7 @@ class ContactTemplateSerializer(ReadSerializer):
                 "created_on": t.created_on,
                 "sent_on": t.sent_on,
                 "direction": "Out" if t.direction == "Outgoing" else "Incoming",
-                "status": self.alias_in_status(t.status),
+                "status": self.STATUSES.get(t.status),
             }
             for t in templates
         ]
