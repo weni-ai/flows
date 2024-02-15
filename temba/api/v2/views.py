@@ -21,6 +21,7 @@ from temba.api.models import APIToken, Resthook, ResthookSubscriber, WebHookEven
 from temba.api.v2.views_base import (
     BaseAPIView,
     BulkWriteAPIMixin,
+    ContactsCursorPagination,
     CreatedOnCursorPagination,
     DateJoinedCursorPagination,
     DeleteAPIMixin,
@@ -1409,7 +1410,7 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
     serializer_class = ContactReadSerializer
     write_serializer_class = ContactWriteSerializer
     write_with_transaction = False
-    pagination_class = ModifiedOnCursorPagination
+    pagination_class = ContactsCursorPagination
     throttle_scope = "v2.contacts"
     lookup_params = {"uuid": "uuid", "urn": "urns__identity", "name": "name"}
 
@@ -1443,11 +1444,6 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
         name = params.get("name")
         if name:
             queryset = queryset.filter(name__icontains=name)
-
-        # order by a field, default modified_on (optional)
-        # order_field = params.get("order_by")
-        # if order_field not in [field.name for field in self.model._meta.get_fields()]:
-        #     raise InvalidQueryError(f"{order_field} is not a valid field to filter")
 
         limit = params.get("limit")
         if limit:
