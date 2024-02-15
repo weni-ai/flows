@@ -1525,6 +1525,16 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
                     "required": False,
                     "help": "Only return contacts modified after this date, ex: 2015-01-28T18:00:00.000",
                 },
+                {
+                    "name": "order_by",
+                    "required": False,
+                    "help": "Expect a date field (created_on or modified_on) to filter, ex: order_by=created_on",
+                },
+                {
+                    "name": "limit",
+                    "required": False,
+                    "help": "Return objects numbers according to limit, ex: limit=50",
+                },
             ],
             "example": {"query": "urn=tel%3A%2B250788123123"},
         }
