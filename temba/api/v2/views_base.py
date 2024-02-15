@@ -271,6 +271,20 @@ class ModifiedOnCursorPagination(CursorPagination):
     offset_cutoff = 1000000
 
 
+class ContactsCursorPagination(ModifiedOnCursorPagination):
+    page_size_query_param = "limit"
+
+    def get_ordering(self, request, queryset, view):
+        accepted_orders_fields = ["created_on", "-created_on", "modified_on"]
+        param = request.GET.get("order_by")
+
+        if param:
+            if param in accepted_orders_fields:
+                return param, "id"
+
+        return super().get_ordering(request, queryset, view)
+
+
 class DateJoinedCursorPagination(CursorPagination):
     ordering = ("-date_joined", "-id")
     offset_cutoff = 1000000
