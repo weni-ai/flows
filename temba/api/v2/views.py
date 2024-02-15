@@ -1710,6 +1710,16 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
                     "required": False,
                     "help": "A Group UUID to filter by. ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
                 },
+                {
+                    "name": "before",
+                    "required": False,
+                    "help": "Only return contacts modified before this date, ex: 2015-01-28T18:00:00.000",
+                },
+                {
+                    "name": "after",
+                    "required": False,
+                    "help": "Only return contacts modified after this date, ex: 2015-01-28T18:00:00.000",
+                },
             ],
         }
 
