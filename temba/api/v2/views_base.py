@@ -263,10 +263,13 @@ class CreatedOnCursorPagination(CursorPagination):
 
 class ModifiedOnCursorPagination(CursorPagination):
     def get_ordering(self, request, queryset, view):
-        order_by_param = request.GET.get("order_by")
+        accepted_orders_fields = ["created_on", "-created_on", "modified_on"]
+        param = request.GET.get("order_by")
 
-        if order_by_param:
-            return order_by_param, "id"
+        if param:
+            if param not in accepted_orders_fields:
+                return "-modified_on", "-id"
+            return param, "id"
 
         if str_to_bool(request.GET.get("reverse")):
             return "modified_on", "id"

@@ -1445,9 +1445,9 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
             queryset = queryset.filter(name__icontains=name)
 
         # order by a field, default modified_on (optional)
-        order_field = params.get("order_by")
-        if order_field not in [field.name for field in self.model._meta.get_fields()]:
-            raise InvalidQueryError(f"{order_field} is not a valid field to filter")
+        # order_field = params.get("order_by")
+        # if order_field not in [field.name for field in self.model._meta.get_fields()]:
+        #     raise InvalidQueryError(f"{order_field} is not a valid field to filter")
 
         limit = params.get("limit")
         if limit:
