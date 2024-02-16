@@ -1,3 +1,7 @@
+3.6.0
+----------
+* Chore: Bump floweditor to 2.11.0
+
 3.5.9
 ----------
 * Add endpoint to get contacts templates
