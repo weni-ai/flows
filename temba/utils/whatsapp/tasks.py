@@ -247,19 +247,16 @@ def update_is_active_catalog(channel, catalogs_data):
 
     if actived_catalog:
         for catalog in catalogs_data:
-            if catalog.facebook_catalog_id != actived_catalog:
-                catalog.is_active = False
+            if catalog.facebook_catalog_id == actived_catalog:
+                catalog.is_active = True
 
             else:
-                catalog.is_active = True
+                catalog.is_active = False
             catalog.save(update_fields=["is_active"])
 
         verify_has_catalog_active = channel.catalogs.filter(is_active=True)
         if verify_has_catalog_active:
             channel.config["catalog_id"] = actived_catalog
-            channel.save(update_fields=["config"])
-        else:
-            channel.config["catalog_id"] = ""
             channel.save(update_fields=["config"])
 
     return catalogs_data
