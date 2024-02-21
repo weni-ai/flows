@@ -5244,6 +5244,11 @@ class ContactsTemplatesEndpointTest(TembaTest):
 
         self.assertEqual(response.status_code, 200)
 
+        # verify filter by template
+        response = self.client.get(url, data={"template": "template_test"})
+
+        self.assertEqual(response.status_code, 200)
+
     def test_contacts_templates_status_unknown(self):
 
         contact1 = self.create_contact(name="Jospem", org=self.org, user=self.user)
