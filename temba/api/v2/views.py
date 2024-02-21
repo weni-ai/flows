@@ -1705,6 +1705,17 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
             if group:
                 queryset = queryset.filter(all_groups=group)
 
+        template = params.get("template")
+        if template:
+            objects = Msg.objects.filter(org=org, metadata__isnull=False)
+            results = [
+                obj
+                for obj in objects
+                if obj.metadata.get("templating", {}).get("template", {}).get("name") == template
+            ]
+
+            queryset = queryset.filter(msgs__in=results)
+
         return self.filter_before_after(queryset, "created_on")
 
     @classmethod
@@ -1734,6 +1745,11 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
                     "name": "after",
                     "required": False,
                     "help": "Only return contacts modified after this date, ex: 2015-01-28T18:00:00.000",
+                },
+                {
+                    "name": "template",
+                    "required": False,
+                    "help": "Only return contacts for this template., ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
                 },
             ],
         }

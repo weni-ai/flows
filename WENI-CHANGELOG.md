@@ -1,3 +1,13 @@
+3.6.0
+----------
+* Chore: Bump floweditor to 2.11.0
+
+3.5.9
+----------
+* Add endpoint to get contacts templates
+* Add user token in facebook tasks
+* Add params to filter groups in contacts endpoint
+
 3.5.8
 ----------
 * Chore: Bump floweditor to 2.10.4
