@@ -278,6 +278,7 @@ class ExplorerView(SmartTemplateView):
             ContactsEndpoint.get_read_explorer(),
             ContactsEndpoint.get_write_explorer(),
             ContactsEndpoint.get_delete_explorer(),
+            ContactsLeanEndpoint.get_read_explorer(),
             ContactActionsEndpoint.get_write_explorer(),
             ContactsTemplatesEndpoint.get_read_explorer(),
             DefinitionsEndpoint.get_read_explorer(),
@@ -1597,7 +1598,7 @@ class ContactsLeanEndpoint(ListAPIMixin, BaseAPIView):
 
     Example:
 
-        GET /api/v2/contacts.json
+        GET /api/v2/contacts_lean.json
 
     Response containing the contacts for your organization:
 
@@ -1678,7 +1679,7 @@ class ContactsLeanEndpoint(ListAPIMixin, BaseAPIView):
             "method": "GET",
             "title": "List Contacts(lean)",
             "url": reverse("api.v2.contacts_lean"),
-            "slug": "contact-list",
+            "slug": "contact-lean",
             "params": [
                 {
                     "name": "uuid",
@@ -1713,7 +1714,6 @@ class ContactsLeanEndpoint(ListAPIMixin, BaseAPIView):
                     "help": "Return objects numbers according to limit, ex: limit=50",
                 },
             ],
-            "example": {"query": "name=John"},
         }
 
 
