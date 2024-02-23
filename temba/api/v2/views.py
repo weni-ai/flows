@@ -22,6 +22,7 @@ from temba.api.v2.views_base import (
     BaseAPIView,
     BulkWriteAPIMixin,
     ContactsCursorPagination,
+    ContactsTemplateCursorPagination,
     CreatedOnCursorPagination,
     DateJoinedCursorPagination,
     DeleteAPIMixin,
@@ -1681,7 +1682,7 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
     permission = "contacts.contact_api"
     model = Contact
     serializer_class = ContactTemplateSerializer
-    pagination_class = CreatedOnCursorPagination
+    pagination_class = ContactsTemplateCursorPagination
 
     def get_queryset(self):
         return self.model.objects.filter(org=self.request.user.get_org(), is_active=True)
@@ -1702,15 +1703,17 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
                 queryset = queryset.filter(all_groups=group)
 
         template = params.get("template")
-        if template:
-            objects = Msg.objects.filter(org=org, metadata__isnull=False)
-            results = [
-                obj
-                for obj in objects
-                if obj.metadata.get("templating", {}).get("template", {}).get("name") == template
-            ]
 
-            queryset = queryset.filter(msgs__in=results)
+        if template:
+            sql = """select msg.id, contact.name from public.msgs_msg as msg
+                join public.contacts_contact as contact
+                on msg.contact_id = contact.id
+                where msg.metadata::json->'templating'->'template'->>'name' = %s
+                and msg.org_id = %s"""
+
+            objects = Msg.objects.raw(sql, [template, org.id])
+
+            queryset = queryset.filter(msgs__in=objects)
 
         return self.filter_before_after(queryset, "created_on")
 

@@ -5249,6 +5249,30 @@ class ContactsTemplatesEndpointTest(TembaTest):
 
         self.assertEqual(response.status_code, 200)
 
+        # verify filter by limit
+        response = self.client.get(url, data={"template": "template_test", "limit": "1"})
+
+        self.assertEqual(response.status_code, 200)
+
+        # verify filter by offset
+        response = self.client.get(url, data={"template": "template_test", "offset": "1"})
+
+        self.assertEqual(response.status_code, 200)
+
+        # verify filter by before
+        response = self.client.get(
+            url, data={"template": "template_test", "before": format_datetime(contact1.modified_on)}
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        # verify filter by after
+        response = self.client.get(
+            url, data={"template": "template_test", "after": format_datetime(contact1.modified_on)}
+        )
+
+        self.assertEqual(response.status_code, 200)
+
     def test_contacts_templates_status_unknown(self):
 
         contact1 = self.create_contact(name="Jospem", org=self.org, user=self.user)
