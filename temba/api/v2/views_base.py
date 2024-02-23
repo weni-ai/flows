@@ -261,6 +261,10 @@ class CreatedOnCursorPagination(CursorPagination):
     offset_cutoff = 1000000
 
 
+class ContactsTemplateCursorPagination(CreatedOnCursorPagination):
+    page_size_query_param = "limit"
+
+
 class ModifiedOnCursorPagination(CursorPagination):
     def get_ordering(self, request, queryset, view):
         accepted_orders_fields = ["created_on", "-created_on", "modified_on"]
