@@ -22,6 +22,7 @@ from temba.api.v2.views_base import (
     BaseAPIView,
     BulkWriteAPIMixin,
     ContactsCursorPagination,
+    ContactsTemplateCursorPagination,
     CreatedOnCursorPagination,
     DateJoinedCursorPagination,
     DeleteAPIMixin,
@@ -1681,7 +1682,7 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
     permission = "contacts.contact_api"
     model = Contact
     serializer_class = ContactTemplateSerializer
-    pagination_class = CreatedOnCursorPagination
+    pagination_class = ContactsTemplateCursorPagination
 
     def get_queryset(self):
         return self.model.objects.filter(org=self.request.user.get_org(), is_active=True)
@@ -1702,15 +1703,44 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
                 queryset = queryset.filter(all_groups=group)
 
         template = params.get("template")
-        if template:
-            objects = Msg.objects.filter(org=org, metadata__isnull=False)
-            results = [
-                obj
-                for obj in objects
-                if obj.metadata.get("templating", {}).get("template", {}).get("name") == template
-            ]
+        before = params.get("before")
+        after = params.get("after")
+        limit = params.get("limit_2")
+        offset = params.get("offset")
 
-            queryset = queryset.filter(msgs__in=results)
+        if template:
+            sql = """select msg.id, contact.name from public.msgs_msg as msg
+                join public.contacts_contact as contact
+                on msg.contact_id = contact.id
+                where msg.metadata::json->'templating'->'template'->>'name' = %s
+                and msg.org_id = %s"""
+
+            before_condition = f" and msg.created_on <= '{before}'"
+            after_condition = f" and msg.created_on >= '{after}'"
+            limit_condition = f" limit {limit}"
+            offset_condition = f" offset {offset}"
+
+            if before:
+                sql = sql + before_condition
+
+            if after:
+                sql = sql + after_condition
+
+            if limit:
+                sql = sql + limit_condition
+
+            if offset:
+                sql = sql + offset_condition
+
+            objects = Msg.objects.raw(sql, [template, org.id])
+
+            # results = [
+            #     obj
+            #     for obj in objects
+            #     if obj.metadata.get("templating", {}).get("template", {}).get("name") == template
+            # ]
+
+            queryset = queryset.filter(msgs__in=objects)
 
         return self.filter_before_after(queryset, "created_on")
 
