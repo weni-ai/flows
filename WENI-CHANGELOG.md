@@ -1,3 +1,8 @@
+3.6.1
+----------
+* Endpoint contacts_lean
+* Disable template instead deleting
+
 3.6.0
 ----------
 * Chore: Bump floweditor to 2.11.0
