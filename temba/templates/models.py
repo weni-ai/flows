@@ -135,7 +135,10 @@ class TemplateTranslation(models.Model):
         """
         ids = [tc.id for tc in existing]
 
-        TemplateTranslation.objects.filter(channel=channel).exclude(id__in=ids).delete()
+        TemplateTranslation.objects.filter(channel=channel).exclude(id__in=ids).update(is_active=False)
+
+        # Make sure the seen one are active
+        TemplateTranslation.objects.filter(channel=channel, id__in=ids, is_active=False).update(is_active=True)
 
     @classmethod
     def get_or_create(
