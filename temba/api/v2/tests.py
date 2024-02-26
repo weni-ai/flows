@@ -2103,6 +2103,88 @@ class APITest(TembaTest):
         response = self.deleteJSON(url, "uuid=%s" % hans.uuid)
         self.assert404(response)
 
+    @mock_mailroom
+    def test_contacts_lean(self, mr_mocks):
+        url = reverse("api.v2.contacts_lean")
+
+        self.assertEndpointAccess(url)
+
+        # create some more contacts (in addition to Joe and Frank)
+        contact1 = self.create_contact(
+            "Mary", phone="0788000001", language="fra", fields={"nickname": "Mary", "gender": "female"}
+        )
+        contact2 = self.create_contact("Rob", phone="0788000002")
+        contact3 = self.create_contact("Paul", phone="0788000003")
+        contact4 = self.create_contact(
+            "Dominic", phone="0788000004", language="fra", fields={"nickname": "Donnie", "gender": "male"}
+        )
+
+        contact1.stop(self.user)
+        contact2.block(self.user)
+        contact3.release(self.user)
+
+        # put some contacts in a group
+        group = self.create_group("Customers", contacts=[self.joe, contact4])
+
+        # tweak modified_on so we get the order we want
+        self.joe.modified_on = timezone.now()
+        self.joe.save(update_fields=("modified_on",))
+        contact4.modified_on = timezone.now()
+        contact4.last_seen_on = datetime(2020, 8, 12, 13, 30, 45, 123456, pytz.UTC)
+        contact4.save(update_fields=("modified_on", "last_seen_on"))
+
+        contact1.refresh_from_db()
+        contact4.refresh_from_db()
+        self.joe.refresh_from_db()
+
+        # filter by UUID
+        response = self.fetchJSON(url, "uuid=%s" % contact2.uuid)
+        self.assertResultsByUUID(response, [contact2])
+
+        # filter by seacrh
+        response = self.fetchJSON(url, "search=%s" % quote_plus("tel:078-8000004"))
+        self.assertResultsByUUID(response, [contact4])
+
+        # filter by search without urn
+        response = self.fetchJSON(url, "search=%s" % contact2.name)
+        self.assertResultsByUUID(response, [contact2])
+
+        # filter by Name
+        response = self.fetchJSON(url, "name=%s" % contact2.name)
+        self.assertResultsByUUID(response, [contact2])
+
+        # filter by group name
+        response = self.fetchJSON(url, "group=Customers")
+        self.assertResultsByUUID(response, [contact4, self.joe])
+
+        # filter by group UUID
+        response = self.fetchJSON(url, "group=%s" % group.uuid)
+        self.assertResultsByUUID(response, [contact4, self.joe])
+
+        # filter by invalid group
+        response = self.fetchJSON(url, "group=invalid")
+        self.assertResultsByUUID(response, [])
+
+        # filter by before
+        response = self.fetchJSON(url, "before=%s" % format_datetime(contact1.modified_on))
+        self.assertResultsByUUID(response, [contact1, self.frank])
+
+        # filter by after
+        response = self.fetchJSON(url, "after=%s" % format_datetime(self.joe.modified_on))
+        self.assertResultsByUUID(response, [contact4, self.joe])
+
+        # test limit
+        response = self.fetchJSON(url, "limit=2")
+        self.assertResultsByUUID(response, [contact4, self.joe])
+
+        # passing a order_by param
+        response = self.fetchJSON(url, "group=%s&order_by=created_on" % group.uuid)
+        self.assertResultsByUUID(response, [self.joe, contact4])
+
+        # passing a order_by param error
+        response = self.fetchJSON(url, "group=%s&order_by=name" % group.uuid)
+        self.assertResultsByUUID(response, [contact4, self.joe])
+
     def test_prevent_modifying_contacts_with_fields_that_have_null_chars(self):
         """
         Verifies fix for: https://sentry.io/nyaruka/textit/issues/770220071/
