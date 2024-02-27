@@ -5,7 +5,11 @@ from rest_framework.response import Response
 from weni.internal.views import InternalGenericViewSet
 
 from temba.channels.models import Channel
-from temba.utils.whatsapp.tasks import update_channel_catalogs_status, update_local_catalogs, update_local_products
+from temba.utils.whatsapp.tasks import (
+    update_channel_catalogs_status,
+    update_local_catalogs,
+    update_local_products_vtex,
+)
 from temba.wpp_products.models import Catalog
 from temba.wpp_products.serializers import UpdateCatalogSerializer
 
@@ -54,5 +58,6 @@ class ProductViewSet(viewsets.ViewSet, InternalGenericViewSet):
                 catalog.get("name"), self.get_object(), False, catalog.get("facebook_catalog_id")
             )
 
-        update_local_products(catalog_object, products, self.get_object())
+        update_local_products_vtex(catalog_object, products, self.get_object())
 
+        return Response(status=status.HTTP_200_OK)

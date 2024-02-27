@@ -221,9 +221,12 @@ def update_is_active_catalog(channel, catalogs_data):
     if not waba_id:
         raise ValueError("Channel wa_waba_id not found")
 
-    url = f"https://graph.facebook.com/v17.0/{waba_id}/product_catalogs"
+    wa_user_token = channel.config.get("wa_user_token")
+    token = wa_user_token if wa_user_token else settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN
 
-    headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
+    url = f"{settings.WHATSAPP_API_URL}/{waba_id}/product_catalogs"
+
+    headers = {"Authorization": f"Bearer {token}"}
     resp = requests.get(url, params=dict(limit=255), headers=headers)
 
     if "error" in resp.json():
@@ -278,7 +281,41 @@ def update_local_catalogs(channel, catalogs_data):
     Catalog.trim(channel, seen)
 
 
-def update_local_products(catalog, products_data, channel):
+def update_local_products_vtex(catalog, products_data, channel):
+    seen = []
+    products_sentenx = {"catalog_id": catalog.facebook_catalog_id, "products": []}
+    for product in products_data:
+        new_product = Product.get_or_create(
+            facebook_product_id=product["id"],
+            title=product["title"],
+            product_retailer_id=product["id"],
+            catalog=catalog,
+            name=catalog.name,
+            channel=channel,
+            facebook_catalog_id=catalog.facebook_catalog_id,
+        )
+
+        seen.append(new_product)
+
+        sentenx_object = {
+            "facebook_id": new_product.facebook_product_id,
+            "title": new_product.title,
+            "org_id": str(catalog.org_id),
+            "catalog_id": catalog.facebook_catalog_id,
+            "product_retailer_id": new_product.product_retailer_id,
+            "channel_id": str(catalog.channel_id),
+        }
+
+        products_sentenx["products"].append(sentenx_object)
+
+    if len(products_sentenx["products"]) > 0:
+        sent_products_to_sentenx(products_sentenx)
+        sent_trim_products_to_sentenx(catalog, seen)
+
+    Product.trim(catalog, seen)
+
+
+def update_local_products_non_vtex(catalog, products_data, channel):
     seen = []
     products_sentenx = {"catalog_id": catalog.facebook_catalog_id, "products": []}
 
@@ -332,7 +369,7 @@ def refresh_whatsapp_catalog_and_products():
                     if not valid:
                         continue
 
-                    update_local_products(catalog, products_data, channel)
+                    update_local_products_non_vtex(catalog, products_data, channel)
 
         except Exception as e:
             logger.error(f"Error refreshing WhatsApp catalog and products: {str(e)}", exc_info=True)

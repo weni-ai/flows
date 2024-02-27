@@ -22,7 +22,13 @@ from django.urls import reverse
 from django.utils import timezone
 
 from temba.api.models import APIToken, Resthook, WebHookEvent
-from temba.api.v2.views import ExternalServicesEndpoint, FlowsLabelsEndpoint, ProductsEndpoint, TemplatesEndpoint
+from temba.api.v2.views import (
+    ContactsTemplatesEndpoint,
+    ExternalServicesEndpoint,
+    FlowsLabelsEndpoint,
+    ProductsEndpoint,
+    TemplatesEndpoint,
+)
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
@@ -1785,6 +1791,18 @@ class APITest(TembaTest):
         response = self.fetchJSON(url, "after=%s" % format_datetime(self.joe.modified_on))
         self.assertResultsByUUID(response, [contact4, self.joe])
 
+        # test limit
+        response = self.fetchJSON(url, "limit=2")
+        self.assertResultsByUUID(response, [contact4, self.joe])
+
+        # passing a order_by param
+        response = self.fetchJSON(url, "group=%s&order_by=created_on" % group.uuid)
+        self.assertResultsByUUID(response, [self.joe, contact4])
+
+        # passing a order_by param error
+        response = self.fetchJSON(url, "group=%s&order_by=name" % group.uuid)
+        self.assertResultsByUUID(response, [contact4, self.joe])
+
         # view the deleted contact
         response = self.fetchJSON(url, "deleted=true")
         self.assertResultsByUUID(response, [contact3])
@@ -2084,6 +2102,88 @@ class APITest(TembaTest):
         # try to delete a contact in another org
         response = self.deleteJSON(url, "uuid=%s" % hans.uuid)
         self.assert404(response)
+
+    @mock_mailroom
+    def test_contacts_lean(self, mr_mocks):
+        url = reverse("api.v2.contacts_lean")
+
+        self.assertEndpointAccess(url)
+
+        # create some more contacts (in addition to Joe and Frank)
+        contact1 = self.create_contact(
+            "Mary", phone="0788000001", language="fra", fields={"nickname": "Mary", "gender": "female"}
+        )
+        contact2 = self.create_contact("Rob", phone="0788000002")
+        contact3 = self.create_contact("Paul", phone="0788000003")
+        contact4 = self.create_contact(
+            "Dominic", phone="0788000004", language="fra", fields={"nickname": "Donnie", "gender": "male"}
+        )
+
+        contact1.stop(self.user)
+        contact2.block(self.user)
+        contact3.release(self.user)
+
+        # put some contacts in a group
+        group = self.create_group("Customers", contacts=[self.joe, contact4])
+
+        # tweak modified_on so we get the order we want
+        self.joe.modified_on = timezone.now()
+        self.joe.save(update_fields=("modified_on",))
+        contact4.modified_on = timezone.now()
+        contact4.last_seen_on = datetime(2020, 8, 12, 13, 30, 45, 123456, pytz.UTC)
+        contact4.save(update_fields=("modified_on", "last_seen_on"))
+
+        contact1.refresh_from_db()
+        contact4.refresh_from_db()
+        self.joe.refresh_from_db()
+
+        # filter by UUID
+        response = self.fetchJSON(url, "uuid=%s" % contact2.uuid)
+        self.assertResultsByUUID(response, [contact2])
+
+        # filter by seacrh
+        response = self.fetchJSON(url, "search=%s" % quote_plus("tel:078-8000004"))
+        self.assertResultsByUUID(response, [contact4])
+
+        # filter by search without urn
+        response = self.fetchJSON(url, "search=%s" % contact2.name)
+        self.assertResultsByUUID(response, [contact2])
+
+        # filter by Name
+        response = self.fetchJSON(url, "name=%s" % contact2.name)
+        self.assertResultsByUUID(response, [contact2])
+
+        # filter by group name
+        response = self.fetchJSON(url, "group=Customers")
+        self.assertResultsByUUID(response, [contact4, self.joe])
+
+        # filter by group UUID
+        response = self.fetchJSON(url, "group=%s" % group.uuid)
+        self.assertResultsByUUID(response, [contact4, self.joe])
+
+        # filter by invalid group
+        response = self.fetchJSON(url, "group=invalid")
+        self.assertResultsByUUID(response, [])
+
+        # filter by before
+        response = self.fetchJSON(url, "before=%s" % format_datetime(contact1.modified_on))
+        self.assertResultsByUUID(response, [contact1, self.frank])
+
+        # filter by after
+        response = self.fetchJSON(url, "after=%s" % format_datetime(self.joe.modified_on))
+        self.assertResultsByUUID(response, [contact4, self.joe])
+
+        # test limit
+        response = self.fetchJSON(url, "limit=2")
+        self.assertResultsByUUID(response, [contact4, self.joe])
+
+        # passing a order_by param
+        response = self.fetchJSON(url, "group=%s&order_by=created_on" % group.uuid)
+        self.assertResultsByUUID(response, [self.joe, contact4])
+
+        # passing a order_by param error
+        response = self.fetchJSON(url, "group=%s&order_by=name" % group.uuid)
+        self.assertResultsByUUID(response, [contact4, self.joe])
 
     def test_prevent_modifying_contacts_with_fields_that_have_null_chars(self):
         """
@@ -5168,3 +5268,106 @@ class FlowsLabelsEndpointTest(TembaTest):
             ],
         }
         self.assertEqual(response.json(), expected_result)
+
+
+class ContactsTemplatesEndpointTest(TembaTest):
+    def test_contacts_templates(self):
+        contact1 = self.create_contact(name="Josefina", org=self.org, user=self.user)
+        contact2 = self.create_contact(name="Jospem", org=self.org, user=self.user)
+        contact2.is_active = False
+        contact2.save(update_fields=["is_active"])
+        group = self.create_group("Customers", [contact1, contact2])
+
+        metadata = {
+            "templating": {
+                "template": {"uuid": "44019537-9afe-4898-9626-a5c724d169ef", "name": "template_test"},
+                "language": "por",
+                "country": "PT",
+                "variables": ["123"],
+                "namespace": "",
+            },
+            "text_language": "pt-BR",
+        }
+
+        Msg.objects.create(
+            org=self.org,
+            direction="O",
+            contact=contact1,
+            contact_urn=None,
+            text="Hello",
+            channel=self.channel,
+            topup_id=None,
+            status="S",
+            msg_type="",
+            attachments=None,
+            visibility="V",
+            external_id=None,
+            high_priority=None,
+            created_on=timezone.now(),
+            sent_on=timezone.now(),
+            broadcast=None,
+            metadata=metadata,
+            next_attempt=None,
+        )
+
+        view = ContactsTemplatesEndpoint
+        view.permission_classes = []
+
+        self.client.force_login(self.user)
+        url = reverse("api.v2.contact_templates") + ".json"
+
+        # Verify filter by contact
+        response = self.client.get(url, data={"contact": contact1.uuid})
+
+        self.assertEqual(response.status_code, 200)
+
+        # verify filter by group
+        response = self.client.get(url, data={"group": group.uuid})
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_contacts_templates_status_unknown(self):
+
+        contact1 = self.create_contact(name="Jospem", org=self.org, user=self.user)
+
+        metadata = {
+            "templating": {
+                "template": {"uuid": "44019537-9afe-4898-9626-a5c724d169ef", "name": "template_test_2"},
+                "language": "eng",
+                "country": "ENG",
+                "variables": ["123"],
+                "namespace": "",
+            },
+            "text_language": "pt-BR",
+        }
+
+        # A status that not exist
+        Msg.objects.create(
+            org=self.org,
+            direction="O",
+            contact=contact1,
+            contact_urn=None,
+            text="Hello",
+            channel=self.channel,
+            topup_id=None,
+            status="Z",
+            msg_type="",
+            attachments=None,
+            visibility="V",
+            external_id=None,
+            high_priority=None,
+            created_on=timezone.now(),
+            sent_on=timezone.now(),
+            broadcast=None,
+            metadata=metadata,
+            next_attempt=None,
+        )
+
+        view = ContactsTemplatesEndpoint
+        view.permission_classes = []
+
+        self.client.force_login(self.user)
+        url = reverse("api.v2.contact_templates") + ".json"
+        response = self.client.get(url, data={"contact": contact1.uuid})
+
+        self.assertEqual(response.status_code, 200)

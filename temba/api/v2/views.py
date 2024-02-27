@@ -18,9 +18,11 @@ from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 
 from temba.api.models import APIToken, Resthook, ResthookSubscriber, WebHookEvent
+from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
 from temba.api.v2.views_base import (
     BaseAPIView,
     BulkWriteAPIMixin,
+    ContactsCursorPagination,
     CreatedOnCursorPagination,
     DateJoinedCursorPagination,
     DeleteAPIMixin,
@@ -64,7 +66,9 @@ from .serializers import (
     ContactFieldWriteSerializer,
     ContactGroupReadSerializer,
     ContactGroupWriteSerializer,
+    ContactLeanReadSerializer,
     ContactReadSerializer,
+    ContactTemplateSerializer,
     ContactWriteSerializer,
     ExternalServicesReadSerializer,
     FlowReadSerializer,
@@ -110,6 +114,7 @@ class RootView(views.APIView):
      * [/api/v2/classifiers](/api/v2/classifiers) - to list classifiers
      * [/api/v2/contacts](/api/v2/contacts) - to list, create, update or delete contacts
      * [/api/v2/contact_actions](/api/v2/contact_actions) - to perform bulk contact actions
+     * [/api/v2/contact_templates](/api/v2/contact_templates) - to list contact data with templates messages
      * [/api/v2/definitions](/api/v2/definitions) - to export flow definitions, campaigns, and triggers
      * [/api/v2/fields](/api/v2/fields) - to list, create or update contact fields
      * [/api/v2/flow_starts](/api/v2/flow_starts) - to list flow starts and start contacts in flows
@@ -220,7 +225,9 @@ class RootView(views.APIView):
                 "channel_events": reverse("api.v2.channel_events", request=request),
                 "classifiers": reverse("api.v2.classifiers", request=request),
                 "contacts": reverse("api.v2.contacts", request=request),
+                "contacts_lean": reverse("api.v2.contacts_lean", request=request),
                 "contact_actions": reverse("api.v2.contact_actions", request=request),
+                "contact_templates": reverse("api.v2.contact_templates", request=request),
                 "definitions": reverse("api.v2.definitions", request=request),
                 "fields": reverse("api.v2.fields", request=request),
                 "flow_starts": reverse("api.v2.flow_starts", request=request),
@@ -271,7 +278,10 @@ class ExplorerView(SmartTemplateView):
             ContactsEndpoint.get_read_explorer(),
             ContactsEndpoint.get_write_explorer(),
             ContactsEndpoint.get_delete_explorer(),
+            ContactsLeanEndpoint.get_read_explorer(),
             ContactActionsEndpoint.get_write_explorer(),
+            ContactsTemplatesEndpoint.get_read_explorer(),
+            ContactsElasticSearchEndpoint.get_read_explorer(),
             DefinitionsEndpoint.get_read_explorer(),
             FieldsEndpoint.get_read_explorer(),
             FieldsEndpoint.get_write_explorer(),
@@ -1405,7 +1415,7 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
     serializer_class = ContactReadSerializer
     write_serializer_class = ContactWriteSerializer
     write_with_transaction = False
-    pagination_class = ModifiedOnCursorPagination
+    pagination_class = ContactsCursorPagination
     throttle_scope = "v2.contacts"
     lookup_params = {"uuid": "uuid", "urn": "urns__identity", "name": "name"}
 
@@ -1521,6 +1531,16 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
                     "required": False,
                     "help": "Only return contacts modified after this date, ex: 2015-01-28T18:00:00.000",
                 },
+                {
+                    "name": "order_by",
+                    "required": False,
+                    "help": "Expect a date field (created_on or modified_on) to filter, ex: order_by=created_on",
+                },
+                {
+                    "name": "limit",
+                    "required": False,
+                    "help": "Return objects numbers according to limit, ex: limit=50",
+                },
             ],
             "example": {"query": "urn=tel%3A%2B250788123123"},
         }
@@ -1560,6 +1580,145 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
             "params": [
                 {"name": "uuid", "required": False, "help": "UUID of the contact to be deleted"},
                 {"name": "urn", "required": False, "help": "URN of the contact to be deleted. ex: tel:+250788123123"},
+            ],
+        }
+
+
+class ContactsLeanEndpoint(ListAPIMixin, BaseAPIView):
+    """
+    This endpoint allows you to list contacts in your account, with basics informations.
+
+    ## Listing Contacts
+
+    A **GET** returns the list of contacts for your organization, in the order of last activity date. You can return
+    only deleted contacts by passing the "deleted=true" parameter to your call.
+
+     * **uuid** - the UUID of the contact (string), filterable as `uuid`.
+     * **name** - the name of the contact (string), filterable as `name`.
+     * **language** - the preferred language of the contact (string).
+     * **blocked** - whether the contact is blocked (boolean).
+     * **stopped** - whether the contact is stopped, i.e. has opted out (boolean).
+     * **created_on** - when this contact was created (datetime).
+     * **modified_on** - when this contact was last modified (datetime), filterable as `before` and `after`.
+     * **last_seen_on** - when this contact last communicated with us (datetime).
+
+    Example:
+
+        GET /api/v2/contacts_lean.json
+
+    Response containing the contacts for your organization:
+
+        {
+            "next": null,
+            "previous": null,
+            "results": [
+            {
+                "uuid": "09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                "name": "Ben Haggerty",
+                "language": null,
+                "blocked": false,
+                "stopped": false,
+                "created_on": "2015-11-11T13:05:57.457742Z",
+                "modified_on": "2020-08-11T13:05:57.576056Z",
+                "last_seen_on": "2020-07-11T13:05:57.576056Z"
+            }]
+        }
+    """
+
+    permission = "contacts.contact_api"
+    model = Contact
+    serializer_class = ContactLeanReadSerializer
+    pagination_class = ContactsCursorPagination
+    throttle_scope = "v2.contacts"
+    lookup_params = {"uuid": "uuid", "name": "name"}
+
+    def filter_queryset(self, queryset):
+        params = self.request.query_params
+        org = self.request.user.get_org()
+
+        deleted_only = str_to_bool(params.get("deleted"))
+        queryset = queryset.filter(is_active=(not deleted_only))
+
+        # filter by UUID (optional)
+        uuid = params.get("uuid")
+        if uuid:
+            queryset = queryset.filter(uuid=uuid)
+
+        # filter by search (optional)
+        search = params.get("search")
+        if search:
+            try:
+                urn_search = Q(urns__identity=self.normalize_urn(search))
+            except InvalidQueryError:
+                urn_search = Q()
+            queryset = queryset.filter(urn_search | Q(name=search))
+
+        # filter by contact name (optional)
+        name = params.get("name")
+        if name:
+            queryset = queryset.filter(name__icontains=name)
+
+        # filter by group name/uuid (optional)
+        group_ref = params.get("group")
+        if group_ref:
+            group = ContactGroup.user_groups.filter(org=org).filter(Q(uuid=group_ref) | Q(name=group_ref)).first()
+            if group:
+                queryset = queryset.filter(all_groups=group)
+            else:
+                queryset = queryset.filter(pk=-1)
+
+        # use prefetch rather than select_related for foreign keys to avoid joins
+        queryset = queryset.prefetch_related(
+            Prefetch("org"),
+            Prefetch(
+                "all_groups",
+                queryset=ContactGroup.user_groups.only("uuid", "name").order_by("pk"),
+                to_attr="prefetched_user_groups",
+            ),
+        )
+
+        return self.filter_before_after(queryset, "modified_on")
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Contacts(lean)",
+            "url": reverse("api.v2.contacts_lean"),
+            "slug": "contact-lean",
+            "params": [
+                {
+                    "name": "uuid",
+                    "required": False,
+                    "help": "A contact UUID to filter by. ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                },
+                {
+                    "name": "search",
+                    "required": False,
+                    "help": "A contact URN to filter by. ex: tel:+250788123123 or by a contact name",
+                },
+                {"name": "group", "required": False, "help": "A group name or UUID to filter by. ex: Customers"},
+                {"name": "deleted", "required": False, "help": "Whether to return only deleted contacts. ex: false"},
+                {
+                    "name": "before",
+                    "required": False,
+                    "help": "Only return contacts modified before this date, ex: 2015-01-28T18:00:00.000",
+                },
+                {
+                    "name": "after",
+                    "required": False,
+                    "help": "Only return contacts modified after this date, ex: 2015-01-28T18:00:00.000",
+                },
+                {
+                    "name": "order_by",
+                    "required": False,
+                    "help": "Expect a date field (created_on or modified_on) to filter, ex: order_by=created_on",
+                },
+                {
+                    "name": "limit",
+                    "required": False,
+                    "help": "Return objects numbers according to limit, ex: limit=50",
+                },
             ],
         }
 
@@ -1611,6 +1770,120 @@ class ContactActionsEndpoint(BulkWriteAPIMixin, BaseAPIView):
                 {"name": "contacts", "required": True, "help": "The UUIDs of the contacts to update"},
                 {"name": "action", "required": True, "help": "One of the following strings: " + ", ".join(actions)},
                 {"name": "group", "required": False, "help": "The UUID or name of a contact group"},
+            ],
+        }
+
+
+class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
+    """
+    This endpoint allows you to list contacts with templates in your account.
+
+    ## Listing Contacts
+
+    A **GET** returns the list of contacts whti templates for your organization, in the order of last activity date. The endpoin
+    will return only with the contact that has template called in Msg.
+
+     * **uuid** - the UUID of the contact (string), filterable as `uuid`.
+     * **name** - the name of the contact (string), filterable as `name`.
+     * **urns** - the URNs associated with the contact (string array), filterable as `urn`.
+     * **groups** - the UUIDs of any groups the contact is part of (array of objects), filterable as `group` with group name or UUID.
+     * **templates** - the templates the contact messages receive
+     * **created_on** - when this contact was created (datetime).
+     * **modified_on** - when this contact was last modified (datetime).
+     * **last_seen_on** - when this contact last communicated with us (datetime).
+
+
+
+    Example:
+
+        GET /api/v2/contact_templates.json
+
+    Response containing the contacts for your organization:
+
+        {
+            "next": null,
+            "previous": null,
+            "results": [
+            {
+            "uuid": "0fcbfa94-abbe-436a-867a-d8b3e6da6b83",
+            "id": 123546,
+            "name": "Jimmy",
+            "urns": [
+                "whatsapp:5555555555"
+            ],
+            "templates": [
+                {
+                    "uuid": "44019537-9afe-4898-9626-a5c724d169ef",
+                    "name": "template_test",
+                    "text": "Hello teste! I'm Doris, Weni's virtual assistant.",
+                    "created_on": "2023-11-01T18:35:52.690932Z",
+                    "sent_on": "2023-11-01T18:36:02.590312Z",
+                    "direction": "Incoming",
+                    "status": "wired"
+                }
+            ],
+            "created_on": "2023-02-24T14:23:11.058607Z",
+            "modified_on": "2024-02-08T14:05:51.711344Z",
+            "last_seen_on": "2023-12-08T14:10:48.490004Z"
+        }
+                ]
+        }
+
+    """
+
+    permission = "contacts.contact_api"
+    model = Contact
+    serializer_class = ContactTemplateSerializer
+    pagination_class = CreatedOnCursorPagination
+
+    def get_queryset(self):
+        return self.model.objects.filter(org=self.request.user.get_org(), is_active=True)
+
+    def filter_queryset(self, queryset):
+        params = self.request.query_params
+        org = self.request.user.get_org()
+
+        contact = params.get("contact")
+        if contact:
+            queryset = queryset.filter(uuid=contact)
+
+        group_ref = params.get("group")
+        if group_ref:
+            group = ContactGroup.user_groups.filter(org=org).filter(Q(uuid=group_ref) | Q(name=group_ref)).first()
+
+            if group:
+                queryset = queryset.filter(all_groups=group)
+
+        return self.filter_before_after(queryset, "created_on")
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Templates for contacts",
+            "url": reverse("api.v2.contact_templates"),
+            "slug": "contacts-templates-list",
+            "params": [
+                {
+                    "name": "contact",
+                    "required": False,
+                    "help": "A Contact UUID to filter by. ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                },
+                {
+                    "name": "group",
+                    "required": False,
+                    "help": "A Group UUID to filter by. ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                },
+                {
+                    "name": "before",
+                    "required": False,
+                    "help": "Only return contacts modified before this date, ex: 2015-01-28T18:00:00.000",
+                },
+                {
+                    "name": "after",
+                    "required": False,
+                    "help": "Only return contacts modified after this date, ex: 2015-01-28T18:00:00.000",
+                },
             ],
         }
 

@@ -54,10 +54,12 @@ class WhatsAppCloudType(ChannelType):
         waba_currency = channel.config.get("wa_currency")
         waba_business_id = channel.config.get("wa_business_id")
 
+        token = self._get_token(channel)
+
         # Assigh system user to WABA
-        url = f"https://graph.facebook.com/v13.0/{waba_id}/assigned_users"
+        url = f"{settings.WHATSAPP_API_URL}/{waba_id}/assigned_users"
         params = {"user": f"{settings.WHATSAPP_ADMIN_SYSTEM_USER_ID}", "tasks": ["MANAGE"]}
-        headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
+        headers = {"Authorization": f"Bearer {token}"}
 
         resp = requests.post(url, params=params, headers=headers)
 
@@ -66,7 +68,7 @@ class WhatsAppCloudType(ChannelType):
 
         if waba_business_id != settings.WHATSAPP_FACEBOOK_BUSINESS_ID:
             # Get credit line ID
-            url = f"https://graph.facebook.com/v13.0/{settings.WHATSAPP_FACEBOOK_BUSINESS_ID}/extendedcredits"
+            url = f"{settings.WHATSAPP_API_URL}/{settings.WHATSAPP_FACEBOOK_BUSINESS_ID}/extendedcredits"
             params = {"fields": "id,legal_entity_name"}
             resp = requests.get(url, params=params, headers=headers)
 
@@ -77,7 +79,7 @@ class WhatsAppCloudType(ChannelType):
             if data:
                 credit_line_id = data[0].get("id", None)
 
-            url = f"https://graph.facebook.com/v13.0/{credit_line_id}/whatsapp_credit_sharing_and_attach"
+            url = f"{settings.WHATSAPP_API_URL}/{credit_line_id}/whatsapp_credit_sharing_and_attach"
             params = {"waba_id": waba_id, "waba_currency": waba_currency}
             resp = requests.post(url, params=params, headers=headers)
 
@@ -85,7 +87,7 @@ class WhatsAppCloudType(ChannelType):
                 raise ValidationError(_("Unable to assign credit line ID"))
 
         # Subscribe to events
-        url = f"https://graph.facebook.com/v13.0/{waba_id}/subscribed_apps"
+        url = f"{settings.WHATSAPP_API_URL}/{waba_id}/subscribed_apps"
         resp = requests.post(url, headers=headers)
 
         if resp.status_code != 200:  # pragma: no cover
@@ -99,12 +101,14 @@ class WhatsAppCloudType(ChannelType):
         if not waba_id:  # pragma: no cover
             return [], False
 
+        token = self._get_token(channel)
+
         start = timezone.now()
         try:
             template_data = []
-            url = f"https://graph.facebook.com/v14.0/{waba_id}/message_templates"
+            url = f"{settings.WHATSAPP_API_URL}/{waba_id}/message_templates"
 
-            headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
+            headers = {"Authorization": f"Bearer {token}"}
             while url:
                 resp = requests.get(url, params=dict(limit=255), headers=headers)
                 elapsed = (timezone.now() - start).total_seconds() * 1000
@@ -129,12 +133,14 @@ class WhatsAppCloudType(ChannelType):
         if not waba_id:  # pragma: no cover
             return [], False
 
+        token = self._get_token(channel)
+
         start = timezone.now()
         try:
             catalog_data = []
-            url = f"https://graph.facebook.com/v16.0/{waba_id}/owned_product_catalogs"
+            url = f"{settings.WHATSAPP_API_URL}/{waba_id}/owned_product_catalogs"
 
-            headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
+            headers = {"Authorization": f"Bearer {token}"}
 
             while url:
                 resp = requests.get(url, params=dict(limit=255), headers=headers)
@@ -161,12 +167,14 @@ class WhatsAppCloudType(ChannelType):
         if not catalog_id:  # pragma: no cover
             return [], False
 
+        token = self._get_token(channel)
+
         start = timezone.now()
         try:
             product_data = []
-            url = f"https://graph.facebook.com/v16.0/{catalog_id}/products"
+            url = f"{settings.WHATSAPP_API_URL}/{catalog_id}/products"
 
-            headers = {"Authorization": f"Bearer {settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN}"}
+            headers = {"Authorization": f"Bearer {token}"}
             while url:
                 resp = requests.get(url, params=dict(limit=255), headers=headers)
                 elapsed = (timezone.now() - start).total_seconds() * 1000
@@ -182,3 +190,10 @@ class WhatsAppCloudType(ChannelType):
         except requests.RequestException as e:
             HTTPLog.create_from_exception(HTTPLog.WHATSAPP_PRODUCTS_SYNCED, url, e, start, channel=channel)
             return [], False
+
+    def _get_token(self, channel):
+        wa_user_token = channel.config.get("wa_user_token")
+
+        token = wa_user_token if wa_user_token else settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN
+
+        return token

@@ -664,6 +664,41 @@ class ContactWriteSerializer(WriteSerializer):
         return self.instance
 
 
+class ContactLeanReadSerializer(ReadSerializer):
+    name = serializers.SerializerMethodField()
+    language = serializers.SerializerMethodField()
+    blocked = serializers.SerializerMethodField()
+    stopped = serializers.SerializerMethodField()
+    created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    modified_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    last_seen_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+
+    def get_name(self, obj):
+        return obj.name if obj.is_active else None
+
+    def get_language(self, obj):
+        return obj.language if obj.is_active else None
+
+    def get_blocked(self, obj):
+        return obj.status == Contact.STATUS_BLOCKED if obj.is_active else None
+
+    def get_stopped(self, obj):
+        return obj.status == Contact.STATUS_STOPPED if obj.is_active else None
+
+    class Meta:
+        model = Contact
+        fields = (
+            "uuid",
+            "name",
+            "language",
+            "blocked",
+            "stopped",
+            "created_on",
+            "modified_on",
+            "last_seen_on",
+        )
+
+
 class ContactFieldReadSerializer(ReadSerializer):
     VALUE_TYPES = {
         ContactField.TYPE_TEXT: "text",
@@ -854,6 +889,59 @@ class ContactBulkActionSerializer(WriteSerializer):
         elif action == self.DELETE:
             for contact in contacts:
                 contact.release(user)
+
+
+class ContactTemplateSerializer(ReadSerializer):
+    STATUSES = {
+        Msg.STATUS_INITIALIZING: "initializing",
+        Msg.STATUS_PENDING: "queued",  # same as far as users are concerned
+        Msg.STATUS_QUEUED: "queued",
+        Msg.STATUS_WIRED: "wired",
+        Msg.STATUS_SENT: "sent",
+        Msg.STATUS_DELIVERED: "delivered",
+        Msg.STATUS_HANDLED: "handled",
+        Msg.STATUS_ERRORED: "errored",
+        Msg.STATUS_FAILED: "failed",
+        Msg.STATUS_RESENT: "resent",
+        Msg.STATUS_READ: "read",
+    }
+
+    urns = serializers.SerializerMethodField()
+    templates = serializers.SerializerMethodField()
+    created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    modified_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    last_seen_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+
+    def get_urns(self, obj):
+        return [urn.api_urn() for urn in obj.get_urns()]
+
+    def get_templates(self, obj):
+        templates = obj.msgs.filter(metadata__contains="templating")
+        return [
+            {
+                "uuid": t.metadata["templating"]["template"]["uuid"],
+                "name": t.metadata["templating"]["template"]["name"],
+                "text": t.text,
+                "created_on": t.created_on,
+                "sent_on": t.sent_on,
+                "direction": "Out" if t.direction == "Outgoing" else "Incoming",
+                "status": self.STATUSES.get(t.status),
+            }
+            for t in templates
+        ]
+
+    class Meta:
+        model = Contact
+        fields = (
+            "uuid",
+            "id",
+            "name",
+            "urns",
+            "templates",
+            "created_on",
+            "modified_on",
+            "last_seen_on",
+        )
 
 
 class FlowReadSerializer(ReadSerializer):
