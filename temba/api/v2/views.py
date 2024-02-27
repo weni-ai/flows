@@ -18,6 +18,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 
 from temba.api.models import APIToken, Resthook, ResthookSubscriber, WebHookEvent
+from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
 from temba.api.v2.views_base import (
     BaseAPIView,
     BulkWriteAPIMixin,
@@ -280,6 +281,7 @@ class ExplorerView(SmartTemplateView):
             ContactsLeanEndpoint.get_read_explorer(),
             ContactActionsEndpoint.get_write_explorer(),
             ContactsTemplatesEndpoint.get_read_explorer(),
+            ContactsElasticSearchEndpoint.get_read_explorer(),
             DefinitionsEndpoint.get_read_explorer(),
             FieldsEndpoint.get_read_explorer(),
             FieldsEndpoint.get_write_explorer(),

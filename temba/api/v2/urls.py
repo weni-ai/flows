@@ -2,6 +2,8 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from django.conf.urls import url
 
+from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
+
 from .views import (
     ArchivesEndpoint,
     AuthenticateView,
@@ -62,6 +64,7 @@ urlpatterns = [
     url(r"^contacts_lean$", ContactsLeanEndpoint.as_view(), name="api.v2.contacts_lean"),
     url(r"^contact_actions$", ContactActionsEndpoint.as_view(), name="api.v2.contact_actions"),
     url(r"^contact_templates$", ContactsTemplatesEndpoint.as_view(), name="api.v2.contact_templates"),
+    url(r"^contacts_elastic$", ContactsElasticSearchEndpoint.as_view(), name="api.v2.contacts_elastic"),
     url(r"^definitions$", DefinitionsEndpoint.as_view(), name="api.v2.definitions"),
     url(r"^fields$", FieldsEndpoint.as_view(), name="api.v2.fields"),
     url(r"^flow_starts$", FlowStartsEndpoint.as_view(), name="api.v2.flow_starts"),
