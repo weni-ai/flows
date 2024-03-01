@@ -16,11 +16,11 @@ class TemplateViewSet(viewsets.ModelViewSet, InternalGenericViewSet):
         if waba_id:
             HTTPLog.create_from_integrations_response(
                 HTTPLog.WHATSAPP_TEMPLATES_SYNCED,
-                f"https://graph.facebook.com/v16.0/{waba_id}/message_templates",
-                request,
-                request.data.get("status_code"),
+                request.data.get("url"),
+                request.data.get("request"),
+                200,
+                request.data.get("response"),
                 channel=channel,
-                request_time=request.data.get("request_time"),
             )
         update_local_templates(channel, request.data.get("data"))
         return Response(status=status.HTTP_200_OK)

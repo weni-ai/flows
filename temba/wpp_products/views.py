@@ -34,15 +34,14 @@ class CatalogViewSet(viewsets.ViewSet, InternalGenericViewSet):
     ):
         channel = get_object_or_404(Channel, uuid=pk, is_active=True)
         if request.data:
-            wa_business_id = channel.config.get("wa_business_id", None)
-            if wa_business_id:
-                HTTPLog.create_from_integrations_response(
-                    HTTPLog.WHATSAPP_CATALOGS_SYNCED,
-                    f"https://graph.facebook.com/v16.0/{wa_business_id}/owned_product_catalogs",
-                    request,
-                    request.data.get("status_code"),
-                    channel=channel,
-                    request_time=request.data.get("request_time"),
-                )
+            HTTPLog.create_from_integrations_response(
+                HTTPLog.WHATSAPP_CATALOGS_SYNCED,
+                request.data.get("urls"),
+                request.data.get("responses"),
+                200,
+                request.data.get("requests"),
+                channel=channel,
+            )
+
             update_local_catalogs(channel, request.data.get("data"))
         return Response(status=status.HTTP_200_OK)
