@@ -12,7 +12,7 @@ from smartmin.views import SmartFormView, SmartTemplateView
 from django import forms
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
-from django.db.models import Prefetch, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
 from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
@@ -1859,6 +1859,14 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
             objects = Msg.objects.raw(sql, [template, org.id])
 
             queryset = queryset.filter(msgs__in=objects)
+
+        else:
+            queryset = queryset.annotate(
+                num_non_empty_templates=Count(
+                    "msgs", filter=Q(msgs__metadata__contains="templating", msgs__text__isnull=False)
+                )
+            )
+            queryset = queryset.filter(num_non_empty_templates__gt=0)
 
         return self.filter_before_after(queryset, "created_on")
 
