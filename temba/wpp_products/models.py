@@ -68,6 +68,8 @@ class Catalog(models.Model):
 
 
 class Product(models.Model):
+    AVAILABILITY_CHOICES = [("in stock", "in stock"), ("out of stock", "out of stock")]
+
     uuid = models.UUIDField(default=uuid4)
     facebook_product_id = models.CharField(max_length=30)
     title = models.CharField(max_length=200)
@@ -75,12 +77,17 @@ class Product(models.Model):
     catalog = models.ForeignKey(Catalog, on_delete=models.CASCADE, related_name="products")
     created_on = models.DateTimeField(default=timezone.now)
     modified_on = models.DateTimeField(default=timezone.now)
+    availability = models.CharField(max_length=12, choices=AVAILABILITY_CHOICES)
 
     @classmethod
     def trim(cls, catalog, existing):
         ids = [tc.id for tc in existing]
 
         Product.objects.filter(catalog=catalog).exclude(id__in=ids).delete()
+
+    @classmethod
+    def trim_vtex(cls, catalog):
+        Product.objects.filter(catalog=catalog).exclude(availability="out of stock").delete()
 
     @classmethod
     def get_or_create(

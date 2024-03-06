@@ -293,26 +293,32 @@ def update_local_products_vtex(catalog, products_data, channel):
             name=catalog.name,
             channel=channel,
             facebook_catalog_id=catalog.facebook_catalog_id,
+            availability=product["availability"],
         )
 
-        seen.append(new_product)
+        if new_product.availability == "out of stock":
+            seen.append(new_product)
 
-        sentenx_object = {
-            "facebook_id": new_product.facebook_product_id,
-            "title": new_product.title,
-            "org_id": str(catalog.org_id),
-            "catalog_id": catalog.facebook_catalog_id,
-            "product_retailer_id": new_product.product_retailer_id,
-            "channel_id": str(catalog.channel_id),
-        }
+        else:
+            sentenx_object = {
+                "facebook_id": new_product.facebook_product_id,
+                "title": new_product.title,
+                "org_id": str(catalog.org_id),
+                "catalog_id": catalog.facebook_catalog_id,
+                "product_retailer_id": new_product.product_retailer_id,
+                "channel_id": str(catalog.channel_id),
+            }
 
-        products_sentenx["products"].append(sentenx_object)
+            products_sentenx["products"].append(sentenx_object)
+
+    Product.trim_vtex(catalog)
 
     if len(products_sentenx["products"]) > 0:
-        sent_products_to_sentenx(products_sentenx)
-        sent_trim_products_to_sentenx(catalog, seen)
-
-    Product.trim(catalog, seen)
+        try:
+            sent_products_to_sentenx(products_sentenx)
+            sent_trim_products_to_sentenx(catalog, seen)
+        except Exception as e:
+            logger.error(f"An error ocurred sending to SentenX: {str(e)}")
 
 
 def update_local_products_non_vtex(catalog, products_data, channel):
@@ -343,11 +349,14 @@ def update_local_products_non_vtex(catalog, products_data, channel):
 
         products_sentenx["products"].append(sentenx_object)
 
-    if len(products_sentenx["products"]) > 0:
-        sent_products_to_sentenx(products_sentenx)
-        sent_trim_products_to_sentenx(catalog, seen)
-
     Product.trim(catalog, seen)
+
+    if len(products_sentenx["products"]) > 0:
+        try:
+            sent_products_to_sentenx(products_sentenx)
+            sent_trim_products_to_sentenx(catalog, seen)
+        except Exception as e:
+            logger.error(f"An error ocurred sending to SentenX: {str(e)}")
 
 
 @shared_task(track_started=True, name="refresh_whatsapp_catalog_and_products")
@@ -374,6 +383,7 @@ def refresh_whatsapp_catalog_and_products():
             logger.error(f"Error refreshing WhatsApp catalog and products: {str(e)}", exc_info=True)
 
 
+@shared_task(name="sent_products_to_sentenx")
 def sent_products_to_sentenx(products):
     sentenx_url = settings.SENTENX_URL
 
@@ -394,6 +404,7 @@ def sent_products_to_sentenx(products):
         raise Exception("Not found SENTENX_URL")
 
 
+@shared_task(name="sent_trim_products_to_sentenx")
 def sent_trim_products_to_sentenx(catalog, products):
     sentenx_url = settings.SENTENX_URL
 
