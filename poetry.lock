@@ -1057,6 +1057,19 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "pika"
+version = "1.3.2"
+description = "Pika Python AMQP Client Library"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.extras]
+gevent = ["gevent"]
+tornado = ["tornado"]
+twisted = ["twisted"]
+
+[[package]]
 name = "platformdirs"
 version = "4.1.0"
 description = "A small Python package for determining appropriate platform-specific dirs, e.g. a \"user data dir\"."
@@ -2393,6 +2406,10 @@ pathspec = [
 phonenumbers = [
     {file = "phonenumbers-8.13.27-py2.py3-none-any.whl", hash = "sha256:97269235cfd99b907d96bf6223599d3347010ea93bba9d06f88629c021fc2166"},
     {file = "phonenumbers-8.13.27.tar.gz", hash = "sha256:983bda7a3a8b2fad31806db109d4d36b2758ed16d0ab7ad5e737541a67d4637e"},
+]
+pika = [
+    {file = "pika-1.3.2-py3-none-any.whl", hash = "sha256:0779a7c1fafd805672796085560d290213a465e4f6f76a6fb19e378d8041a14f"},
+    {file = "pika-1.3.2.tar.gz", hash = "sha256:b2a327ddddf8570b4965b3576ac77091b850262d34ce8c1d8cb4e4146aa4145f"},
 ]
 platformdirs = [
     {file = "platformdirs-4.1.0-py3-none-any.whl", hash = "sha256:11c8f37bcca40db96d8144522d925583bdb7a31f7b0e37e3ed4318400a8e2380"},
