@@ -944,6 +944,18 @@ class ContactTemplateSerializer(ReadSerializer):
         )
 
 
+class FilterTemplateSerializer(ReadSerializer):
+    template = serializers.CharField()
+    page_size = serializers.IntegerField(default=10)
+    offset = serializers.IntegerField(default=0)
+    before = serializers.DateField(required=False)
+    after = serializers.DateField(required=False)
+
+    class Meta:
+        model = Msg
+        fields = ("template", "page_size", "offset", "before", "after")
+
+
 class FlowReadSerializer(ReadSerializer):
     FLOW_TYPES = {
         Flow.TYPE_MESSAGE: "message",
