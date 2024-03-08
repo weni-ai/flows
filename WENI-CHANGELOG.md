@@ -1,3 +1,8 @@
+3.6.2
+----------
+* Add filter to contact_templates endpoint
+* Endpoint to get contacts elasticsearch
+
 3.6.1
 ----------
 * Endpoint contacts_lean
