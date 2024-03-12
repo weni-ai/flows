@@ -39,8 +39,8 @@ class GetContactsSerializer(serializers.ModelSerializer):
 
 
 class ContactsElasticSerializer(serializers.ModelSerializer):
-    urns = serializers.ListField(child=serializers.DictField(), required=False)
-    groups = serializers.ListField(child=serializers.DictField(), required=False)
+    urns = serializers.ListField(child=serializers.CharField(), required=False)
+    groups = serializers.ListField(child=serializers.CharField(), required=False)
     created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
     modified_on = serializers.DateTimeField(default_timezone=pytz.UTC)
     last_seen_on = serializers.DateTimeField(default_timezone=pytz.UTC)
