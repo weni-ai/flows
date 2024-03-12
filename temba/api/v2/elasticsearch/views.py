@@ -51,6 +51,7 @@ class ContactsElasticSearchEndpoint(APIView):
             index = "contacts"
             if name:
                 filte.append(Q("match_phrase", name=name))
+                filte.append(Q("exists", field="name"))
             if number:
                 filte.append(
                     Q(
@@ -62,7 +63,8 @@ class ContactsElasticSearchEndpoint(APIView):
                                 Q(
                                     "match_phrase",
                                     **{"urns.path": number},
-                                )
+                                ),
+                                Q("exists", field="urns.path"),
                             ],
                         ),
                     ),
@@ -76,8 +78,8 @@ class ContactsElasticSearchEndpoint(APIView):
             start = (page_number - 1) * page_size
             end = page_number * page_size
             # results = [hit.to_dict() for hit in response[start:end]]
-            serialized_data = ContactsElasticSerializer([hit.to_dict() for hit in response[start:end]], many=True)
-            return Response(serialized_data, status=status.HTTP_200_OK)
+            serializer = ContactsElasticSerializer([hit.to_dict() for hit in response[start:end]], many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
         queryset = Contact.objects.filter(org=project.org).order_by("-modified_on")[:10]
         serializer = ContactsElasticSerializer(queryset, many=True)
