@@ -1,3 +1,5 @@
+import ast
+
 import pytz
 from rest_framework import serializers
 
@@ -42,6 +44,19 @@ class ContactsElasticSerializer(serializers.ModelSerializer):
     created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
     modified_on = serializers.DateTimeField(default_timezone=pytz.UTC)
     last_seen_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+
+    def get_urns(self, instance):
+        urns = instance.get("urns", [])
+        urns_list = []
+        for urn_str in urns:
+            urn_dict = ast.literal_eval(urn_str)
+            urns_list.append(urn_dict)
+        return urns_list
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["urns"] = self.get_urns(instance)
+        return data
 
     class Meta:
         model = Contact
