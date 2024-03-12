@@ -70,15 +70,18 @@ class ContactsElasticSearchEndpoint(APIView):
                     ),
                 )
             qs = Q("bool", must=filte)
-            contacts = Search(using=client, index=index).query(qs)
-            response = list(contacts.scan())
 
             page_number = int(params.get("page_number", 1))
             page_size = int(params.get("page_size", 10))
-            start = (page_number - 1) * page_size
-            end = page_number * page_size
-            # results = [hit.to_dict() for hit in response[start:end]]
-            serializer = ContactsElasticSerializer([hit.to_dict() for hit in response[start:end]], many=True)
+
+            contacts = (
+                Search(using=client, index=index).query(qs).params(size=page_size, from_=(page_number - 1) * page_size)
+            )
+            response = list(contacts.scan())
+
+            results = [hit.to_dict() for hit in response]
+
+            serializer = ContactsElasticSerializer(results, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         queryset = Contact.objects.filter(org=project.org).order_by("-modified_on")[:10]
