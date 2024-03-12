@@ -11,6 +11,9 @@ from weni.internal.models import Project
 from django.conf import settings
 from django.urls import reverse
 
+from temba.api.v2.elasticsearch.serializers import ContactsElasticSerializer
+from temba.contacts.models import Contact
+
 
 class ContactsElasticSearchEndpoint(APIView):
     """
@@ -41,38 +44,46 @@ class ContactsElasticSearchEndpoint(APIView):
         name = params.get("name")
         number = params.get("number", "")
 
-        base_url = settings.ELASTICSEARCH_URL
-        client = Elasticsearch(f"{base_url}", timeout=settings.ELASTICSEARCH_TIMEOUT_REQUEST)
-        filte = [Q("match", org_id=org_id)]
-        index = "contacts"
-        if name:
-            filte.append(Q("match_phrase", name=name))
-        if number:
-            filte.append(
-                Q(
-                    "nested",
-                    path="urns",
-                    query=Q(
-                        "bool",
-                        must=[
-                            Q(
-                                "match_phrase",
-                                **{"urns.path": number},
-                            )
-                        ],
+        if name or number:
+            base_url = settings.ELASTICSEARCH_URL
+            client = Elasticsearch(f"{base_url}", timeout=settings.ELASTICSEARCH_TIMEOUT_REQUEST)
+            filte = [Q("match", org_id=org_id)]
+            index = "contacts"
+            if name:
+                filte.append(Q("match_phrase", name=name))
+                filte.append(Q("exists", field="name"))
+            if number:
+                filte.append(
+                    Q(
+                        "nested",
+                        path="urns",
+                        query=Q(
+                            "bool",
+                            must=[
+                                Q(
+                                    "match_phrase",
+                                    **{"urns.path": number},
+                                ),
+                                Q("exists", field="urns.path"),
+                            ],
+                        ),
                     ),
-                ),
-            )
-        qs = Q("bool", must=filte)
-        contacts = Search(using=client, index=index).query(qs)
-        response = list(contacts.scan())
+                )
+            qs = Q("bool", must=filte)
+            contacts = Search(using=client, index=index).query(qs)
+            response = list(contacts.scan())
 
-        page_number = int(params.get("page_number", 1))
-        page_size = int(params.get("page_size", 10))
-        start = (page_number - 1) * page_size
-        end = page_number * page_size
-        results = [hit.to_dict() for hit in response[start:end]]
-        return Response(results, status=status.HTTP_200_OK)
+            page_number = int(params.get("page_number", 1))
+            page_size = int(params.get("page_size", 10))
+            start = (page_number - 1) * page_size
+            end = page_number * page_size
+            # results = [hit.to_dict() for hit in response[start:end]]
+            serializer = ContactsElasticSerializer([hit.to_dict() for hit in response[start:end]], many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        queryset = Contact.objects.filter(org=project.org).order_by("-modified_on")[:10]
+        serializer = ContactsElasticSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @classmethod
     def get_read_explorer(cls):
