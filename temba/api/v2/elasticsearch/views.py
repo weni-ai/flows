@@ -80,9 +80,23 @@ class ContactsElasticSearchEndpoint(APIView):
             response = list(contacts.scan())
 
             results = [hit.to_dict() for hit in response]
+            # contacts = []
+            # for contact in results:
+            #     data = dict(
+            #         id=contact["id"].
+            #         uuid=contact["uuid"],
+            #         name=contact["name"],
+            #         org_id=contact["org_id"],
+            #         urns=contact["urns"],
+            #         groups=contact["groups"],
+            #         created_on=contact["created_on"],
+            #         modified_on=contact["modified_on"],
+            #         last_seen_on=contact["last_seen_on"],
+            #     )
+            #     contacts.append(data)
 
-            serializer = ContactsElasticSerializer(results, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            # serializer = ContactsElasticSerializer(contacts, many=True)
+            return Response(results, status=status.HTTP_200_OK)
 
         queryset = Contact.objects.filter(org=project.org).order_by("-modified_on")[:10]
         serializer = GetContactsSerializer(queryset, many=True)
