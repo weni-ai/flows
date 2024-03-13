@@ -11,7 +11,7 @@ from weni.internal.models import Project
 from django.conf import settings
 from django.urls import reverse
 
-from temba.api.v2.elasticsearch.serializers import ContactsElasticSerializer, GetContactsSerializer
+from temba.api.v2.elasticsearch.serializers import GetContactsSerializer
 from temba.contacts.models import Contact
 
 
@@ -80,9 +80,7 @@ class ContactsElasticSearchEndpoint(APIView):
             response = list(contacts.scan())
 
             results = [hit.to_dict() for hit in response]
-
-            serializer = ContactsElasticSerializer(results, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(results, status=status.HTTP_200_OK)
 
         queryset = Contact.objects.filter(org=project.org).order_by("-modified_on")[:10]
         serializer = GetContactsSerializer(queryset, many=True)
