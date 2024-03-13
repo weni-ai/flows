@@ -1,3 +1,12 @@
+3.6.6
+----------
+* Fix performance in contacts elastic endpoint
+* Update rp-apps version to 2.7.11
+
+3.6.5
+----------
+* Hotfix using 3.6.2 version to adjust permission in contact_elastic endpoint
+
 3.6.4
 ----------
 * Change urn return in elastic serializer
