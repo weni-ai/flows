@@ -1,3 +1,7 @@
+3.6.4
+----------
+* Change urn return in elastic serializer
+
 3.6.3
 ----------
 * Add condition when not receive parameter
