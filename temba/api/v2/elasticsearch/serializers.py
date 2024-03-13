@@ -12,7 +12,7 @@ class GetContactsSerializer(serializers.ModelSerializer):
     groups = serializers.SerializerMethodField()
 
     def get_urns(self, obj):
-        return [urn.api_urn() for urn in obj.get_urns()]
+        return [{"scheme": urn.scheme, "path": urn.path} for urn in obj.get_urns()]
 
     def get_groups(self, obj):
         if not obj.is_active:
