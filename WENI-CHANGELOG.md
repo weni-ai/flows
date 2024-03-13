@@ -1,3 +1,8 @@
+3.6.3
+----------
+* Add condition when not receive parameter
+* Update rp-apps version to 2.7.10
+
 3.6.2
 ----------
 * Add filter to contact_templates endpoint
