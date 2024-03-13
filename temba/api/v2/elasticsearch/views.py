@@ -36,7 +36,7 @@ class ContactsElasticSearchEndpoint(APIView):
         project_uuid = params.get("project_uuid")
 
         project = Project.objects.get(project_uuid=project_uuid)
-        if request.user not in project.get_users():
+        if not project.get_users().filter(id=request.user.id).exists():
             return Response(status=status.HTTP_401_UNAUTHORIZED)
 
         org_id = project.org.id
