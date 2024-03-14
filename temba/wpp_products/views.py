@@ -8,7 +8,7 @@ from temba.channels.models import Channel
 from temba.utils.whatsapp.tasks import (
     update_channel_catalogs_status,
     update_local_catalogs,
-    update_local_products_vtex,
+    update_local_products_vtex_task,
 )
 from temba.wpp_products.models import Catalog
 from temba.wpp_products.serializers import UpdateCatalogSerializer
@@ -58,7 +58,14 @@ class ProductViewSet(viewsets.ViewSet, InternalGenericViewSet):
             catalog_object = Catalog.get_or_create(
                 catalog.get("name"), self.get_object(), False, catalog.get("facebook_catalog_id")
             )
+        # app = Celery("temba")
 
-        update_local_products_vtex(catalog_object, products, self.get_object())
+        # app.send_task(
+        #             "update_local_products_vtex_task",
+        #             kwargs={
+        #                 "catalog":catalog.get("name")
+        #             }
+        #         )
+        update_local_products_vtex_task.delay(catalog_object.pk, products, self.get_object().pk)
 
         return Response(status=status.HTTP_200_OK)

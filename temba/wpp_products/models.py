@@ -91,7 +91,14 @@ class Product(models.Model):
 
     @classmethod
     def get_or_create(
-        cls, facebook_product_id, title, product_retailer_id, catalog, name, channel, facebook_catalog_id
+        cls,
+        facebook_product_id,
+        title,
+        product_retailer_id,
+        catalog,
+        name,
+        channel,
+        facebook_catalog_id,  # , availability
     ):
         existing = Product.objects.filter(catalog=catalog, facebook_product_id=facebook_product_id).first()
 
@@ -115,17 +122,22 @@ class Product(models.Model):
                 title=title,
                 product_retailer_id=product_retailer_id,
                 catalog=catalog,
+                # availability=availability,
             )
 
         else:
-            if existing.title != title or existing.product_retailer_id != product_retailer_id:
+            if (
+                existing.title != title or existing.product_retailer_id != product_retailer_id
+            ):  # or existing.availability != availability:
                 existing.title = title
                 existing.product_retailer_id = product_retailer_id
+                # existing.availability = availability
 
                 existing.save(
                     update_fields=[
                         "title",
                         "product_retailer_id",
+                        # "availability",
                     ]
                 )
 
