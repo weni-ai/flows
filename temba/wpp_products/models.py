@@ -68,6 +68,8 @@ class Catalog(models.Model):
 
 
 class Product(models.Model):
+    AVAILABILITY_CHOICES = [("in stock", "in stock"), ("out of stock", "out of stock")]
+
     uuid = models.UUIDField(default=uuid4)
     facebook_product_id = models.CharField(max_length=30)
     title = models.CharField(max_length=200)
@@ -75,6 +77,7 @@ class Product(models.Model):
     catalog = models.ForeignKey(Catalog, on_delete=models.CASCADE, related_name="products")
     created_on = models.DateTimeField(default=timezone.now)
     modified_on = models.DateTimeField(default=timezone.now)
+    availability = models.CharField(max_length=12, choices=AVAILABILITY_CHOICES)
 
     @classmethod
     def trim(cls, catalog, existing):
@@ -83,8 +86,19 @@ class Product(models.Model):
         Product.objects.filter(catalog=catalog).exclude(id__in=ids).delete()
 
     @classmethod
+    def trim_vtex(cls, catalog):
+        Product.objects.filter(catalog=catalog).exclude(availability="out of stock").delete()
+
+    @classmethod
     def get_or_create(
-        cls, facebook_product_id, title, product_retailer_id, catalog, name, channel, facebook_catalog_id
+        cls,
+        facebook_product_id,
+        title,
+        product_retailer_id,
+        catalog,
+        name,
+        channel,
+        facebook_catalog_id,  # , availability
     ):
         existing = Product.objects.filter(catalog=catalog, facebook_product_id=facebook_product_id).first()
 
@@ -108,17 +122,22 @@ class Product(models.Model):
                 title=title,
                 product_retailer_id=product_retailer_id,
                 catalog=catalog,
+                # availability=availability,
             )
 
         else:
-            if existing.title != title or existing.product_retailer_id != product_retailer_id:
+            if (
+                existing.title != title or existing.product_retailer_id != product_retailer_id
+            ):  # or existing.availability != availability:
                 existing.title = title
                 existing.product_retailer_id = product_retailer_id
+                # existing.availability = availability
 
                 existing.save(
                     update_fields=[
                         "title",
                         "product_retailer_id",
+                        # "availability",
                     ]
                 )
 
