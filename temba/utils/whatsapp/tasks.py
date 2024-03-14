@@ -281,7 +281,11 @@ def update_local_catalogs(channel, catalogs_data):
     Catalog.trim(channel, seen)
 
 
-def update_local_products_vtex(catalog, products_data, channel):
+@shared_task(name="update_local_products_vtex_task")
+def update_local_products_vtex_task(catalog_id, products_data, channel_id):
+    catalog = Catalog.objects.get(id=catalog_id)
+    channel = Channel.objects.get(id=channel_id)
+
     seen = []
     products_sentenx = {"catalog_id": catalog.facebook_catalog_id, "products": []}
     for product in products_data:
@@ -293,10 +297,9 @@ def update_local_products_vtex(catalog, products_data, channel):
             name=catalog.name,
             channel=channel,
             facebook_catalog_id=catalog.facebook_catalog_id,
-            availability=product["availability"],
         )
 
-        if new_product.availability == "out of stock":
+        if product["availability"] == "out of stock":
             seen.append(new_product)
 
         else:
@@ -311,7 +314,7 @@ def update_local_products_vtex(catalog, products_data, channel):
 
             products_sentenx["products"].append(sentenx_object)
 
-    Product.trim_vtex(catalog)
+    Product.trim_vtex(catalog, seen)
 
     if len(products_sentenx["products"]) > 0:
         try:
@@ -383,7 +386,6 @@ def refresh_whatsapp_catalog_and_products():
             logger.error(f"Error refreshing WhatsApp catalog and products: {str(e)}", exc_info=True)
 
 
-@shared_task(name="sent_products_to_sentenx")
 def sent_products_to_sentenx(products):
     sentenx_url = settings.SENTENX_URL
 
@@ -404,7 +406,6 @@ def sent_products_to_sentenx(products):
         raise Exception("Not found SENTENX_URL")
 
 
-@shared_task(name="sent_trim_products_to_sentenx")
 def sent_trim_products_to_sentenx(catalog, products):
     sentenx_url = settings.SENTENX_URL
 
