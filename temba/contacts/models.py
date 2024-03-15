@@ -236,6 +236,29 @@ class URN:
         return True
 
     @classmethod
+    def verify_brazilian_number(cls, urn, scheme, norm_path):
+        contact_urn = ContactURN.objects.filter(identity=urn).first()
+        if contact_urn:
+            return norm_path
+
+        if len(norm_path) == 13:
+            # remove number 9
+            number = norm_path[:4] + norm_path[5:]
+            contact_urn = ContactURN.objects.filter(path=number).first()
+
+            if contact_urn:
+                return number
+
+        else:
+            # add number 9
+            number = norm_path[:4] + "9" + norm_path[4:]
+            contact_urn = ContactURN.objects.filter(path=number).first()
+            if contact_urn:
+                return number
+
+        return norm_path
+
+    @classmethod
     def normalize(cls, urn, country_code=None):
         """
         Normalizes the path of a URN string. Should be called anytime looking for a URN match.
@@ -261,6 +284,9 @@ class URN:
 
         elif scheme == cls.EMAIL_SCHEME:
             norm_path = norm_path.lower()
+
+        elif scheme == cls.WHATSAPP_SCHEME and norm_path[0:2] == "55":
+            norm_path = cls.verify_brazilian_number(urn, scheme, norm_path)
 
         return cls.from_parts(scheme, norm_path, query, display)
 
