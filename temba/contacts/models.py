@@ -244,7 +244,7 @@ class URN:
         if len(norm_path) == 13:
             # remove number 9
             number = norm_path[:4] + norm_path[5:]
-            contact_urn = ContactURN.objects.filter(path=number).first()
+            contact_urn = ContactURN.objects.filter(scheme=scheme, path=number).first()
 
             if contact_urn:
                 return number
@@ -252,7 +252,7 @@ class URN:
         else:
             # add number 9
             number = norm_path[:4] + "9" + norm_path[4:]
-            contact_urn = ContactURN.objects.filter(path=number).first()
+            contact_urn = ContactURN.objects.filter(scheme=scheme, path=number).first()
             if contact_urn:
                 return number
 
