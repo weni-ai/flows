@@ -296,7 +296,6 @@ def update_local_products_vtex_task(catalog_id, products_data, channel_id):
             name=catalog.name,
             channel=channel,
             facebook_catalog_id=catalog.facebook_catalog_id,
-            # availability=product["availability"],
         )
 
         if product["availability"] == "out of stock":
@@ -314,7 +313,7 @@ def update_local_products_vtex_task(catalog_id, products_data, channel_id):
 
             products_sentenx["products"].append(sentenx_object)
 
-    Product.trim_vtex(catalog)
+    Product.trim_vtex(catalog, seen)
 
     if len(products_sentenx["products"]) > 0:
         try:
@@ -337,7 +336,6 @@ def update_local_products_non_vtex(catalog, products_data, channel):
             name=catalog.name,
             channel=channel,
             facebook_catalog_id=catalog.facebook_catalog_id,
-            # availability=product["availability"],
         )
 
         seen.append(new_product)
