@@ -243,7 +243,7 @@ class URN:
 
         if len(norm_path) == 13:
             # remove number 9
-            number = norm_path = norm_path[:4] + norm_path[5:]
+            number = norm_path[:4] + norm_path[5:]
             contact_urn = ContactURN.objects.filter(path=number).first()
 
             if contact_urn:
