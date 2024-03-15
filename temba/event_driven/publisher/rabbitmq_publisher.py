@@ -24,13 +24,10 @@ class RabbitmqPublisher:  # pragma: no cover
                     body=json.dumps(body),
                     properties=BasicProperties(delivery_mode=2),
                 )
-                print(f"Message sent {body}")
                 sended = True
-            except StreamLostError as e:
-                print(f"stream lost error: {e}")
+            except StreamLostError:
                 self.rabbitmq_connection.make_connection()
-            except Exception as err:
-                print(f"error: {err}")
+            except Exception:
                 self.rabbitmq_connection.make_connection()
             if not sended:
                 sleep(settings.EDA_WAIT_TIME_RETRY)
