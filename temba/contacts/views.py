@@ -443,7 +443,7 @@ class ContactForm(forms.ModelForm):
 
         def validate_urn(key, scheme, path):
             try:
-                normalized = URN.normalize(URN.from_parts(scheme, path), country)
+                normalized = URN.normalize(URN.from_parts(scheme, path), country, org=self.org)
                 existing_urn = ContactURN.lookup(self.org, normalized, normalize=False)
 
                 if existing_urn and existing_urn.contact and existing_urn.contact != self.instance:
