@@ -236,35 +236,34 @@ class URN:
         return True
 
     @classmethod
-    def verify_brazilian_number(cls, urn, scheme, norm_path):
-        contact_urn = ContactURN.objects.filter(identity=urn).first()
+    def verify_brazilian_number(cls, urn, scheme, norm_path, org):
+        contact_urn = ContactURN.objects.filter(identity=urn, org=org)
         if contact_urn:
             return norm_path
 
+        # remove number 9
         if len(norm_path) == 13:
-            # remove number 9
             number = norm_path[:4] + norm_path[5:]
-            contact_urn = ContactURN.objects.filter(scheme=scheme, path=number).first()
+            contact_urn = ContactURN.objects.filter(scheme=scheme, path=number, org=org).first()
 
             if contact_urn:
                 return number
 
+        # add number 9
         else:
-            # add number 9
             number = norm_path[:4] + "9" + norm_path[4:]
-            contact_urn = ContactURN.objects.filter(scheme=scheme, path=number).first()
+            contact_urn = ContactURN.objects.filter(scheme=scheme, path=number, org=org).first()
             if contact_urn:
                 return number
 
         return norm_path
 
     @classmethod
-    def normalize(cls, urn, country_code=None):
+    def normalize(cls, urn, country_code=None, org=None):
         """
         Normalizes the path of a URN string. Should be called anytime looking for a URN match.
         """
         scheme, path, query, display = cls.to_parts(urn)
-
         country_code = str(country_code) if country_code else ""
         norm_path = str(path).strip()
 
@@ -285,8 +284,8 @@ class URN:
         elif scheme == cls.EMAIL_SCHEME:
             norm_path = norm_path.lower()
 
-        elif scheme == cls.WHATSAPP_SCHEME and norm_path[0:2] == "55":
-            norm_path = cls.verify_brazilian_number(urn, scheme, norm_path)
+        elif scheme == cls.WHATSAPP_SCHEME and norm_path[0:2] == "55" and org:
+            norm_path = cls.verify_brazilian_number(urn, scheme, norm_path, org)
 
         return cls.from_parts(scheme, norm_path, query, display)
 
@@ -1421,7 +1420,7 @@ class ContactURN(models.Model):
         Looks up an existing URN by a formatted URN string, e.g. "tel:+250234562222"
         """
         if normalize:
-            urn_as_string = URN.normalize(urn_as_string, country_code)
+            urn_as_string = URN.normalize(urn_as_string, country_code, org=org)
 
         identity = URN.identity(urn_as_string)
         (scheme, path, query, display) = URN.to_parts(urn_as_string)
@@ -2201,7 +2200,7 @@ class ContactImport(SmartModel):
         num_records = 0
         for raw_row in data:
             row = cls._parse_row(raw_row, len(mappings))
-            uuid, urns = cls._extract_uuid_and_urns(row, mappings)
+            uuid, urns = cls._extract_uuid_and_urns(row, mappings, org)
             if uuid:
                 if uuid in seen_uuids:
                     raise ValidationError(
@@ -2231,7 +2230,7 @@ class ContactImport(SmartModel):
         return mappings, num_records
 
     @staticmethod
-    def _extract_uuid_and_urns(row, mappings) -> tuple[str, list[str]]:
+    def _extract_uuid_and_urns(row, mappings, org) -> tuple[str, list[str]]:
         """
         Extracts any UUIDs and URNs from the given row so they can be checked for uniqueness
         """
@@ -2244,7 +2243,7 @@ class ContactImport(SmartModel):
             elif mapping["type"] == "scheme" and value:
                 urn = URN.from_parts(mapping["scheme"], value)
                 try:
-                    urn = URN.normalize(urn)
+                    urn = URN.normalize(urn, org=org)
                 except ValueError:
                     pass
                 urns.append(urn)
@@ -2484,7 +2483,7 @@ class ContactImport(SmartModel):
                         spec["urns"] = []
                     urn = URN.from_parts(scheme, value)
                     try:
-                        urn = URN.normalize(urn, country_code=self.org.default_country_code)
+                        urn = URN.normalize(urn, country_code=self.org.default_country_code, org=self.org)
                     except ValueError:
                         pass
                     spec["urns"].append(urn)
