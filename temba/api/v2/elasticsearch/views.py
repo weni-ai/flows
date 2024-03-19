@@ -1,3 +1,5 @@
+from math import ceil
+
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Q, Search
 from mozilla_django_oidc.contrib.drf import OIDCAuthentication
@@ -13,6 +15,17 @@ from django.urls import reverse
 
 from temba.api.v2.elasticsearch.serializers import GetContactsSerializer
 from temba.contacts.models import Contact
+
+
+def get_pagination_links(page_number, total_pages):
+    links = {}
+    url = reverse("api.v2.contacts_elastic")
+    print(url)
+    if page_number < total_pages:
+        links["next"] = f"{url}?page_number={page_number + 1}"
+    if page_number > 1:
+        links["previous"] = f"{url}?page_number={page_number - 1}"
+    return links
 
 
 class ContactsElasticSearchEndpoint(APIView):
@@ -81,7 +94,22 @@ class ContactsElasticSearchEndpoint(APIView):
 
             results = [hit.to_dict() for hit in response]
 
-            return Response(results, status=status.HTTP_200_OK)
+            total_results = len(results)
+            total_pages = ceil(total_results / page_size)
+
+            pagination_links = get_pagination_links(page_number, total_pages)
+
+            data = {
+                "results": results,
+                "pagination": {
+                    "page_number": page_number,
+                    "page_size": page_size,
+                    "total_pages": total_pages,
+                    "links": pagination_links,
+                },
+            }
+
+            return Response(data, status=status.HTTP_200_OK)
 
         queryset = Contact.objects.filter(org=project.org).order_by("-modified_on")[:10]
         serializer = GetContactsSerializer(queryset, many=True)
