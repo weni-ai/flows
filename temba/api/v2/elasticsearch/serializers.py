@@ -21,6 +21,13 @@ class GetContactsSerializer(serializers.ModelSerializer):
         groups = obj.prefetched_user_groups if hasattr(obj, "prefetched_user_groups") else obj.user_groups.all()
         return [{"uuid": g.uuid, "name": g.name} for g in groups]
 
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        urns = instance.get_urns()
+        if not urns:
+            return None
+        return representation
+
     class Meta:
         model = Contact
         fields = (
