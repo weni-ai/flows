@@ -93,11 +93,17 @@ class ContactsElasticSearchEndpoint(APIView):
             response = list(contacts.scan())
 
             for _ in range(from_index):
-                next(response, None)
+                try:
+                    next(response)
+                except StopIteration:
+                    break
 
-            results = [hit.to_dict() for hit in response]
+            results = []
 
-            results = results[:page_size]
+            for hit in response:
+                results.append(hit.to_dict())
+                if len(results) >= page_size:
+                    break
 
             total_results = len(results)
             total_pages = ceil(total_results / page_size)
