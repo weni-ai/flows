@@ -87,17 +87,10 @@ class ContactsElasticSearchEndpoint(APIView):
 
             from_index = (page_number - 1) * page_size
 
-            contacts = Search(using=client, index=index).query(
-                qs
-            )  # .params(size=page_size, from_=(page_number - 1) * page_size)
+            contacts = Search(using=client, index=index).query(qs).params(size=page_size, from_=from_index)
             response = list(contacts.scan())
-
-            for _ in range(from_index):
-                next(response, None)
-
+            
             results = [hit.to_dict() for hit in response]
-
-            results = results[:page_size]
 
             total_results = len(results)
             total_pages = ceil(total_results / page_size)
