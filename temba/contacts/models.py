@@ -236,34 +236,25 @@ class URN:
         return True
 
     @classmethod
-    def process_ddd_number(cls, urn, scheme, norm_path):
-        # List with DDD that not need to remove 9 before personal number
-        list_ddd = ["11", "12", "13", "14", "15", "16", "17", "18", "19", "21", "22", "23", "24", "27", "28"]
-        ddd = norm_path[2:4]
+    def verify_brazilian_number(cls, urn, scheme, norm_path):
+        contact_urn = ContactURN.objects.filter(identity=urn).first()
+        if contact_urn:
+            return norm_path
 
-        # When the len of norm_path = 13, it means that this number has a 9 before the personal number
-        if ddd not in list_ddd and len(norm_path) == 13:
-            norm_path = norm_path[:4] + norm_path[5:]
-            try:
-                with transaction.atomic():
-                    update_contact_urn = ContactURN.objects.filter(identity=urn).first()
-                    if update_contact_urn:
-                        update_contact_urn.path = norm_path
-                        update_contact_urn.scheme = scheme
-                        update_contact_urn.identity = scheme + ":" + norm_path
-                        if ContactURN.objects.filter(identity=update_contact_urn.identity):
-                            ContactURN.objects.filter(identity=urn).first().delete()
+        if len(norm_path) == 13:
+            # remove number 9
+            number = norm_path[:4] + norm_path[5:]
+            contact_urn = ContactURN.objects.filter(scheme=scheme, path=number).first()
 
-                        update_contact_urn.save(
-                            update_fields=(
-                                "path",
-                                "scheme",
-                                "identity",
-                            )
-                        )
+            if contact_urn:
+                return number
 
-            except Exception as e:
-                print(f"Error during update: {e}")
+        else:
+            # add number 9
+            number = norm_path[:4] + "9" + norm_path[4:]
+            contact_urn = ContactURN.objects.filter(scheme=scheme, path=number).first()
+            if contact_urn:
+                return number
 
         return norm_path
 
@@ -295,7 +286,7 @@ class URN:
             norm_path = norm_path.lower()
 
         elif scheme == cls.WHATSAPP_SCHEME and norm_path[0:2] == "55":
-            norm_path = cls.process_ddd_number(urn, scheme, norm_path)
+            norm_path = cls.verify_brazilian_number(urn, scheme, norm_path)
 
         return cls.from_parts(scheme, norm_path, query, display)
 

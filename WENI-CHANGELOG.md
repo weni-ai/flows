@@ -1,3 +1,7 @@
+3.6.7
+----------
+* Fix error import contact digit 9
+
 3.6.6
 ----------
 * Fix performance in contacts elastic endpoint

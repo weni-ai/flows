@@ -15,6 +15,15 @@ from temba.api.v2.elasticsearch.serializers import GetContactsSerializer
 from temba.contacts.models import Contact
 
 
+def get_pagination_links(base_url, page_number, total_pages):
+    links = {}
+    if page_number < total_pages:
+        links["next"] = f"{base_url}?page_number={page_number + 1}"
+    if page_number > 1:
+        links["previous"] = f"{base_url}?page_number={page_number - 1}"
+    return links
+
+
 class ContactsElasticSearchEndpoint(APIView):
     """
     This endpoint allows you to list the contacts of the project by elasticsearch.
@@ -80,7 +89,22 @@ class ContactsElasticSearchEndpoint(APIView):
             response = list(contacts.scan())
 
             results = [hit.to_dict() for hit in response]
-            return Response(results, status=status.HTTP_200_OK)
+
+            total_pages = (contacts.count() + page_size - 1) // page_size
+
+            pagination_links = get_pagination_links(base_url, page_number, total_pages)
+
+            data = {
+                "results": results,
+                "pagination": {
+                    "page_number": page_number,
+                    "page_size": page_size,
+                    "total_pages": total_pages,
+                    "links": pagination_links,
+                },
+            }
+
+            return Response(data, status=status.HTTP_200_OK)
 
         queryset = Contact.objects.filter(org=project.org).order_by("-modified_on")[:10]
         serializer = GetContactsSerializer(queryset, many=True)
