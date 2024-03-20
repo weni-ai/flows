@@ -1,3 +1,7 @@
+3.6.8
+----------
+* Chore: Bump floweditor to 2.11.1
+
 3.6.7
 ----------
 * Fix error import contact digit 9
