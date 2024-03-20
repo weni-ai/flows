@@ -1,3 +1,5 @@
+from math import ceil
+
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Q, Search
 from mozilla_django_oidc.contrib.drf import OIDCAuthentication
@@ -90,7 +92,8 @@ class ContactsElasticSearchEndpoint(APIView):
 
             results = [hit.to_dict() for hit in response]
 
-            total_pages = (contacts.count() + page_size - 1) // page_size
+            total_results = len(results)
+            total_pages = ceil(total_results / page_size)
 
             pagination_links = get_pagination_links(base_url, page_number, total_pages)
 
