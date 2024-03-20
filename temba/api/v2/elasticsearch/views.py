@@ -17,14 +17,12 @@ from temba.api.v2.elasticsearch.serializers import GetContactsSerializer
 from temba.contacts.models import Contact
 
 
-def get_pagination_links(page_number, total_pages):
+def get_pagination_links(base_url, page_number, total_pages, page_size):
     links = {}
-    url = reverse("api.v2.contacts_elastic")
-    print(url)
     if page_number < total_pages:
-        links["next"] = f"{url}?page_number={page_number + 1}"
+        links["next"] = f"{base_url}&page_number={page_number + 1}&page_size={page_size}"
     if page_number > 1:
-        links["previous"] = f"{url}?page_number={page_number - 1}"
+        links["previous"] = f"{base_url}&page_number={page_number - 1}&page_size={page_size}"
     return links
 
 
@@ -87,17 +85,25 @@ class ContactsElasticSearchEndpoint(APIView):
             page_number = int(params.get("page_number", 1))
             page_size = int(params.get("page_size", 10))
 
-            contacts = (
-                Search(using=client, index=index).query(qs).params(size=page_size, from_=(page_number - 1) * page_size)
-            )
+            from_index = (page_number - 1) * page_size
+
+            contacts = Search(using=client, index=index).query(
+                qs
+            )  # .params(size=page_size, from_=(page_number - 1) * page_size)
             response = list(contacts.scan())
 
+            for _ in range(from_index):
+                next(response, None)
+
             results = [hit.to_dict() for hit in response]
+
+            results = results[:page_size]
 
             total_results = len(results)
             total_pages = ceil(total_results / page_size)
 
-            pagination_links = get_pagination_links(page_number, total_pages)
+            new_url = request.build_absolute_uri()
+            pagination_links = get_pagination_links(new_url, page_number, total_pages, page_size)
 
             data = {
                 "results": results,
