@@ -87,15 +87,10 @@ class ContactsElasticSearchEndpoint(APIView):
 
             from_index = (page_number - 1) * page_size
 
-            contacts = Search(using=client, index=index).query(
-                qs
-            )  # .params(size=page_size, from_=(page_number - 1) * page_size)
-            response = list(contacts.scan())
-
-            for _ in range(from_index):
-                next(response, None)
-
-            results = [hit.to_dict() for hit in response]
+            contacts = Search(using=client, index=index).query(qs)  # .params(size=page_size, from_=(page_number - 1) * page_size)
+            response = contacts.scan()
+            
+            results = response[from_index:]
 
             results = results[:page_size]
 
@@ -106,7 +101,7 @@ class ContactsElasticSearchEndpoint(APIView):
             pagination_links = get_pagination_links(new_url, page_number, total_pages, page_size)
 
             data = {
-                "results": results,
+                "results": [hit.to_dict() for hit in results],
                 "pagination": {
                     "page_number": page_number,
                     "page_size": page_size,
