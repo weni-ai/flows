@@ -1071,19 +1071,6 @@ twisted = ["twisted"]
 
 [[package]]
 name = "platformdirs"
-version = "2.4.0"
-description = "A small Python module for determining appropriate platform-specific dirs, e.g. a \"user data dir\"."
-category = "main"
-optional = false
-python-versions = ">=3.7"
-
-[package.extras]
-gevent = ["gevent"]
-tornado = ["tornado"]
-twisted = ["twisted"]
-
-[[package]]
-name = "platformdirs"
 version = "4.1.0"
 description = "A small Python package for determining appropriate platform-specific dirs, e.g. a \"user data dir\"."
 category = "main"
@@ -1742,11 +1729,11 @@ protobuf = ">=3.17.3,<4.0.0"
 
 [[package]]
 name = "weni-rp-apps"
-version = "2.7.11a3"
+version = "2.7.11a5"
 description = "Weni apps for Rapidpro Platform"
 category = "main"
 optional = false
-python-versions = ">=3.7,<4.0"
+python-versions = "<4.0,>=3.7"
 
 [package.dependencies]
 django-csp = ">=3.7,<4.0"
@@ -1807,7 +1794,7 @@ testing = ["big-o", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "11ae70e5ee72f5edf505812ad3855dadda94034791b04af1191471d57e6e3ba9"
+content-hash = "b422a5724cafa393eacf978b0407894683e925a030b8d49a89a70f5d08b847d0"
 
 [metadata.files]
 amqp = [
@@ -2890,8 +2877,8 @@ weni-protobuffers = [
     {file = "weni_protobuffers-1.2.18-py3-none-any.whl", hash = "sha256:f398af8de476d7d129a10fc677cb287623512775130b9ee15cc9953dbbd80807"},
 ]
 weni-rp-apps = [
-    {file = "weni_rp_apps-2.7.11a3-py3-none-any.whl", hash = "sha256:e9b9201fbdccd67e9471b633682fc8c6996c81c4732f029f9b16d881b5f5744a"},
-    {file = "weni_rp_apps-2.7.11a3.tar.gz", hash = "sha256:bea670fbef0e33a7032a3300f7115422efb607ec626ad63f89ac213164c1f0cb"},
+    {file = "weni_rp_apps-2.7.11a5-py3-none-any.whl", hash = "sha256:202e1fe5bf6685731e0d658c579014392855e56bfc383b7a12554e50ca673885"},
+    {file = "weni_rp_apps-2.7.11a5.tar.gz", hash = "sha256:86f5f0f2400be72290671d4a08708e6fd37888d066cb0b2482e511b81e1839e6"},
 ]
 wrapt = [
     {file = "wrapt-1.16.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:ffa565331890b90056c01db69c0fe634a776f8019c143a5ae265f9c6bc4bd6d4"},
