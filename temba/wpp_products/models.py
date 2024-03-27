@@ -69,9 +69,9 @@ class Catalog(models.Model):
 
 class Product(models.Model):
     uuid = models.UUIDField(default=uuid4)
-    facebook_product_id = models.CharField(max_length=30)
+    facebook_product_id = models.CharField(max_length=100)
     title = models.CharField(max_length=200)
-    product_retailer_id = models.CharField(max_length=50)
+    product_retailer_id = models.CharField(max_length=100)
     catalog = models.ForeignKey(Catalog, on_delete=models.CASCADE, related_name="products")
     created_on = models.DateTimeField(default=timezone.now)
     modified_on = models.DateTimeField(default=timezone.now)
