@@ -68,8 +68,6 @@ class Catalog(models.Model):
 
 
 class Product(models.Model):
-    AVAILABILITY_CHOICES = [("in stock", "in stock"), ("out of stock", "out of stock")]
-
     uuid = models.UUIDField(default=uuid4)
     facebook_product_id = models.CharField(max_length=30)
     title = models.CharField(max_length=200)

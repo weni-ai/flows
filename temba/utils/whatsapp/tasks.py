@@ -273,15 +273,8 @@ def update_local_catalogs(facebook_catalog: FacebookCatalog, channel: Channel, c
     Catalog.trim(channel, seen)
 
 
-# app = Celery("temba")
-# app.task
-
-
 @shared_task(name="update_local_products_vtex_task")
 def update_local_products_vtex_task(catalog_id, products_data, channel_id):
-    # @app.task(name="update_local_products_vtex_task")
-    # def update_local_products_vtex_task(**kwargs):
-    #
     catalog = Catalog.objects.get(id=catalog_id)
     channel = Channel.objects.get(id=channel_id)
 
