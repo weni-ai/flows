@@ -28,6 +28,7 @@ from .tasks import (
     update_is_active_catalog,
     update_local_catalogs,
     update_local_products_non_vtex,
+    update_local_products_vtex_task,
     update_local_templates,
 )
 
@@ -417,6 +418,22 @@ class UpdateLocalProductsTest(TembaTest):
 
         self.assertEqual(Product.objects.count(), 2)
         self.assertEqual(Product.objects.filter(catalog=catalog).count(), 2)
+
+    def test_update_local_products_vtex_task(self):
+        catalog = Catalog(name="Test Catalog2", org=self.org, channel=self.channel, facebook_catalog_id=2)
+
+        catalog.channel.get_type().code = "WAC"
+        catalog.save()
+
+        products_data = [
+            {"id": 3, "title": "Product C", "retailer_id": 123, "availability": "in stock"},
+            {"id": 4, "title": "Product D", "retailer_id": 456, "availability": "out of stock"},
+        ]
+
+        update_local_products_vtex_task(catalog.id, products_data, self.channel.id)
+
+        self.assertEqual(Product.objects.count(), 1)
+        self.assertEqual(Product.objects.filter(catalog=catalog).count(), 1)
 
 
 class RefreshWhatsappCatalogAndProductsTestCase(TembaTest):
