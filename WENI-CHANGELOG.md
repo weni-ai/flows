@@ -1,3 +1,43 @@
+3.6.9
+----------
+* Chore: Bump floweditor to 2.12.0
+
+3.6.8
+----------
+* Chore: Bump floweditor to 2.11.1
+
+3.6.7
+----------
+* Fix error import contact digit 9
+
+3.6.6
+----------
+* Fix performance in contacts elastic endpoint
+* Update rp-apps version to 2.7.11
+
+3.6.5
+----------
+* Hotfix using 3.6.2 version to adjust permission in contact_elastic endpoint
+
+3.6.4
+----------
+* Change urn return in elastic serializer
+
+3.6.3
+----------
+* Add condition when not receive parameter
+* Update rp-apps version to 2.7.10
+
+3.6.2
+----------
+* Add filter to contact_templates endpoint
+* Endpoint to get contacts elasticsearch
+
+3.6.1
+----------
+* Endpoint contacts_lean
+* Disable template instead deleting
+
 3.6.0
 ----------
 * Chore: Bump floweditor to 2.11.0

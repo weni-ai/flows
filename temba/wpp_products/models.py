@@ -83,8 +83,21 @@ class Product(models.Model):
         Product.objects.filter(catalog=catalog).exclude(id__in=ids).delete()
 
     @classmethod
+    def trim_vtex(cls, catalog, existing):
+        ids = [tc.id for tc in existing]
+
+        Product.objects.filter(catalog=catalog).filter(id__in=ids).delete()
+
+    @classmethod
     def get_or_create(
-        cls, facebook_product_id, title, product_retailer_id, catalog, name, channel, facebook_catalog_id
+        cls,
+        facebook_product_id,
+        title,
+        product_retailer_id,
+        catalog,
+        name,
+        channel,
+        facebook_catalog_id,
     ):
         existing = Product.objects.filter(catalog=catalog, facebook_product_id=facebook_product_id).first()
 

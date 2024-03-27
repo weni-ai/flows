@@ -664,6 +664,41 @@ class ContactWriteSerializer(WriteSerializer):
         return self.instance
 
 
+class ContactLeanReadSerializer(ReadSerializer):
+    name = serializers.SerializerMethodField()
+    language = serializers.SerializerMethodField()
+    blocked = serializers.SerializerMethodField()
+    stopped = serializers.SerializerMethodField()
+    created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    modified_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    last_seen_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+
+    def get_name(self, obj):
+        return obj.name if obj.is_active else None
+
+    def get_language(self, obj):
+        return obj.language if obj.is_active else None
+
+    def get_blocked(self, obj):
+        return obj.status == Contact.STATUS_BLOCKED if obj.is_active else None
+
+    def get_stopped(self, obj):
+        return obj.status == Contact.STATUS_STOPPED if obj.is_active else None
+
+    class Meta:
+        model = Contact
+        fields = (
+            "uuid",
+            "name",
+            "language",
+            "blocked",
+            "stopped",
+            "created_on",
+            "modified_on",
+            "last_seen_on",
+        )
+
+
 class ContactFieldReadSerializer(ReadSerializer):
     VALUE_TYPES = {
         ContactField.TYPE_TEXT: "text",
@@ -907,6 +942,18 @@ class ContactTemplateSerializer(ReadSerializer):
             "modified_on",
             "last_seen_on",
         )
+
+
+class FilterTemplateSerializer(ReadSerializer):
+    template = serializers.CharField()
+    page_size = serializers.IntegerField(default=10)
+    offset = serializers.IntegerField(default=0)
+    before = serializers.DateField(required=False)
+    after = serializers.DateField(required=False)
+
+    class Meta:
+        model = Msg
+        fields = ("template", "page_size", "offset", "before", "after")
 
 
 class FlowReadSerializer(ReadSerializer):
