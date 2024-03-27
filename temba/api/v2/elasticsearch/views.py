@@ -1,3 +1,5 @@
+from math import ceil
+
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Q, Search
 from mozilla_django_oidc.contrib.drf import OIDCAuthentication
@@ -13,6 +15,15 @@ from django.urls import reverse
 
 from temba.api.v2.elasticsearch.serializers import GetContactsSerializer
 from temba.contacts.models import Contact
+
+
+def get_pagination_links(base_url, page_number, total_pages, page_size):  # pragma: no cover
+    links = {}
+    if page_number < total_pages:
+        links["next"] = f"{base_url}&page_number={page_number + 1}&page_size={page_size}"
+    if page_number > 1:
+        links["previous"] = f"{base_url}&page_number={page_number - 1}&page_size={page_size}"
+    return links
 
 
 class ContactsElasticSearchEndpoint(APIView):
@@ -74,14 +85,35 @@ class ContactsElasticSearchEndpoint(APIView):
             page_number = int(params.get("page_number", 1))
             page_size = int(params.get("page_size", 10))
 
-            contacts = (
-                Search(using=client, index=index).query(qs).params(size=page_size, from_=(page_number - 1) * page_size)
-            )
+            from_index = (page_number - 1) * page_size
+
+            contacts = Search(using=client, index=index).query(qs)
             response = list(contacts.scan())
+
+            for _ in range(from_index):
+                next(response, None)
 
             results = [hit.to_dict() for hit in response]
 
-            return Response(results, status=status.HTTP_200_OK)
+            results = results[:page_size]
+
+            total_results = len(results)
+            total_pages = ceil(total_results / page_size)
+
+            new_url = request.build_absolute_uri()
+            pagination_links = get_pagination_links(new_url, page_number, total_pages, page_size)
+
+            data = {
+                "results": results,
+                "pagination": {
+                    "page_number": page_number,
+                    "page_size": page_size,
+                    "total_pages": total_pages,
+                    "links": pagination_links,
+                },
+            }
+
+            return Response(data, status=status.HTTP_200_OK)
 
         queryset = Contact.objects.filter(org=project.org).order_by("-modified_on")[:10]
         serializer = GetContactsSerializer(queryset, many=True)
