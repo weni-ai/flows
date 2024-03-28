@@ -1,3 +1,20 @@
+3.7.0
+----------
+* Revert "fix error import contact digit 9"
+* Change endpoint to update products vtex to be a celery task
+* Fix pagination error and urns list empty
+* Add publisher in EDA
+* Update max length in product model fields
+* Update rp-apps version to 2.8.0
+
+3.6.9
+----------
+* Chore: Bump floweditor to 2.12.0
+
+3.6.8
+----------
+* Chore: Bump floweditor to 2.11.1
+
 3.6.7
 ----------
 * Fix error import contact digit 9
