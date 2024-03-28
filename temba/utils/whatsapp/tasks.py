@@ -291,7 +291,7 @@ def update_local_products_vtex_task(catalog_id, products_data, channel_id):
             facebook_catalog_id=catalog.facebook_catalog_id,
         )
 
-        if product["availability"] == "out of stock":
+        if product["availability"] != "in stock":
             seen.append(new_product)
 
         else:
@@ -376,6 +376,7 @@ def refresh_whatsapp_catalog_and_products():
 
         except Exception as e:
             logger.error(f"Error refreshing WhatsApp catalog and products: {str(e)}", exc_info=True)
+
 
 def sent_products_to_sentenx(products):
     sentenx_url = settings.SENTENX_URL

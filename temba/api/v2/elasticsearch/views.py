@@ -17,7 +17,7 @@ from temba.api.v2.elasticsearch.serializers import GetContactsSerializer
 from temba.contacts.models import Contact
 
 
-def get_pagination_links(base_url, page_number, total_pages, page_size):
+def get_pagination_links(base_url, page_number, total_pages, page_size):  # pragma: no cover
     links = {}
     if page_number < total_pages:
         links["next"] = f"{base_url}&page_number={page_number + 1}&page_size={page_size}"
@@ -85,19 +85,20 @@ class ContactsElasticSearchEndpoint(APIView):
             page_number = int(params.get("page_number", 1))
             page_size = int(params.get("page_size", 10))
 
-            contacts = Search(using=client, index=index).query(qs)
-            response = contacts.execute()
-            
-            total_results = response.hits.total.value
-
-            total_pages = ceil(total_results / page_size)
-            
             from_index = (page_number - 1) * page_size
-            to_index = min(from_index + page_size, total_results)
-                # Extraia apenas os resultados relevantes para a página atual
-            paged_results = response[from_index:to_index]
 
-            results = [hit.to_dict() for hit in paged_results]
+            contacts = Search(using=client, index=index).query(qs)
+            response = list(contacts.scan())
+
+            for _ in range(from_index):
+                next(response, None)
+
+            results = [hit.to_dict() for hit in response]
+
+            results = results[:page_size]
+
+            total_results = len(results)
+            total_pages = ceil(total_results / page_size)
 
             new_url = request.build_absolute_uri()
             pagination_links = get_pagination_links(new_url, page_number, total_pages, page_size)

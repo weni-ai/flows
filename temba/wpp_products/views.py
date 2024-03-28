@@ -64,31 +64,3 @@ class ProductViewSet(viewsets.ViewSet, InternalGenericViewSet):
         update_local_products_vtex_task.delay(catalog_object.pk, products, self.get_object().pk)
 
         return Response(status=status.HTTP_200_OK)
-
-
-class ProductViewSet(viewsets.ViewSet, InternalGenericViewSet):
-    def get_object(self) -> Channel:
-        channel_uuid = self.request.data.get("channel_uuid")
-        return get_object_or_404(Channel, uuid=channel_uuid)
-
-    @action(detail=False, methods=["POST"], url_path="update-products")
-    def update_products(self, request, *args, **kwargs):
-        catalog = request.data.get("catalog")
-        products = request.data.get("products")
-
-        catalog_object = Catalog.objects.filter(facebook_catalog_id=catalog.get("facebook_catalog_id")).first()
-        if not catalog_object:
-            catalog_object = Catalog.get_or_create(
-                catalog.get("name"), self.get_object(), False, catalog.get("facebook_catalog_id")
-            )
-        # app = Celery("temba")
-
-        # app.send_task(
-        #             "update_local_products_vtex_task",
-        #             kwargs={
-        #                 "catalog":catalog.get("name")
-        #             }
-        #         )
-        update_local_products_vtex_task.delay(catalog_object.pk, products, self.get_object().pk)
-
-        return Response(status=status.HTTP_200_OK)
