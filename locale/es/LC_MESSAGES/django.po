@@ -7923,3 +7923,7 @@ msgstr "Datos en hoja de cálculo de Excel sobre Project Webhooks:"
 
 msgid "Data in the Excel spreadsheet about Project template messages:"
 msgstr "Datos en la hoja de cálculo de Excel sobre mensajes de plantilla de Proyecto:"
+
+#, python-brace-format
+msgid "Selected groups have {group_totals_sum} contacts in total, which exceeds the maximum of {max_group_sum_size} contacts. Please select less or smaller groups and try again."
+msgstr "Los grupos seleccionados tienen {group_totals_sum} contactos en total, lo que excede el máximo de {max_group_sum_size} contactos. Seleccione menos grupos o más pequeños e inténtelo de nuevo."
