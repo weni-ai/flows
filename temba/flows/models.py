@@ -619,6 +619,8 @@ class Flow(TembaModel):
         self.save_revision(user, cloned_definition)
 
     def archive(self, user):
+        from weni.activities.signals import create_recent_activity
+
         self.is_archived = True
         self.modified_by = user
         self.save(update_fields=("is_archived", "modified_by", "modified_on"))
@@ -629,6 +631,8 @@ class Flow(TembaModel):
         # archive our triggers as well
         for trigger in self.triggers.all():
             trigger.archive(user)
+
+        create_recent_activity(instance=self, created=False, delete=True)  # pragma: no cover
 
     def restore(self, user):
         self.is_archived = False
