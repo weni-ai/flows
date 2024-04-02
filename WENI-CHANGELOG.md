@@ -1,3 +1,7 @@
+3.7.2
+----------
+* Chore: Bump floweditor to 2.13.1
+
 3.7.1
 ----------
 * Block manual broadcast for large groups
