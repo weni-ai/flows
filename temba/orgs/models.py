@@ -385,6 +385,8 @@ class Org(SmartModel):
         help_text=_("The parent org that manages this org"),
     )
 
+    brain_on = models.BooleanField(default=False, help_text=_("Whether this organization use router"))
+
     # when this org was released and when it was actually deleted
     released_on = models.DateTimeField(null=True)
     deleted_on = models.DateTimeField(null=True)
