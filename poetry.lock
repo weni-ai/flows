@@ -1729,7 +1729,7 @@ protobuf = ">=3.17.3,<4.0.0"
 
 [[package]]
 name = "weni-rp-apps"
-version = "2.7.11"
+version = "2.8.0a2"
 description = "Weni apps for Rapidpro Platform"
 category = "main"
 optional = false
@@ -1794,7 +1794,7 @@ testing = ["big-o", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "983b6fc42de2dbedfb239bd520cd3460a76312944a4e62a4377409f98b527734"
+content-hash = "d80574d180bc4837326626830e771e10539e7b1328243bcf535075be28920eba"
 
 [metadata.files]
 amqp = [
@@ -2411,10 +2411,6 @@ pika = [
     {file = "pika-1.3.2-py3-none-any.whl", hash = "sha256:0779a7c1fafd805672796085560d290213a465e4f6f76a6fb19e378d8041a14f"},
     {file = "pika-1.3.2.tar.gz", hash = "sha256:b2a327ddddf8570b4965b3576ac77091b850262d34ce8c1d8cb4e4146aa4145f"},
 ]
-pika = [
-    {file = "pika-1.3.2-py3-none-any.whl", hash = "sha256:0779a7c1fafd805672796085560d290213a465e4f6f76a6fb19e378d8041a14f"},
-    {file = "pika-1.3.2.tar.gz", hash = "sha256:b2a327ddddf8570b4965b3576ac77091b850262d34ce8c1d8cb4e4146aa4145f"},
-]
 platformdirs = [
     {file = "platformdirs-4.1.0-py3-none-any.whl", hash = "sha256:11c8f37bcca40db96d8144522d925583bdb7a31f7b0e37e3ed4318400a8e2380"},
     {file = "platformdirs-4.1.0.tar.gz", hash = "sha256:906d548203468492d432bcb294d4bc2fff751bf84971fbb2c10918cc206ee420"},
@@ -2881,8 +2877,8 @@ weni-protobuffers = [
     {file = "weni_protobuffers-1.2.18-py3-none-any.whl", hash = "sha256:f398af8de476d7d129a10fc677cb287623512775130b9ee15cc9953dbbd80807"},
 ]
 weni-rp-apps = [
-    {file = "weni_rp_apps-2.7.11-py3-none-any.whl", hash = "sha256:5e2fd86bdbd9538761ead394425d8021c412bee4aead3ff69f5d56c7c886d367"},
-    {file = "weni_rp_apps-2.7.11.tar.gz", hash = "sha256:3f2e1bc9d2105caa002137b32078633c75b2961257db59fe147884040fa3f99f"},
+    {file = "weni_rp_apps-2.8.0a2-py3-none-any.whl", hash = "sha256:71ad5817c41205c9dde14a7e9110ab725dadb6ab174af7a98c98ebd4d1f4faf0"},
+    {file = "weni_rp_apps-2.8.0a2.tar.gz", hash = "sha256:132cba4638c40bcfe3361cc332af62864444a0327698c3440c4b7762162c1c0d"},
 ]
 wrapt = [
     {file = "wrapt-1.16.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:ffa565331890b90056c01db69c0fe634a776f8019c143a5ae265f9c6bc4bd6d4"},
