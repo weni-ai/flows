@@ -35,7 +35,7 @@ from django.views.generic import FormView
 from temba import mailroom
 from temba.archives.models import Archive
 from temba.channels.models import Channel
-from temba.contacts.models import URN, ContactField, ContactGroup
+from temba.contacts.models import URN, ContactField, ContactGroup, ContactGroupCount
 from temba.contacts.search import SearchException, parse_query
 from temba.contacts.search.omnibox import omnibox_deserialize
 from temba.flows.models import Flow, FlowRevision, FlowRun, FlowRunCount, FlowSession, FlowStart
@@ -1928,6 +1928,18 @@ class FlowCRUDL(SmartCRUDL):
                         self.add_error("omnibox", _("This field is required."))
                     elif mode == self.MODE_QUERY and not query:
                         self.add_error("query", _("This field is required."))
+
+                    max_group_sum_size = getattr(settings, "MANUAL_FLOW_BROADCAST_MAX_GROUP_SUM_SIZE", 0)
+                    if max_group_sum_size:
+                        group_totals = ContactGroupCount.get_totals(omnibox.get("groups", []))
+                        group_totals_sum = sum(group_totals.values())
+                        if group_totals_sum > max_group_sum_size:
+                            self.add_error(
+                                "omnibox",
+                                _(
+                                    f"Selected groups have {group_totals_sum} contacts in total, which exceeds the maximum of {max_group_sum_size} contacts. Please select less or smaller groups and try again.",
+                                ),
+                            )
 
                 return cleaned_data
 

@@ -1,3 +1,7 @@
+3.7.1
+----------
+* Block manual broadcast for large groups
+
 3.7.0
 ----------
 * Revert "fix error import contact digit 9"

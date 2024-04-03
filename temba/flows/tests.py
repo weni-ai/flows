@@ -2575,6 +2575,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertEqual(404, response.status_code)
 
     @mock_mailroom
+    @override_settings(MANUAL_FLOW_BROADCAST_MAX_GROUP_SUM_SIZE=1)
     def test_broadcast(self, mr_mocks):
         contact = self.create_contact("Bob", phone="+593979099111")
         flow = self.create_flow()
@@ -2632,6 +2633,19 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
             broadcast_url,
             {"mode": "select", "omnibox": [], "exclude_in_other": False, "exclude_reruns": False},
             form_errors={"omnibox": "This field is required."},
+            object_unchanged=flow,
+        )
+
+        # try to create a selection based flow start with an exceeding group sum count
+        contact2 = self.create_contact("Alice", phone="+593979099112")
+        group = self.create_group("Group of Two", contacts=[contact, contact2])
+        selection = json.dumps({"id": group.uuid, "name": group.name, "type": "group"})
+        self.assertUpdateSubmit(
+            broadcast_url,
+            {"mode": "select", "omnibox": selection, "exclude_in_other": False, "exclude_reruns": False},
+            form_errors={
+                "omnibox": "Selected groups have 2 contacts in total, which exceeds the maximum of 1 contacts. Please select less or smaller groups and try again."
+            },
             object_unchanged=flow,
         )
 
