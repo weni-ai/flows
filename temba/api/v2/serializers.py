@@ -1721,9 +1721,6 @@ class WorkspaceReadSerializer(ReadSerializer):
     def get_date_style(self, obj):
         return self.DATE_STYLES.get(obj.date_format)
 
-    def get_credits(self, obj):
-        return {"used": obj.get_credits_used(), "remaining": obj.get_credits_remaining()}
-
     def get_anon(self, obj):
         return obj.is_anon
 
