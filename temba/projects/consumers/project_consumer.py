@@ -21,6 +21,7 @@ class ProjectConsumer(EDAConsumer):
                 template_type_uuid=body.get("template_type_uuid"),
                 timezone=body.get("timezone"),
                 description=body.get("description"),
+                brain_on=body.get("brain_on", False),
             )
 
             flow_setup_handler = FlowSetupHandlerUseCase()
