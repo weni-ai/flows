@@ -1,3 +1,9 @@
+3.7.2
+----------
+* Deactivate topup credits tasks
+* Add brain_on in create project consumer
+* Add brain_on field in Org model
+
 3.7.1
 ----------
 * Block manual broadcast for large groups
