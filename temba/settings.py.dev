@@ -150,3 +150,5 @@ if USE_EDA:
     EDA_BROKER_PASSWORD = os.environ.get("EDA_BROKER_PASSWORD", default="guest")
 
 BOTHUB_SYNC_INTENTS_URL = os.environ.get("BOTHUB_SYNC_INTENTS_URL", default="https://nlp.bothub.it/info/")
+
+ROUTER_FIXED_ACCESS_TOKEN = os.environ.get("ROUTER_FIXED_ACCESS_TOKEN", default="")
