@@ -1,8 +1,17 @@
-3.7.2
+3.7.4
 ----------
+* Fix overwritten floweditor version back to 2.13.0
+
+3.7.3
+----------
+⚠️ Floweditor rolled back to 2.12.0
 * Deactivate topup credits tasks
 * Add brain_on in create project consumer
 * Add brain_on field in Org model
+
+3.7.2
+----------
+* Chore: Bump floweditor to 2.13.0
 
 3.7.1
 ----------
