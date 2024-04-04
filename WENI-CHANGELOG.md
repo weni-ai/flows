@@ -1,3 +1,7 @@
+3.7.5
+----------
+* Remove credits check from sidebar
+
 3.7.4
 ----------
 * Fix overwritten floweditor version back to 2.13.0
