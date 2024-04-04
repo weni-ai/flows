@@ -1,3 +1,7 @@
+3.7.6
+----------
+* Set fixed credits calculation
+
 3.7.5
 ----------
 * Remove credits check from sidebar
