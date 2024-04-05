@@ -1,3 +1,7 @@
+3.7.7
+----------
+* Allow adding classifiers
+
 3.7.6
 ----------
 * Set fixed credits calculation
