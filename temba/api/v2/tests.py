@@ -3527,7 +3527,6 @@ class APITest(TembaTest):
                 "primary_language": None,
                 "timezone": "Africa/Kigali",
                 "date_style": "day_first",
-                "credits": {"used": 0, "remaining": 1000},
                 "anon": False,
             },
         )
@@ -3545,7 +3544,6 @@ class APITest(TembaTest):
                 "primary_language": "eng",
                 "timezone": "Africa/Kigali",
                 "date_style": "day_first",
-                "credits": {"used": 0, "remaining": 1000},
                 "anon": False,
             },
         )

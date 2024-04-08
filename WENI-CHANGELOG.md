@@ -1,3 +1,51 @@
+3.7.7
+----------
+* Allow adding classifiers
+
+3.7.6
+----------
+* Set fixed credits calculation
+
+3.7.5
+----------
+* Remove credits check from sidebar
+
+3.7.4
+----------
+* Fix overwritten floweditor version back to 2.13.0
+
+3.7.3
+----------
+⚠️ Floweditor rolled back to 2.12.0
+* Deactivate topup credits tasks
+* Add brain_on in create project consumer
+* Add brain_on field in Org model
+
+3.7.2
+----------
+* Chore: Bump floweditor to 2.13.0
+
+3.7.1
+----------
+* Block manual broadcast for large groups
+
+3.7.0
+----------
+* Revert "fix error import contact digit 9"
+* Change endpoint to update products vtex to be a celery task
+* Fix pagination error and urns list empty
+* Add publisher in EDA
+* Update max length in product model fields
+* Update rp-apps version to 2.8.0
+
+3.6.9
+----------
+* Chore: Bump floweditor to 2.12.0
+
+3.6.8
+----------
+* Chore: Bump floweditor to 2.11.1
+
 3.6.7
 ----------
 * Fix error import contact digit 9

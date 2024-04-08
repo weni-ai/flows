@@ -499,5 +499,9 @@ if USE_EDA:
     EDA_BROKER_PORT = env.int("EDA_BROKER_PORT", default=5672)
     EDA_BROKER_USER = env("EDA_BROKER_USER", default="guest")
     EDA_BROKER_PASSWORD = env("EDA_BROKER_PASSWORD", default="guest")
+    EDA_WAIT_TIME_RETRY = env.int("EDA_WAIT_TIME_RETRY", default=5)
 
 BOTHUB_SYNC_INTENTS_URL = env("BOTHUB_SYNC_INTENTS_URL", default="https://nlp.bothub.it/info/")
+
+# Max group sum size allowed for manual flow broadcasts
+MANUAL_FLOW_BROADCAST_MAX_GROUP_SUM_SIZE = env.int("MANUAL_FLOW_BROADCAST_MAX_GROUP_SUM_SIZE", default=0)
