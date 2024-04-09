@@ -96,6 +96,63 @@ def _calculate_variable_count(content):
     return count
 
 
+def update_template_status(value, template):
+    external_id = value.get("message_template_id")
+    template_status = value.get("event")
+
+    if template_status == "APPROVED":
+        template_status = "A"
+
+    elif template_status == "REJECTED":
+        template_status = "R"
+
+    elif template_status == "PENDING":
+        template_status = "P"
+
+    template_object = Template.objects.get(id=template)
+    translation = template_object.translations.filter(external_id=external_id)
+
+    if translation:
+        for trans in translation:
+            trans.status = template_status
+
+            trans.save(update_fields=["status"])
+        return True
+
+    else:
+        for translation in template_object.translations.all():
+            translation.status = template_status
+            translation.save(update_fields=["status"])
+        return True
+
+
+def process_event(field, value, template):
+    if field == "message_template_status_update":
+        update_template_status(value, template)
+
+    elif field == "template_category_update":
+        pass
+
+    elif field == "message_template_quality_update":
+        pass
+
+
+def update_template_sync(template_id, webhook):
+    allowed_event_types = [
+        "message_template_status_update",
+    ]
+
+    for entry in webhook["entry"]:
+        for change in entry.get("changes", []):
+            field = change.get("field")
+            value = change.get("value")
+            if field in allowed_event_types:
+                process_event(field, value, template_id)
+
+            else:
+                logger.info(f"Event: {field}, not mapped to usage")
+
+
 def update_local_templates(channel, templates_data):
     channel_namespace = channel.config.get("fb_namespace", "")
     # run through all our templates making sure they are present in our DB
