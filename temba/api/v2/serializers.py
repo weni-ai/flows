@@ -1703,7 +1703,6 @@ class WorkspaceReadSerializer(ReadSerializer):
     primary_language = serializers.SerializerMethodField()
     timezone = serializers.SerializerMethodField()
     date_style = serializers.SerializerMethodField()
-    credits = serializers.SerializerMethodField()
     anon = serializers.SerializerMethodField()
 
     def get_country(self, obj):
@@ -1721,9 +1720,6 @@ class WorkspaceReadSerializer(ReadSerializer):
     def get_date_style(self, obj):
         return self.DATE_STYLES.get(obj.date_format)
 
-    def get_credits(self, obj):
-        return {"used": obj.get_credits_used(), "remaining": obj.get_credits_remaining()}
-
     def get_anon(self, obj):
         return obj.is_anon
 
@@ -1737,7 +1733,6 @@ class WorkspaceReadSerializer(ReadSerializer):
             "primary_language",
             "timezone",
             "date_style",
-            "credits",
             "anon",
         )
 
