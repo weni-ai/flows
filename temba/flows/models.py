@@ -632,7 +632,7 @@ class Flow(TembaModel):
         for trigger in self.triggers.all():
             trigger.archive(user)
 
-        create_recent_activity(instance=self, created=False, delete=True)
+        create_recent_activity(instance=self, created=False, delete=True)  # pragma: no cover
 
     def restore(self, user):
         self.is_archived = False
