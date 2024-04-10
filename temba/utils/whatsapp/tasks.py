@@ -115,8 +115,10 @@ def update_template_status(value, template):
     translation = template_object.translations.filter(external_id=external_id)
 
     if translation:
-        translation.status = template_status
-        translation.save(update_fields=["status"])
+        for trans in translation:
+            trans.status = template_status
+
+            trans.save(update_fields=["status"])
         return True
 
     else:
