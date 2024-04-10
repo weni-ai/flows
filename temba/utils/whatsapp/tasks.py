@@ -100,14 +100,11 @@ def update_template_status(value, template):
     external_id = value.get("message_template_id")
     template_status = value.get("event")
 
-    if template_status == "APPROVED":
-        template_status = "A"
+    if template_status not in STATUS_MAPPING:
+        logger.error(f"Status not found in flows: {template_status}", exc_info=True)
+        raise ValueError("Status not found in flows")
 
-    elif template_status == "REJECTED":
-        template_status = "R"
-
-    elif template_status == "PENDING":
-        template_status = "P"
+    template_status = STATUS_MAPPING[template_status]
 
     template_object = Template.objects.get(id=template)
     translation = template_object.translations.filter(external_id=external_id)
