@@ -116,7 +116,7 @@ def update_template_status(value, template):
 
     if translation:
         translation.status = template_status
-        translation.save("status")
+        translation.save(update_fields=["status"])
         return True
 
     else:
