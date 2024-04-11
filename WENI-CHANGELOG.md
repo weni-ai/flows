@@ -1,3 +1,8 @@
+3.7.10
+----------
+* Update weni-rp-apps to 2.8.2
+* Call recent activities when flow is archived
+
 3.7.9
 ----------
 * Create internal endpoints that allows to create flow starts and broadcasts
