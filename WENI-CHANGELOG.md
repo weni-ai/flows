@@ -1,3 +1,13 @@
+3.7.9
+----------
+* Create internal endpoints that allows to create flow starts and broadcasts
+
+3.7.8
+----------
+* Update weni-rp-apps to 2.8.1
+* Consumer to update brain on
+* Endpoint to update template status
+
 3.7.7
 ----------
 * Allow adding classifiers
