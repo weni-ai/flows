@@ -1,10 +1,10 @@
 from rest_framework import serializers
+from weni.serializers import fields as weni_serializers
 
 from temba.api.v2 import fields
-from temba.utils import on_transaction_commit
-from temba.msgs.models import Broadcast, Msg
-from weni.serializers import fields as weni_serializers
 from temba.api.v2.serializers import WriteSerializer
+from temba.msgs.models import Broadcast, Msg
+from temba.utils import on_transaction_commit
 
 
 class UserAndProjectSerializer(serializers.Serializer):
