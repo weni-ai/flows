@@ -1,6 +1,44 @@
+3.7.10
+----------
+* Update weni-rp-apps to 2.8.2
+* Call recent activities when flow is archived
+
+3.7.9
+----------
+* Create internal endpoints that allows to create flow starts and broadcasts
+
+3.7.8
+----------
+* Update weni-rp-apps to 2.8.1
+* Consumer to update brain on
+* Endpoint to update template status
+
+3.7.7
+----------
+* Allow adding classifiers
+
+3.7.6
+----------
+* Set fixed credits calculation
+
+3.7.5
+----------
+* Remove credits check from sidebar
+
+3.7.4
+----------
+* Fix overwritten floweditor version back to 2.13.0
+
+3.7.3
+----------
+⚠️ Floweditor rolled back to 2.12.0
+* Deactivate topup credits tasks
+* Add brain_on in create project consumer
+* Add brain_on field in Org model
+
 3.7.2
 ----------
-* Chore: Bump floweditor to 2.13.1
+* Chore: Bump floweditor to 2.13.0
 
 3.7.1
 ----------

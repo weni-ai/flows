@@ -22,6 +22,7 @@ class ProjectCreationDTO:
     timezone: str
     template_type_uuid: str
     description: str
+    brain_on: bool
 
 
 class ProjectCreationUseCase:
@@ -41,6 +42,7 @@ class ProjectCreationUseCase:
                 created_by=user,
                 modified_by=user,
                 plan="infinity",
+                brain_on=project_dto.brain_on,
                 config={
                     "is_template": project_dto.is_template,
                     "description": project_dto.description,
