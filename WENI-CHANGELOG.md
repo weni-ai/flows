@@ -1,3 +1,7 @@
+3.7.11
+----------
+* Chore: Bump floweditor to 2.13.1
+
 3.7.10
 ----------
 * Update weni-rp-apps to 2.8.2
