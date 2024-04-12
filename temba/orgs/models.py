@@ -387,6 +387,8 @@ class Org(SmartModel):
 
     brain_on = models.BooleanField(default=False, help_text=_("Whether this organization use router"))
 
+    proj_uuid = models.UUIDField(null=True, blank=True)
+
     # when this org was released and when it was actually deleted
     released_on = models.DateTimeField(null=True)
     deleted_on = models.DateTimeField(null=True)

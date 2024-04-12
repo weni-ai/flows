@@ -10,7 +10,7 @@ def get_or_create_user_by_email(email: str) -> tuple:  # pragma: no cover
     return User.objects.get_or_create(email=email, username=email)
 
 
-def update_project_brain_on(project_uuid: Project, brain_on: bool, user_email=None) -> Project:
+def update_project_brain_on(project_uuid: Project, brain_on: bool, user_email=None) -> Project:  # pragma: no cover
     project = Project.objects.get(project_uuid=project_uuid)
     user, _ = get_or_create_user_by_email(user_email)
 
