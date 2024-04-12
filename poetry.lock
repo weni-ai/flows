@@ -1718,7 +1718,7 @@ protobuf = ">=3.17.3,<4.0.0"
 
 [[package]]
 name = "weni-rp-apps"
-version = "2.8.2"
+version = "2.8.3a0"
 description = "Weni apps for Rapidpro Platform"
 category = "main"
 optional = false
@@ -1783,7 +1783,7 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=4.6)", "pytest-black (
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "7df04c52ba248828dda584344e37378c64a7908cc03933b84148bf529b544df6"
+content-hash = "02c5e56304eb3a83bee81cf22d1632caca6a0e9bb20c522ec395cdad55f01f03"
 
 [metadata.files]
 amqp = [
@@ -2758,8 +2758,8 @@ weni-protobuffers = [
     {file = "weni_protobuffers-1.2.18-py3-none-any.whl", hash = "sha256:f398af8de476d7d129a10fc677cb287623512775130b9ee15cc9953dbbd80807"},
 ]
 weni-rp-apps = [
-    {file = "weni_rp_apps-2.8.2-py3-none-any.whl", hash = "sha256:c238ee9e8187c3e72a5796703cfa0e26c866eb400e268e04040f52aa68cf7ff7"},
-    {file = "weni_rp_apps-2.8.2.tar.gz", hash = "sha256:07950bfce9db4d587d4ff284171f4481bd90156658dd48e1064b32af7b06cb70"},
+    {file = "weni_rp_apps-2.8.3a0-py3-none-any.whl", hash = "sha256:c74dfe6fc12118b286437afeb3e2a6ebd9d32cf1466174aa84a276b931f3989d"},
+    {file = "weni_rp_apps-2.8.3a0.tar.gz", hash = "sha256:caf826b8b79d702c1ec0ff6fbdb7128c2f2316cca5b5825a3a54a53f643c9f43"},
 ]
 wrapt = [
     {file = "wrapt-1.14.1-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:1b376b3f4896e7930f1f772ac4b064ac12598d1c38d04907e696cc4d794b43d3"},
