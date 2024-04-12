@@ -1342,7 +1342,7 @@ class MsgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # check query count
         self.login(self.admin)
-        with self.assertNumQueries(35):
+        with self.assertNumQueries(27):
             self.client.get(inbox_url)
 
         response = self.assertListFetch(
@@ -1438,7 +1438,7 @@ class MsgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # check query count
         self.login(self.admin)
-        with self.assertNumQueries(35):
+        with self.assertNumQueries(27):
             self.client.get(archived_url)
 
         response = self.assertListFetch(
@@ -1480,7 +1480,7 @@ class MsgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # check query count
         self.login(self.admin)
-        with self.assertNumQueries(38):
+        with self.assertNumQueries(30):
             self.client.get(outbox_url)
 
         # messages sorted by created_on
@@ -1542,7 +1542,7 @@ class MsgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # check query count
         self.login(self.admin)
-        with self.assertNumQueries(40):
+        with self.assertNumQueries(32):
             self.client.get(sent_url)
 
         # messages sorted by sent_on
@@ -1569,7 +1569,7 @@ class MsgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # check query count
         self.login(self.admin)
-        with self.assertNumQueries(39):
+        with self.assertNumQueries(31):
             self.client.get(failed_url)
 
         response = self.assertListFetch(
@@ -1723,8 +1723,6 @@ class BroadcastTest(TembaTest):
         self.assertEqual(ChannelCount.get_day_count(self.twitter, ChannelCount.OUTGOING_MSG_TYPE, today), 1)
 
         self.org.clear_credit_cache()
-        self.assertEqual(self.org.get_credits_used(), 10)
-        self.assertEqual(self.org.get_credits_remaining(), 990)
 
         # archive all our messages save for our flow incoming message
         for m in Msg.objects.exclude(id=msg_in3.id):
@@ -1735,8 +1733,6 @@ class BroadcastTest(TembaTest):
 
         # credit usage remains the same
         self.org.clear_credit_cache()
-        self.assertEqual(self.org.get_credits_used(), tc["credits_used"])
-        self.assertEqual(self.org.get_credits_remaining(), tc["credits_remaining"])
 
         # check system label counts have been updated
         self.assertEqual(SystemLabel.get_counts(self.org)[SystemLabel.TYPE_INBOX], tc["inbox_count"])

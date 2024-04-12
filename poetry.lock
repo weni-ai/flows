@@ -1051,6 +1051,19 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "pika"
+version = "1.3.2"
+description = "Pika Python AMQP Client Library"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.extras]
+gevent = ["gevent"]
+tornado = ["tornado"]
+twisted = ["twisted"]
+
+[[package]]
 name = "platformdirs"
 version = "2.4.0"
 description = "A small Python module for determining appropriate platform-specific dirs, e.g. a \"user data dir\"."
@@ -1705,11 +1718,11 @@ protobuf = ">=3.17.3,<4.0.0"
 
 [[package]]
 name = "weni-rp-apps"
-version = "2.7.11"
+version = "2.8.2"
 description = "Weni apps for Rapidpro Platform"
 category = "main"
 optional = false
-python-versions = ">=3.7,<4.0"
+python-versions = "<4.0,>=3.7"
 
 [package.dependencies]
 django-csp = ">=3.7,<4.0"
@@ -1770,7 +1783,7 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=4.6)", "pytest-black (
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "983b6fc42de2dbedfb239bd520cd3460a76312944a4e62a4377409f98b527734"
+content-hash = "7df04c52ba248828dda584344e37378c64a7908cc03933b84148bf529b544df6"
 
 [metadata.files]
 amqp = [
@@ -2293,6 +2306,10 @@ phonenumbers = [
     {file = "phonenumbers-8.13.24-py2.py3-none-any.whl", hash = "sha256:7dd66c57da00c0f373de83074e78d66a0801381cface4d010cfe07be2fa77fe5"},
     {file = "phonenumbers-8.13.24.tar.gz", hash = "sha256:7abc66f38d92c3b9e827d597b5d590283ca3b05288d9fadea8bc0d6c8ad73c06"},
 ]
+pika = [
+    {file = "pika-1.3.2-py3-none-any.whl", hash = "sha256:0779a7c1fafd805672796085560d290213a465e4f6f76a6fb19e378d8041a14f"},
+    {file = "pika-1.3.2.tar.gz", hash = "sha256:b2a327ddddf8570b4965b3576ac77091b850262d34ce8c1d8cb4e4146aa4145f"},
+]
 platformdirs = [
     {file = "platformdirs-2.4.0-py3-none-any.whl", hash = "sha256:8868bbe3c3c80d42f20156f22e7131d2fb321f5bc86a2a345375c6481a67021d"},
     {file = "platformdirs-2.4.0.tar.gz", hash = "sha256:367a5e80b3d04d2428ffa76d33f124cf11e8fff2acdaa9b43d545f5c7d661ef2"},
@@ -2741,8 +2758,8 @@ weni-protobuffers = [
     {file = "weni_protobuffers-1.2.18-py3-none-any.whl", hash = "sha256:f398af8de476d7d129a10fc677cb287623512775130b9ee15cc9953dbbd80807"},
 ]
 weni-rp-apps = [
-    {file = "weni_rp_apps-2.7.11-py3-none-any.whl", hash = "sha256:5e2fd86bdbd9538761ead394425d8021c412bee4aead3ff69f5d56c7c886d367"},
-    {file = "weni_rp_apps-2.7.11.tar.gz", hash = "sha256:3f2e1bc9d2105caa002137b32078633c75b2961257db59fe147884040fa3f99f"},
+    {file = "weni_rp_apps-2.8.2-py3-none-any.whl", hash = "sha256:c238ee9e8187c3e72a5796703cfa0e26c866eb400e268e04040f52aa68cf7ff7"},
+    {file = "weni_rp_apps-2.8.2.tar.gz", hash = "sha256:07950bfce9db4d587d4ff284171f4481bd90156658dd48e1064b32af7b06cb70"},
 ]
 wrapt = [
     {file = "wrapt-1.14.1-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:1b376b3f4896e7930f1f772ac4b064ac12598d1c38d04907e696cc4d794b43d3"},

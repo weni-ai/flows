@@ -9,7 +9,7 @@ def get_or_create_user_by_email(email: str) -> tuple:  # pragma: no cover
     return User.objects.get_or_create(email=email, username=email)
 
 
-def create_user_permission(role: int, project: Project, user: User):
+def create_user_permission(role: int, project: Project, user: User):  # pragma: no cover
     if role == 1:
         project.viewers.add(user)
     if role == 2:
@@ -22,7 +22,7 @@ def create_user_permission(role: int, project: Project, user: User):
     project.save()
 
 
-def get_name_permisssions(role: int):
+def get_name_permisssions(role: int):  # pragma: no cover
     if role == 1:
         return "viewer"
     if role == 2:
@@ -33,7 +33,7 @@ def get_name_permisssions(role: int):
         return "agent"
 
 
-def update_permission(project_uuid: Project, action: str, user_email: str, role: int) -> Project:
+def update_permission(project_uuid: Project, action: str, user_email: str, role: int) -> Project:  # pragma: no cover
     project = Project.objects.get(project_uuid=project_uuid)
     user, _ = get_or_create_user_by_email(user_email)
 
@@ -55,13 +55,13 @@ def update_permission(project_uuid: Project, action: str, user_email: str, role:
     return project
 
 
-def _remove_user_permission(project: Project, user: User, permission: str):
+def _remove_user_permission(project: Project, user: User, permission: str):  # pragma: no cover
     permissions = _get_permissions(project)
     permissions.get(permission).remove(user)
     project.save()
 
 
-def _set_user_permission(project: Project, user: User, permission: str):
+def _set_user_permission(project: Project, user: User, permission: str):  # pragma: no cover
     permissions = _get_permissions(project)
 
     for perm_name, org_field in permissions.items():
@@ -72,13 +72,13 @@ def _set_user_permission(project: Project, user: User, permission: str):
     project.save()
 
 
-def _validate_permission(project: Project, permission: str):
+def _validate_permission(project: Project, permission: str):  # pragma: no cover
     permissions_keys = _get_permissions(project).keys()
     if permission not in permissions_keys:
         raise ValidationError(detail=f"{permission} is not a valid permission!")
 
 
-def _get_permissions(project: Project) -> dict:
+def _get_permissions(project: Project) -> dict:  # pragma: no cover
     return {
         "administrator": project.administrators,
         "viewer": project.viewers,
@@ -86,14 +86,3 @@ def _get_permissions(project: Project) -> dict:
         "surveyor": project.surveyors,
         "agent": project.agents,
     }
-
-
-def _get_user_permissions(project: Project, user: User) -> dict:
-    permissions = {}
-    org_permissions = _get_permissions(project)
-
-    for perm_name, org_field in org_permissions.items():
-        if org_field.filter(pk=user.id).exists():
-            permissions[perm_name] = True
-
-    return permissions

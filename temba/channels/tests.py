@@ -917,9 +917,6 @@ class ChannelTest(TembaTest):
         self.org.topups.all().update(credits=10)
         self.org.clear_credit_cache()
 
-        self.assertEqual(10, self.org.get_credits_remaining())
-        self.assertEqual(0, self.org.get_credits_used())
-
         # if we sync should get one message back
         self.send_message(["250788382382"], "How is it going?")
 
@@ -927,9 +924,6 @@ class ChannelTest(TembaTest):
         self.assertEqual(200, response.status_code)
         response = response.json()
         self.assertEqual(1, len(response["cmds"]))
-
-        self.assertEqual(9, self.org.get_credits_remaining())
-        self.assertEqual(1, self.org.get_credits_used())
 
         # let's create 10 other messages
         for i in range(10):

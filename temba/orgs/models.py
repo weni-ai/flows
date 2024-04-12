@@ -385,6 +385,8 @@ class Org(SmartModel):
         help_text=_("The parent org that manages this org"),
     )
 
+    brain_on = models.BooleanField(default=False, help_text=_("Whether this organization use router"))
+
     # when this org was released and when it was actually deleted
     released_on = models.DateTimeField(null=True)
     deleted_on = models.DateTimeField(null=True)
@@ -1096,9 +1098,7 @@ class Org(SmartModel):
         """
         Get the credits number to consider as low threshold to this org
         """
-        return get_cacheable_result(
-            ORG_LOW_CREDIT_THRESHOLD_CACHE_KEY % self.pk, self._calculate_low_credits_threshold
-        )
+        return 1
 
     def _calculate_low_credits_threshold(self):
         now = timezone.now()
@@ -1113,9 +1113,7 @@ class Org(SmartModel):
         """
         Gets the total number of credits purchased or assigned to this org
         """
-        return get_cacheable_result(
-            ORG_CREDITS_TOTAL_CACHE_KEY % self.pk, self._calculate_credits_total, force_dirty=force_dirty
-        )
+        return 1000
 
     def get_purchased_credits(self):
         """
@@ -1153,7 +1151,7 @@ class Org(SmartModel):
         """
         Gets the number of credits used by this org
         """
-        return get_cacheable_result(ORG_CREDITS_USED_CACHE_KEY % self.pk, self._calculate_credits_used)
+        return 1
 
     def _calculate_credits_used(self):
         used_credits_sum = TopUpCredits.objects.filter(topup__org=self, topup__is_active=True)

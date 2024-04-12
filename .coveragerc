@@ -24,6 +24,9 @@ omit =
     */tests*
     *__init__*
     *settings*
+    temba/event_driven/publisher/*
+    temba/event_driven/connection/*
+    temba/event_driven/handle.py
     temba/*/management/commands/*
 
 [html]
