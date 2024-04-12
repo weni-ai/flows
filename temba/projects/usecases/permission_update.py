@@ -10,6 +10,8 @@ from django.utils import timezone
 def get_or_create_user_by_email(email: str) -> tuple:  # pragma: no cover
     print("ENTRA AQUI")
     print(email)
+
+def get_or_create_user_by_email(email: str) -> tuple:  # pragma: no cover
     return User.objects.get_or_create(email=email, username=email)
 
 

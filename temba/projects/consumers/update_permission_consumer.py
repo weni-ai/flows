@@ -11,18 +11,15 @@ class UpdatePermissionConsumer(EDAConsumer):
         print(f"[UpdatePermission] - Consuming a message. Body: {message.body}")
         try:
             body = JSONParser.parse(message.body)
-            print(body)
-            for data in body:
-                print("BODYS")
-                print(data)
-                update_permission(
-                    project_uuid=data.get("project"),  # project_uuid
-                    action=data.get("action"),
-                    user_email=data.get("user"),  # user_email
-                    role=data.get("role"),
-                )
 
-                message.channel.basic_ack(message.delivery_tag)
+            update_permission(
+                project_uuid=body.get("project"),  # project_uuid
+                action=body.get("action"),
+                user_email=body.get("user"),  # user_email
+                role=body.get("role"),
+            )
+
+            message.channel.basic_ack(message.delivery_tag)
 
         except Exception as exception:
             capture_exception(exception)
