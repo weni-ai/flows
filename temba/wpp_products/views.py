@@ -11,6 +11,8 @@ from temba.utils.whatsapp.tasks import (
     update_local_products_vtex_task,
 )
 from temba.wpp_products.models import Catalog
+from temba.request_logs.models import HTTPLog
+from temba.utils.whatsapp.tasks import update_channel_catalogs_status, update_local_catalogs
 from temba.wpp_products.serializers import UpdateCatalogSerializer
 
 
@@ -38,6 +40,15 @@ class CatalogViewSet(viewsets.ViewSet, InternalGenericViewSet):
     ):
         channel = get_object_or_404(Channel, uuid=pk, is_active=True)
         if request.data:
+            HTTPLog.create_from_integrations_response(
+                HTTPLog.WHATSAPP_CATALOGS_SYNCED,
+                request.data.get("urls"),
+                request.data.get("responses"),
+                200,
+                request.data.get("requests"),
+                channel=channel,
+            )
+
             update_local_catalogs(channel, request.data.get("data"))
         return Response(status=status.HTTP_200_OK)
 
