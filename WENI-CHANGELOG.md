@@ -1,3 +1,7 @@
+3.8.0
+----------
+* Create consumer to update user permissions
+
 3.7.11
 ----------
 * Chore: Bump floweditor to 2.13.1
