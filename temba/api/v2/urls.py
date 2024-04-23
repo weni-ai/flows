@@ -5,6 +5,7 @@ from django.urls import include, path
 
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
 
+from .flows.urls import urlpatterns as flows_urlpatterns
 from .internals.urls import urlpatterns as internals_urlpatterns
 from .views import (
     ArchivesEndpoint,
@@ -100,3 +101,4 @@ urlpatterns = [
 urlpatterns = format_suffix_patterns(urlpatterns, allowed=["json", "api"])
 
 urlpatterns += [path("internals/", include(internals_urlpatterns))]
+urlpatterns += flows_urlpatterns
