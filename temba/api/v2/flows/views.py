@@ -1,7 +1,7 @@
 import json
 
 from mozilla_django_oidc.contrib.drf import OIDCAuthentication
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
@@ -14,12 +14,15 @@ from temba.flows.models import Flow
 from temba.utils import analytics
 
 
-class SimulateAPIView(APIView):
+class SimulateAPIView(APIView):  # pragma: no cover
     authentication_classes = [OIDCAuthentication]
     permission_classes = [IsAuthenticated]
     pagination_class = None
     renderer_classes = [JSONRenderer]
     throttle_classes = []
+
+    def user_has_org_perm(self, org, permission):
+        return self.request.user.has_org_perm(org, permission)
 
     def post(self, request, flow_uuid, *args, **kwargs):
         flows = Flow.objects.filter(uuid=flow_uuid)
@@ -29,9 +32,12 @@ class SimulateAPIView(APIView):
 
         flow = flows.first()
 
+        if not self.user_has_org_perm(flow.org, "flows.flow_simulate"):
+            raise PermissionDenied()
+
         try:
             json_dict = json.loads(request.body)
-        except Exception as e:  # pragma: needs cover
+        except Exception as e:
             return Response(dict(status="error", description="Error parsing JSON: %s" % str(e)), status=400)
 
         if not settings.MAILROOM_URL:  # pragma: no cover
