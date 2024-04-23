@@ -1,3 +1,7 @@
+3.8.1
+----------
+* Creates endpoint that allows to simulate a flow
+
 3.8.0
 ----------
 * Create consumer to update user permissions
