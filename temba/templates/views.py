@@ -34,5 +34,5 @@ class TemplateViewSet(viewsets.ModelViewSet, InternalGenericViewSet):
             return Response(status=status.HTTP_200_OK)
 
         else:
-            update_local_templates(channel, [validated_data.get("template_data")])
+            update_local_templates(channel, [validated_data.get("template_data")], True)
             return Response(status=status.HTTP_204_NO_CONTENT)
