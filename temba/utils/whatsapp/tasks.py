@@ -150,7 +150,7 @@ def update_template_sync(template_id, webhook):
                 logger.info(f"Event: {field}, not mapped to usage")
 
 
-def update_local_templates(channel, templates_data):
+def update_local_templates(channel, templates_data, unique=False):
     channel_namespace = channel.config.get("fb_namespace", "")
     # run through all our templates making sure they are present in our DB
     seen = []
@@ -224,9 +224,10 @@ def update_local_templates(channel, templates_data):
 
         seen.append(translation)
 
-    # trim any translations we didn't see
-    TemplateTranslation.trim(channel, seen)
-    Template.trim(channel)
+    if not unique:
+        # trim any translations we didn't see
+        TemplateTranslation.trim(channel, seen)
+        Template.trim(channel)
 
 
 @shared_task(track_started=True, name="refresh_whatsapp_templates")
