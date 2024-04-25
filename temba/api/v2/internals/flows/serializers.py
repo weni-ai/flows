@@ -1,14 +1,11 @@
-from rest_framework import serializers
+from rest_framework import relations, serializers
+from weni.serializers import fields as weni_serializers
+
 from django.contrib.auth import get_user_model
 
-from weni.serializers import fields as weni_serializers
-from temba.flows.models import FlowStart
-from temba.api.v2.serializers import normalize_extra
 from temba.api.v2 import fields
-from temba.api.v2.serializers import WriteSerializer
-from temba.flows.models import Flow
-from rest_framework import relations
-
+from temba.api.v2.serializers import WriteSerializer, normalize_extra
+from temba.flows.models import Flow, FlowStart
 
 User = get_user_model()
 

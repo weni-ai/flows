@@ -102,14 +102,11 @@ def update_template_status(value, template):
     external_id = value.get("message_template_id")
     template_status = value.get("event")
 
-    if template_status == "APPROVED":
-        template_status = "A"
+    if template_status not in STATUS_MAPPING:
+        logger.error(f"Status not found in flows: {template_status}", exc_info=True)
+        raise ValueError("Status not found in flows")
 
-    elif template_status == "REJECTED":
-        template_status = "R"
-
-    elif template_status == "PENDING":
-        template_status = "P"
+    template_status = STATUS_MAPPING[template_status]
 
     template_object = Template.objects.get(id=template)
     translation = template_object.translations.filter(external_id=external_id)
@@ -155,7 +152,7 @@ def update_template_sync(template_id, webhook):
                 logger.info(f"Event: {field}, not mapped to usage")
 
 
-def update_local_templates(channel, templates_data):
+def update_local_templates(channel, templates_data, unique=False):
     channel_namespace = channel.config.get("fb_namespace", "")
     # run through all our templates making sure they are present in our DB
     seen = []
@@ -229,9 +226,10 @@ def update_local_templates(channel, templates_data):
 
         seen.append(translation)
 
-    # trim any translations we didn't see
-    TemplateTranslation.trim(channel, seen)
-    Template.trim(channel)
+    if not unique:
+        # trim any translations we didn't see
+        TemplateTranslation.trim(channel, seen)
+        Template.trim(channel)
 
 
 @shared_task(track_started=True, name="refresh_whatsapp_templates")

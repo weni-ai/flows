@@ -1,3 +1,30 @@
+3.8.1
+----------
+* Creates endpoint that allows to simulate a flow
+
+3.8.0
+----------
+* Create consumer to update user permissions
+
+3.7.11
+----------
+* Chore: Bump floweditor to 2.13.1
+
+3.7.10
+----------
+* Update weni-rp-apps to 2.8.2
+* Call recent activities when flow is archived
+
+3.7.9
+----------
+* Create internal endpoints that allows to create flow starts and broadcasts
+
+3.7.8
+----------
+* Update weni-rp-apps to 2.8.1
+* Consumer to update brain on
+* Endpoint to update template status
+
 3.7.7
 ----------
 * Allow adding classifiers

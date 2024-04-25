@@ -1,13 +1,11 @@
-from django.conf import settings
-from django.contrib.auth import get_user_model
+from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
 from rest_framework.mixins import CreateModelMixin
-from rest_framework.exceptions import NotAuthenticated, AuthenticationFailed
-
 from weni.internal.views import InternalGenericViewSet
 
-from .serializers import UserAndFlowSerializer
-from .serializers import FlowStartSerializer
+from django.conf import settings
+from django.contrib.auth import get_user_model
 
+from .serializers import FlowStartSerializer, UserAndFlowSerializer
 
 User = get_user_model()
 

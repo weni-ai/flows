@@ -3,20 +3,18 @@ from sentry_sdk import capture_exception
 
 from temba.event_driven.consumers import EDAConsumer
 from temba.event_driven.parsers.json_parser import JSONParser
-from temba.projects.usecases.permission_update import update_permission
+from temba.projects.usecases.update_brain_on import update_project_brain_on
 
 
-class UpdatePermissionConsumer(EDAConsumer):
+class UpdateBrainOnConsumer(EDAConsumer):
     def consume(self, message: amqp.Message):  # pragma: no cover
-        print(f"[UpdatePermission] - Consuming a message. Body: {message.body}")
+        print(f"[UpdateBrainOnConsumer] - Consuming a message. Body: {message.body}")
         try:
             body = JSONParser.parse(message.body)
-
-            update_permission(
-                project_uuid=body.get("project"),  # project_uuid
-                action=body.get("action"),
-                user_email=body.get("user"),  # user_email
-                role=body.get("role"),
+            update_project_brain_on(
+                project_uuid=body.get("project_uuid"),
+                brain_on=body.get("brain_on"),
+                user_email=body.get("user"),
             )
 
             message.channel.basic_ack(message.delivery_tag)
@@ -24,4 +22,4 @@ class UpdatePermissionConsumer(EDAConsumer):
         except Exception as exception:
             capture_exception(exception)
             message.channel.basic_reject(message.delivery_tag, requeue=False)
-            print(f"[UpdatePermission] - Message rejected by: {exception}")
+            print(f"[UpdateBrainOnConsumer] - Message rejected by: {exception}")
