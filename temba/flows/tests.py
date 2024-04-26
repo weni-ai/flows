@@ -364,7 +364,7 @@ class FlowTest(TembaTest):
 
     def test_editor_feature_filters(self):
         flow = self.create_flow()
-
+        self.org.config["has_vtex"] = True
         self.login(self.admin)
 
         def assert_features(features: set):
@@ -381,20 +381,20 @@ class FlowTest(TembaTest):
 
         # add a DT One integration
         DTOneType().connect(flow.org, self.admin, "login", "token")
-        assert_features({"airtime", "classifier", "resthook"})
+        assert_features({"airtime", "classifier", "resthook", "has_vtex"})
 
         # change our channel to use a whatsapp scheme
         self.channel.schemes = [URN.WHATSAPP_SCHEME]
         self.channel.save()
-        assert_features({"whatsapp", "airtime", "classifier", "resthook"})
+        assert_features({"whatsapp", "airtime", "classifier", "resthook", "has_vtex"})
 
         # change our channel to use a facebook scheme
         self.channel.schemes = [URN.FACEBOOK_SCHEME]
         self.channel.save()
-        assert_features({"facebook", "airtime", "classifier", "resthook"})
+        assert_features({"facebook", "airtime", "classifier", "resthook", "has_vtex"})
 
         Ticketer.create(self.org, self.user, "mailgun", "Email (bob@acme.com)", {})
-        assert_features({"facebook", "airtime", "classifier", "resthook", "ticketer"})
+        assert_features({"facebook", "airtime", "classifier", "resthook", "ticketer", "has_vtex"})
 
         ExternalService.objects.create(
             uuid=uuid.uuid4(),
@@ -405,7 +405,7 @@ class FlowTest(TembaTest):
             created_by=self.user,
             modified_by=self.user,
         )
-        assert_features({"facebook", "airtime", "classifier", "resthook", "ticketer", "external_service"})
+        assert_features({"facebook", "airtime", "classifier", "resthook", "ticketer", "external_service", "has_vtex"})
 
         channel = self.channel
         channel.get_type().code = "WAC"
@@ -426,7 +426,16 @@ class FlowTest(TembaTest):
         )
 
         assert_features(
-            {"facebook", "airtime", "classifier", "resthook", "ticketer", "external_service", "whatsapp_catalog"}
+            {
+                "facebook",
+                "airtime",
+                "classifier",
+                "resthook",
+                "ticketer",
+                "external_service",
+                "whatsapp_catalog",
+                "has_vtex",
+            }
         )
 
         self.setUpLocations()
@@ -440,6 +449,7 @@ class FlowTest(TembaTest):
                 "ticketer",
                 "external_service",
                 "whatsapp_catalog",
+                "has_vtex",
                 "locations",
             }
         )
