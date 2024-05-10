@@ -3,6 +3,7 @@ import uuid
 from django_countries.fields import CountryField
 
 from django.db import models
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from temba.channels.models import Channel
@@ -57,11 +58,19 @@ class Template(models.Model):
     # when this template was created
     created_on = models.DateTimeField(default=timezone.now)
 
+    is_active = models.BooleanField(default=True)
+
     @classmethod
     def trim(cls, channel):
         org = channel.org
-        templates = org.templates.filter(translations=None)
-        templates.delete()
+
+        templates_with_active_translations = org.templates.annotate(
+            active_translation_count=Count("translations", filter=Q(translations__is_active=True))
+        )
+
+        templates_to_inactive = templates_with_active_translations.filter(active_translation_count=0)
+
+        templates_to_inactive.update(is_active=False)
 
     def is_approved(self):
         """
@@ -87,13 +96,23 @@ class TemplateTranslation(models.Model):
     """
 
     STATUS_APPROVED = "A"
+    STATUS_IN_APPEAL = "I"
     STATUS_PENDING = "P"
     STATUS_REJECTED = "R"
+    STATUS_PENDING_DELETION = "E"
+    STATUS_DELETED = "D"
+    STATUS_DISABLED = "S"
+    STATUS_LOCKED = "L"
     STATUS_UNSUPPORTED_LANGUAGE = "U"
 
     STATUS_CHOICES = (
         (STATUS_APPROVED, "approved"),
+        (STATUS_IN_APPEAL, "in_appeal"),
         (STATUS_PENDING, "pending"),
+        (STATUS_PENDING_DELETION, "pending_deletion"),
+        (STATUS_DELETED, "deleted"),
+        (STATUS_DISABLED, "disabled"),
+        (STATUS_LOCKED, "locked"),
         (STATUS_REJECTED, "rejected"),
         (STATUS_UNSUPPORTED_LANGUAGE, "unsupported_language"),
     )
