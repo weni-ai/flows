@@ -5022,9 +5022,17 @@ class ProductReadSerializersTestCase(TembaTest):
 
 
 class ProductsEndpointViewSetTest(TembaTest):
-    def test_get_queryset(self):
+    def setUp(self):
+        super().setUp()
+
         Channel.objects.all().delete()
         Catalog.objects.all().delete()
+
+        self.url = reverse("api.v2.products") + ".json"
+        self.client = APIClient()
+        self.view = ProductsEndpoint
+        self.view.permission_classes = []
+        self.client.force_login(user=self.user)
 
         channel = self.create_channel(
             "WAC",
@@ -5049,13 +5057,14 @@ class ProductsEndpointViewSetTest(TembaTest):
         catalog2 = Catalog.objects.create(name="Catalog 2", facebook_catalog_id="222", org=self.org, channel=channel)
         Catalog.objects.create(name="Catalog 3", facebook_catalog_id="333", org=self.org, channel=channel)
 
-        product1 = Product.objects.create(
+        self.product1 = Product.objects.create(
             catalog=catalog1, title="Product 1", facebook_product_id="fb456", product_retailer_id="retail456"
         )
         Product.objects.create(
             catalog=catalog2, title="Product 2", facebook_product_id="fb789", product_retailer_id="retail789"
         )
 
+    def test_get_queryset(self):
         viewset = ProductsEndpoint()
         viewset.request = self.client.get("/")
         viewset.request.user = self.user
@@ -5063,7 +5072,29 @@ class ProductsEndpointViewSetTest(TembaTest):
         filtered_queryset = viewset.get_queryset()
 
         self.assertEqual(filtered_queryset.count(), 1)
-        self.assertEqual(filtered_queryset.first(), product1)
+        self.assertEqual(filtered_queryset.first(), self.product1)
+
+    @patch("temba.api.v2.views.ProductsEndpoint.filter_before_after")
+    def test_filter_queryset_prodcut_name(self, mock_filter_before_after):
+        name = self.product1.title
+        queryset = Product.objects.filter(title=name)
+        mock_filter_before_after.return_value = queryset
+
+        response = self.client.get(self.url, data={"name": name})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.product1.title)
+
+    @patch("temba.api.v2.views.ProductsEndpoint.filter_before_after")
+    def test_filter_queryset_product_retailer_id(self, mock_filter_before_after):
+        retailer_id = self.product1.product_retailer_id
+        queryset = Product.objects.filter(product_retailer_id=retailer_id)
+        mock_filter_before_after.return_value = queryset
+
+        response = self.client.get(self.url, data={"retailer_id": retailer_id})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.product1.title)
 
 
 class TestSearchIntegrations(TembaTest):
