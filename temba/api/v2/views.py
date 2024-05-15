@@ -4083,7 +4083,8 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
     def filter_queryset(self, queryset):
         params = self.request.query_params
         org = self.request.user.get_org()
-        queryset = org.templates.exclude(translations=None).prefetch_related(
+
+        queryset = org.templates.exclude(translations__is_active=False).prefetch_related(
             Prefetch(
                 "translations",
                 TemplateTranslation.objects.filter(is_active=True),
@@ -4663,6 +4664,19 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
         org = self.request.user.get_org()
         catalog = org.catalogs.exclude(is_active=False).first()
         return Product.objects.filter(catalog=catalog)
+
+    def filter_queryset(self, queryset):
+        params = self.request.query_params
+
+        name = params.get("name")
+        if name:
+            queryset = queryset.filter(title__icontains=name)
+        
+        retailer_id = params.get("retailer_id")
+        if retailer_id:
+            queryset = queryset.filter(product_retailer_id=retailer_id)
+
+        return queryset
 
     @classmethod
     def get_read_explorer(cls):

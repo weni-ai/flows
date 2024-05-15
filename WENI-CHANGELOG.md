@@ -1,3 +1,7 @@
+3.8.2
+----------
+* Prevent template trimming on webhook calls
+
 3.8.1
 ----------
 * Creates endpoint that allows to simulate a flow
