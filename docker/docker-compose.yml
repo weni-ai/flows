@@ -35,9 +35,9 @@ services:
     ports:
       - 5432:5432
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-rapidpro}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-rapidpro}
-      - POSTGRES_DB=${POSTGRES_DB:-rapidpro}
+      - POSTGRES_USER=${POSTGRES_USER:-temba}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-temba}
+      - POSTGRES_DB=${POSTGRES_DB:-temba}
   varnish:
     image: ilhasoft/varnish:6.0
     build:
