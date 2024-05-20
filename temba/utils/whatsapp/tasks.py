@@ -96,7 +96,61 @@ def _calculate_variable_count(content):
     return count
 
 
-def update_local_templates(channel, templates_data):
+def update_template_status(value, template):
+    external_id = value.get("message_template_id")
+    template_status = value.get("event")
+
+    if template_status not in STATUS_MAPPING:
+        logger.error(f"Status not found in flows: {template_status}", exc_info=True)
+        raise ValueError("Status not found in flows")
+
+    template_status = STATUS_MAPPING[template_status]
+
+    template_object = Template.objects.get(id=template)
+    translation = template_object.translations.filter(external_id=external_id)
+
+    if translation:
+        for trans in translation:
+            trans.status = template_status
+
+            trans.save(update_fields=["status"])
+        return True
+
+    else:
+        for translation in template_object.translations.all():
+            translation.status = template_status
+            translation.save(update_fields=["status"])
+        return True
+
+
+def process_event(field, value, template):
+    if field == "message_template_status_update":
+        update_template_status(value, template)
+
+    elif field == "template_category_update":
+        pass
+
+    elif field == "message_template_quality_update":
+        pass
+
+
+def update_template_sync(template_id, webhook):
+    allowed_event_types = [
+        "message_template_status_update",
+    ]
+
+    for entry in webhook["entry"]:
+        for change in entry.get("changes", []):
+            field = change.get("field")
+            value = change.get("value")
+            if field in allowed_event_types:
+                process_event(field, value, template_id)
+
+            else:
+                logger.info(f"Event: {field}, not mapped to usage")
+
+
+def update_local_templates(channel, templates_data, unique=False):
     channel_namespace = channel.config.get("fb_namespace", "")
     # run through all our templates making sure they are present in our DB
     seen = []
@@ -170,9 +224,10 @@ def update_local_templates(channel, templates_data):
 
         seen.append(translation)
 
-    # trim any translations we didn't see
-    TemplateTranslation.trim(channel, seen)
-    Template.trim(channel)
+    if not unique:
+        # trim any translations we didn't see
+        TemplateTranslation.trim(channel, seen)
+        Template.trim(channel)
 
 
 @shared_task(track_started=True, name="refresh_whatsapp_templates")
@@ -281,7 +336,11 @@ def update_local_catalogs(channel, catalogs_data):
     Catalog.trim(channel, seen)
 
 
-def update_local_products_vtex(catalog, products_data, channel):
+@shared_task(name="update_local_products_vtex_task")
+def update_local_products_vtex_task(catalog_id, products_data, channel_id):
+    catalog = Catalog.objects.get(id=catalog_id)
+    channel = Channel.objects.get(id=channel_id)
+
     seen = []
     products_sentenx = {"catalog_id": catalog.facebook_catalog_id, "products": []}
     for product in products_data:
@@ -295,24 +354,29 @@ def update_local_products_vtex(catalog, products_data, channel):
             facebook_catalog_id=catalog.facebook_catalog_id,
         )
 
-        seen.append(new_product)
+        if product["availability"] != "in stock":
+            seen.append(new_product)
 
-        sentenx_object = {
-            "facebook_id": new_product.facebook_product_id,
-            "title": new_product.title,
-            "org_id": str(catalog.org_id),
-            "catalog_id": catalog.facebook_catalog_id,
-            "product_retailer_id": new_product.product_retailer_id,
-            "channel_id": str(catalog.channel_id),
-        }
+        else:
+            sentenx_object = {
+                "facebook_id": new_product.facebook_product_id,
+                "title": new_product.title,
+                "org_id": str(catalog.org_id),
+                "catalog_id": catalog.facebook_catalog_id,
+                "product_retailer_id": new_product.product_retailer_id,
+                "channel_id": str(catalog.channel_id),
+            }
 
-        products_sentenx["products"].append(sentenx_object)
+            products_sentenx["products"].append(sentenx_object)
+
+    Product.trim_vtex(catalog, seen)
 
     if len(products_sentenx["products"]) > 0:
-        sent_products_to_sentenx(products_sentenx)
-        sent_trim_products_to_sentenx(catalog, seen)
-
-    Product.trim(catalog, seen)
+        try:
+            sent_products_to_sentenx(products_sentenx)
+            sent_trim_products_to_sentenx(catalog, seen)
+        except Exception as e:
+            logger.error(f"An error ocurred sending to SentenX: {str(e)}")
 
 
 def update_local_products_non_vtex(catalog, products_data, channel):
@@ -344,11 +408,14 @@ def update_local_products_non_vtex(catalog, products_data, channel):
 
         products_sentenx["products"].append(sentenx_object)
 
-    if len(products_sentenx["products"]) > 0:
-        sent_products_to_sentenx(products_sentenx)
-        sent_trim_products_to_sentenx(catalog, seen)
-
     Product.trim(catalog, seen)
+
+    if len(products_sentenx["products"]) > 0:
+        try:
+            sent_products_to_sentenx(products_sentenx)
+            sent_trim_products_to_sentenx(catalog, seen)
+        except Exception as e:
+            logger.error(f"An error ocurred sending to SentenX: {str(e)}")
 
 
 @shared_task(track_started=True, name="refresh_whatsapp_catalog_and_products")

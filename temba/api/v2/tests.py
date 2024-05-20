@@ -25,6 +25,7 @@ from temba.api.models import APIToken, Resthook, WebHookEvent
 from temba.api.v2.views import (
     ContactsTemplatesEndpoint,
     ExternalServicesEndpoint,
+    FilterTemplatesEndpoint,
     FlowsLabelsEndpoint,
     ProductsEndpoint,
     TemplatesEndpoint,
@@ -3526,7 +3527,6 @@ class APITest(TembaTest):
                 "primary_language": None,
                 "timezone": "Africa/Kigali",
                 "date_style": "day_first",
-                "credits": {"used": 0, "remaining": 1000},
                 "anon": False,
             },
         )
@@ -3544,7 +3544,6 @@ class APITest(TembaTest):
                 "primary_language": "eng",
                 "timezone": "Africa/Kigali",
                 "date_style": "day_first",
-                "credits": {"used": 0, "remaining": 1000},
                 "anon": False,
             },
         )
@@ -5326,6 +5325,35 @@ class ContactsTemplatesEndpointTest(TembaTest):
 
         self.assertEqual(response.status_code, 200)
 
+        # verify filter by template
+        response = self.client.get(url, data={"template": "template_test"})
+
+        self.assertEqual(response.status_code, 200)
+
+        # verify filter by limit
+        response = self.client.get(url, data={"template": "template_test", "limit": "1"})
+
+        self.assertEqual(response.status_code, 200)
+
+        # verify filter by offset
+        response = self.client.get(url, data={"template": "template_test", "offset": "1"})
+
+        self.assertEqual(response.status_code, 200)
+
+        # verify filter by before
+        response = self.client.get(
+            url, data={"template": "template_test", "before": format_datetime(contact1.modified_on)}
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        # verify filter by after
+        response = self.client.get(
+            url, data={"template": "template_test", "after": format_datetime(contact1.modified_on)}
+        )
+
+        self.assertEqual(response.status_code, 200)
+
     def test_contacts_templates_status_unknown(self):
 
         contact1 = self.create_contact(name="Jospem", org=self.org, user=self.user)
@@ -5369,5 +5397,73 @@ class ContactsTemplatesEndpointTest(TembaTest):
         self.client.force_login(self.user)
         url = reverse("api.v2.contact_templates") + ".json"
         response = self.client.get(url, data={"contact": contact1.uuid})
+
+        self.assertEqual(response.status_code, 200)
+
+
+class FilterTemplatesEndpointTest(TembaTest):
+    def test_filter_templates(self):
+        contact = self.create_contact(name="Martinelli", org=self.org, user=self.user)
+
+        metadata = {
+            "templating": {
+                "template": {"uuid": "44019537-9afe-4898-9626-a5c724d169gh", "name": "template_test_2"},
+                "language": "eng",
+                "country": "USA",
+                "variables": ["321"],
+                "namespace": "",
+            },
+            "text_language": "eng-US",
+        }
+
+        Msg.objects.create(
+            org=self.org,
+            direction="O",
+            contact=contact,
+            contact_urn=None,
+            text="Hello My friend",
+            channel=self.channel,
+            topup_id=None,
+            status="S",
+            msg_type="",
+            attachments=None,
+            visibility="V",
+            external_id=None,
+            high_priority=None,
+            created_on=timezone.now(),
+            sent_on=timezone.now(),
+            broadcast=None,
+            metadata=metadata,
+            next_attempt=None,
+        )
+
+        view = FilterTemplatesEndpoint
+        view.permission_classes = []
+
+        self.client.force_login(self.user)
+        url = reverse("api.v2.filter_templates") + ".json"
+
+        # verify filter by template
+        response = self.client.get(url, data={"template": "template_test"})
+
+        self.assertEqual(response.status_code, 200)
+
+        # verify filter with page size
+        response = self.client.get(url, data={"template": "template_test", "page_size": "1"})
+
+        self.assertEqual(response.status_code, 200)
+
+        # verify filter by offset
+        response = self.client.get(url, data={"template": "template_test", "offset": "1"})
+
+        self.assertEqual(response.status_code, 200)
+
+        # verify filter with before
+        response = self.client.get(url, data={"template": "template_test", "before": "2024-03-08"})
+
+        self.assertEqual(response.status_code, 200)
+
+        # verify filter with after
+        response = self.client.get(url, data={"template": "template_test", "after": "2024-03-05"})
 
         self.assertEqual(response.status_code, 200)

@@ -944,6 +944,18 @@ class ContactTemplateSerializer(ReadSerializer):
         )
 
 
+class FilterTemplateSerializer(ReadSerializer):
+    template = serializers.CharField()
+    page_size = serializers.IntegerField(default=10)
+    offset = serializers.IntegerField(default=0)
+    before = serializers.DateField(required=False)
+    after = serializers.DateField(required=False)
+
+    class Meta:
+        model = Msg
+        fields = ("template", "page_size", "offset", "before", "after")
+
+
 class FlowReadSerializer(ReadSerializer):
     FLOW_TYPES = {
         Flow.TYPE_MESSAGE: "message",
@@ -1691,7 +1703,6 @@ class WorkspaceReadSerializer(ReadSerializer):
     primary_language = serializers.SerializerMethodField()
     timezone = serializers.SerializerMethodField()
     date_style = serializers.SerializerMethodField()
-    credits = serializers.SerializerMethodField()
     anon = serializers.SerializerMethodField()
 
     def get_country(self, obj):
@@ -1709,9 +1720,6 @@ class WorkspaceReadSerializer(ReadSerializer):
     def get_date_style(self, obj):
         return self.DATE_STYLES.get(obj.date_format)
 
-    def get_credits(self, obj):
-        return {"used": obj.get_credits_used(), "remaining": obj.get_credits_remaining()}
-
     def get_anon(self, obj):
         return obj.is_anon
 
@@ -1725,7 +1733,6 @@ class WorkspaceReadSerializer(ReadSerializer):
             "primary_language",
             "timezone",
             "date_style",
-            "credits",
             "anon",
         )
 

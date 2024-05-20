@@ -1,3 +1,105 @@
+3.8.1
+----------
+* Creates endpoint that allows to simulate a flow
+
+3.8.0
+----------
+* Create consumer to update user permissions
+
+3.7.11
+----------
+* Chore: Bump floweditor to 2.13.1
+
+3.7.10
+----------
+* Update weni-rp-apps to 2.8.2
+* Call recent activities when flow is archived
+
+3.7.9
+----------
+* Create internal endpoints that allows to create flow starts and broadcasts
+
+3.7.8
+----------
+* Update weni-rp-apps to 2.8.1
+* Consumer to update brain on
+* Endpoint to update template status
+
+3.7.7
+----------
+* Allow adding classifiers
+
+3.7.6
+----------
+* Set fixed credits calculation
+
+3.7.5
+----------
+* Remove credits check from sidebar
+
+3.7.4
+----------
+* Fix overwritten floweditor version back to 2.13.0
+
+3.7.3
+----------
+⚠️ Floweditor rolled back to 2.12.0
+* Deactivate topup credits tasks
+* Add brain_on in create project consumer
+* Add brain_on field in Org model
+
+3.7.2
+----------
+* Chore: Bump floweditor to 2.13.0
+
+3.7.1
+----------
+* Block manual broadcast for large groups
+
+3.7.0
+----------
+* Revert "fix error import contact digit 9"
+* Change endpoint to update products vtex to be a celery task
+* Fix pagination error and urns list empty
+* Add publisher in EDA
+* Update max length in product model fields
+* Update rp-apps version to 2.8.0
+
+3.6.9
+----------
+* Chore: Bump floweditor to 2.12.0
+
+3.6.8
+----------
+* Chore: Bump floweditor to 2.11.1
+
+3.6.7
+----------
+* Fix error import contact digit 9
+
+3.6.6
+----------
+* Fix performance in contacts elastic endpoint
+* Update rp-apps version to 2.7.11
+
+3.6.5
+----------
+* Hotfix using 3.6.2 version to adjust permission in contact_elastic endpoint
+
+3.6.4
+----------
+* Change urn return in elastic serializer
+
+3.6.3
+----------
+* Add condition when not receive parameter
+* Update rp-apps version to 2.7.10
+
+3.6.2
+----------
+* Add filter to contact_templates endpoint
+* Endpoint to get contacts elasticsearch
+
 3.6.1
 ----------
 * Endpoint contacts_lean

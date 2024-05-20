@@ -1,9 +1,12 @@
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from django.conf.urls import url
+from django.urls import include, path
 
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
 
+from .flows.urls import urlpatterns as flows_urlpatterns
+from .internals.urls import urlpatterns as internals_urlpatterns
 from .views import (
     ArchivesEndpoint,
     AuthenticateView,
@@ -22,6 +25,7 @@ from .views import (
     ExplorerView,
     ExternalServicesEndpoint,
     FieldsEndpoint,
+    FilterTemplatesEndpoint,
     FlowsEndpoint,
     FlowsLabelsEndpoint,
     FlowStartsEndpoint,
@@ -65,6 +69,7 @@ urlpatterns = [
     url(r"^contact_actions$", ContactActionsEndpoint.as_view(), name="api.v2.contact_actions"),
     url(r"^contact_templates$", ContactsTemplatesEndpoint.as_view(), name="api.v2.contact_templates"),
     url(r"^contacts_elastic$", ContactsElasticSearchEndpoint.as_view(), name="api.v2.contacts_elastic"),
+    url(r"^filter_templates$", FilterTemplatesEndpoint.as_view(), name="api.v2.filter_templates"),
     url(r"^definitions$", DefinitionsEndpoint.as_view(), name="api.v2.definitions"),
     url(r"^fields$", FieldsEndpoint.as_view(), name="api.v2.fields"),
     url(r"^flow_starts$", FlowStartsEndpoint.as_view(), name="api.v2.flow_starts"),
@@ -94,3 +99,6 @@ urlpatterns = [
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns, allowed=["json", "api"])
+
+urlpatterns += [path("internals/", include(internals_urlpatterns))]
+urlpatterns += flows_urlpatterns
