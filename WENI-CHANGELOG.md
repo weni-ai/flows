@@ -1,3 +1,13 @@
+3.8.3
+----------
+* New field proj_uuid in org model
+* Review inactive template and add status in template translation
+* Update weni-rp-apps version to 2.8.3
+
+3.8.2
+----------
+* Prevent template trimming on webhook calls
+
 3.8.1
 ----------
 * Creates endpoint that allows to simulate a flow

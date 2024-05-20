@@ -3936,7 +3936,8 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
     def filter_queryset(self, queryset):
         params = self.request.query_params
         org = self.request.user.get_org()
-        queryset = org.templates.exclude(translations=None).prefetch_related(
+
+        queryset = org.templates.exclude(translations__is_active=False).prefetch_related(
             Prefetch(
                 "translations",
                 TemplateTranslation.objects.filter(is_active=True),
