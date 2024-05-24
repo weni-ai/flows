@@ -1,3 +1,7 @@
+3.8.4
+----------
+* Update weni-rp-apps version to 2.8.4
+
 3.8.3
 ----------
 * New field proj_uuid in org model
