@@ -508,3 +508,6 @@ MANUAL_FLOW_BROADCAST_MAX_GROUP_SUM_SIZE = env.int("MANUAL_FLOW_BROADCAST_MAX_GR
 
 # Access token for internal endpoints used by the router
 ROUTER_FIXED_ACCESS_TOKEN = env("ROUTER_FIXED_ACCESS_TOKEN", default="")
+
+# Access token for internal endpoints used by the billing
+BILLING_FIXED_ACCESS_TOKEN = env("BILLING_FIXED_ACCESS_TOKEN", default="")
