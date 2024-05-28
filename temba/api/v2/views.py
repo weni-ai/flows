@@ -4518,6 +4518,19 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
         catalog = org.catalogs.exclude(is_active=False).first()
         return Product.objects.filter(catalog=catalog)
 
+    def filter_queryset(self, queryset):
+        params = self.request.query_params
+
+        name = params.get("name")
+        if name:
+            queryset = queryset.filter(title__icontains=name)
+
+        retailer_id = params.get("retailer_id")
+        if retailer_id:
+            queryset = queryset.filter(product_retailer_id=retailer_id)
+
+        return queryset
+
     @classmethod
     def get_read_explorer(cls):
         return {
