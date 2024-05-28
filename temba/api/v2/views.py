@@ -1954,12 +1954,15 @@ class FilterTemplatesEndpoint(BaseAPIView):
         before = None
         if params.get("before"):
             before = serializer.validated_data["before"]
-            filter_before = f""" AND msg.created_on <= '{before}'"""
+
+            filter_before = f"""
+                    AND msg.created_on <= '{before}'"""
 
         after = None
         if params.get("after"):
             after = serializer.validated_data["after"]
-            filter_after = f""" AND msg.created_on >= '{after}'"""
+            filter_after = f"""
+                    AND msg.created_on >= '{after}'"""
 
         sql = """SELECT
                     contact.id,
@@ -4501,6 +4504,19 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
         org = self.request.user.get_org()
         catalog = org.catalogs.exclude(is_active=False).first()
         return Product.objects.filter(catalog=catalog)
+
+    def filter_queryset(self, queryset):
+        params = self.request.query_params
+
+        name = params.get("name")
+        if name:
+            queryset = queryset.filter(title__icontains=name)
+
+        retailer_id = params.get("retailer_id")
+        if retailer_id:
+            queryset = queryset.filter(product_retailer_id=retailer_id)
+
+        return queryset
 
     @classmethod
     def get_read_explorer(cls):
