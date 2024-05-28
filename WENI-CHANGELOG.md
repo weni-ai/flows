@@ -1,4 +1,12 @@
 
+3.8.5
+----------
+* Add filter title in product endpoint
+* Adjust database variables in Docker Compose to facilitate project execution
+* Update before and after to support time in filter template endpoint
+* Adds an endpoint that allows you to list projects from channels
+* Chore: Bump floweditor to 2.14.0
+
 3.8.4
 ----------
 * Update weni-rp-apps version to 2.8.4
