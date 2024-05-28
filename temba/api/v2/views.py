@@ -4671,7 +4671,6 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
         name = params.get("name")
         if name:
             queryset = queryset.filter(title__icontains=name)
-        
         retailer_id = params.get("retailer_id")
         if retailer_id:
             queryset = queryset.filter(product_retailer_id=retailer_id)
