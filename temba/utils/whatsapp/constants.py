@@ -5,6 +5,11 @@ STATUS_MAPPING = dict(
     PENDING=TemplateTranslation.STATUS_PENDING,
     APPROVED=TemplateTranslation.STATUS_APPROVED,
     REJECTED=TemplateTranslation.STATUS_REJECTED,
+    IN_APPEAL=TemplateTranslation.STATUS_IN_APPEAL,
+    PENDING_DELETION=TemplateTranslation.STATUS_PENDING_DELETION,
+    DELETED=TemplateTranslation.STATUS_DELETED,
+    DISABLED=TemplateTranslation.STATUS_DISABLED,
+    LOCKED=TemplateTranslation.STATUS_LOCKED,
 )
 
 # This maps from WA iso-639-2 codes to our internal 639-3 codes

@@ -2,7 +2,7 @@ import base64
 import time
 import uuid
 from collections import OrderedDict
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 from unittest.mock import Mock, patch
 from urllib.parse import quote_plus
@@ -4463,7 +4463,7 @@ class APITest(TembaTest):
         )
 
         # no filtering
-        with self.assertNumQueries(NUM_BASE_REQUEST_QUERIES + 3):
+        with self.assertNumQueries(NUM_BASE_REQUEST_QUERIES + 1):
             response = self.fetchJSON(url, readonly_models={Template})
 
         resp_json = response.json()
