@@ -1,7 +1,6 @@
 import logging
 import numbers
 from collections import OrderedDict
-from datetime import datetime
 
 import iso8601
 import pycountry
@@ -946,35 +945,11 @@ class ContactTemplateSerializer(ReadSerializer):
 
 
 class FilterTemplateSerializer(ReadSerializer):
-    template = serializers.CharField()
-    page_size = serializers.IntegerField(default=10)
-    offset = serializers.IntegerField(default=0)
-    before = serializers.CharField(required=False)
-    after = serializers.CharField(required=False)
-
-    def validate_before(self, value):
-        try:
-            before = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except ValueError:
-            try:
-                before = datetime.fromisoformat(value + "T00:00:00")
-            except ValueError:
-                raise serializers.ValidationError("Invalid datetime format.")
-        return before
-
-    def validate_after(self, value):
-        try:
-            after = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except ValueError:
-            try:
-                after = datetime.fromisoformat(value + "T00:00:00")
-            except ValueError:
-                raise serializers.ValidationError("Invalid datetime format.")
-        return after
+    template = serializers.CharField(required=True)
 
     class Meta:
         model = Msg
-        fields = ("template", "page_size", "offset", "before", "after")
+        fields = ("uuid", "contact_id", "template", "text", "created_on", "sent_on", "status")
 
 
 class FlowReadSerializer(ReadSerializer):
