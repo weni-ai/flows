@@ -1,31 +1,43 @@
 from django.db import migrations
 from django.utils import timezone
 
+from temba.msgs.models import Msg
 
-def populate_template(apps, schema_editor):  # pragma: no cover
-    Msg = apps.get_model("msgs", "Msg")
 
-    num_updated = 0
-    for msg in Msg.objects.exclude(metadata=None, direction="I"):
-        template_name = msg.metadata.get("templating", {}).get("template", {}).get("name")
-        if template_name:
-            msg.template = template_name
-            msg.modified_on = timezone.now()
-            msg.save(update_fields=("template", "modified_on"))
-            num_updated += 1
+def batch_queryset(queryset, batch_size=1000):
+    total = queryset.count()
 
-    if num_updated:
-        print(f"Updated template name for {num_updated} msgs")
+    for start in range(0, total, batch_size):
+        end = min(start + batch_size, total)
+        yield (start, end, total, queryset[start:end])
+
+
+queryset = Msg.objects.exclude(metadata=None, direction="I")
+
+
+def populate_template(apps, schema_editor):
+    for start, end, total, batch in batch_queryset(queryset, batch_size=500):
+        print(f"Lote de {start} a {end} de um total de {total} elementos:")
+
+        msgs_to_update = []
+        for msg in batch:
+            template_name = msg.metadata.get("templating", {}).get("template", {}).get("name")
+            if template_name:
+                msg.template = template_name
+                msg.modified_on = timezone.now()
+                msgs_to_update.append(msg)
+        if msgs_to_update:
+            Msg.objects.bulk_update(msgs_to_update, ["template", "modified_on"])
 
 
 def reverse(apps, schema_editor):  # pragma: no cover
-    pass
+    from django.apps import apps
+
+    populate_template(apps, schema_editor)
 
 
 def apply_manual():  # pragma: no cover
-    from django.apps import apps
-
-    populate_template(apps, None)
+    populate_template()
 
 
 class Migration(migrations.Migration):
