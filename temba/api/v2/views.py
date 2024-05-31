@@ -12,7 +12,6 @@ from smartmin.views import SmartFormView, SmartTemplateView
 from django import forms
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
-from django.db import connection
 from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
 from django.utils.translation import ugettext_lazy as _
@@ -1895,7 +1894,7 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
         }
 
 
-class FilterTemplatesEndpoint(BaseAPIView):
+class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list contacts with templates in your account.
 
@@ -1943,89 +1942,18 @@ class FilterTemplatesEndpoint(BaseAPIView):
     """
 
     permission = "contacts.contact_api"
+    model = Msg
+    serializer_class = FilterTemplateSerializer
+    pagination_class = ContactsTemplateCursorPagination
 
-    def get(self, request, *args, **kwargs):
+    def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
 
-        serializer = FilterTemplateSerializer(data=params)
-        serializer.is_valid(raise_exception=True)
+        template = params.get("template")
+        if template:
+            queryset = queryset.filter(template=template)
 
-        template = serializer.validated_data["template"]
-        page_size = serializer.validated_data["page_size"]
-        offset = serializer.validated_data["offset"]
-
-        before = None
-        if params.get("before"):
-            before = serializer.validated_data["before"]
-            filter_before = f""" AND msg.created_on <= '{before}'"""
-
-        after = None
-        if params.get("after"):
-            after = serializer.validated_data["after"]
-            filter_after = f""" AND msg.created_on >= '{after}'"""
-
-        sql = """SELECT
-                    contact.id,
-                    contact.uuid,
-                    contact.name,
-                    msg.metadata::json->'templating'->'template'->>'uuid',
-                    msg.metadata::json->'templating'->'template'->>'name',
-                    msg.text,
-                    msg.created_on,
-                    msg.sent_on,
-                    msg.direction,
-                    msg.status
-
-                FROM public.msgs_msg as msg
-                JOIN public.contacts_contact as contact
-                    on msg.contact_id = contact.id
-                WHERE
-                    msg.metadata::json->'templating'->'template'->>'name' = %s
-                    AND msg.org_id = %s"""
-
-        final_sql = """
-                ORDER BY contact.id
-                LIMIT %s
-                OFFSET %s
-                """
-
-        messages = None
-        with connection.cursor() as cursor:
-            if before:
-                sql = sql + filter_before
-
-            if after:
-                sql = sql + filter_after
-
-            sql = sql + final_sql
-            cursor.execute(sql, [template, org.id, int(page_size), int(offset)])
-
-            results = cursor.fetchall()
-            messages = list(
-                map(
-                    lambda message: {
-                        "id": message[0],
-                        "uuid": message[1],
-                        "name": message[2],
-                        "template": {
-                            "uuid": message[3],
-                            "name": message[4],
-                            "text": message[5],
-                            "created_on": message[6],
-                            "sent_on": message[7],
-                            "direction": message[8],
-                            "status": message[9],
-                        },
-                    },
-                    results,
-                )
-            )
-
-        response_data = {
-            "results": messages,
-        }
-        return Response(response_data)
+        return self.filter_before_after(queryset, "created_on")
 
     @classmethod
     def get_read_explorer(cls):
