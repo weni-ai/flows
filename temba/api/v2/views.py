@@ -1853,6 +1853,10 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
             if group:
                 queryset = queryset.filter(all_groups=group)
 
+        template = params.get("template")
+        if template:
+            queryset = queryset.filter(msgs__template=template)
+
         queryset = queryset.annotate(
             num_non_empty_templates=Count(
                 "msgs", filter=Q(msgs__metadata__contains="templating", msgs__text__isnull=False)
@@ -1860,7 +1864,7 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
         )
         queryset = queryset.filter(num_non_empty_templates__gt=0)
 
-        return self.filter_before_after(queryset, "created_on")
+        return self.filter_before_after(queryset, "msgs__sent_on")
 
     @classmethod
     def get_read_explorer(cls):

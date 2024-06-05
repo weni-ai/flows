@@ -916,11 +916,16 @@ class ContactTemplateSerializer(ReadSerializer):
         return [urn.api_urn() for urn in obj.get_urns()]
 
     def get_templates(self, obj):
+        request = self.context.get("request")
+        template = request.query_params.get("template") if request else None
         templates = obj.msgs.filter(metadata__contains="templating")
+
+        if template:
+            templates = templates.filter(template=template)
+
         return [
             {
-                "uuid": t.metadata["templating"]["template"]["uuid"],
-                "name": t.metadata["templating"]["template"]["name"],
+                "name": t.template,
                 "text": t.text,
                 "created_on": t.created_on,
                 "sent_on": t.sent_on,
