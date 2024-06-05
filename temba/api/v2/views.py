@@ -1963,12 +1963,15 @@ class FilterTemplatesEndpoint(BaseAPIView):
         before = None
         if params.get("before"):
             before = serializer.validated_data["before"]
-            filter_before = f""" AND msg.created_on <= '{before}'"""
+
+            filter_before = f"""
+                    AND msg.created_on <= '{before}'"""
 
         after = None
         if params.get("after"):
             after = serializer.validated_data["after"]
-            filter_after = f""" AND msg.created_on >= '{after}'"""
+            filter_after = f"""
+                    AND msg.created_on >= '{after}'"""
 
         sql = """SELECT
                     contact.id,
