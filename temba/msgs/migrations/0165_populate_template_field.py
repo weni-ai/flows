@@ -12,12 +12,12 @@ def batch_queryset(queryset, batch_size=1000):  # pragma: no cover
         yield (start, end, total, queryset[start:end])
 
 
-queryset = Msg.objects.exclude(metadata=None, direction="I")
+queryset = Msg.objects.exclude(metadata=None, direction="I", template__isnull=False)
 
 
 def populate_template(apps, schema_editor):  # pragma: no cover
     for start, end, total, batch in batch_queryset(queryset, batch_size=500):
-        print(f"Lote de {start} a {end} de um total de {total} elementos:")
+        print(f"Batch of {start} to {end} in a total of {total} elements:")
 
         msgs_to_update = []
         for msg in batch:

@@ -12,6 +12,7 @@ from smartmin.views import SmartFormView, SmartTemplateView
 from django import forms
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
+from django.db import connection
 from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
 from django.utils.translation import ugettext_lazy as _
@@ -73,6 +74,7 @@ from .serializers import (
     ContactWriteSerializer,
     ExternalServicesReadSerializer,
     FilterTemplateSerializer,
+    FilterTemplateSerializerNew,
     FlowReadSerializer,
     FlowRunReadSerializer,
     FlowsLabelsReadSerializer,
@@ -1890,7 +1892,7 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
         }
 
 
-class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
+class FilterTemplatesEndpoint(BaseAPIView):
     """
     This endpoint allows you to list contacts with templates in your account.
 
@@ -1942,6 +1944,171 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
     serializer_class = FilterTemplateSerializer
     pagination_class = ContactsTemplateCursorPagination
 
+    def get(self, request, *args, **kwargs):
+        params = self.request.query_params
+        org = self.request.user.get_org()
+
+        serializer = FilterTemplateSerializer(data=params)
+        serializer.is_valid(raise_exception=True)
+
+        template = serializer.validated_data["template"]
+        page_size = serializer.validated_data["page_size"]
+        offset = serializer.validated_data["offset"]
+
+        before = None
+        if params.get("before"):
+            before = serializer.validated_data["before"]
+
+            filter_before = f"""
+                    AND msg.created_on <= '{before}'"""
+
+        after = None
+        if params.get("after"):
+            after = serializer.validated_data["after"]
+            filter_after = f"""
+                    AND msg.created_on >= '{after}'"""
+
+        sql = """SELECT
+                    contact.id,
+                    contact.uuid,
+                    contact.name,
+                    msg.metadata::json->'templating'->'template'->>'uuid',
+                    msg.metadata::json->'templating'->'template'->>'name',
+                    msg.text,
+                    msg.created_on,
+                    msg.sent_on,
+                    msg.direction,
+                    msg.status
+                FROM public.msgs_msg as msg
+                JOIN public.contacts_contact as contact
+                    on msg.contact_id = contact.id
+                WHERE
+                    msg.metadata::json->'templating'->'template'->>'name' = %s
+                    AND msg.org_id = %s"""
+
+        final_sql = """
+                ORDER BY contact.id
+                LIMIT %s
+                OFFSET %s
+                """
+
+        messages = None
+        with connection.cursor() as cursor:
+            if before:
+                sql = sql + filter_before
+
+            if after:
+                sql = sql + filter_after
+
+            sql = sql + final_sql
+            cursor.execute(sql, [template, org.id, int(page_size), int(offset)])
+
+            results = cursor.fetchall()
+            messages = list(
+                map(
+                    lambda message: {
+                        "id": message[0],
+                        "uuid": message[1],
+                        "name": message[2],
+                        "template": {
+                            "uuid": message[3],
+                            "name": message[4],
+                            "text": message[5],
+                            "created_on": message[6],
+                            "sent_on": message[7],
+                            "direction": message[8],
+                            "status": message[9],
+                        },
+                    },
+                    results,
+                )
+            )
+
+        response_data = {
+            "results": messages,
+        }
+
+        return Response(response_data)
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "Filter Templates for contacts context",
+            "url": reverse("api.v2.filter_templates"),
+            "slug": "contacts-templates-list",
+            "params": [
+                {
+                    "name": "template",
+                    "required": False,
+                    "help": "Only return contacts for this template, ex: template=template_test",
+                },
+                {
+                    "name": "before",
+                    "required": False,
+                    "help": "Only return contacts for this template before the date, ex: before=2024-01-01",
+                },
+                {
+                    "name": "after",
+                    "required": False,
+                    "help": "Only return contacts for this template after the data, ex: after=2023-01-01",
+                },
+            ],
+        }
+
+
+class FilterTemplatesEndpointNew(ListAPIMixin, BaseAPIView):
+    """
+    This endpoint allows you to list contacts with templates in your account.
+
+    ## Filter contacts by templates
+
+    A **GET** returns the list of contacts with templates for your organization, in the order of last activity date. The endpoint
+    will return only with the contact that has template called in Msg.
+
+     * **uuid** - the UUID of the contact (string), filterable as `uuid`.
+     * **name** - the name of the contact (string), filterable as `name`.
+     * **template** - the template the contact messages receive
+     * **created_on** - when this contact was created (datetime).
+     * **modified_on** - when this contact was last modified (datetime).
+     * **last_seen_on** - when this contact last communicated with us (datetime).
+
+    Example:
+
+        GET /api/v2/filter_templates.json
+
+    Response containing the contacts for your organization:
+
+        {
+            "results": [
+            {
+            "id": 123546,
+            "uuid": "0fcbfa94-abbe-436a-867a-d8b3e6da6b83",
+            "name": "Jimmy",
+            "template":
+                {
+                    "uuid": "44019537-9afe-4898-9626-a5c724d169ef",
+                    "name": "template_test",
+                    "text": "Hello teste! I'm Doris, Weni's virtual assistant.",
+                    "created_on": "2023-11-01T18:35:52.690932Z",
+                    "sent_on": "2023-11-01T18:36:02.590312Z",
+                    "direction": "I",
+                    "status": "wired"
+                },
+            "created_on": "2023-02-24T14:23:11.058607Z",
+            "modified_on": "2024-02-08T14:05:51.711344Z",
+            "last_seen_on": "2023-12-08T14:10:48.490004Z"
+        }
+                ]
+        }
+
+    """
+
+    permission = "contacts.contact_api"
+    model = Msg
+    serializer_class = FilterTemplateSerializerNew
+    pagination_class = ContactsTemplateCursorPagination
+
     def filter_queryset(self, queryset):
         params = self.request.query_params
 
@@ -1956,7 +2123,7 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
         return {
             "method": "GET",
             "title": "Filter Templates for contacts context",
-            "url": reverse("api.v2.filter_templates"),
+            "url": reverse("api.v2.filter_templates_new"),
             "slug": "contacts-templates-list",
             "params": [
                 {
