@@ -977,6 +977,14 @@ class FilterTemplateSerializer(ReadSerializer):
         fields = ("template", "page_size", "offset", "before", "after")
 
 
+class FilterTemplateSerializerNew(ReadSerializer):
+    template = serializers.CharField(required=True)
+
+    class Meta:
+        model = Msg
+        fields = ("uuid", "contact_id", "template", "text", "created_on", "sent_on", "status")
+
+
 class FlowReadSerializer(ReadSerializer):
     FLOW_TYPES = {
         Flow.TYPE_MESSAGE: "message",

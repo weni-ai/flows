@@ -408,6 +408,8 @@ class Msg(models.Model):
     # can be set before deletion to indicate deletion by a user which should decrement from counts
     delete_from_counts = models.BooleanField(null=True, default=False)
 
+    template = models.CharField(max_length=512, null=True)
+
     # TODO deprecated in favor of delete_from_counts
     DELETE_FOR_ARCHIVE = "A"
     DELETE_FOR_USER = "U"
