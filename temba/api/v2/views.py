@@ -13,6 +13,7 @@ from smartmin.views import SmartFormView, SmartTemplateView
 from django import forms
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
+from django.db import connection
 from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
 from django.utils.translation import ugettext_lazy as _
@@ -71,6 +72,7 @@ from .serializers import (
     ContactLeanReadSerializer,
     ContactReadSerializer,
     ContactTemplateSerializer,
+    ContactTemplateSerializerNew,
     ContactWriteSerializer,
     ExternalServicesReadSerializer,
     FilterTemplateSerializer,
@@ -1874,6 +1876,131 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
             "method": "GET",
             "title": "List Templates for contacts",
             "url": reverse("api.v2.contact_templates"),
+            "slug": "contacts-templates-list",
+            "params": [
+                {
+                    "name": "contact",
+                    "required": False,
+                    "help": "A Contact UUID to filter by. ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                },
+                {
+                    "name": "group",
+                    "required": False,
+                    "help": "A Group UUID to filter by. ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                },
+                {
+                    "name": "before",
+                    "required": False,
+                    "help": "Only return contacts modified before this date, ex: 2015-01-28T18:00:00.000",
+                },
+                {
+                    "name": "after",
+                    "required": False,
+                    "help": "Only return contacts modified after this date, ex: 2015-01-28T18:00:00.000",
+                },
+            ],
+        }
+
+
+class ContactsTemplatesEndpointNew(ListAPIMixin, BaseAPIView):
+    """
+    This endpoint allows you to list contacts with templates in your account.
+
+    ## Listing Contacts
+
+    A **GET** returns the list of contacts whti templates for your organization, in the order of last activity date. The endpoin
+    will return only with the contact that has template called in Msg.
+
+     * **uuid** - the UUID of the contact (string), filterable as `uuid`.
+     * **name** - the name of the contact (string), filterable as `name`.
+     * **urns** - the URNs associated with the contact (string array), filterable as `urn`.
+     * **groups** - the UUIDs of any groups the contact is part of (array of objects), filterable as `group` with group name or UUID.
+     * **templates** - the templates the contact messages receive
+     * **created_on** - when this contact was created (datetime).
+     * **modified_on** - when this contact was last modified (datetime).
+     * **last_seen_on** - when this contact last communicated with us (datetime).
+
+
+
+    Example:
+
+        GET /api/v2/contact_templates.json
+
+    Response containing the contacts for your organization:
+
+        {
+            "next": null,
+            "previous": null,
+            "results": [
+            {
+            "uuid": "0fcbfa94-abbe-436a-867a-d8b3e6da6b83",
+            "id": 123546,
+            "name": "Jimmy",
+            "urns": [
+                "whatsapp:5555555555"
+            ],
+            "templates": [
+                {
+                    "uuid": "44019537-9afe-4898-9626-a5c724d169ef",
+                    "name": "template_test",
+                    "text": "Hello teste! I'm Doris, Weni's virtual assistant.",
+                    "created_on": "2023-11-01T18:35:52.690932Z",
+                    "sent_on": "2023-11-01T18:36:02.590312Z",
+                    "direction": "Incoming",
+                    "status": "wired"
+                }
+            ],
+            "created_on": "2023-02-24T14:23:11.058607Z",
+            "modified_on": "2024-02-08T14:05:51.711344Z",
+            "last_seen_on": "2023-12-08T14:10:48.490004Z"
+        }
+                ]
+        }
+
+    """
+
+    permission = "contacts.contact_api"
+    model = Contact
+    serializer_class = ContactTemplateSerializerNew
+    pagination_class = ContactsTemplateCursorPagination
+
+    def get_queryset(self):
+        return self.model.objects.filter(org=self.request.user.get_org(), is_active=True)
+
+    def filter_queryset(self, queryset):
+        params = self.request.query_params
+        org = self.request.user.get_org()
+
+        contact = params.get("contact")
+        if contact:
+            queryset = queryset.filter(uuid=contact)
+
+        group_ref = params.get("group")
+        if group_ref:
+            group = ContactGroup.user_groups.filter(org=org).filter(Q(uuid=group_ref) | Q(name=group_ref)).first()
+
+            if group:
+                queryset = queryset.filter(all_groups=group)
+
+        template = params.get("template")
+        if template:
+            queryset = queryset.filter(msgs__template=template)
+
+        queryset = queryset.annotate(
+            num_non_empty_templates=Count(
+                "msgs", filter=Q(msgs__metadata__contains="templating", msgs__text__isnull=False)
+            )
+        )
+        queryset = queryset.filter(num_non_empty_templates__gt=0)
+
+        return self.filter_before_after(queryset, "msgs__sent_on")
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Templates for contacts",
+            "url": reverse("api.v2.contact_templates_new"),
             "slug": "contacts-templates-list",
             "params": [
                 {

@@ -1,6 +1,7 @@
 import logging
 import numbers
 from collections import OrderedDict
+from datetime import datetime
 
 import iso8601
 import pycountry
@@ -891,7 +892,7 @@ class ContactBulkActionSerializer(WriteSerializer):
                 contact.release(user)
 
 
-class ContactTemplateSerializer(ReadSerializer):
+class ContactTemplateSerializerNew(ReadSerializer):
     STATUSES = {
         Msg.STATUS_INITIALIZING: "initializing",
         Msg.STATUS_PENDING: "queued",  # same as far as users are concerned
@@ -949,12 +950,89 @@ class ContactTemplateSerializer(ReadSerializer):
         )
 
 
+class ContactTemplateSerializer(ReadSerializer):
+    STATUSES = {
+        Msg.STATUS_INITIALIZING: "initializing",
+        Msg.STATUS_PENDING: "queued",  # same as far as users are concerned
+        Msg.STATUS_QUEUED: "queued",
+        Msg.STATUS_WIRED: "wired",
+        Msg.STATUS_SENT: "sent",
+        Msg.STATUS_DELIVERED: "delivered",
+        Msg.STATUS_HANDLED: "handled",
+        Msg.STATUS_ERRORED: "errored",
+        Msg.STATUS_FAILED: "failed",
+        Msg.STATUS_RESENT: "resent",
+        Msg.STATUS_READ: "read",
+    }
+
+    urns = serializers.SerializerMethodField()
+    templates = serializers.SerializerMethodField()
+    created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    modified_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    last_seen_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+
+    def get_urns(self, obj):
+        return [urn.api_urn() for urn in obj.get_urns()]
+
+    def get_templates(self, obj):
+        templates = obj.msgs.filter(metadata__contains="templating")
+
+        return [
+            {
+                "name": t.template,
+                "text": t.text,
+                "created_on": t.created_on,
+                "sent_on": t.sent_on,
+                "direction": "Out" if t.direction == "Outgoing" else "Incoming",
+                "status": self.STATUSES.get(t.status),
+            }
+            for t in templates
+        ]
+
+    class Meta:
+        model = Contact
+        fields = (
+            "uuid",
+            "id",
+            "name",
+            "urns",
+            "templates",
+            "created_on",
+            "modified_on",
+            "last_seen_on",
+        )
+
+
 class FilterTemplateSerializer(ReadSerializer):
-    template = serializers.CharField(required=True)
+    template = serializers.CharField()
+    page_size = serializers.IntegerField(default=10)
+    offset = serializers.IntegerField(default=0)
+    before = serializers.CharField(required=False)
+    after = serializers.CharField(required=False)
+
+    def validate_before(self, value):
+        try:
+            before = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            try:
+                before = datetime.fromisoformat(value + "T00:00:00")
+            except ValueError:
+                raise serializers.ValidationError("Invalid datetime format.")
+        return before
+
+    def validate_after(self, value):
+        try:
+            after = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            try:
+                after = datetime.fromisoformat(value + "T00:00:00")
+            except ValueError:
+                raise serializers.ValidationError("Invalid datetime format.")
+        return after
 
     class Meta:
         model = Msg
-        fields = ("uuid", "contact_id", "template", "text", "created_on", "sent_on", "status")
+        fields = ("template", "page_size", "offset", "before", "after")
 
 
 class FilterTemplateSerializerNew(ReadSerializer):

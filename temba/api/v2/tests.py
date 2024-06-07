@@ -5338,6 +5338,7 @@ class ContactsTemplatesEndpointTest(TembaTest):
             broadcast=None,
             metadata=metadata,
             next_attempt=None,
+            template="template_test",
         )
 
         view = ContactsTemplatesEndpoint
