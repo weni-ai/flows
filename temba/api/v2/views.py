@@ -103,6 +103,7 @@ from .serializers import (
     WorkspaceReadSerializer,
 )
 from .wenigpt.views import IntelligencesEndpoint
+from .wenibrain.views import BrainInfoEndpoint
 
 
 class RootView(views.APIView):
@@ -324,6 +325,7 @@ class ExplorerView(SmartTemplateView):
             WorkspaceEndpoint.get_read_explorer(),
             IntelligencesEndpoint.get_read_explorer(),
             ExternalServicesEndpoint.get_read_explorer(),
+            BrainInfoEndpoint.get_read_explorer(),
         ]
         return context
 

@@ -1086,6 +1086,8 @@ class FlowCRUDL(SmartCRUDL):
                 features.append("whatsapp_catalog")
             if org.config.get("has_vtex"):
                 features.append("has_vtex")
+            if org.brain_on:
+                features.append("brain")
 
             return features
 
