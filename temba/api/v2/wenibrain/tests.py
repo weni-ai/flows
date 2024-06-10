@@ -14,11 +14,10 @@ class TestBrainInfoEndpoint(TembaTest):
                 "name": "Bob",
                 "role": "Auxiliar de vendas",
                 "personality": "Organizado",
-                "goal": "Realizar atendimento ao cliente"
+                "goal": "Realizar atendimento ao cliente",
             },
-            "instructions": []
+            "instructions": [],
         }
-        
 
         mock_requests_get.return_value = mock_response
         mock_requests_get.return_value.status_code = 200
@@ -31,23 +30,24 @@ class TestBrainInfoEndpoint(TembaTest):
 
         self.assertEqual(response.status_code, 200)
 
-        expected_data = { "name": "Bob", "occupation": "Auxiliar de vendas" }
+        expected_data = {"name": "Bob", "occupation": "Auxiliar de vendas"}
 
         self.assertEqual(response.json(), expected_data)
 
     @patch("temba.api.v2.wenigpt.views.requests.get")
     def test_get_intelligences_error(self, mock_requests_get):
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "agent": {
-                "name": "Bob",
-                "role": "Auxiliar de vendas",
-                "personality": "Organizado",
-                "goal": "Realizar atendimento ao cliente"
+        mock_response.json.return_value = (
+            {
+                "agent": {
+                    "name": "Bob",
+                    "role": "Auxiliar de vendas",
+                    "personality": "Organizado",
+                    "goal": "Realizar atendimento ao cliente",
+                },
+                "instructions": [],
             },
-            "instructions": []
-        },
-        
+        )
 
         mock_requests_get.return_value = mock_response
         mock_requests_get.return_value.status_code = 500
@@ -60,16 +60,14 @@ class TestBrainInfoEndpoint(TembaTest):
 
         self.assertEqual(response.status_code, 200)
 
-        expected_data = { "name": "", "occupation": ""}
+        expected_data = {"name": "", "occupation": ""}
 
         self.assertEqual(response.json(), expected_data)
 
     @patch("temba.api.v2.wenigpt.views.requests.get")
     def test_get_intelligences_missing_agent_data(self, mock_requests_get):
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "instructions": []
-        }
+        mock_response.json.return_value = {"instructions": []}
 
         mock_requests_get.return_value = mock_response
         mock_requests_get.return_value.status_code = 200
@@ -82,6 +80,6 @@ class TestBrainInfoEndpoint(TembaTest):
 
         self.assertEqual(response.status_code, 200)
 
-        expected_data = { "name": "", "occupation": ""}
+        expected_data = {"name": "", "occupation": ""}
 
         self.assertEqual(response.json(), expected_data)
