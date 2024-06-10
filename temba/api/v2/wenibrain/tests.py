@@ -9,17 +9,16 @@ class TestBrainInfoEndpoint(TembaTest):
     @patch("temba.api.v2.wenibrain.views.requests.get")
     def test_get_brain_info(self, mock_requests_get):
         mock_response = MagicMock()
-        mock_response.json.return_value = [
-            {
-                "agent": {
-                    "name": "Bob",
-                    "role": "Auxiliar de vendas",
-                    "personality": "Organizado",
-                    "goal": "Realizar atendimento ao cliente"
-                },
-                "instructions": []
-            }
-        ]
+        mock_response.json.return_value = {
+            "agent": {
+                "name": "Bob",
+                "role": "Auxiliar de vendas",
+                "personality": "Organizado",
+                "goal": "Realizar atendimento ao cliente"
+            },
+            "instructions": []
+        }
+        
 
         mock_requests_get.return_value = mock_response
         mock_requests_get.return_value.status_code = 200
@@ -39,17 +38,16 @@ class TestBrainInfoEndpoint(TembaTest):
     @patch("temba.api.v2.wenigpt.views.requests.get")
     def test_get_intelligences_error(self, mock_requests_get):
         mock_response = MagicMock()
-        mock_response.json.return_value = [
-            {
-                "agent": {
-                    "name": "Bob",
-                    "role": "Auxiliar de vendas",
-                    "personality": "Organizado",
-                    "goal": "Realizar atendimento ao cliente"
-                },
-                "instructions": []
+        mock_response.json.return_value = {
+            "agent": {
+                "name": "Bob",
+                "role": "Auxiliar de vendas",
+                "personality": "Organizado",
+                "goal": "Realizar atendimento ao cliente"
             },
-        ]
+            "instructions": []
+        },
+        
 
         mock_requests_get.return_value = mock_response
         mock_requests_get.return_value.status_code = 500
@@ -69,12 +67,9 @@ class TestBrainInfoEndpoint(TembaTest):
     @patch("temba.api.v2.wenigpt.views.requests.get")
     def test_get_intelligences_missing_agent_data(self, mock_requests_get):
         mock_response = MagicMock()
-        mock_response.json.return_value = [
-            {
-                "agent": {},
-                "instructions": []
-            },
-        ]
+        mock_response.json.return_value = {
+            "instructions": []
+        }
 
         mock_requests_get.return_value = mock_response
         mock_requests_get.return_value.status_code = 200
