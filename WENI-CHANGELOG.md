@@ -1,3 +1,9 @@
+3.9.1
+----------
+* Add template field in Msg model and refact related endpoint
+* Update contacts templates endpoint with new template field
+* Remove validation in get_features function
+
 3.9.0
 ----------
 * Chore: Bump floweditor to 2.15.0
