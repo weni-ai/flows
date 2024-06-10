@@ -429,6 +429,13 @@ class FlowTest(TembaTest):
             {"facebook", "airtime", "classifier", "resthook", "ticketer", "external_service", "whatsapp_catalog"}
         )
 
+        self.org.brain_on = True
+        self.org.save(update_fields=("brain_on",))
+
+        assert_features(
+            {"facebook", "airtime", "classifier", "resthook", "ticketer", "external_service", "whatsapp_catalog", "brain"}
+        )
+
         self.setUpLocations()
 
         assert_features(
@@ -440,6 +447,7 @@ class FlowTest(TembaTest):
                 "ticketer",
                 "external_service",
                 "whatsapp_catalog",
+                "brain",
                 "locations",
             }
         )
