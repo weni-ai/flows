@@ -49,7 +49,7 @@ class BrainInfoEndpoint(BaseAPIView, BaseInternalClient):
 
         if response.status_code >= 400:
             return Response({"name": "", "occupation": ""})
-        
+
         agent = response.json().get("agent", None)
 
         if not agent:

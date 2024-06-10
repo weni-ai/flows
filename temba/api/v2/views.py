@@ -102,8 +102,8 @@ from .serializers import (
     WebHookEventReadSerializer,
     WorkspaceReadSerializer,
 )
-from .wenigpt.views import IntelligencesEndpoint
 from .wenibrain.views import BrainInfoEndpoint
+from .wenigpt.views import IntelligencesEndpoint
 
 
 class RootView(views.APIView):
