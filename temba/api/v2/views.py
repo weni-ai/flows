@@ -1,5 +1,6 @@
 import itertools
 import json
+import logging
 import requests
 from enum import Enum
 
@@ -4577,20 +4578,27 @@ class CodeActionsEndpoint(BaseAPIView):
     """
     
     def get(self, request, *args, **kwargs):
-        org = self.request.user.get_org()
+        org = request.user.get_org()
         codeactionsServiceUrl = settings.CODEACTIONS_URL
-        requrl = f"{codeactionsServiceUrl}/code?project_uuid={org.proj_uuid}"
+        requrl = f"{codeactionsServiceUrl}/code?project_uuid={org.proj_uuid}&code_type=flow"
         results = []
+        statuscode = 200
+        response_data = {"project_uuid": org.proj_uuid}
         try:
             resp = requests.get(requrl)
-            results = json.loads(resp.text)
+            if resp.status_code == 200:
+                results = json.loads(resp.text)
+            else:
+                statuscode = resp.status_code
+                results = [],
         except Exception as e:
-            results = e
-        response_data = {
-            "results": results,
-            "project_uuid": org.proj_uuid,
-        }
-        return Response(response_data)
+            logger = logging.getLogger(__name__)
+            logger.error("Exception on request code actions: %s" % str(e), exc_info=True)
+            statuscode = 500
+            results = []
+            response_data["error"] = str(e)
+        response_data["results"] = results
+        return Response(response_data, statuscode)
     
     def get_read_explorer(cls):
         return {
