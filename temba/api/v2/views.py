@@ -1,4 +1,7 @@
 import itertools
+import json
+import logging
+import requests
 from enum import Enum
 
 from rest_framework import generics, status, views
@@ -10,6 +13,7 @@ from rest_framework.reverse import reverse
 from smartmin.views import SmartFormView, SmartTemplateView
 
 from django import forms
+from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
 from django.db import connection
@@ -253,6 +257,7 @@ class RootView(views.APIView):
                 "topics": reverse("api.v2.topics", request=request),
                 "users": reverse("api.v2.users", request=request),
                 "workspace": reverse("api.v2.workspace", request=request),
+                "code_actions": reverse("api.v2.code_actions", request=request),
             }
         )
 
@@ -321,6 +326,7 @@ class ExplorerView(SmartTemplateView):
             WorkspaceEndpoint.get_read_explorer(),
             IntelligencesEndpoint.get_read_explorer(),
             ExternalServicesEndpoint.get_read_explorer(),
+            CodeActionsEndpoint.get_read_explorer(),
         ]
         return context
 
@@ -4543,4 +4549,77 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
             "slug": "products-list",
             "params": [],
             "example": {},
+        }
+
+class CodeActionsEndpoint(BaseAPIView):
+    """
+    This endpoint allows you to list the code actions in your organizations/project
+    
+    ## Listing Code Actions
+    
+    A `GET` request returns the code actions for your organizations/project
+
+    Example:
+    
+        GET /api/v2/code_actions.json
+    
+    Response is the list of code actions for your organizations/project
+    
+        {
+            "results": [
+                {
+                    "id": "6605bb5069a97e1c6718fcf0",
+                    "name": "foo bar 1",
+                    "type": "user",
+                    "source": "",
+                    "language": "",
+                    "url": "",
+                    "project_uuid": "815af923-6994-47b0-b460-e050f08d965a",
+                    "creted_at": "2024-03-28T18:47:44.037Z",
+                    "updated_at": "2024-03-28T18:47:44.037Z"
+                },
+                {
+                    "id": "6605d70ad493bd3e8dc78789",
+                    "name": "foo bar 2",
+                    "type": "user",
+                    "source": "console.log(\"hello world\")",
+                    "language": "",
+                    "url": "",
+                    "project_uuid": "815af923-6994-47b0-b460-e050f08d965a",
+                    "creted_at": "2024-03-28T20:46:02.381Z",
+                    "updated_at": "2024-03-28T20:46:02.381Z"
+                }
+            ]
+        }
+    """
+    
+    def get(self, request, *args, **kwargs):
+        org = request.user.get_org()
+        codeactionsServiceUrl = settings.CODEACTIONS_URL
+        requrl = f"{codeactionsServiceUrl}/code?project_uuid={org.proj_uuid}&code_type=flow"
+        results = []
+        statuscode = 200
+        response_data = {"project_uuid": org.proj_uuid}
+        try:
+            resp = requests.get(requrl)
+            if resp.status_code == 200:
+                results = json.loads(resp.text)
+            else:
+                statuscode = resp.status_code
+                results = [],
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error("Exception on request code actions: %s" % str(e), exc_info=True)
+            statuscode = 500
+            results = []
+            response_data["error"] = str(e)
+        response_data["results"] = results
+        return Response(response_data, statuscode)
+    
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Code Actions",
+            "url": reverse("api.v2.code_actions"),
+            "slug": "codeactions",
         }

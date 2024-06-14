@@ -1348,3 +1348,6 @@ INTELLIGENCES_TOKEN = os.environ.get("INTELLIGENCES_TOKEN", default="")
 
 # Nexus url
 NEXUS_BASE_URL = os.environ.get("NEXUS_BASE_URL", default="https://nexus.dev.cloud.weni.ai")
+
+# Code Actions url
+CODEACTIONS_URL = os.environ.get("NEXUS_BASE_URL", default="http://localhost:8050")
