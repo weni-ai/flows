@@ -6,6 +6,7 @@ import tempfile
 from datetime import date, datetime
 from gettext import gettext as _
 from urllib.parse import urlparse
+import smart_open
 
 from dateutil.relativedelta import relativedelta
 
@@ -173,6 +174,10 @@ class Archive(models.Model):
 
         def generator():
             for archive in archives:
+                print(archive.id)
+                #if archive.id == 14055487:
+                    #print("retirando id com problema", archive.id)
+                    #continue
                 for record in archive.iter_records(where=where):
                     yield record
 
@@ -184,28 +189,48 @@ class Archive(models.Model):
         """
 
         s3_client = s3.client()
+        bucket, key = self.get_storage_location()
+        print(where)
 
-        if where:
-            bucket, key = self.get_storage_location()
-            response = s3_client.select_object_content(
-                Bucket=bucket,
-                Key=key,
-                ExpressionType="SQL",
-                Expression=s3.compile_select(where=where),
-                InputSerialization={"CompressionType": "GZIP", "JSON": {"Type": "LINES"}},
-                OutputSerialization={"JSON": {"RecordDelimiter": "\n"}},
-            )
+        try:
+            if where:
+                print('ENTRA NO WHERE')
+                response = s3_client.select_object_content(
+                    Bucket=bucket,
+                    Key=key,
+                    ExpressionType="SQL",
+                    Expression=s3.compile_select(where=where),
+                    InputSerialization={"CompressionType": "GZIP", "JSON": {"Type": "LINES"}},
+                    OutputSerialization={"JSON": {"RecordDelimiter": "\n"}},
+                )
 
-            def generator():
-                for record in EventStreamReader(response["Payload"]):
-                    yield record
+                def generator():
+                    for record in EventStreamReader(response["Payload"]):
+                        print('PASSOU AQUI')
+                        yield record
 
-            return generator()
+                return generator()
 
-        else:
-            bucket, key = self.get_storage_location()
-            s3_obj = s3_client.get_object(Bucket=bucket, Key=key)
-            return jsonlgz_iterate(s3_obj["Body"])
+            else:
+                #bucket, key = self.get_storage_location()
+                s3_obj = s3_client.get_object(Bucket=bucket, Key=key)
+                return jsonlgz_iterate(s3_obj["Body"])
+        
+        except s3_client.exceptions.ClientError as e:
+            print('ENTROU NO ERRO')
+            error_code = e.response['Error']['Code']
+            if error_code == 'OverMaxRecordSize':
+                # Handle the error by switching to smart_open
+                s3_path = f's3://{bucket}/{key}'
+                with smart_open.open(s3_path, 'rb', transport_params={'client': s3_client}) as s3_file:
+                    with open("logs.json", 'w') as output_file:
+                        for line in s3_file:
+                            record = json.loads(line.decode('utf-8'))
+                            print('BORA')
+                            output_file.write(json.dumps(record) + '\n')
+                            yield record
+            else:
+                raise  # Re-raise the exception if it's not the expected one
 
     def rewrite(self, transform, delete_old=False):
         s3_client = s3.client()
