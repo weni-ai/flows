@@ -6,6 +6,8 @@ from itertools import chain
 from pathlib import Path
 from typing import Any
 
+from elasticsearch import Elasticsearch
+from elasticsearch_dsl import Search
 import iso8601
 import phonenumbers
 import pyexcel
@@ -237,22 +239,25 @@ class URN:
 
     @classmethod
     def verify_brazilian_number(cls, urn, scheme, norm_path, org):
-        contact_urn = ContactURN.objects.filter(identity=urn, org=org)
+        # contact_urn = ContactURN.objects.filter(identity=urn, org=org)
+        contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, norm_path, org)
+
         if contact_urn:
             return norm_path
 
         # remove number 9
         if len(norm_path) == 13:
             number = norm_path[:4] + norm_path[5:]
-            contact_urn = ContactURN.objects.filter(scheme=scheme, path=number, org=org).first()
-
+            contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, number, org)
+            # contact_urn = ContactURN.objects.filter(scheme=scheme, path=number, org=org).first()
             if contact_urn:
                 return number
 
         # add number 9
         else:
             number = norm_path[:4] + "9" + norm_path[4:]
-            contact_urn = ContactURN.objects.filter(scheme=scheme, path=number, org=org).first()
+            contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, number, org)
+            # contact_urn = ContactURN.objects.filter(scheme=scheme, path=number, org=org).first()
             if contact_urn:
                 return number
 
@@ -340,6 +345,39 @@ class URN:
     @classmethod
     def from_discord(cls, path):
         return cls.from_parts(cls.DISCORD_SCHEME, path)
+
+    def _get_contact_on_elasticsearch(cls, scheme, path, org):
+        from elasticsearch_dsl import Q
+
+        base_url = settings.ELASTICSEARCH_URL
+        client = Elasticsearch(f"{base_url}", timeout=settings.ELASTICSEARCH_TIMEOUT_REQUEST)
+        filte = [Q("match", org_id=org.id)]
+        index = "contacts"
+
+        filte.append(
+            Q(
+                "nested",
+                path="urns",
+                query=Q(
+                    "bool",
+                    must=[
+                        Q(
+                            "match_phrase",
+                            **{"urns.path": path},
+                        ),
+                        Q("term", urns__scheme=scheme),
+                    ],
+                ),
+            ),
+        )
+        qs = Q("bool", must=filte)
+
+        contacts = Search(using=client, index=index).query(qs)
+        response = list(contacts.scan())
+
+        if not response:
+            return False
+        return True
 
 
 class UserContactFieldsQuerySet(models.QuerySet):
