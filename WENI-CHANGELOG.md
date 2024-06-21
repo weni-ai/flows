@@ -1,3 +1,7 @@
+3.9.3
+----------
+* Chore: Bump floweditor to 2.15.1
+
 3.9.2
 ----------
 * Add config page for Teams Channel
