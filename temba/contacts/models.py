@@ -12,6 +12,8 @@ import pyexcel
 import pytz
 import regex
 from django_redis import get_redis_connection
+from elasticsearch import Elasticsearch
+from elasticsearch_dsl import Search
 from smartmin.models import SmartModel
 
 from django.conf import settings
@@ -236,12 +238,37 @@ class URN:
         return True
 
     @classmethod
-    def normalize(cls, urn, country_code=None):
+    def verify_brazilian_number(cls, urn, scheme, norm_path, org):  # pragma: no cover
+        if not org.config.get("access_elastic"):
+            return norm_path
+
+        contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, norm_path, org)
+
+        if contact_urn:
+            return norm_path
+
+        # remove number 9
+        if len(norm_path) == 13:
+            number = norm_path[:4] + norm_path[5:]
+            contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, number, org)
+            if contact_urn:
+                return number
+
+        # add number 9
+        else:
+            number = norm_path[:4] + "9" + norm_path[4:]
+            contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, number, org)
+            if contact_urn:
+                return number
+
+        return norm_path
+
+    @classmethod
+    def normalize(cls, urn, country_code=None, org=None):
         """
         Normalizes the path of a URN string. Should be called anytime looking for a URN match.
         """
         scheme, path, query, display = cls.to_parts(urn)
-
         country_code = str(country_code) if country_code else ""
         norm_path = str(path).strip()
 
@@ -261,6 +288,9 @@ class URN:
 
         elif scheme == cls.EMAIL_SCHEME:
             norm_path = norm_path.lower()
+
+        elif scheme == cls.WHATSAPP_SCHEME and norm_path[0:2] == "55" and org:  # pragma: no cover
+            norm_path = cls.verify_brazilian_number(urn, scheme, norm_path, org)
 
         return cls.from_parts(scheme, norm_path, query, display)
 
@@ -315,6 +345,39 @@ class URN:
     @classmethod
     def from_discord(cls, path):
         return cls.from_parts(cls.DISCORD_SCHEME, path)
+
+    def _get_contact_on_elasticsearch(cls, scheme, path, org):  # pragma: no cover
+        from elasticsearch_dsl import Q
+
+        base_url = settings.ELASTICSEARCH_URL
+        client = Elasticsearch(f"{base_url}", timeout=settings.ELASTICSEARCH_TIMEOUT_REQUEST)
+        filte = [Q("match", org_id=org.id)]
+        index = "contacts"
+
+        filte.append(
+            Q(
+                "nested",
+                path="urns",
+                query=Q(
+                    "bool",
+                    must=[
+                        Q(
+                            "match_phrase",
+                            **{"urns.path": path},
+                        ),
+                        Q("term", urns__scheme=scheme),
+                    ],
+                ),
+            ),
+        )
+        qs = Q("bool", must=filte)
+
+        contacts = Search(using=client, index=index).query(qs)
+        response = list(contacts.scan())
+
+        if not response:
+            return False
+        return True
 
 
 class UserContactFieldsQuerySet(models.QuerySet):
@@ -1395,7 +1458,7 @@ class ContactURN(models.Model):
         Looks up an existing URN by a formatted URN string, e.g. "tel:+250234562222"
         """
         if normalize:
-            urn_as_string = URN.normalize(urn_as_string, country_code)
+            urn_as_string = URN.normalize(urn_as_string, country_code, org=org)
 
         identity = URN.identity(urn_as_string)
         (scheme, path, query, display) = URN.to_parts(urn_as_string)
@@ -2175,7 +2238,7 @@ class ContactImport(SmartModel):
         num_records = 0
         for raw_row in data:
             row = cls._parse_row(raw_row, len(mappings))
-            uuid, urns = cls._extract_uuid_and_urns(row, mappings)
+            uuid, urns = cls._extract_uuid_and_urns(row, mappings, org)
             if uuid:
                 if uuid in seen_uuids:
                     raise ValidationError(
@@ -2205,7 +2268,7 @@ class ContactImport(SmartModel):
         return mappings, num_records
 
     @staticmethod
-    def _extract_uuid_and_urns(row, mappings) -> tuple[str, list[str]]:
+    def _extract_uuid_and_urns(row, mappings, org) -> tuple[str, list[str]]:
         """
         Extracts any UUIDs and URNs from the given row so they can be checked for uniqueness
         """
@@ -2218,7 +2281,7 @@ class ContactImport(SmartModel):
             elif mapping["type"] == "scheme" and value:
                 urn = URN.from_parts(mapping["scheme"], value)
                 try:
-                    urn = URN.normalize(urn)
+                    urn = URN.normalize(urn, org=org)
                 except ValueError:
                     pass
                 urns.append(urn)
@@ -2458,7 +2521,7 @@ class ContactImport(SmartModel):
                         spec["urns"] = []
                     urn = URN.from_parts(scheme, value)
                     try:
-                        urn = URN.normalize(urn, country_code=self.org.default_country_code)
+                        urn = URN.normalize(urn, country_code=self.org.default_country_code, org=self.org)
                     except ValueError:
                         pass
                     spec["urns"].append(urn)
