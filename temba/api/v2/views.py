@@ -4142,12 +4142,17 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
         params = self.request.query_params
         org = self.request.user.get_org()
 
-        queryset = org.templates.exclude(translations__is_active=False).prefetch_related(
-            Prefetch(
-                "translations",
-                TemplateTranslation.objects.filter(is_active=True),
-            )
+        # queryset = org.templates.exclude(translations__is_active=False).prefetch_related(
+        #     Prefetch(
+        #         "translations",
+        #         TemplateTranslation.objects.filter(is_active=True),
+        #     )
+        # )
+        active_translations = Prefetch(
+            "translations", queryset=TemplateTranslation.objects.filter(is_active=True), to_attr="active_translations"
         )
+
+        queryset = org.templates.filter(translations__is_active=True).distinct().prefetch_related(active_translations)
 
         status = params.get("status", "A")
         queryset = queryset.filter(translations__status=status).distinct()
