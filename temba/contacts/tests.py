@@ -4960,6 +4960,27 @@ class URNTest(TembaTest):
         # external ids are case sensitive
         self.assertEqual(URN.normalize("ext: eXterNAL123 "), "ext:eXterNAL123")
 
+        ContactURN.objects.create(
+            org=self.org, scheme="whatsapp", path="559178838338", identity="whatsapp:559178838338", priority=50
+        )
+
+        ContactURN.objects.create(
+            org=self.org, scheme="whatsapp", path="559178838340", identity="whatsapp:559178838340", priority=50
+        )
+
+        ContactURN.objects.create(
+            org=self.org, scheme="whatsapp", path="5591978838395", identity="whatsapp:5591978838395", priority=50
+        )
+
+        # valid whatsapp numbers - verify brazilian numbers conditions
+        # Removed because have to mock Elasticsearch call TODO: Create mock to test this function
+        # self.assertEqual(URN.normalize("whatsapp:250788383383"), "whatsapp:250788383383")
+        # self.assertEqual(URN.normalize("whatsapp:558478838338", org=self.org), "whatsapp:558478838338")
+        # self.assertEqual(URN.normalize("whatsapp:5587988348338", org=self.org), "whatsapp:5587988348338")
+        # self.assertEqual(URN.normalize("whatsapp:559178838338", org=self.org), "whatsapp:559178838338")
+        # self.assertEqual(URN.normalize("whatsapp:5591978838340", org=self.org), "whatsapp:559178838340")
+        # self.assertEqual(URN.normalize("whatsapp:559178838395", org=self.org), "whatsapp:5591978838395")
+
     def test_validate(self):
         self.assertFalse(URN.validate("xxxx", None))  # un-parseable URNs don't validate
 
