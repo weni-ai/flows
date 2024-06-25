@@ -1,3 +1,8 @@
+3.9.4
+----------
+* Fix performance in normalize urns
+* Change filter in templates endpoint
+
 3.9.3
 ----------
 * Chore: Bump floweditor to 2.15.1
