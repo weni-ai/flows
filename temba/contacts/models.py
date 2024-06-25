@@ -239,6 +239,9 @@ class URN:
 
     @classmethod
     def verify_brazilian_number(cls, urn, scheme, norm_path, org):  # pragma: no cover
+        if not org.config.get("access_elastic"):
+            return norm_path
+
         contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, norm_path, org)
 
         if contact_urn:
