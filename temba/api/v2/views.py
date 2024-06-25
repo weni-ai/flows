@@ -4582,23 +4582,17 @@ class CodeActionsEndpoint(BaseAPIView):
         codeactionsServiceUrl = settings.CODEACTIONS_URL
         requrl = f"{codeactionsServiceUrl}/code?project_uuid={org.proj_uuid}&code_type=flow"
         results = []
-        statuscode = 200
-        response_data = {"project_uuid": org.proj_uuid}
+        response_data = {}
         try:
             resp = requests.get(requrl)
             if resp.status_code == 200:
                 results = json.loads(resp.text)
-            else:
-                statuscode = resp.status_code
-                results = [],
         except Exception as e:
             logger = logging.getLogger(__name__)
             logger.error("Exception on request code actions: %s" % str(e), exc_info=True)
-            statuscode = 500
-            results = []
             response_data["error"] = str(e)
         response_data["results"] = results
-        return Response(response_data, statuscode)
+        return Response(response_data)
     
     def get_read_explorer(cls):
         return {
