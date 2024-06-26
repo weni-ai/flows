@@ -1,3 +1,17 @@
+3.9.4
+----------
+* Fix performance in normalize urns
+* Change filter in templates endpoint
+
+3.9.3
+----------
+* Chore: Bump floweditor to 2.15.1
+
+3.9.2
+----------
+* Add config page for Teams Channel
+* Fix: display messages in correct place
+
 3.9.1
 ----------
 * Add template field in Msg model and refact related endpoint

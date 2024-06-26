@@ -1443,13 +1443,13 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
         # filter by URN (optional)
         urn = params.get("urn")
         if urn:
-            queryset = queryset.filter(urns__identity=self.normalize_urn(urn))
+            queryset = queryset.filter(urns__identity=self.normalize_urn(urn), org=org)
 
         # filter by search (optional)
         search = params.get("search")
         if search:
             try:
-                urn_search = Q(urns__identity=self.normalize_urn(search))
+                urn_search = Q(urns__identity=self.normalize_urn(search), org=org)
             except InvalidQueryError:
                 urn_search = Q()
             queryset = queryset.filter(urn_search | Q(name=search))
@@ -4144,12 +4144,11 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
         params = self.request.query_params
         org = self.request.user.get_org()
 
-        queryset = org.templates.exclude(translations__is_active=False).prefetch_related(
-            Prefetch(
-                "translations",
-                TemplateTranslation.objects.filter(is_active=True),
-            )
+        active_translations = Prefetch(
+            "translations", queryset=TemplateTranslation.objects.filter(is_active=True), to_attr="active_translations"
         )
+
+        queryset = org.templates.filter(translations__is_active=True).distinct().prefetch_related(active_translations)
 
         status = params.get("status", "A")
         queryset = queryset.filter(translations__status=status).distinct()
