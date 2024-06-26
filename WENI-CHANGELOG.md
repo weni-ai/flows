@@ -1,3 +1,7 @@
+3.10.0
+----------
+* Chore: Bump floweditor to 2.16.0
+
 3.9.4
 ----------
 * Fix performance in normalize urns
