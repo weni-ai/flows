@@ -51,6 +51,7 @@ from .views import (
     UsersEndpoint,
     WorkspaceEndpoint,
 )
+from .wenibrain.views import BrainInfoEndpoint
 from .wenigpt.views import IntelligencesEndpoint
 
 urlpatterns = [
@@ -100,6 +101,7 @@ urlpatterns = [
     url(r"^users$", UsersEndpoint.as_view(), name="api.v2.users"),
     url(r"^workspace$", WorkspaceEndpoint.as_view(), name="api.v2.workspace"),
     url(r"^intelligences$", IntelligencesEndpoint.as_view(), name="api.v2.intelligences"),
+    url(r"^brain_info$", BrainInfoEndpoint.as_view(), name="api.v2.brain_info"),
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns, allowed=["json", "api"])

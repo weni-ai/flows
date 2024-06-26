@@ -101,6 +101,7 @@ from .serializers import (
     WebHookEventReadSerializer,
     WorkspaceReadSerializer,
 )
+from .wenibrain.views import BrainInfoEndpoint
 from .wenigpt.views import IntelligencesEndpoint
 
 
@@ -323,6 +324,7 @@ class ExplorerView(SmartTemplateView):
             WorkspaceEndpoint.get_read_explorer(),
             IntelligencesEndpoint.get_read_explorer(),
             ExternalServicesEndpoint.get_read_explorer(),
+            BrainInfoEndpoint.get_read_explorer(),
         ]
         return context
 
