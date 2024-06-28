@@ -30,3 +30,7 @@ class WhatsappFlows(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.facebook_flow_id}"
+
+    @classmethod
+    def trim(self, channel, ids):
+        WhatsappFlows.objects.filter(channel=channel).exclude(facebook_flow_id__in=ids).update(is_active=False)

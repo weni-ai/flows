@@ -297,6 +297,7 @@ INSTALLED_APPS = (
     "temba.wpp_products",
     "temba.projects",
     "temba.event_driven",
+    "temba.wpp_flows",
 )
 
 # the last installed app that uses smartmin permissions
@@ -1034,6 +1035,7 @@ CELERY_BEAT_SCHEDULE = {
         "task": "refresh_whatsapp_catalog_and_products",
         "schedule": timedelta(seconds=900),
     },
+    "refresh-whatsapp-flows": {"task": "refresh_whatsapp_flows", "schedule": timedelta(seconds=900)},
     "send-notification-emails": {"task": "send_notification_emails", "schedule": timedelta(seconds=60)},
     "squash-channelcounts": {"task": "squash_channelcounts", "schedule": timedelta(seconds=60)},
     "squash-contactgroupcounts": {"task": "squash_contactgroupcounts", "schedule": timedelta(seconds=60)},
