@@ -994,7 +994,7 @@ class Org(SmartModel):
         for qs in user_sets:
             all_users = all_users.union(qs)
 
-        return User.objects.filter(id__in=all_users.values_list("id", flat=True)))
+        return User.objects.filter(id__in=all_users.values_list("id", flat=True))
 
     def get_users_with_perm(self, perm: str):
         """
