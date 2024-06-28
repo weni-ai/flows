@@ -8,7 +8,7 @@ from celery import shared_task
 
 from temba.channels.models import Channel
 from temba.request_logs.models import HTTPLog
-from temba.wpp_flows.models import WhatsappFlows
+from temba.wpp_flows.models import WhatsappFlow
 
 
 @shared_task(track_started=True, name="refresh_whatsapp_flows")
@@ -71,10 +71,8 @@ def update_whatsapp_flows(flows, channel):
     seen = []
 
     for obj in flows:
-        flow = WhatsappFlows.objects.filter(facebook_flow_id=obj.get("id"), channel=channel).first()
+        flow = WhatsappFlow.objects.filter(facebook_flow_id=obj.get("id"), channel=channel).first()
         if flow:
-            print("opa opa")
-            print("object retornado fluxo", flow)
             flow.category = (obj.get("categories"),)
             flow.status = (obj.get("status"),)
             flow.name = (obj.get("name"),)
@@ -83,7 +81,7 @@ def update_whatsapp_flows(flows, channel):
             flow.save()
 
         else:
-            WhatsappFlows.objects.create(
+            WhatsappFlow.objects.create(
                 facebook_flow_id=obj.get("id"),
                 category=obj.get("categories"),
                 status=obj.get("status"),
@@ -96,4 +94,4 @@ def update_whatsapp_flows(flows, channel):
 
         seen.append(obj.get("id"))
 
-    WhatsappFlows.trim(channel, seen)
+    WhatsappFlow.trim(channel, seen)

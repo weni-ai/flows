@@ -2,18 +2,19 @@ from uuid import uuid4
 
 from django.db import models
 from django.utils import timezone
+from django.utils.translation import ugettext_lazy as _
 
 from temba.channels.models import Channel
 from temba.orgs.models import Org
 
 
-class WhatsappFlows(models.Model):
+class WhatsappFlow(models.Model):
     STATUS_CHOICES = (
-        ("DRAFT", "drafted"),
-        ("PUBLISHED", "published"),
-        ("DEPRECATED", "deprecated"),
-        ("BLOCKED", "blocked"),
-        ("THROTTLED", "throttled"),
+        ("DRAFT", _("drafted")),
+        ("PUBLISHED", _("published")),
+        ("DEPRECATED", _("deprecated")),
+        ("BLOCKED", _("blocked")),
+        ("THROTTLED", _("throttled")),
     )
 
     uuid = models.UUIDField(default=uuid4)
@@ -26,11 +27,11 @@ class WhatsappFlows(models.Model):
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="wpp_flows")
     created_on = models.DateTimeField(default=timezone.now)
     modified_on = models.DateTimeField(default=timezone.now)
-    is_active = models.BooleanField(default=False)
-
-    def __str__(self):
-        return f"{self.name} - {self.facebook_flow_id}"
+    is_active = models.BooleanField(default=True)
 
     @classmethod
     def trim(self, channel, ids):
-        WhatsappFlows.objects.filter(channel=channel).exclude(facebook_flow_id__in=ids).update(is_active=False)
+        WhatsappFlow.objects.filter(channel=channel).exclude(facebook_flow_id__in=ids).update(is_active=False)
+
+    def __str__(self):
+        return f"{self.name}"

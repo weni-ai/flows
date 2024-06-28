@@ -295,9 +295,9 @@ INSTALLED_APPS = (
     "temba.sql",
     "temba.externals",
     "temba.wpp_products",
+    "temba.wpp_flows",
     "temba.projects",
     "temba.event_driven",
-    "temba.wpp_flows",
 )
 
 # the last installed app that uses smartmin permissions
@@ -971,9 +971,9 @@ TEST_EXCLUDE = ("smartmin",)
 # -----------------------------------------------------------------------------------
 _default_database_config = {
     "ENGINE": "django.contrib.gis.db.backends.postgis",
-    "NAME": "temba",
-    "USER": "temba",
-    "PASSWORD": "temba",
+    "NAME": "rapidpro",
+    "USER": "rapidpro",
+    "PASSWORD": "rapidpro",
     "HOST": "localhost",
     "PORT": "5432",
     "ATOMIC_REQUESTS": True,
