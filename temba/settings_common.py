@@ -295,6 +295,7 @@ INSTALLED_APPS = (
     "temba.sql",
     "temba.externals",
     "temba.wpp_products",
+    "temba.wpp_flows",
     "temba.projects",
     "temba.event_driven",
 )
