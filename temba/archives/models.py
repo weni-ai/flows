@@ -5,6 +5,7 @@ import re
 import tempfile
 from datetime import date, datetime
 from gettext import gettext as _
+from typing import Generator
 from urllib.parse import urlparse
 import smart_open
 
@@ -158,7 +159,7 @@ class Archive(models.Model):
     @classmethod
     def iter_all_records(
         cls, org, archive_type: str, after: datetime = None, before: datetime = None, where: dict = None
-    ):
+    )-> Generator[dict, None, None]:
         """
         Creates a record iterator across archives of the given type for records which match the given criteria
         """
@@ -187,50 +188,62 @@ class Archive(models.Model):
         """
         Creates an iterator for the records in this archive, streaming and decompressing on the fly
         """
+        bucket, key = self.get_storage_location()
+        return self.read_from_s3(bucket, key, where=where)
+
+    def read_from_s3(self, bucket, key, where=None):
+        s3_uri = f"s3://{bucket}/{key}"
 
         s3_client = s3.client()
-        bucket, key = self.get_storage_location()
-        print(where)
 
-        try:
+        with smart_open.open(s3_uri, 'rb', transport_params={'client': s3_client} ) as s3_obj, open("logs2.json", 'w') as output_file:
             if where:
-                print('ENTRA NO WHERE')
-                response = s3_client.select_object_content(
-                    Bucket=bucket,
-                    Key=key,
-                    ExpressionType="SQL",
-                    Expression=s3.compile_select(where=where),
-                    InputSerialization={"CompressionType": "GZIP", "JSON": {"Type": "LINES"}},
-                    OutputSerialization={"JSON": {"RecordDelimiter": "\n"}},
-                )
+                yield from self.filter_records(s3_obj, where)
+            else:
+                yield from self.jsonlgz_iterate(s3_obj)
+    
+    def filter_records(self, s3_obj, where):
+        buffer = bytearray()
+        for chunk in s3_obj:
+            buffer.extend(chunk)
+            while True:
+                try:
+                    end = buffer.index(b'\n')
+                    line = buffer[:end]
+                    buffer = buffer[end + 1:]
+                    record = json.loads(line.decode('utf-8'))
 
-                def generator():
-                    for record in EventStreamReader(response["Payload"]):
-                        print('PASSOU AQUI')
+                    if self.apply_where(record, where):
                         yield record
+                except ValueError:
+                    break
 
-                return generator()
+    def apply_where(self, record, where) -> bool:
+        for key, value in where.items():
+            field, op = key.split('__')
+            if op == 'gte' and record.get(field, None) < value:
+                return False
+            if op == 'lte' and record.get(field, None) > value:
+                return False
+            if op == 'eq' and record.get(field, None) != value:
+                return False
 
-            else:
-                #bucket, key = self.get_storage_location()
-                s3_obj = s3_client.get_object(Bucket=bucket, Key=key)
-                return jsonlgz_iterate(s3_obj["Body"])
-        
-        except s3_client.exceptions.ClientError as e:
-            print('ENTROU NO ERRO')
-            error_code = e.response['Error']['Code']
-            if error_code == 'OverMaxRecordSize':
-                # Handle the error by switching to smart_open
-                s3_path = f's3://{bucket}/{key}'
-                with smart_open.open(s3_path, 'rb', transport_params={'client': s3_client}) as s3_file:
-                    with open("logs.json", 'w') as output_file:
-                        for line in s3_file:
-                            record = json.loads(line.decode('utf-8'))
-                            print('BORA')
-                            output_file.write(json.dumps(record) + '\n')
-                            yield record
-            else:
-                raise  # Re-raise the exception if it's not the expected one
+        return True
+
+    def jsonlgz_iterate(self, s3_obj) -> Generator[dict, None, None]:
+        buffer = bytearray()
+        for chunk in s3_obj:
+            buffer.extend(chunk)
+            while True:
+                try:
+                    end = buffer.index(b'\n')
+                    line = buffer[:end]
+                    buffer = buffer[end + 1:]
+                    record = json.loads(line.decode('utf-8'))
+
+                    yield record
+                except ValueError:
+                    break
 
     def rewrite(self, transform, delete_old=False):
         s3_client = s3.client()
@@ -291,9 +304,12 @@ def jsonlgz_iterate(in_file):
     in_stream = gzip.GzipFile(fileobj=in_file, mode="r")
 
     def generator():
-        for line in in_stream:
-            record = json.loads(line.decode("utf-8"))
-            yield record
+        with open("logs.json", 'w') as output_file:
+            for line in in_stream:
+                print('BORA')
+                record = json.loads(line.decode("utf-8"))
+                output_file.write(json.dumps(record) + '\n')
+                yield record
 
     return generator()
 
