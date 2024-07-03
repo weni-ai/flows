@@ -971,9 +971,9 @@ TEST_EXCLUDE = ("smartmin",)
 # -----------------------------------------------------------------------------------
 _default_database_config = {
     "ENGINE": "django.contrib.gis.db.backends.postgis",
-    "NAME": "temba",
-    "USER": "temba",
-    "PASSWORD": "temba",
+    "NAME": "rapidpro",
+    "USER": "rapidpro",
+    "PASSWORD": "rapidpro",
     "HOST": "localhost",
     "PORT": "5432",
     "ATOMIC_REQUESTS": True,
@@ -1035,6 +1035,7 @@ CELERY_BEAT_SCHEDULE = {
         "task": "refresh_whatsapp_catalog_and_products",
         "schedule": timedelta(seconds=900),
     },
+    "refresh-whatsapp-flows": {"task": "refresh_whatsapp_flows", "schedule": timedelta(seconds=900)},
     "send-notification-emails": {"task": "send_notification_emails", "schedule": timedelta(seconds=60)},
     "squash-channelcounts": {"task": "squash_channelcounts", "schedule": timedelta(seconds=60)},
     "squash-contactgroupcounts": {"task": "squash_contactgroupcounts", "schedule": timedelta(seconds=60)},
