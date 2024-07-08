@@ -133,7 +133,7 @@ jobs:
           cache-target: /npm_cache
 
       - name: Build and push - Flows Image by digest
-        id: build
+        id: docker
         uses: docker/build-push-action@v6
         with:
           cache-from: type=gha
