@@ -1,3 +1,7 @@
+3.10.2
+----------
+* Fix: Users endpoint optimization
+
 3.10.1
 ----------
 * Chore: Bump floweditor to 2.16.1
