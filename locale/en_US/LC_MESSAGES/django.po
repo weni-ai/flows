@@ -6024,8 +6024,8 @@ msgid "No messages"
 msgstr ""
 
 #, python-format
-msgid "Found %(results_count)s message in last 90 days matching <i>%(search)s</i>."
-msgid_plural "Found %(results_count)s messages in last 90 days matching <i>%(search)s</i>."
+msgid "Found %(results_count)s message in last 15 days matching <i>%(search)s</i>."
+msgid_plural "Found %(results_count)s messages in last 15 days matching <i>%(search)s</i>."
 msgstr[0] ""
 msgstr[1] ""
 
