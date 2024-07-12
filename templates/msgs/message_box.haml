@@ -227,9 +227,9 @@
                       -if not paginator or paginator.num_pages <= 1                        
                         -if search
                           -blocktrans trimmed with results_count=paginator.count|intcomma count cc=paginator.count
-                            Found {{ results_count }} message in last 90 days matching <i>{{search}}</i>.
+                            Found {{ results_count }} message in last 15 days matching <i>{{search}}</i>.
                             -plural
-                              Found {{ results_count }} messages in last 90 days matching <i>{{search}}</i>.
+                              Found {{ results_count }} messages in last 15 days matching <i>{{search}}</i>.
                         -else
                           -if start_date
                             -blocktrans trimmed with results_count=paginator.count|intcomma count cc=paginator.count
@@ -241,7 +241,7 @@
 
                         -if search
                           -blocktrans trimmed with results_count=paginator.count|intcomma start=page_obj.start_index|intcomma end=page_obj.end_index|intcomma count cc=paginator.count 
-                            Found {{ results_count }} message in last 90 days matching <i>{{search}}</i>.
+                            Found {{ results_count }} message in last 15 days matching <i>{{search}}</i>.
                             -plural
                               {{ start }} - {{ end }} of {{ results_count }} results for <i>{{search}}</i> since {{start_date}}.
                         -else
