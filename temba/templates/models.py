@@ -104,6 +104,8 @@ class TemplateTranslation(models.Model):
     STATUS_DISABLED = "S"
     STATUS_LOCKED = "L"
     STATUS_UNSUPPORTED_LANGUAGE = "U"
+    STATUS_PAUSED = "T"
+    STATUS_LIMIT_EXCEEDED = "L"
 
     STATUS_CHOICES = (
         (STATUS_APPROVED, "approved"),
@@ -115,6 +117,8 @@ class TemplateTranslation(models.Model):
         (STATUS_LOCKED, "locked"),
         (STATUS_REJECTED, "rejected"),
         (STATUS_UNSUPPORTED_LANGUAGE, "unsupported_language"),
+        (STATUS_PAUSED, "paused"),
+        (STATUS_LIMIT_EXCEEDED, "limit_exceeded"),
     )
 
     # the template this maps to
