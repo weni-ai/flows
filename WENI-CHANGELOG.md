@@ -1,3 +1,7 @@
+3.10.3
+----------
+* Change queryset to bring data of 15 days
+
 3.10.2
 ----------
 * Fix: Users endpoint optimization
