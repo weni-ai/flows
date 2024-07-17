@@ -1,3 +1,8 @@
+3.10.5
+----------
+* Update weni-rp-apps version to 2.8.6
+* Create index to channel address
+
 3.10.4
 ----------
 * Update weni-rp-apps version to 2.8.5
