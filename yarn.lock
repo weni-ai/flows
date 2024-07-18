@@ -104,10 +104,10 @@
   optionalDependencies:
     prettier "^1.18.2 || ^2.0.0"
 
-"@weni/flow-editor@2.16.2-alpha.4":
-  version "2.16.2-alpha.4"
-  resolved "https://registry.yarnpkg.com/@weni/flow-editor/-/flow-editor-2.16.2-alpha.4.tgz#fbffbf2a152d2ef57660c51b431491bb95c5c992"
-  integrity sha512-PsuiN7KkeLRHAc15jbJaIoM9obWe9cXhrz+x7FfTKp6FcQiSp2by7p1luK/89Wcze2j4lWyF92VII5SjTgYeLA==
+"@weni/flow-editor@2.16.2-alpha.5":
+  version "2.16.2-alpha.5"
+  resolved "https://registry.yarnpkg.com/@weni/flow-editor/-/flow-editor-2.16.2-alpha.5.tgz#01ac2d2903aaf6319e52b1beb9c0ca79a86f54e9"
+  integrity sha512-vF3wrJpGpAsMVlBiyO+BB4wterV/KMApgJ5+yscBeeJ1r842D2/eYXggTkYvILHEyB7E9fgVZttaoQN/DtDqvA==
   dependencies:
     "@material-symbols/font-400" "0.13.2"
     "@weni/unnnic-system" "1.24.8"
