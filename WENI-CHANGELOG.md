@@ -1,3 +1,13 @@
+3.10.5
+----------
+* Update weni-rp-apps version to 2.8.6
+* Create index to channel address
+
+3.10.4
+----------
+* Update weni-rp-apps version to 2.8.5
+* Add status choices in TemplateTranslation model
+
 3.10.3
 ----------
 * Change queryset to bring data of 15 days
