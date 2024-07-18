@@ -4835,6 +4835,7 @@ class CodeActionsEndpoint(BaseAPIView):
         response_data["results"] = results
         return Response(response_data, statuscode)
     
+    @classmethod
     def get_read_explorer(cls):
         return {
             "method": "GET",
