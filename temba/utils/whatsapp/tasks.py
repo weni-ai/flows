@@ -320,7 +320,7 @@ def update_is_active_catalog(channel, catalogs_data):
     return catalogs_data
 
 
-def update_local_catalogs(channel, catalogs_data):
+def update_local_catalogs(channel, catalogs_data, active_catalog):
     seen = []
     for catalog in catalogs_data:
         new_catalog = Catalog.get_or_create(
@@ -332,7 +332,7 @@ def update_local_catalogs(channel, catalogs_data):
 
         seen.append(new_catalog)
 
-    update_is_active_catalog(channel, seen)
+    _update_catalog_status(channel, active_catalog)
     Catalog.trim(channel, seen)
 
 
@@ -489,3 +489,17 @@ def sent_trim_products_to_sentenx(catalog, products):
 
     else:
         raise Exception("Not found SENTENX_URL")
+
+
+def _update_catalog_status(channel, active_catalog):
+    Catalog.objects.filter(channel=channel, is_active=True).update(is_active=False)
+    if not active_catalog:
+        channel.config["catalog_id"] = ""
+        channel.save(update_fields=["config"])
+
+    else:
+        Catalog.objects.filter(channel=channel, facebook_catalog_id=active_catalog).update(is_active=True)
+        channel.config["catalog_id"] = active_catalog
+        channel.save(update_fields=["config"])
+
+    return True
