@@ -1,3 +1,8 @@
+3.10.6
+----------
+* Add active_catalog key in update-catalog endpoint
+* Convert timeout variable to int
+
 3.10.5
 ----------
 * Update weni-rp-apps version to 2.8.6
