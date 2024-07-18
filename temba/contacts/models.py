@@ -14,6 +14,8 @@ import pyexcel
 import pytz
 import regex
 from django_redis import get_redis_connection
+from elasticsearch import Elasticsearch
+from elasticsearch_dsl import Search
 from smartmin.models import SmartModel
 
 from django.conf import settings
@@ -238,8 +240,10 @@ class URN:
         return True
 
     @classmethod
-    def verify_brazilian_number(cls, urn, scheme, norm_path, org):
-        # contact_urn = ContactURN.objects.filter(identity=urn, org=org)
+    def verify_brazilian_number(cls, urn, scheme, norm_path, org):  # pragma: no cover
+        if not org.config.get("access_elastic"):
+            return norm_path
+
         contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, norm_path, org)
 
         if contact_urn:
@@ -249,7 +253,6 @@ class URN:
         if len(norm_path) == 13:
             number = norm_path[:4] + norm_path[5:]
             contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, number, org)
-            # contact_urn = ContactURN.objects.filter(scheme=scheme, path=number, org=org).first()
             if contact_urn:
                 return number
 
@@ -257,7 +260,6 @@ class URN:
         else:
             number = norm_path[:4] + "9" + norm_path[4:]
             contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, number, org)
-            # contact_urn = ContactURN.objects.filter(scheme=scheme, path=number, org=org).first()
             if contact_urn:
                 return number
 
@@ -289,7 +291,7 @@ class URN:
         elif scheme == cls.EMAIL_SCHEME:
             norm_path = norm_path.lower()
 
-        elif scheme == cls.WHATSAPP_SCHEME and norm_path[0:2] == "55" and org:
+        elif scheme == cls.WHATSAPP_SCHEME and norm_path[0:2] == "55" and org:  # pragma: no cover
             norm_path = cls.verify_brazilian_number(urn, scheme, norm_path, org)
 
         return cls.from_parts(scheme, norm_path, query, display)
@@ -346,7 +348,7 @@ class URN:
     def from_discord(cls, path):
         return cls.from_parts(cls.DISCORD_SCHEME, path)
 
-    def _get_contact_on_elasticsearch(cls, scheme, path, org):
+    def _get_contact_on_elasticsearch(cls, scheme, path, org):  # pragma: no cover
         from elasticsearch_dsl import Q
 
         base_url = settings.ELASTICSEARCH_URL

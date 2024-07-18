@@ -10,6 +10,8 @@ STATUS_MAPPING = dict(
     DELETED=TemplateTranslation.STATUS_DELETED,
     DISABLED=TemplateTranslation.STATUS_DISABLED,
     LOCKED=TemplateTranslation.STATUS_LOCKED,
+    PAUSED=TemplateTranslation.STATUS_PAUSED,
+    LIMIT_EXCEEDED=TemplateTranslation.STATUS_LIMIT_EXCEEDED,
 )
 
 # This maps from WA iso-639-2 codes to our internal 639-3 codes

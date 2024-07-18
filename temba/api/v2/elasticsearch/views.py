@@ -57,8 +57,8 @@ class ContactsElasticSearchEndpoint(APIView):
 
         if name or number:
             base_url = settings.ELASTICSEARCH_URL
-            # timeout = int(settings.ELASTICSEARCH_TIMEOUT_REQUEST)
-            client = Elasticsearch(f"{base_url}", timeout=settings.ELASTICSEARCH_TIMEOUT_REQUEST)
+            timeout = int(settings.ELASTICSEARCH_TIMEOUT_REQUEST)
+            client = Elasticsearch(f"{base_url}", timeout=timeout)
             filte = [Q("match", org_id=org_id)]
             index = "contacts"
             if name:

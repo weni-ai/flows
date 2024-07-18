@@ -6099,10 +6099,10 @@ msgid "No messages"
 msgstr "Ningún mensaje"
 
 #, python-format
-msgid "Found %(results_count)s message in last 90 days matching <i>%(search)s</i>."
-msgid_plural "Found %(results_count)s messages in last 90 days matching <i>%(search)s</i>."
-msgstr[0] "Se encontró un mensaje %(results_count)s en los últimos 90 días que coincide con <i> %(search)s </i>."
-msgstr[1] "Se encontraron mensajes %(results_count)s en los últimos 90 días que coinciden con <i> %(search)s </i>."
+msgid "Found %(results_count)s message in last 15 days matching <i>%(search)s</i>."
+msgid_plural "Found %(results_count)s messages in last 15 days matching <i>%(search)s</i>."
+msgstr[0] "Se encontró un mensaje %(results_count)s en los últimos 15 días que coincide con <i> %(search)s </i>."
+msgstr[1] "Se encontraron mensajes %(results_count)s en los últimos 15 días que coinciden con <i> %(search)s </i>."
 
 #, python-format
 msgid "%(results_count)s message since %(start_date)s."

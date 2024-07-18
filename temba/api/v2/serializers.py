@@ -892,6 +892,64 @@ class ContactBulkActionSerializer(WriteSerializer):
                 contact.release(user)
 
 
+class ContactTemplateSerializerNew(ReadSerializer):
+    STATUSES = {
+        Msg.STATUS_INITIALIZING: "initializing",
+        Msg.STATUS_PENDING: "queued",  # same as far as users are concerned
+        Msg.STATUS_QUEUED: "queued",
+        Msg.STATUS_WIRED: "wired",
+        Msg.STATUS_SENT: "sent",
+        Msg.STATUS_DELIVERED: "delivered",
+        Msg.STATUS_HANDLED: "handled",
+        Msg.STATUS_ERRORED: "errored",
+        Msg.STATUS_FAILED: "failed",
+        Msg.STATUS_RESENT: "resent",
+        Msg.STATUS_READ: "read",
+    }
+
+    urns = serializers.SerializerMethodField()
+    templates = serializers.SerializerMethodField()
+    created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    modified_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    last_seen_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+
+    def get_urns(self, obj):
+        return [urn.api_urn() for urn in obj.get_urns()]
+
+    def get_templates(self, obj):
+        request = self.context.get("request")
+        template = request.query_params.get("template") if request else None
+        templates = obj.msgs.filter(metadata__contains="templating")
+
+        if template:
+            templates = templates.filter(template=template)
+
+        return [
+            {
+                "name": t.template,
+                "text": t.text,
+                "created_on": t.created_on,
+                "sent_on": t.sent_on,
+                "direction": "Out" if t.direction == "Outgoing" else "Incoming",
+                "status": self.STATUSES.get(t.status),
+            }
+            for t in templates
+        ]
+
+    class Meta:
+        model = Contact
+        fields = (
+            "uuid",
+            "id",
+            "name",
+            "urns",
+            "templates",
+            "created_on",
+            "modified_on",
+            "last_seen_on",
+        )
+
+
 class ContactTemplateSerializer(ReadSerializer):
     STATUSES = {
         Msg.STATUS_INITIALIZING: "initializing",
@@ -918,6 +976,7 @@ class ContactTemplateSerializer(ReadSerializer):
 
     def get_templates(self, obj):
         templates = obj.msgs.filter(metadata__contains="templating")
+
         return [
             {
                 "uuid": t.metadata["templating"]["template"]["uuid"],
@@ -975,6 +1034,14 @@ class FilterTemplateSerializer(ReadSerializer):
     class Meta:
         model = Msg
         fields = ("template", "page_size", "offset", "before", "after")
+
+
+class FilterTemplateSerializerNew(ReadSerializer):
+    template = serializers.CharField(required=True)
+
+    class Meta:
+        model = Msg
+        fields = ("uuid", "contact_id", "template", "text", "created_on", "sent_on", "status")
 
 
 class FlowReadSerializer(ReadSerializer):

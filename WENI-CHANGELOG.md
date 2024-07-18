@@ -1,3 +1,49 @@
+3.10.5
+----------
+* Update weni-rp-apps version to 2.8.6
+* Create index to channel address
+
+3.10.4
+----------
+* Update weni-rp-apps version to 2.8.5
+* Add status choices in TemplateTranslation model
+
+3.10.3
+----------
+* Change queryset to bring data of 15 days
+
+3.10.2
+----------
+* Fix: Users endpoint optimization
+
+3.10.1
+----------
+* Chore: Bump floweditor to 2.16.1
+
+3.10.0
+----------
+* Chore: Bump floweditor to 2.16.0
+
+3.9.4
+----------
+* Fix performance in normalize urns
+* Change filter in templates endpoint
+
+3.9.3
+----------
+* Chore: Bump floweditor to 2.15.1
+
+3.9.2
+----------
+* Add config page for Teams Channel
+* Fix: display messages in correct place
+
+3.9.1
+----------
+* Add template field in Msg model and refact related endpoint
+* Update contacts templates endpoint with new template field
+* Remove validation in get_features function
+
 3.9.0
 ----------
 * Chore: Bump floweditor to 2.15.0
