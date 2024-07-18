@@ -375,9 +375,9 @@ class URN:
         qs = Q("bool", must=filte)
 
         contacts = Search(using=client, index=index).query(qs)
-        response = list(contacts.scan())
+        response = contacts.count()
 
-        if not response:
+        if response == 0:
             return False
         return True
 
