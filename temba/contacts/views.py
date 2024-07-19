@@ -459,8 +459,9 @@ class ContactForm(forms.ModelForm):
                         self._errors[key] = self.error_class([_("Invalid format")])
                     return False
                 return True
-            except ValueError:
+            except ValueError as e:
                 self._errors[key] = self.error_class([_("Invalid input")])
+                logger.error(f"Erro ao adicionar whatsapp: {str(e)}")
                 return False
 
         # validate URN fields

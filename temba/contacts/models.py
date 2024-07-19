@@ -352,7 +352,8 @@ class URN:
         from elasticsearch_dsl import Q
 
         base_url = settings.ELASTICSEARCH_URL
-        client = Elasticsearch(f"{base_url}", timeout=settings.ELASTICSEARCH_TIMEOUT_REQUEST)
+        timeout = int(settings.ELASTICSEARCH_TIMEOUT_REQUEST)
+        client = Elasticsearch(f"{base_url}", timeout=timeout)
         filte = [Q("match", org_id=org.id)]
         index = "contacts"
 
