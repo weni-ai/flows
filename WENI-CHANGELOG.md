@@ -1,3 +1,8 @@
+3.10.7
+----------
+* Change attribute in elastic return
+* Update weni-rp-apps to 2.8.7
+
 3.10.6
 ----------
 * Add active_catalog key in update-catalog endpoint
