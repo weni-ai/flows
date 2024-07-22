@@ -40,16 +40,7 @@ class CatalogViewSet(viewsets.ViewSet, InternalGenericViewSet):
     ):
         channel = get_object_or_404(Channel, uuid=pk, is_active=True)
         if request.data:
-            HTTPLog.create_from_integrations_response(
-                HTTPLog.WHATSAPP_CATALOGS_SYNCED,
-                request.data.get("urls"),
-                request.data.get("responses"),
-                200,
-                request.data.get("requests"),
-                channel=channel,
-            )
-
-            update_local_catalogs(channel, request.data.get("data"))
+            update_local_catalogs(channel, request.data.get("data"), request.data.get("active_catalog"))
         return Response(status=status.HTTP_200_OK)
 
 
