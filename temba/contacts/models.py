@@ -350,7 +350,8 @@ class URN:
         from elasticsearch_dsl import Q
 
         base_url = settings.ELASTICSEARCH_URL
-        client = Elasticsearch(f"{base_url}", timeout=settings.ELASTICSEARCH_TIMEOUT_REQUEST)
+        timeout = int(settings.ELASTICSEARCH_TIMEOUT_REQUEST)
+        client = Elasticsearch(f"{base_url}", timeout=timeout)
         filte = [Q("match", org_id=org.id)]
         index = "contacts"
 
@@ -373,9 +374,9 @@ class URN:
         qs = Q("bool", must=filte)
 
         contacts = Search(using=client, index=index).query(qs)
-        response = list(contacts.scan())
+        response = contacts.count()
 
-        if not response:
+        if response == 0:
             return False
         return True
 
