@@ -4001,6 +4001,7 @@ class FlowStartsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     serializer_class = FlowStartReadSerializer
     write_serializer_class = FlowStartWriteSerializer
     pagination_class = ModifiedOnCursorPagination
+    throttle_scope = "v2.flowstart"
 
     def filter_queryset(self, queryset):
         # ignore flow starts created by mailroom
