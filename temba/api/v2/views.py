@@ -4002,6 +4002,15 @@ class FlowStartsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     write_serializer_class = FlowStartWriteSerializer
     pagination_class = ModifiedOnCursorPagination
 
+    def get_write_serializer_class(self, instance, data, context):
+        query_params = self.request.query_params.dict()
+        for key in ["groups", "contacts", "urns"]:
+            if key in self.request.query_params:
+                query_params[key] = self.request.query_params.getlist(key)
+        data = {**data, **query_params}
+
+        return self.write_serializer_class(instance=instance, data=data, context=context)
+
     def filter_queryset(self, queryset):
         # ignore flow starts created by mailroom
         queryset = queryset.exclude(created_by=None)
@@ -4028,6 +4037,12 @@ class FlowStartsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
         context = super().get_serializer_context()
         context["is_zapier"] = "Zapier" in self.request.META.get("HTTP_USER_AGENT", "")
         return context
+
+    # def post(self, request, *args, **kwargs):
+    #     print(type(request.data))
+    #     print(type(request.query_params.dict()))
+    #     request.data = request.data.update(request.query_params.dict()) #{**request.data, **request.query_params.dict()} # contater os requests
+    #     return super().post(request, *args, **kwargs)
 
     def post_save(self, instance):
         # actually start our flow

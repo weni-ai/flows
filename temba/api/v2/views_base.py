@@ -184,6 +184,9 @@ class WriteAPIMixin:
         """
         pass
 
+    def get_write_serializer_class(self, instance, data, context):
+        return self.write_serializer_class(instance=instance, data=data, context=context)
+
     def post(self, request, *args, **kwargs):
         self.lookup_values = self.get_lookup_values()
 
@@ -197,7 +200,7 @@ class WriteAPIMixin:
         context["lookup_values"] = self.lookup_values
         context["instance"] = instance
 
-        serializer = self.write_serializer_class(instance=instance, data=request.data, context=context)
+        serializer = self.get_write_serializer_class(instance=instance, data=request.data, context=context)
 
         if serializer.is_valid():
             mgr = transaction.atomic() if self.write_with_transaction else contextlib.suppress()
