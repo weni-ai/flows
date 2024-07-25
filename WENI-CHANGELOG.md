@@ -1,3 +1,7 @@
+3.10.8
+----------
+* Add throttle scope to flowstart endpoint
+
 3.10.7
 ----------
 * Change attribute in elastic return
