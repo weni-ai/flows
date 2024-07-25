@@ -205,22 +205,50 @@ class Archive(models.Model):
     
     # VALIDAR A PARTE DO CHUNCK E DO BUFFER, OCORENDO ERRO DE PRÓXIMO BUFFER VAZIO
     def filter_records(self, s3_obj, where):
-        import pdb; pdb.set_trace()
-        buffer = bytearray()
+        s3_client = s3.client()
+        #import pdb; pdb.set_trace()
+        
         for chunk in s3_obj:
-            buffer.extend(chunk)
-            while True:
-                try:
-                    end = buffer.index(b'\n')
-                    line = buffer[:end]
-                    buffer = buffer[end + 1:]
-                    record = json.loads(line.decode('utf-8'))
-                    if self.apply_where(record, where):
-                        yield record
-                except ValueError:
-                    break
+            try:
+                buffer = bytearray(chunk)
+                #buffer.extend(chunk)
+
+                record = json.loads(buffer.decode('utf-8'))
+                if self.apply_where(record, where):
+                    yield record
+            except ValueError:
+                break
+            except s3_client.ClientError as e:
+                if e.response['Error']['Code'] == 'OverMaxRecordSize':
+                    print(f"Skipping record due to OverMaxRecordSize: {e}")
+                    # Retornar um gerador vazio para continuar a execução
+                    def empty_generator():
+                        yield from ()
+                    return empty_generator()
+                else:
+                    raise
+            # while True:
+            #     try:
+                    # lines = buffer.splitlines(keepends=True)
+    
+                    # if not lines[-1].endswith(b"\n"):
+                    #     buffer = bytearray(lines[-1])
+                    #     lines = lines[:-1]
+
+                    # for line in lines:
+                    #     record = json.loads(line.decode("utf-8"))
+
+
+                    # end = buffer.index(b'\n')
+                    # line = buffer[:end]
+                    # buffer = buffer[end + 1:]
+                    # record = json.loads(line.decode('utf-8'))
+                        # if self.apply_where(record, where):
+                        #     yield record
+
 
     def apply_where(self, record, where) -> bool:
+        #import pdb; pdb.set_trace()
         for key, value in where.items():
             created_on = parse_datetime(record.get("created_on", None))
             if key == "created_on__gte":
@@ -232,6 +260,13 @@ class Archive(models.Model):
             if key == "created_on__eq":
                 if created_on != value:
                     return False
+            if key == "flow__uuid__in":
+                if record.get("flow").get("uuid") not in value:
+                    return False
+            if key == "responded":
+                if record.get("responded") != value:
+                    return False
+
         return True
 
     def jsonlgz_iterate(self, s3_obj) -> Generator[dict, None, None]:
