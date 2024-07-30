@@ -1,3 +1,13 @@
+3.10.8
+----------
+* Add throttle scope to flowstart endpoint
+
+3.10.7
+----------
+* Change attribute in elastic return
+* Update weni-rp-apps to 2.8.7
+* Update floweditor to 2.17.0
+
 3.10.6
 ----------
 * Add active_catalog key in update-catalog endpoint
