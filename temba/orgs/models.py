@@ -621,9 +621,7 @@ class Org(SmartModel):
             }
             list_flows.append(flow_data)
         
-        return {
-            "imported_flows": list_flows
-        }
+        return list_flows
 
     def validate_import(self, import_def):
         from temba.triggers.models import Trigger
