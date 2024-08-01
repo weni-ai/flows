@@ -54,13 +54,13 @@
     <!-- Hotjar Tracking -->
     <script>
     (function (h, o, t, j, a, r) {
-        if (env('HOTJAR_ID')) {
+        if ({{ hotjar_id }}) {
         h.hj =
           h.hj ||
           function () {
             (h.hj.q = h.hj.q || []).push(arguments);
           };
-        h._hjSettings = { hjid: Number(env('HOTJAR_ID')), hjsv: 6 };
+        h._hjSettings = { hjid: {{ hotjar_id }}, hjsv: 6 };
         a = o.getElementsByTagName('head')[0];
         r = o.createElement('script');
         r.async = 1;
