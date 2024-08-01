@@ -51,6 +51,25 @@
       <script src="https://cdn.lr-in.com/LogRocket.min.js" crossorigin="anonymous"></script>
       <script>window.LogRocket && window.LogRocket.init("{{logrocket_id}}", {mergeIframes: true, parentDomain: "{{parent_iframe_domain}}"});</script>
 
+    <!-- Hotjar Tracking -->
+    <script>
+    (function (h, o, t, j, a, r) {
+        if ({{ hotjar_id }}) {
+        h.hj =
+          h.hj ||
+          function () {
+            (h.hj.q = h.hj.q || []).push(arguments);
+          };
+        h._hjSettings = { hjid: {{ hotjar_id }}, hjsv: 6 };
+        a = o.getElementsByTagName('head')[0];
+        r = o.createElement('script');
+        r.async = 1;
+        r.src = t + h._hjSettings.hjid + j + h._hjSettings.hjsv;
+        a.appendChild(r);
+      }
+    })(window, document, 'https://static.hotjar.com/c/hotjar-', '.js?sv=');
+    </script>
+
     -compress js
       :javascript
         var static_url = '{{STATIC_URL}}';

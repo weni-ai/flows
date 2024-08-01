@@ -36,6 +36,12 @@ def logrocket(request):
     }
 
 
+def hotjar(request):
+    return {
+        "hotjar_id": settings.HOTJAR_ID,
+    }
+
+
 def old_design_excluded_channels_codes(request):
     return {"old_design_excluded_channels_codes": settings.OLD_DESIGN_EXCLUDED_CHANNELS_CODES}
 
