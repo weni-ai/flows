@@ -1084,7 +1084,7 @@ class FlowCRUDL(SmartCRUDL):
                 features.append("external_service")
             if org.catalogs.filter(is_active=True).exists():
                 features.append("whatsapp_catalog")
-            if org.brain_on and self.request.user.email.endswith("@weni.ai"):
+            if org.brain_on:
                 features.append("brain")
 
             return features
