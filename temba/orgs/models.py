@@ -612,7 +612,7 @@ class Org(SmartModel):
 
             for flow_obj in export_json["flows"]:
                 if flow_obj.get("name") == flow_name:
-                    flow_base_uuid = flow_obj.uuid
+                    flow_base_uuid = flow_obj.get("uuid")
 
             flow_data = {
                 "base_uuid": flow_base_uuid,
