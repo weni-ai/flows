@@ -126,7 +126,7 @@ def trim_flow_starts():
     while True:
         start_ids = list(
             FlowStart.objects.filter(
-                created_by=None,
+                start_type=FlowStart.TYPE_API,
                 status__in=(FlowStart.STATUS_COMPLETE, FlowStart.STATUS_FAILED),
                 modified_on__lte=trim_before,
             ).values_list("id", flat=True)[:1000]
