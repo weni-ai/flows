@@ -4392,6 +4392,15 @@ class APITest(TembaTest):
         self.assertTrue(start5.restart_participants)
         self.assertFalse(start5.include_active)
 
+        query = f"flow={flow.uuid}&groups={hans_group.uuid}"
+
+        response = self.postJSON(
+            url,
+            query,
+            {},
+        )
+        self.assertEqual(response.status_code, 201)
+
     def test_templates(self):
         url = reverse("api.v2.templates")
         self.assertEndpointAccess(url)
