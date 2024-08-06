@@ -214,6 +214,7 @@ FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 
 MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
+    "django_permissions_policy.PermissionsPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -226,6 +227,25 @@ MIDDLEWARE = (
     "temba.middleware.LanguageMiddleware",
     "temba.middleware.TimezoneMiddleware",
 )
+
+PERMISSIONS_POLICY = {
+    "accelerometer": [],
+    "ambient-light-sensor": [],
+    "autoplay": [],
+    "camera": [],
+    "display-capture": [],
+    "document-domain": [],
+    "encrypted-media": [],
+    "fullscreen": [],
+    "geolocation": [],
+    "gyroscope": [],
+    "interest-cohort": [],
+    "magnetometer": [],
+    "microphone": [],
+    "midi": [],
+    "payment": [],
+    "usb": [],
+}
 
 # security middleware configuration
 SECURE_CONTENT_TYPE_NOSNIFF = True
@@ -250,6 +270,7 @@ INSTALLED_APPS = (
     "django.contrib.sitemaps",
     "django.contrib.postgres",
     "django.forms",
+    # ""
     # Haml-like templates
     "hamlpy",
     # Redis cache
