@@ -39,13 +39,11 @@ def disable_flows_has_issues(project, sample_flows):
     flows_name = list(map(lambda flow: flow.get("name"), sample_flows.get("flows")))
     project.flows.filter(name__in=flows_name).update(has_issues=False)
 
-def publish_integrate_success(project_uuid ,imported_data):
+
+def publish_integrate_success(project_uuid, imported_data):
     rabbitmq_publisher = RabbitmqPublisher()
     rabbitmq_publisher.send_message(
-        body=dict(
-            project_uuid=str(project_uuid),
-            imported_flows=imported_data
-            ),
+        body=dict(project_uuid=str(project_uuid), imported_flows=imported_data),
         exchange="retail.feature-integrated",
-        routing_key=""
+        routing_key="",
     )
