@@ -4003,6 +4003,15 @@ class FlowStartsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     pagination_class = ModifiedOnCursorPagination
     throttle_scope = "v2.flowstart"
 
+    def get_write_serializer_class(self, instance, data, context):
+        query_params = self.request.query_params.dict()
+        for key in ["groups", "contacts", "urns"]:
+            if key in self.request.query_params:
+                query_params[key] = self.request.query_params.getlist(key)
+        data = {**data, **query_params}
+
+        return self.write_serializer_class(instance=instance, data=data, context=context)
+
     def filter_queryset(self, queryset):
         # ignore flow starts created by mailroom
         queryset = queryset.exclude(created_by=None)

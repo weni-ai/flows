@@ -8,7 +8,7 @@ from temba.features.usecases.delete_feature_integration import delete_feature_te
 
 class DeleteFeatureTemplateIntegrationConsumer(EDAConsumer):
     def consume(self, message: amqp.Message):  # pragma: no cover
-        print("[DeleteFeatureTemplateIntegrationConsumer] - Consuming a message.")  # Body: {message.body}")
+        print(f"[DeleteFeatureTemplateIntegrationConsumer] - Consuming a message. Body: {message.body}")
         try:
             body = JSONParser.parse(message.body)
             delete_feature_template(

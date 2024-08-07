@@ -1,3 +1,9 @@
+3.10.9
+----------
+* Update flow start endpoint to receive query params
+* Remove WAC type from update_api_version call
+* feat: allow brain
+
 3.10.8
 ----------
 * Add throttle scope to flowstart endpoint
