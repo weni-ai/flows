@@ -599,7 +599,7 @@ class Org(SmartModel):
             flow_info = mailroom.get_client().flow_inspect(self.id, flow.get_definition())
             flow.has_issues = len(flow_info[Flow.INSPECT_ISSUES]) > 0
             flow.save(update_fields=("has_issues",))
-        
+
         imported_flows_data = self.get_new_flows_data(new_flows, export_json)
         return imported_flows_data
 
@@ -614,13 +614,9 @@ class Org(SmartModel):
                 if flow_obj.get("name") == flow_name:
                     flow_base_uuid = flow_obj.get("uuid")
 
-            flow_data = {
-                "base_uuid": flow_base_uuid,
-                "uuid": flow.uuid,
-                "name": flow.name
-            }
+            flow_data = {"base_uuid": flow_base_uuid, "uuid": flow.uuid, "name": flow.name}
             list_flows.append(flow_data)
-        
+
         return list_flows
 
     def validate_import(self, import_def):
