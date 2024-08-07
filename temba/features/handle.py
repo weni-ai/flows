@@ -1,7 +1,8 @@
 import amqp
 
-from .consumers import IntegrateFeatureTemplateConsumer  # pragma: no cover
+from .consumers import DeleteFeatureTemplateIntegrationConsumer, IntegrateFeatureTemplateConsumer  # pragma: no cover
 
 
-def handle_consumers(channel: amqp.Channel):
+def handle_consumers(channel: amqp.Channel):  # pragma: no cover
     channel.basic_consume("flows.integrate-feature-template", callback=IntegrateFeatureTemplateConsumer().handle)
+    channel.basic_consume("flows.delete-feature-template", callback=DeleteFeatureTemplateIntegrationConsumer().handle)

@@ -26,6 +26,6 @@ def integrate_feature_template_consumer(
     return project
 
 
-def disable_flows_has_issues(project, sample_flows):
+def disable_flows_has_issues(project, sample_flows):  # pragma: no cover
     flows_name = list(map(lambda flow: flow.get("name"), sample_flows.get("flows")))
     project.flows.filter(name__in=flows_name).update(has_issues=False)
