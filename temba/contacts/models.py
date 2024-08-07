@@ -346,37 +346,30 @@ class URN:
     def from_discord(cls, path):
         return cls.from_parts(cls.DISCORD_SCHEME, path)
 
+    @classmethod
     def _get_contact_on_elasticsearch(cls, scheme, path, org):  # pragma: no cover
         from elasticsearch_dsl import Q
 
         base_url = settings.ELASTICSEARCH_URL
         timeout = int(settings.ELASTICSEARCH_TIMEOUT_REQUEST)
         client = Elasticsearch(f"{base_url}", timeout=timeout)
-        filte = [Q("match", org_id=org.id)]
         index = "contacts"
 
-        filte.append(
-            Q(
-                "nested",
-                path="urns",
-                query=Q(
-                    "bool",
-                    must=[
-                        Q(
-                            "match_phrase",
-                            **{"urns.path": path},
-                        ),
-                        Q("term", urns__scheme=scheme),
-                    ],
+        query = Q(
+            "bool",
+            must=[
+                Q("match", org_id=org.id),
+                Q(
+                    "nested",
+                    path="urns",
+                    query=Q("bool", must=[Q("term", **{"urns.path.keyword": path}), Q("term", urns__scheme=scheme)]),
                 ),
-            ),
+            ],
         )
-        qs = Q("bool", must=filte)
 
-        contacts = Search(using=client, index=index).query(qs)
-        response = contacts.count()
-
-        if response == 0:
+        contacts = Search(using=client, index=index).query(query).source(["_id"])
+        response = contacts.execute()
+        if len(response) == 0:
             return False
         return True
 
