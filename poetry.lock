@@ -487,7 +487,7 @@ django-js-asset = "*"
 
 [[package]]
 name = "django-permissions-policy"
-version = "4.20.0"
+version = "4.21.0"
 description = "Set the draft security HTTP header Permissions-Policy (previously Feature-Policy) on your Django app."
 category = "main"
 optional = false
@@ -1798,7 +1798,7 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=4.6)", "pytest-black (
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "847d557775f21418d05de5029791cb909baed49eb11e0f54a9dbb09e0d6e498c"
+content-hash = "870ef72acded8fbddca4af13bde74c971d07c447b59c2002bd8ad9e0c54820f4"
 
 [metadata.files]
 amqp = [
@@ -2066,8 +2066,8 @@ django-mptt = [
     {file = "django_mptt-0.12.0-py2.py3-none-any.whl", hash = "sha256:63b421a054bceb7406582e2be876a80b3848a5106765baea1003696348ffd628"},
 ]
 django-permissions-policy = [
-    {file = "django_permissions_policy-4.20.0-py3-none-any.whl", hash = "sha256:6473a698d04a87eb05bfd86bf7c5aec59afbbd7a5cadcb85a5fc6aa0a26a1639"},
-    {file = "django_permissions_policy-4.20.0.tar.gz", hash = "sha256:e56141f7b407d2d220e415f9ceb6a19fadda826fb4460e78b30422536fdd4d42"},
+    {file = "django_permissions_policy-4.21.0-py3-none-any.whl", hash = "sha256:9ec1edd028d8f4ea0cc9c1f44ad0c8c3339aec3aa796e40630dd3c3875f3b50e"},
+    {file = "django_permissions_policy-4.21.0.tar.gz", hash = "sha256:233f5de198ba8f4ee85ba9ffd5dacfd02c9d661bdaf11e91eb45ae02e6f0e915"},
 ]
 django-redis = [
     {file = "django-redis-4.12.1.tar.gz", hash = "sha256:306589c7021e6468b2656edc89f62b8ba67e8d5a1c8877e2688042263daa7a63"},

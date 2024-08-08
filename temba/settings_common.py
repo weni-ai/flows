@@ -229,27 +229,32 @@ MIDDLEWARE = (
 )
 
 PERMISSIONS_POLICY = {
-    "accelerometer": [],
-    "ambient-light-sensor": [],
-    "autoplay": [],
-    "camera": [],
-    "display-capture": [],
-    "document-domain": [],
-    "encrypted-media": [],
-    "fullscreen": [],
-    "geolocation": [],
-    "gyroscope": [],
-    "interest-cohort": [],
-    "magnetometer": [],
-    "microphone": [],
-    "midi": [],
-    "payment": [],
-    "usb": [],
+    "camera": ["https://*.weni.ai",],
+    "fullscreen": ["https://*.weni.ai",],
+    "geolocation": ["https://*.weni.ai",],
+    "gyroscope": ["https://*.weni.ai",],
+    "magnetometer": ["https://*.weni.ai",],
+    "midi": ["https://*.weni.ai",],
+    "payment": ["https://*.weni.ai",],
 }
 
 # security middleware configuration
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = False
+SECURE_HSTS_SECONDS = 86400  # 24 hours
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "HTTPS")
+SECURE_REDIRECT_EXEMPT = []
+SECURE_SSL_HOST = None
+SECURE_SSL_REDIRECT = False
+
+# cross-site request forgery prevention
+CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = "Strict"
+CSRF_COOKIE_AGE = 10800
 
 ROOT_URLCONF = "temba.urls"
 
