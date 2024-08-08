@@ -1,3 +1,7 @@
+3.10.10
+----------
+* Update floweditor to 2.17.1
+
 3.10.9
 ----------
 * Update flow start endpoint to receive query params
