@@ -365,6 +365,7 @@ class Flow(TembaModel):
                 flow.restore(user)
 
             dependency_mapping[flow_uuid] = str(flow.uuid)
+            flow.father_uuid = flow_uuid
             created_flows.append((flow, flow_def))
 
         # import each definition (includes re-mapping dependency references)
