@@ -367,7 +367,7 @@ class URN:
             ],
         )
 
-        contacts = Search(using=client, index=index).query(query).source(["_id"])
+        contacts = Search(using=client, index=index).query(query)
         response = contacts.count()
         if response == 0:
             return False
