@@ -578,7 +578,6 @@ class Org(SmartModel):
         export_triggers = export_json.get("triggers", [])
 
         dependency_mapping = {}  # dependency UUIDs in import => new UUIDs
-        imported_flows_data = []
 
         with transaction.atomic():
             ContactField.import_fields(self, user, export_fields)
@@ -600,24 +599,7 @@ class Org(SmartModel):
             flow.has_issues = len(flow_info[Flow.INSPECT_ISSUES]) > 0
             flow.save(update_fields=("has_issues",))
 
-        imported_flows_data = self.get_new_flows_data(new_flows, export_json)
-        return imported_flows_data
-
-    def get_new_flows_data(self, new_flows, export_json):
-        list_flows = []
-
-        for flow in new_flows:
-            flow_name = flow.name
-            flow_base_uuid = ""
-
-            for flow_obj in export_json["flows"]:
-                if flow_obj.get("name") == flow_name:
-                    flow_base_uuid = flow_obj.get("uuid")
-
-            flow_data = {"base_uuid": flow_base_uuid, "uuid": flow.uuid, "name": flow.name}
-            list_flows.append(flow_data)
-
-        return list_flows
+        return new_flows
 
     def validate_import(self, import_def):
         from temba.triggers.models import Trigger

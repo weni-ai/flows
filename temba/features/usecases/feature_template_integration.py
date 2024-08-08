@@ -1,5 +1,3 @@
-import logging
-
 from weni.internal.models import Project
 
 from django.contrib.auth import get_user_model
@@ -8,8 +6,6 @@ from temba.event_driven.publisher.rabbitmq_publisher import RabbitmqPublisher
 from temba.projects.usecases.globals_creation import create_globals
 
 User = get_user_model()
-
-logger = logging.getLogger(__name__)
 
 
 def get_or_create_user_by_email(email: str) -> tuple:  # pragma: no cover
@@ -22,15 +18,13 @@ def integrate_feature_template_consumer(
     project = Project.objects.get(project_uuid=project_uuid)
     user, _ = get_or_create_user_by_email(user_email)
 
-    imported_data = project.import_app(definition, user)
+    new_flows = project.import_app(definition, user)
     disable_flows_has_issues(project, definition)
-
-    logger.info(f"resultados da importação: {imported_data}")
 
     if parameters:
         create_globals(parameters, project, user)
 
-    publish_integrate_success(project.project_uuid, imported_data)
+    publish_integrate_success(project.project_uuid, format_new_flows_data(new_flows))
 
     return project
 
@@ -38,6 +32,15 @@ def integrate_feature_template_consumer(
 def disable_flows_has_issues(project, sample_flows):
     flows_name = list(map(lambda flow: flow.get("name"), sample_flows.get("flows")))
     project.flows.filter(name__in=flows_name).update(has_issues=False)
+
+
+def format_new_flows_data(new_flows):
+    flows_list = []
+    for flow in new_flows:
+        flow_data = {"base_uuid": flow.father_uuid, "uuid": flow.uuid, "name": flow.name}
+        flows_list.append(flow_data)
+
+    return flows_list
 
 
 def publish_integrate_success(project_uuid, imported_data):
