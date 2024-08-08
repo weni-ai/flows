@@ -29,11 +29,14 @@ test = ["flake8 (==3.7.9)", "mock (==2.0.0)", "pylint (==1.9.3)"]
 
 [[package]]
 name = "asgiref"
-version = "3.4.1"
+version = "3.8.1"
 description = "ASGI specs, helper code, and adapters"
 category = "main"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.8"
+
+[package.dependencies]
+typing-extensions = {version = ">=4", markers = "python_version < \"3.11\""}
 
 [package.extras]
 tests = ["mypy (>=0.800)", "pytest", "pytest-asyncio"]
@@ -481,6 +484,18 @@ python-versions = ">=3.6"
 [package.dependencies]
 Django = ">=1.11"
 django-js-asset = "*"
+
+[[package]]
+name = "django-permissions-policy"
+version = "4.21.0"
+description = "Set the draft security HTTP header Permissions-Policy (previously Feature-Policy) on your Django app."
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
+[package.dependencies]
+asgiref = ">=3.6"
+django = ">=3.2"
 
 [[package]]
 name = "django-redis"
@@ -1783,7 +1798,7 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=4.6)", "pytest-black (
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "02212cc7f69028b63d7662801b68489f1a9696502a5f8862f0ce4726939706e3"
+content-hash = "870ef72acded8fbddca4af13bde74c971d07c447b59c2002bd8ad9e0c54820f4"
 
 [metadata.files]
 amqp = [
@@ -1795,8 +1810,8 @@ analytics-python = [
     {file = "analytics_python-1.4.post1-py2.py3-none-any.whl", hash = "sha256:33ab660150d0f37bb2fefc93fd19c9e7bd85e5b17db44df5e7e1139f63c14246"},
 ]
 asgiref = [
-    {file = "asgiref-3.4.1-py3-none-any.whl", hash = "sha256:ffc141aa908e6f175673e7b1b3b7af4fdb0ecb738fc5c8b88f69f055c2415214"},
-    {file = "asgiref-3.4.1.tar.gz", hash = "sha256:4ef1ab46b484e3c706329cedeff284a5d40824200638503f5768edb6de7d58e9"},
+    {file = "asgiref-3.8.1-py3-none-any.whl", hash = "sha256:3e1e3ecc849832fe52ccf2cb6686b7a55f82bb1d6aee72a58826471390335e47"},
+    {file = "asgiref-3.8.1.tar.gz", hash = "sha256:c343bd80a0bec947a9860adb4c432ffa7db769836c64238fc34bdc3fec84d590"},
 ]
 backoff = [
     {file = "backoff-1.10.0-py2.py3-none-any.whl", hash = "sha256:5e73e2cbe780e1915a204799dba0a01896f45f4385e636bcca7a0614d879d0cd"},
@@ -2049,6 +2064,10 @@ django-js-asset = [
 django-mptt = [
     {file = "django-mptt-0.12.0.tar.gz", hash = "sha256:8ae6c3821127b529bb2f938de27bf0771b1bcbe9dbccdfba33986af78611f13a"},
     {file = "django_mptt-0.12.0-py2.py3-none-any.whl", hash = "sha256:63b421a054bceb7406582e2be876a80b3848a5106765baea1003696348ffd628"},
+]
+django-permissions-policy = [
+    {file = "django_permissions_policy-4.21.0-py3-none-any.whl", hash = "sha256:9ec1edd028d8f4ea0cc9c1f44ad0c8c3339aec3aa796e40630dd3c3875f3b50e"},
+    {file = "django_permissions_policy-4.21.0.tar.gz", hash = "sha256:233f5de198ba8f4ee85ba9ffd5dacfd02c9d661bdaf11e91eb45ae02e6f0e915"},
 ]
 django-redis = [
     {file = "django-redis-4.12.1.tar.gz", hash = "sha256:306589c7021e6468b2656edc89f62b8ba67e8d5a1c8877e2688042263daa7a63"},
