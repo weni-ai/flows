@@ -13,7 +13,7 @@ def get_or_create_user_by_email(email: str) -> tuple:  # pragma: no cover
 
 
 def integrate_feature_template_consumer(
-    project_uuid: Project, definition: dict, parameters: dict, user_email=None
+    project_uuid: Project, definition: dict, parameters: dict, feature_version_uuid: str, user_email=None
 ) -> Project:  # pragma: no cover
     project = Project.objects.get(project_uuid=project_uuid)
     user, _ = get_or_create_user_by_email(user_email)
@@ -24,7 +24,7 @@ def integrate_feature_template_consumer(
     if parameters:
         create_globals(parameters, project, user)
 
-    publish_integrate_success(project.project_uuid, format_new_flows_data(new_flows))
+    publish_integrate_success(project.project_uuid, feature_version_uuid, format_new_flows_data(new_flows))
 
     return project
 
@@ -43,10 +43,12 @@ def format_new_flows_data(new_flows):
     return flows_list
 
 
-def publish_integrate_success(project_uuid, imported_data):
+def publish_integrate_success(project_uuid, feature_version_uuid, imported_data):
     rabbitmq_publisher = RabbitmqPublisher()
     rabbitmq_publisher.send_message(
-        body=dict(project_uuid=str(project_uuid), imported_flows=imported_data),
-        exchange="retail.feature-integrated",
+        body=dict(
+            project_uuid=str(project_uuid), feature_version_uuid=feature_version_uuid, imported_flows=imported_data
+        ),
+        exchange="flows-integrated-feature.topic",
         routing_key="",
     )
