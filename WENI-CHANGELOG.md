@@ -1,3 +1,11 @@
+3.11.0
+----------
+* Update floweditor to 3.0.0
+* Support new floweditor static file handling
+* Add attributes in headers
+* Add waba and phone number in billing endpoint
+* Change trim flow start task to delete api starts
+
 3.10.10
 ----------
 * Update floweditor to 2.17.1
