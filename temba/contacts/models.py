@@ -242,6 +242,7 @@ class URN:
         if not org.config.get("access_elastic"):
             return norm_path
 
+        print('elastic neles')
         contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, norm_path, org)
 
         if contact_urn:
