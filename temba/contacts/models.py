@@ -264,7 +264,7 @@ class URN:
         return norm_path
 
     @classmethod
-    def normalize(cls, urn, country_code=None, org=None):
+    def normalize(cls, urn, country_code=None, org=None, bypass_elastic=None):
         """
         Normalizes the path of a URN string. Should be called anytime looking for a URN match.
         """
@@ -290,7 +290,8 @@ class URN:
             norm_path = norm_path.lower()
 
         elif scheme == cls.WHATSAPP_SCHEME and norm_path[0:2] == "55" and org:  # pragma: no cover
-            norm_path = cls.verify_brazilian_number(urn, scheme, norm_path, org)
+            if not bypass_elastic:
+                norm_path = cls.verify_brazilian_number(urn, scheme, norm_path, org)
 
         return cls.from_parts(scheme, norm_path, query, display)
 
@@ -2233,26 +2234,52 @@ class ContactImport(SmartModel):
 
         mappings = cls._auto_mappings(org, headers)
 
+        # Verificar se o bulk_elastic está ativo
+        bypass_elastic = org.config.get("bulk_elastic", False)
+
         # iterate over rest of the rows to do row-level validation
         seen_uuids = set()
         seen_urns = set()
         num_records = 0
+
+        urn_batch = []
+        urn_to_row = {}  # Mapping URN to row for error reporting
+        records_to_process = []
+
         for raw_row in data:
             row = cls._parse_row(raw_row, len(mappings))
-            uuid, urns = cls._extract_uuid_and_urns(row, mappings, org)
+            uuid, urns = cls._extract_uuid_and_urns(row, mappings, org, bypass_elastic)
             if uuid:
                 if uuid in seen_uuids:
                     raise ValidationError(
                         _("Import file contains duplicated contact UUID '%(uuid)s'."), params={"uuid": uuid}
                     )
                 seen_uuids.add(uuid)
-            for urn in urns:
-                if urn in seen_urns:
-                    raise ValidationError(
-                        _("Import file contains duplicated contact URN '%(urn)s'."), params={"urn": urn}
-                    )
-                seen_urns.add(urn)
+            
+            # new
+            if org.config.get("bulk_elastic"):
+                print('estamos fazendo o batch')
+                for urn in urns:
 
+                    # try to get variations of the number
+                    variations = cls._generate_urn_variations(urn, org)
+                    urn_batch.extend(variations)
+                    print(variations)
+                    urn_to_row.update({v: raw_row for v in variations})
+
+                if len(urn_batch) >= 500:
+                    cls._process_urn_batch(urn_batch, urn_to_row, seen_urns, org)
+                    urn_batch.clear()
+            
+            else:
+                for urn in urns:
+                    if urn in seen_urns:
+                        raise ValidationError(
+                            _("Import file contains duplicated contact URN '%(urn)s'."), params={"urn": urn}
+                        )
+                    seen_urns.add(urn)
+
+            records_to_process.append(row)
             # check if we exceed record limit
             num_records += 1
             if num_records > ContactImport.MAX_RECORDS:
@@ -2260,6 +2287,10 @@ class ContactImport(SmartModel):
                     _("Import files can contain a maximum of %(max)d records."),
                     params={"max": ContactImport.MAX_RECORDS},
                 )
+        
+        # Process any remaining URNs in the final batch
+        if urn_batch:
+            cls._process_urn_batch(urn_batch, urn_to_row, seen_urns, org)
 
         if num_records == 0:
             raise ValidationError(_("Import file doesn't contain any records."))
@@ -2267,9 +2298,60 @@ class ContactImport(SmartModel):
         file.seek(0)  # seek back to beginning so subsequent reads work
 
         return mappings, num_records
+    
+    @classmethod
+    def _generate_urn_variations(cls, urn, org):
+        """
+        Generates variations of the URN (with and without the digit 9) for Brazilian numbers.
+        """
+        scheme, path, _, _ = URN.to_parts(urn)
+        variations = [urn]
+
+        if scheme == "whatsapp" and path.startswith("55"):
+            if len(path) == 13 and path[4] == "9":
+                # Generate without digit 9
+                number_without_9 = path[:4] + path[5:]
+                variations.append(URN.from_parts(scheme, number_without_9))
+            else:
+                # Generate with digit 9
+                number_with_9 = path[:4] + "9" + path[4:]
+                variations.append(URN.from_parts(scheme, number_with_9))
+
+        return variations
+    
+    @classmethod
+    def _process_urn_batch(cls, urn_batch, urn_to_row, seen_urns, org):
+        """
+        Processes a batch of URNs by checking them against Elasticsearch.
+        If a URN already exists, it raises a ValidationError.
+        """
+        if org.config.get("bulk_elastic"):
+            print('tamanho do batch', len(urn_batch))
+            # Query Elasticsearch to check if any of these URNs exist
+            existing_urns = cls._check_urns_in_elasticsearch(urn_batch, org)
+
+            for urn in existing_urns:
+                raise ValidationError(
+                    _("Import file contains duplicated contact URN '%(urn)s'."), params={"urn": urn}
+                )
+            seen_urns.update(urn_batch)
+    
+    @classmethod
+    def _check_urns_in_elasticsearch(cls, urn_batch, org):
+        """
+        Checks if the given batch of URNs exists in Elasticsearch.
+        """
+        existing_urns = set()
+        # Implement the actual Elasticsearch query here
+        # Example pseudocode:
+        # query = {"query": {"terms": {"urn.keyword": urn_batch}}}
+        # response = elasticsearch_client.search(index="contacts", body=query)
+        # for hit in response['hits']['hits']:
+        #     existing_urns.add(hit['_source']['urn'])
+        return existing_urns
 
     @staticmethod
-    def _extract_uuid_and_urns(row, mappings, org) -> tuple[str, list[str]]:
+    def _extract_uuid_and_urns(row, mappings, org, bypass_elastic) -> tuple[str, list[str]]:
         """
         Extracts any UUIDs and URNs from the given row so they can be checked for uniqueness
         """
@@ -2282,7 +2364,7 @@ class ContactImport(SmartModel):
             elif mapping["type"] == "scheme" and value:
                 urn = URN.from_parts(mapping["scheme"], value)
                 try:
-                    urn = URN.normalize(urn, org=org)
+                    urn = URN.normalize(urn, org=org, bypass_elastic=bypass_elastic)
                 except ValueError:
                     pass
                 urns.append(urn)
