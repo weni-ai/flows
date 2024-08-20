@@ -43,7 +43,7 @@ def format_new_flows_data(new_flows):
     return flows_list
 
 
-def publish_integrate_success(project_uuid, feature_version_uuid, imported_data):
+def publish_integrate_success(project_uuid, feature_version_uuid, imported_data):  # pragma: no cover
     rabbitmq_publisher = RabbitmqPublisher()
     rabbitmq_publisher.send_message(
         body=dict(
