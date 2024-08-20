@@ -599,6 +599,8 @@ class Org(SmartModel):
             flow.has_issues = len(flow_info[Flow.INSPECT_ISSUES]) > 0
             flow.save(update_fields=("has_issues",))
 
+        return new_flows
+
     def validate_import(self, import_def):
         from temba.triggers.models import Trigger
 

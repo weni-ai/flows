@@ -8,11 +8,12 @@ from temba.features.usecases.feature_template_integration import integrate_featu
 
 class IntegrateFeatureTemplateConsumer(EDAConsumer):
     def consume(self, message: amqp.Message):  # pragma: no cover
-        print("[IntegrateFeatureTemplateConsumer] - Consuming a message.")  # Body: {message.body}")
+        print("[IntegrateFeatureTemplateConsumer] - Consuming a message.")
         try:
             body = JSONParser.parse(message.body)
             integrate_feature_template_consumer(
                 project_uuid=body.get("project_uuid"),
+                feature_version_uuid=body.get("feature_version"),
                 definition=body.get("definition"),
                 parameters=body.get("parameters"),
                 user_email=body.get("user_email"),
