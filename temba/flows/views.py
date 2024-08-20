@@ -1026,7 +1026,7 @@ class FlowCRUDL(SmartCRUDL):
 
             for key, filedata in data.items():
                 # tack on our prefix for dev mode
-                filename = prefix + './' + filedata["file"]
+                filename = prefix + "./" + filedata["file"]
 
                 # ignore precache manifest
                 if key.startswith("precache-manifest") or key.startswith("service-worker"):
