@@ -1,3 +1,7 @@
+3.12.1
+----------
+* Hotfix: Resolve error calling elasticsearch
+
 3.12.0
 ----------
 * Fix error on code_check
