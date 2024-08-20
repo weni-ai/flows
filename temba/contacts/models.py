@@ -256,7 +256,7 @@ class URN:
                 return number
 
         # add number 9
-        else:
+        if len(norm_path) == 12:
             number = norm_path[:4] + "9" + norm_path[4:]
             contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, number, org)
             if contact_urn:
