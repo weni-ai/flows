@@ -1,3 +1,11 @@
+3.12.0
+----------
+* Fix error on code_check
+* Consumer to delete flows objects
+* Publisher that will send event that flows were created
+* Add consumer to integrate feature template
+* Improve query on elasticsearch
+
 3.11.0
 ----------
 * Update floweditor to 3.0.0
