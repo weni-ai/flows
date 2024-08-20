@@ -242,7 +242,7 @@ class URN:
         if not org.config.get("access_elastic"):
             return norm_path
 
-        contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, norm_path, org)
+        contact_urn = cls._get_contact_on_elasticsearch(scheme, norm_path, org)
 
         if contact_urn:
             return norm_path
@@ -250,14 +250,14 @@ class URN:
         # remove number 9
         if len(norm_path) == 13:
             number = norm_path[:4] + norm_path[5:]
-            contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, number, org)
+            contact_urn = cls._get_contact_on_elasticsearch(scheme, number, org)
             if contact_urn:
                 return number
 
         # add number 9
         if len(norm_path) == 12:
             number = norm_path[:4] + "9" + norm_path[4:]
-            contact_urn = cls._get_contact_on_elasticsearch(cls, scheme, number, org)
+            contact_urn = cls._get_contact_on_elasticsearch(scheme, number, org)
             if contact_urn:
                 return number
 
