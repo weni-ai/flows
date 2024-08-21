@@ -35,9 +35,9 @@ def validate_translations(value, base_language, max_length):
             raise serializers.ValidationError("Ensure translations have no more than %d characters." % max_length)
 
 
-def validate_urn(value, strict=True, country_code=None, org=None):
+def validate_urn(value, strict=True, country_code=None):
     try:
-        normalized = URN.normalize(value, country_code=country_code, org=org)
+        normalized = URN.normalize(value, country_code=country_code)
 
         if strict and not URN.validate(normalized, country_code=country_code):
             raise ValueError()

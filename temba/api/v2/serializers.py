@@ -24,6 +24,7 @@ from temba.flows.models import Flow, FlowLabel, FlowRun, FlowStart
 from temba.globals.models import Global
 from temba.locations.models import AdminBoundary
 from temba.mailroom import modifiers
+from temba.mailroom.client import MailroomException
 from temba.msgs.models import Broadcast, Label, Msg
 from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
@@ -652,15 +653,18 @@ class ContactWriteSerializer(WriteSerializer):
 
         # create new contact
         else:
-            self.instance = Contact.create(
-                self.context["org"],
-                self.context["user"],
-                name,
-                language,
-                urns or [],
-                custom_fields or {},
-                groups or [],
-            )
+            try:
+                self.instance = Contact.create(
+                    self.context["org"],
+                    self.context["user"],
+                    name,
+                    language,
+                    urns or [],
+                    custom_fields or {},
+                    groups or [],
+                )
+            except MailroomException as e:
+                raise serializers.ValidationError(e.response)
 
         return self.instance
 
