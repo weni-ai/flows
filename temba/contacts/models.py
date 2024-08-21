@@ -2341,13 +2341,36 @@ class ContactImport(SmartModel):
         """
         Checks if the given batch of URNs exists in Elasticsearch.
         """
+        from elasticsearch_dsl import Q
+
+        base_url = settings.ELASTICSEARCH_URL
+        timeout = int(settings.ELASTICSEARCH_TIMEOUT_REQUEST)
+        client = Elasticsearch(f"{base_url}", timeout=timeout)
+
+        index = "contacts"
+        
+        query = {
+            "query": {
+                "bool": {
+                    "filter":[
+                        {"match":{"org_id":org.id}}
+                        ],
+                    "must":{
+                        "terms": {
+                            "urn.keyword": urn_batch
+                        }
+                    }
+                }
+            }
+        }
+
+        response = Search(using=client, index=index).query(query)
+
+        # Extrair URNs existentes do resultado
         existing_urns = set()
-        # Implement the actual Elasticsearch query here
-        # Example pseudocode:
-        # query = {"query": {"terms": {"urn.keyword": urn_batch}}}
-        # response = elasticsearch_client.search(index="contacts", body=query)
-        # for hit in response['hits']['hits']:
-        #     existing_urns.add(hit['_source']['urn'])
+        for hit in response['hits']['hits']:
+            existing_urns.add(hit['_source']['urn'])
+        
         return existing_urns
 
     @staticmethod
