@@ -1,4 +1,4 @@
-import amqp
+import amqp  # pragma: no cover
 
 from .consumers import DeleteFeatureTemplateIntegrationConsumer, IntegrateFeatureTemplateConsumer  # pragma: no cover
 

@@ -229,13 +229,27 @@ MIDDLEWARE = (
 )
 
 PERMISSIONS_POLICY = {
-    "camera": ["https://*.weni.ai",],
-    "fullscreen": ["https://*.weni.ai",],
-    "geolocation": ["https://*.weni.ai",],
-    "gyroscope": ["https://*.weni.ai",],
-    "magnetometer": ["https://*.weni.ai",],
-    "midi": ["https://*.weni.ai",],
-    "payment": ["https://*.weni.ai",],
+    "camera": [
+        "https://*.weni.ai",
+    ],
+    "fullscreen": [
+        "https://*.weni.ai",
+    ],
+    "geolocation": [
+        "https://*.weni.ai",
+    ],
+    "gyroscope": [
+        "https://*.weni.ai",
+    ],
+    "magnetometer": [
+        "https://*.weni.ai",
+    ],
+    "midi": [
+        "https://*.weni.ai",
+    ],
+    "payment": [
+        "https://*.weni.ai",
+    ],
 }
 
 # security middleware configuration
