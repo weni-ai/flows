@@ -111,7 +111,7 @@ class URNField(serializers.CharField):
 
     def to_internal_value(self, data):
         country_code = self.context["org"].default_country_code
-        return validate_urn(str(data), country_code=country_code, org=self.context["org"])
+        return validate_urn(str(data), country_code=country_code)
 
 
 class URNListField(LimitedListField):
