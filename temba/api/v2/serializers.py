@@ -30,6 +30,7 @@ from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.utils import extract_constants, json, on_transaction_commit
 from temba.wpp_products.models import Product
+from temba.mailroom.client import MailroomException
 
 from . import fields
 from .validators import UniqueForOrgValidator
@@ -652,15 +653,18 @@ class ContactWriteSerializer(WriteSerializer):
 
         # create new contact
         else:
-            self.instance = Contact.create(
-                self.context["org"],
-                self.context["user"],
-                name,
-                language,
-                urns or [],
-                custom_fields or {},
-                groups or [],
-            )
+            try:
+                self.instance = Contact.create(
+                    self.context["org"],
+                    self.context["user"],
+                    name,
+                    language,
+                    urns or [],
+                    custom_fields or {},
+                    groups or [],
+                )
+            except MailroomException as e:
+                raise serializers.ValidationError(e.response)
 
         return self.instance
 

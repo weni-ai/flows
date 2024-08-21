@@ -2258,7 +2258,7 @@ class ContactImport(SmartModel):
             
             # new
             if org.config.get("bulk_elastic"):
-                print('estamos fazendo o batch')
+                #print('estamos fazendo o batch')
                 for urn in urns:
 
                     # try to get variations of the number
@@ -2267,8 +2267,14 @@ class ContactImport(SmartModel):
                     print(variations)
                     urn_to_row.update({v: raw_row for v in variations})
 
+                    if urn in seen_urns:
+                        raise ValidationError(
+                            _("Import file contains duplicated contact URN '%(urn)s'."), params={"urn": urn}
+                        )
+                    seen_urns.add(urn)
+
                 if len(urn_batch) >= 500:
-                    cls._process_urn_batch(urn_batch, urn_to_row, seen_urns, org)
+                    cls._process_urn_batch(urn_batch, seen_urns, org)
                     urn_batch.clear()
             
             else:
@@ -2290,7 +2296,7 @@ class ContactImport(SmartModel):
         
         # Process any remaining URNs in the final batch
         if urn_batch:
-            cls._process_urn_batch(urn_batch, urn_to_row, seen_urns, org)
+            cls._process_urn_batch(urn_batch, seen_urns, org)
 
         if num_records == 0:
             raise ValidationError(_("Import file doesn't contain any records."))
@@ -2305,22 +2311,23 @@ class ContactImport(SmartModel):
         Generates variations of the URN (with and without the digit 9) for Brazilian numbers.
         """
         scheme, path, _, _ = URN.to_parts(urn)
-        variations = [urn]
+        variations = [path]
 
         if scheme == "whatsapp" and path.startswith("55"):
             if len(path) == 13 and path[4] == "9":
                 # Generate without digit 9
                 number_without_9 = path[:4] + path[5:]
-                variations.append(URN.from_parts(scheme, number_without_9))
+                variations.append(number_without_9)
             else:
                 # Generate with digit 9
                 number_with_9 = path[:4] + "9" + path[4:]
-                variations.append(URN.from_parts(scheme, number_with_9))
+                #variations.append(URN.from_parts(scheme, number_with_9))
+                variations.append(number_with_9)
 
         return variations
     
     @classmethod
-    def _process_urn_batch(cls, urn_batch, urn_to_row, seen_urns, org):
+    def _process_urn_batch(cls, urn_batch, seen_urns, org):
         """
         Processes a batch of URNs by checking them against Elasticsearch.
         If a URN already exists, it raises a ValidationError.
@@ -2330,14 +2337,12 @@ class ContactImport(SmartModel):
             # Query Elasticsearch to check if any of these URNs exist
             existing_urns = cls._check_urns_in_elasticsearch(urn_batch, org)
 
-            for urn in existing_urns:
-                raise ValidationError(
-                    _("Import file contains duplicated contact URN '%(urn)s'."), params={"urn": urn}
-                )
-            seen_urns.update(urn_batch)
+            print("tamanho do existing_urns", len(existing_urns))
+            seen_urns.update(existing_urns)
     
     @classmethod
     def _check_urns_in_elasticsearch(cls, urn_batch, org):
+        print("CHECKING IN ELASTIC 👽")
         """
         Checks if the given batch of URNs exists in Elasticsearch.
         """
@@ -2349,28 +2354,52 @@ class ContactImport(SmartModel):
 
         index = "contacts"
         
-        query = {
-            "query": {
-                "bool": {
-                    "filter":[
-                        {"match":{"org_id":org.id}}
-                        ],
-                    "must":{
-                        "terms": {
-                            "urn.keyword": urn_batch
-                        }
-                    }
-                }
-            }
-        }
+        # query = {
+        #     "bool": {
+        #         "filter":[
+        #             {"match":{"org_id":org.id}}
+        #             ],
+        #         "must":{
+        #             "terms": {
+        #                 "urn.keyword": urn_batch
+        #             }
+        #         }
+        #     }
+        # }
 
-        response = Search(using=client, index=index).query(query)
+        query = Q(
+        "bool",
+        must=[
+            Q("match", org_id=org.id),  # Filtra pela organização
+            Q(
+                "nested",
+                path="urns",
+                query=Q(
+                    "bool",
+                    must=[
+                        Q("terms", **{"urns.path.keyword": urn_batch}),
+                        Q("term", urns__scheme="whatsapp")
+                    ]
+                )
+            )
+            ]
+        )
+
+        search = Search(using=client, index=index).query(query).source(includes='urns.path')
+        response = search.execute()
+        print("RESPONSE 🔥", vars(response))
 
         # Extrair URNs existentes do resultado
         existing_urns = set()
-        for hit in response['hits']['hits']:
-            existing_urns.add(hit['_source']['urn'])
+        for hit in response:#['hits']['hits']:
+            urns = hit.urns
+            first_urn = urns[0] # TODO: GET CORRECT URN
+            print(vars(hit), 'type', type(hit))
+            print(hit.to_dict())
+            #print('IHA', hit['_source'].items())
+            existing_urns.add(first_urn['path'])
         
+        print('EXISTING URNS', existing_urns)
         return existing_urns
 
     @staticmethod
@@ -2489,7 +2518,7 @@ class ContactImport(SmartModel):
         """
         Starts this import, creating batches to be handled by mailroom
         """
-
+        print("Starting import 🔥🔥")
         assert self.status == self.STATUS_PENDING, "trying to start an already started import"
 
         # mark us as processing to prevent double starting
@@ -2739,6 +2768,7 @@ class ContactImportBatch(models.Model):
     finished_on = models.DateTimeField(null=True)
 
     def import_async(self):
+        print("IMPORT ASYNC 🔥🔥")
         mailroom.queue_contact_import_batch(self)
 
 
