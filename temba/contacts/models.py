@@ -238,33 +238,7 @@ class URN:
         return True
 
     @classmethod
-    def verify_brazilian_number(cls, urn, scheme, norm_path, org):  # pragma: no cover
-        if not org.config.get("access_elastic"):
-            return norm_path
-
-        contact_urn = cls._get_contact_on_elasticsearch(scheme, norm_path, org)
-
-        if contact_urn:
-            return norm_path
-
-        # remove number 9
-        if len(norm_path) == 13:
-            number = norm_path[:4] + norm_path[5:]
-            contact_urn = cls._get_contact_on_elasticsearch(scheme, number, org)
-            if contact_urn:
-                return number
-
-        # add number 9
-        if len(norm_path) == 12:
-            number = norm_path[:4] + "9" + norm_path[4:]
-            contact_urn = cls._get_contact_on_elasticsearch(scheme, number, org)
-            if contact_urn:
-                return number
-
-        return norm_path
-
-    @classmethod
-    def normalize(cls, urn, country_code=None, org=None):
+    def normalize(cls, urn, country_code=None):
         """
         Normalizes the path of a URN string. Should be called anytime looking for a URN match.
         """
@@ -288,9 +262,6 @@ class URN:
 
         elif scheme == cls.EMAIL_SCHEME:
             norm_path = norm_path.lower()
-
-        elif scheme == cls.WHATSAPP_SCHEME and norm_path[0:2] == "55" and org:  # pragma: no cover
-            norm_path = cls.verify_brazilian_number(urn, scheme, norm_path, org)
 
         return cls.from_parts(scheme, norm_path, query, display)
 
@@ -1452,7 +1423,7 @@ class ContactURN(models.Model):
         Looks up an existing URN by a formatted URN string, e.g. "tel:+250234562222"
         """
         if normalize:
-            urn_as_string = URN.normalize(urn_as_string, country_code, org=org)
+            urn_as_string = URN.normalize(urn_as_string, country_code)
 
         identity = URN.identity(urn_as_string)
         (scheme, path, query, display) = URN.to_parts(urn_as_string)
@@ -2275,7 +2246,7 @@ class ContactImport(SmartModel):
             elif mapping["type"] == "scheme" and value:
                 urn = URN.from_parts(mapping["scheme"], value)
                 try:
-                    urn = URN.normalize(urn, org=org)
+                    urn = URN.normalize(urn)
                 except ValueError:
                     pass
                 urns.append(urn)
@@ -2515,7 +2486,7 @@ class ContactImport(SmartModel):
                         spec["urns"] = []
                     urn = URN.from_parts(scheme, value)
                     try:
-                        urn = URN.normalize(urn, country_code=self.org.default_country_code, org=self.org)
+                        urn = URN.normalize(urn, country_code=self.org.default_country_code)
                     except ValueError:
                         pass
                     spec["urns"].append(urn)
