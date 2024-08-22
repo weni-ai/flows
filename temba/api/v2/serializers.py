@@ -663,7 +663,7 @@ class ContactWriteSerializer(WriteSerializer):
                     custom_fields or {},
                     groups or [],
                 )
-            except MailroomException as e:
+            except MailroomException as e:  # pragma: no cover
                 raise serializers.ValidationError(e.response)
 
         return self.instance
