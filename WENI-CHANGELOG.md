@@ -1,3 +1,7 @@
+3.12.2
+----------
+* Remove references with digit 9 in flows
+
 3.12.1
 ----------
 * Hotfix: Resolve error calling elasticsearch
