@@ -356,13 +356,10 @@ class Flow(TembaModel):
                 )
 
             for ticketer in integrations.get("ticketers", []):  # pragma: no cover
-                print('ticketer')
                 name = ticketer.get("name")
                 if IntegrationRequest.objects.filter(flow=flow, name=name, project=org.project):
-                    print('encontrou ticketer na tabela de IntegrationsRequest')
                     continue
-                
-                print('criaremos novo IntegrationRequest')
+
                 IntegrationRequest.objects.create(
                     flow=flow,
                     integration_uuid=ticketer.get("uuid"),
