@@ -1,3 +1,7 @@
+3.12.3
+----------
+* Update floweditor to 3.0.1
+
 3.12.2
 ----------
 * Remove references with digit 9 in flows
