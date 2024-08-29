@@ -1,3 +1,7 @@
+3.12.4
+----------
+* Add Hotjar
+
 3.12.3
 ----------
 * Update floweditor to 3.0.1
