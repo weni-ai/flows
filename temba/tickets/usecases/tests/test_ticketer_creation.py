@@ -42,7 +42,6 @@ class TicketerCreationTestCase(TembaTest):
         self.project_uuid = str(uuid.uuid4())
         self.project_auth = "project-auth"
         self.name = "Integration Request Name"
-        self.uuid = str(uuid.uuid4())
         self.queues = [{"uuid": "1d8176f2-c852-4d92-8521-9dbad81ae531", "name": "Queue 1"}]
         self.user, _ = User.objects.get_or_create(email=self.user_email)
 
@@ -65,53 +64,61 @@ class TicketerCreationTestCase(TembaTest):
         self.revision = FlowRevision.objects.filter(flow=self.flow).last()
         self.revision.definition = definition
         self.revision.save()
+
+    def test_create_ticketer_with_integration_request(self):
         self.integration_request = IntegrationRequest.objects.create(
-            project=self.project, name=self.name, integration_uuid=str(uuid.uuid4()), repository=None, flow=self.flow
-        )
-
-        self.ticketer = Ticketer.objects.create(
-            uuid=self.uuid,
-            org=self.org,
-            ticketer_type="wenichats",
-            created_by=self.user,
-            modified_by=self.user,
+            project=self.project,
             name=self.name,
-            config=dict(
-                project_auth=self.project_auth,
-                sector_uuid=self.uuid,
-            ),
+            integration_uuid=str(uuid.uuid4()),
+            repository=None,
+            flow=self.flow,
         )
 
-        TicketerQueue.objects.create(
-            uuid="de6d19af-a905-475e-b824-bf7fbca277fd",
-            name="Queue 1",
-            org=self.org,
-            created_by=self.user,
-            modified_by=self.user,
-            ticketer=self.ticketer,
-        )
+        ticketer_uuid = str(uuid.uuid4())
 
-        TicketerQueue.objects.create(
-            uuid="cb3ee8dc-705c-4512-893f-8d1d347680bb",
-            name="Fila gg",
-            org=self.org,
-            created_by=self.user,
-            modified_by=self.user,
-            ticketer=self.ticketer,
-        )
-
-    def test_create_ticketer(self):
         ticketer = create_ticketer(
+            uuid=ticketer_uuid,
             project_auth=self.project_auth,
             name=self.name,
             project_uuid=self.project_uuid,
             user_email=self.user_email,
-            uuid=self.uuid,
             queues=self.queues,
         )
 
         self.assertIsInstance(ticketer, Ticketer)
-        self.assertEqual(ticketer.uuid, self.uuid)
+        self.assertEqual(str(ticketer.uuid), ticketer_uuid)
 
         created_queues = TicketerQueue.objects.filter(ticketer=ticketer)
         self.assertEqual(created_queues.count(), len(self.queues))
+        self.assertEqual(str(created_queues.first().uuid), self.queues[0].get("uuid"))
+
+    def test_adding_new_queue_to_existing_ticketer(self):
+        ticketer_uuid = str(uuid.uuid4())
+
+        ticketer = create_ticketer(
+            uuid=ticketer_uuid,
+            project_auth=self.project_auth,
+            name=self.name,
+            project_uuid=self.project_uuid,
+            user_email=self.user_email,
+            queues=self.queues,
+        )
+
+        self.assertEqual(ticketer.queues.count(), 1)
+
+        queues = self.queues + [{"uuid": str(uuid.uuid4()), "name": "Queue 2"}]
+
+        ticketer = create_ticketer(
+            uuid=ticketer_uuid,
+            project_auth=self.project_auth,
+            name=self.name,
+            project_uuid=self.project_uuid,
+            user_email=self.user_email,
+            queues=queues,
+        )
+
+        self.assertEqual(ticketer.queues.count(), 2)
+
+        for queue in queues:
+            queue_uuid = queue.get("uuid")
+            ticketer.queues.get(uuid=queue_uuid)
