@@ -1,3 +1,7 @@
+3.13.0
+----------
+* Adjust retail consumers
+
 3.12.4
 ----------
 * Add Hotjar
