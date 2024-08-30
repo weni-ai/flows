@@ -53,9 +53,7 @@ def update_flow_definition(integration_request, ticketer):
         topic_uuid = topic.get("uuid")
         topic_name = topic.get("name")
         queue = ticketer.queues.get(name=topic_name)
-        updated_definition = updated_definition.replace(
-            str(topic_uuid), str(queue.uuid)
-        )
+        updated_definition = updated_definition.replace(str(topic_uuid), str(queue.uuid))
 
     loads_definition = json.loads(updated_definition)
     last_revision.definition = loads_definition
