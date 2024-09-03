@@ -1,3 +1,7 @@
+3.13.1
+----------
+* Update floweditor to 3.0.2
+
 3.13.0
 ----------
 * Adjust retail consumers
