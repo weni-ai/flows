@@ -22,14 +22,20 @@ def refresh_whatsapp_flows():
         return
 
     with r.lock("refresh_whatsapp_flows", 1800):
-        # for every whatsapp channel
         for channel in Channel.objects.filter(is_active=True, channel_type__in=["WA", "WAC"]):
-            # update the version only when have it set in the config
             if channel.config.get("wa_waba_id"):
                 flows = get_whatsapp_flows(channel)
 
                 if flows:
                     update_whatsapp_flows(flows, channel)
+
+
+def refresh_whatsapp_flows_for_a_channel(channel):
+    if channel.config.get("wa_waba_id"):
+        flows = get_whatsapp_flows(channel)
+
+        if flows:
+            update_whatsapp_flows(flows, channel)
 
 
 def get_whatsapp_flows(channel):
@@ -72,11 +78,16 @@ def update_whatsapp_flows(flows, channel):
 
     for obj in flows:
         flow = WhatsappFlow.objects.filter(facebook_flow_id=obj.get("id"), channel=channel).first()
+        assets_data = get_assets_data(channel, obj.get("id"))
+        variables = extract_data_keys(assets_data)
+
         if flow:
-            flow.category = (obj.get("categories"),)
-            flow.status = (obj.get("status"),)
-            flow.name = (obj.get("name"),)
-            flow.validation_errors = (obj.get("validation_errors"),)
+            flow.category = obj.get("categories")
+            flow.status = obj.get("status")
+            flow.name = obj.get("name")
+            flow.validation_errors = obj.get("validation_errors")
+            flow.screens = assets_data
+            flow.variables = variables
             flow.modified_on = timezone.now()
             flow.save()
 
@@ -87,6 +98,8 @@ def update_whatsapp_flows(flows, channel):
                 status=obj.get("status"),
                 name=obj.get("name"),
                 validation_errors=obj.get("validation_errors"),
+                screens=assets_data,
+                variables=variables,
                 org=channel.org,
                 channel=channel,
                 is_active=True,
@@ -95,3 +108,45 @@ def update_whatsapp_flows(flows, channel):
         seen.append(obj.get("id"))
 
     WhatsappFlow.trim(channel, seen)
+
+
+def get_assets_data(channel, facebook_flow_id):
+    token = _get_token(channel)
+    url = f"{settings.WHATSAPP_API_URL}/{facebook_flow_id}/assets"
+    headers = {"Authorization": f"Bearer {token}"}
+
+    try:
+        resp = requests.get(url, headers=headers)
+        if resp.status_code == 200:
+            assets_info = resp.json().get("data", [])
+
+            if assets_info and "download_url" in assets_info[0]:
+                download_url = assets_info[0]["download_url"]
+                # get JSON of download_url
+                json_data = requests.get(download_url).json()
+                return json_data
+    except requests.RequestException as e:
+        start = timezone.now()
+        HTTPLog.create_from_exception(HTTPLog.WHATSAPP_FLOWS_SYNCED, url, e, start, channel=channel)
+
+    return {}
+
+
+def extract_data_keys(json_data):
+    keys = []
+    screens_ids = []
+
+    def extract_keys(data):
+        if isinstance(data, dict):
+            if "id" in data and isinstance(data["id"], str):
+                screens_ids.append(data["id"])
+            for key, value in data.items():
+                if key == "data" and isinstance(value, dict):
+                    keys.extend(value.keys())
+                extract_keys(value)
+        elif isinstance(data, list):
+            for item in data:
+                extract_keys(item)
+
+    extract_keys(json_data)
+    return {"screens": list(set(screens_ids)), "variables": list(set(keys))}
