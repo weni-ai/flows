@@ -971,9 +971,9 @@ TEST_EXCLUDE = ("smartmin",)
 # -----------------------------------------------------------------------------------
 _default_database_config = {
     "ENGINE": "django.contrib.gis.db.backends.postgis",
-    "NAME": "rapidpro",
-    "USER": "rapidpro",
-    "PASSWORD": "rapidpro",
+    "NAME": "temba",
+    "USER": "temba",
+    "PASSWORD": "temba",
     "HOST": "localhost",
     "PORT": "5432",
     "ATOMIC_REQUESTS": True,
