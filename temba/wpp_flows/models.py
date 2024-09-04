@@ -19,7 +19,7 @@ class WhatsappFlow(models.Model):
 
     uuid = models.UUIDField(default=uuid4)
     facebook_flow_id = models.CharField(max_length=50)
-    category = models.JSONField()
+    category = models.JSONField(default=list, blank=True)
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, null=False)
     name = models.CharField(max_length=100)
     validation_errors = models.JSONField()
@@ -28,6 +28,8 @@ class WhatsappFlow(models.Model):
     created_on = models.DateTimeField(default=timezone.now)
     modified_on = models.DateTimeField(default=timezone.now)
     is_active = models.BooleanField(default=True)
+    screens = models.JSONField()
+    variables = models.JSONField(default=list, blank=True)
 
     @classmethod
     def trim(self, channel, ids):
