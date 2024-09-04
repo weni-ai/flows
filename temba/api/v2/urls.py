@@ -49,6 +49,7 @@ from .views import (
     TicketsEndpoint,
     TopicsEndpoint,
     UsersEndpoint,
+    WhatsappFlowsEndpoint,
     WorkspaceEndpoint,
 )
 from .wenibrain.views import BrainInfoEndpoint
@@ -102,6 +103,7 @@ urlpatterns = [
     url(r"^workspace$", WorkspaceEndpoint.as_view(), name="api.v2.workspace"),
     url(r"^intelligences$", IntelligencesEndpoint.as_view(), name="api.v2.intelligences"),
     url(r"^brain_info$", BrainInfoEndpoint.as_view(), name="api.v2.brain_info"),
+    url(r"^whatsapp_flows$", WhatsappFlowsEndpoint.as_view(), name="api.v2.whatsapp_flows"),
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns, allowed=["json", "api"])

@@ -47,6 +47,7 @@ from temba.orgs.models import OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.utils import splitting_getlist, str_to_bool
+from temba.wpp_flows.models import WhatsappFlow
 from temba.wpp_products.models import Product
 
 from ..models import SSLPermission
@@ -99,6 +100,7 @@ from .serializers import (
     TopicWriteSerializer,
     UserReadSerializer,
     WebHookEventReadSerializer,
+    WhatsappFlowReadSerializer,
     WorkspaceReadSerializer,
 )
 from .wenibrain.views import BrainInfoEndpoint
@@ -325,6 +327,7 @@ class ExplorerView(SmartTemplateView):
             IntelligencesEndpoint.get_read_explorer(),
             ExternalServicesEndpoint.get_read_explorer(),
             BrainInfoEndpoint.get_read_explorer(),
+            WhatsappFlowsEndpoint.get_read_explorer(),
         ]
         return context
 
@@ -4744,6 +4747,74 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
             "title": "List Products",
             "url": reverse("api.v2.products"),
             "slug": "products-list",
+            "params": [],
+            "example": {},
+        }
+
+
+class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
+    """
+    This endpoint allows you to fetch the WhatsApp flows that have been synced.
+
+    ## Listing Whatsapp Flows
+
+    A `GET` request returns the whatsapp flows for your organization.
+
+    Each whatsapp flows has the following attributes:
+
+     * **id** - the id of meta flow
+     * **name** - the name of the whatsapp flow
+     * **assets** - a dictionary with screens and variables list
+
+    Example:
+
+        GET /api/v2/whatsapp_flows.json
+
+    Response is the list of whatsapp flows for your organization:
+
+        {
+            "next": "http://example.com/api/v2/whatsapp_flows.json?cursor=cD0yMDE1LTExLTExKzExJTNBM40NjQlMkIwMCUzRv",
+            "previous": null,
+            "results": [
+            {
+            "id": "1111111111111111111",
+            "name": "Flow Test",
+            "assets": {
+                "screens": [
+                    "WELCOME", "MIDDLE"
+                },
+                "variables": [
+                    "question1Checkbox", "checkbox_source"
+                ]
+            ],
+        }
+    """
+
+    permission = "templates.template_api"
+    model = WhatsappFlow
+    serializer_class = WhatsappFlowReadSerializer
+    pagination_class = CreatedOnCursorPagination
+
+    def filter_queryset(self, queryset):
+        params = self.request.query_params
+
+        name = params.get("name")
+        if name:
+            queryset = queryset.filter(name__icontains=name)
+
+        facebook_flow_id = params.get("id")
+        if facebook_flow_id:
+            queryset = queryset.filter(facebook_flow_id=facebook_flow_id)
+
+        return queryset
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Whatsapp Flows",
+            "url": reverse("api.v2.whatsapp_flows"),
+            "slug": "whatsapp_flows-list",
             "params": [],
             "example": {},
         }

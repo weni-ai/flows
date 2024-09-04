@@ -29,6 +29,7 @@ from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.utils import extract_constants, json, on_transaction_commit
+from temba.wpp_flows.models import WhatsappFlow
 from temba.wpp_products.models import Product
 
 from . import fields
@@ -1851,4 +1852,18 @@ class FlowsLabelsReadSerializer(ReadSerializer):
             "uuid",
             "name",
             "parent",
+        )
+
+
+class WhatsappFlowReadSerializer(ReadSerializer):
+    id = serializers.CharField(source="facebook_flow_id")
+    name = serializers.CharField()
+    assets = serializers.JSONField(source="variables")
+
+    class Meta:
+        model = WhatsappFlow
+        fields = (
+            "id",
+            "name",
+            "assets",
         )
