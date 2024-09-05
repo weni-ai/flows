@@ -6095,10 +6095,10 @@ msgid "No messages"
 msgstr "Мессеж байхгүй байна"
 
 #, python-format
-msgid "Found %(results_count)s message in last 90 days matching <i>%(search)s</i>."
-msgid_plural "Found %(results_count)s messages in last 90 days matching <i>%(search)s</i>."
-msgstr[0] "<i> %(search)s </i> -н сүүлийн 90 хоногийн дотор %(results_count)s мессеж олдлоо."
-msgstr[1] "<i> %(search)s </i> -н сүүлийн 90 хоногийн дотор %(results_count)s мессежнүүд олдлоо."
+msgid "Found %(results_count)s message in last 15 days matching <i>%(search)s</i>."
+msgid_plural "Found %(results_count)s messages in last 15 days matching <i>%(search)s</i>."
+msgstr[0] "<i> %(search)s </i> -н сүүлийн 15 хоногийн дотор %(results_count)s мессеж олдлоо."
+msgstr[1] "<i> %(search)s </i> -н сүүлийн 15 хоногийн дотор %(results_count)s мессежнүүд олдлоо."
 
 #, python-format
 msgid "%(results_count)s message since %(start_date)s."

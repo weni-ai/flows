@@ -30,16 +30,27 @@ class ChannelProjectViewTest(TembaTest):
 
             project = Project.objects.create(name="Test project", created_by=self.user, modified_by=self.user)
             channel = self.create_channel("TG", "Test Channel", "test", org=project.org)
+            channel_wac = self.create_channel("WAC", "Test WAC Channel", "74123456789", org=project.org)
+            channel_wac.config = {"wa_waba_id": "12345678910", "wa_number": "+55 00 900001234"}
+            channel_wac.save()
 
             url = "/api/v2/internals/channel_projects?token=12345"
-            response = self.client.post(url, data={"channels": [str(channel.uuid)]}, content_type="application/json")
+            response = self.client.post(
+                url, data={"channels": [str(channel.uuid), str(channel_wac.uuid)]}, content_type="application/json"
+            )
             data = response.json()
 
             self.assertEqual(response.status_code, 200)
             self.assertTrue("results" in data)
-            self.assertEqual(len(data.get("results")), 1)
+            self.assertEqual(len(data.get("results")), 2)
 
-            result = data.get("results")[0]
+            result_wac = data.get("results")[0]
+            result = data.get("results")[1]
 
             self.assertEqual(result.get("channel_uuid"), str(channel.uuid))
             self.assertEqual(result.get("project_uuid"), str(project.project_uuid))
+
+            self.assertEqual(result_wac.get("channel_uuid"), str(channel_wac.uuid))
+            self.assertEqual(result_wac.get("waba"), str(channel_wac.config.get("wa_waba_id")))
+            self.assertEqual(result_wac.get("phone_number"), str(channel_wac.config.get("wa_number")))
+            self.assertEqual(result_wac.get("project_uuid"), str(project.project_uuid))

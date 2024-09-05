@@ -1018,15 +1018,15 @@ class FlowCRUDL(SmartCRUDL):
             styles = []
 
             if dev_mode:  # pragma: no cover
-                response = requests.get("http://localhost:3000/asset-manifest.json")
+                response = requests.get("http://localhost:3000/manifest.json")
                 data = response.json()
             else:
-                with open("node_modules/@weni/flow-editor/build/asset-manifest.json") as json_file:
+                with open("node_modules/@weni/flow-editor/build/manifest.json") as json_file:
                     data = json.load(json_file)
 
-            for key, filename in data.get("files").items():
+            for key, filedata in data.items():
                 # tack on our prefix for dev mode
-                filename = prefix + filename
+                filename = prefix + "./" + filedata["file"]
 
                 # ignore precache manifest
                 if key.startswith("precache-manifest") or key.startswith("service-worker"):
@@ -1037,7 +1037,7 @@ class FlowCRUDL(SmartCRUDL):
                     styles.append(filename)
 
                 # javascript
-                if key.endswith(".js") and filename.endswith(".js"):
+                if key.endswith(".js") or key.endswith(".jsx") and filename.endswith(".js"):
                     scripts.append(filename)
 
             flow = self.object
@@ -1084,7 +1084,7 @@ class FlowCRUDL(SmartCRUDL):
                 features.append("external_service")
             if org.catalogs.filter(is_active=True).exists():
                 features.append("whatsapp_catalog")
-            if org.brain_on and self.request.user.email.endswith("@weni.ai"):
+            if org.brain_on:
                 features.append("brain")
 
             return features

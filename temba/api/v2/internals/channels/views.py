@@ -25,11 +25,21 @@ class ChannelProjectView(APIViewMixin, APIView):
         serializer.is_valid(raise_exception=True)
         channels_uuids = serializer.validated_data.get("channels")
 
-        channels = Channel.objects.filter(uuid__in=channels_uuids).select_related("org").only("uuid", "org__proj_uuid")
+        channels = (
+            Channel.objects.filter(uuid__in=channels_uuids)
+            .select_related("org")
+            .only("uuid", "org__proj_uuid", "config")
+        )
 
         response = {"results": []}
 
         for channel in channels:
-            response["results"].append({"channel_uuid": str(channel.uuid), "project_uuid": str(channel.org.proj_uuid)})
+            channel_data = {"channel_uuid": str(channel.uuid), "project_uuid": str(channel.org.proj_uuid)}
+            if channel.channel_type == "WAC":
+                channel_data["waba"] = channel.config.get("wa_waba_id") if channel.config.get("wa_waba_id") else ""
+                channel_data["phone_number"] = (
+                    channel.config.get("wa_number") if channel.config.get("wa_number") else ""
+                )
+            response["results"].append(channel_data)
 
         return Response(response)
