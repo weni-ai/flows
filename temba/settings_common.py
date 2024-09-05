@@ -214,6 +214,7 @@ FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 
 MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
+    "django_permissions_policy.PermissionsPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -227,9 +228,47 @@ MIDDLEWARE = (
     "temba.middleware.TimezoneMiddleware",
 )
 
+PERMISSIONS_POLICY = {
+    "camera": [
+        "https://*.weni.ai",
+    ],
+    "fullscreen": [
+        "https://*.weni.ai",
+    ],
+    "geolocation": [
+        "https://*.weni.ai",
+    ],
+    "gyroscope": [
+        "https://*.weni.ai",
+    ],
+    "magnetometer": [
+        "https://*.weni.ai",
+    ],
+    "midi": [
+        "https://*.weni.ai",
+    ],
+    "payment": [
+        "https://*.weni.ai",
+    ],
+}
+
 # security middleware configuration
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = False
+SECURE_HSTS_SECONDS = 86400  # 24 hours
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "HTTPS")
+SECURE_REDIRECT_EXEMPT = []
+SECURE_SSL_HOST = None
+SECURE_SSL_REDIRECT = False
+
+# cross-site request forgery prevention
+CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = "Strict"
+CSRF_COOKIE_AGE = 10800
 
 ROOT_URLCONF = "temba.urls"
 
@@ -1076,6 +1115,7 @@ REST_FRAMEWORK = {
         "v2.broadcasts": "36000/hour",
         "v2.runs": "2500/hour",
         "v2.api": "2500/hour",
+        "v2.flowstart": "2500/hour",
     },
     "PAGE_SIZE": 250,
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",

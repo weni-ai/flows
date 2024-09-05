@@ -1446,13 +1446,13 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
         # filter by URN (optional)
         urn = params.get("urn")
         if urn:
-            queryset = queryset.filter(urns__identity=self.normalize_urn(urn), org=org)
+            queryset = queryset.filter(urns__identity=self.normalize_urn(urn))
 
         # filter by search (optional)
         search = params.get("search")
         if search:
             try:
-                urn_search = Q(urns__identity=self.normalize_urn(search), org=org)
+                urn_search = Q(urns__identity=self.normalize_urn(search))
             except InvalidQueryError:
                 urn_search = Q()
             queryset = queryset.filter(urn_search | Q(name=search))
@@ -4004,6 +4004,16 @@ class FlowStartsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     serializer_class = FlowStartReadSerializer
     write_serializer_class = FlowStartWriteSerializer
     pagination_class = ModifiedOnCursorPagination
+    throttle_scope = "v2.flowstart"
+
+    def get_write_serializer_class(self, instance, data, context):
+        query_params = self.request.query_params.dict()
+        for key in ["groups", "contacts", "urns"]:
+            if key in self.request.query_params:
+                query_params[key] = self.request.query_params.getlist(key)
+        data = {**data, **query_params}
+
+        return self.write_serializer_class(instance=instance, data=data, context=context)
 
     def filter_queryset(self, queryset):
         # ignore flow starts created by mailroom

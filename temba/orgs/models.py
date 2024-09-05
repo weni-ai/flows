@@ -599,6 +599,8 @@ class Org(SmartModel):
             flow.has_issues = len(flow_info[Flow.INSPECT_ISSUES]) > 0
             flow.save(update_fields=("has_issues",))
 
+        return new_flows
+
     def validate_import(self, import_def):
         from temba.triggers.models import Trigger
 
@@ -990,8 +992,11 @@ class Org(SmartModel):
         Gets all of the users across all roles for this org
         """
         user_sets = [role.get_users(self) for role in roles or OrgRole]
-        all_users = functools.reduce(operator.or_, user_sets)
-        return all_users.distinct()
+        all_users = User.objects.none()
+        for qs in user_sets:
+            all_users = all_users.union(qs)
+
+        return User.objects.filter(id__in=all_users.values_list("id", flat=True))
 
     def get_users_with_perm(self, perm: str):
         """

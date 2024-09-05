@@ -24,6 +24,7 @@ from temba.flows.models import Flow, FlowLabel, FlowRun, FlowStart
 from temba.globals.models import Global
 from temba.locations.models import AdminBoundary
 from temba.mailroom import modifiers
+from temba.mailroom.client import MailroomException
 from temba.msgs.models import Broadcast, Label, Msg
 from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
@@ -613,7 +614,7 @@ class ContactWriteSerializer(WriteSerializer):
         if not data.get("urns") and "urns__identity" in self.context["lookup_values"] and not self.instance:
             url_urn = self.context["lookup_values"]["urns__identity"]
 
-            data["urns"] = [fields.validate_urn(url_urn, org=self.context["org"])]
+            data["urns"] = [fields.validate_urn(url_urn)]
 
         return data
 
@@ -653,15 +654,18 @@ class ContactWriteSerializer(WriteSerializer):
 
         # create new contact
         else:
-            self.instance = Contact.create(
-                self.context["org"],
-                self.context["user"],
-                name,
-                language,
-                urns or [],
-                custom_fields or {},
-                groups or [],
-            )
+            try:
+                self.instance = Contact.create(
+                    self.context["org"],
+                    self.context["user"],
+                    name,
+                    language,
+                    urns or [],
+                    custom_fields or {},
+                    groups or [],
+                )
+            except MailroomException as e:  # pragma: no cover
+                raise serializers.ValidationError(e.response)
 
         return self.instance
 

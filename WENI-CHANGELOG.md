@@ -1,3 +1,86 @@
+3.13.1
+----------
+* Update floweditor to 3.0.2
+
+3.13.0
+----------
+* Adjust retail consumers
+
+3.12.4
+----------
+* Add Hotjar
+
+3.12.3
+----------
+* Update floweditor to 3.0.1
+
+3.12.2
+----------
+* Remove references with digit 9 in flows
+
+3.12.1
+----------
+* Hotfix: Resolve error calling elasticsearch
+
+3.12.0
+----------
+* Fix error on code_check
+* Consumer to delete flows objects
+* Publisher that will send event that flows were created
+* Add consumer to integrate feature template
+* Improve query on elasticsearch
+
+3.11.0
+----------
+* Update floweditor to 3.0.0
+* Support new floweditor static file handling
+* Add attributes in headers
+* Add waba and phone number in billing endpoint
+* Change trim flow start task to delete api starts
+
+3.10.10
+----------
+* Update floweditor to 2.17.1
+
+3.10.9
+----------
+* Update flow start endpoint to receive query params
+* Remove WAC type from update_api_version call
+* feat: allow brain
+
+3.10.8
+----------
+* Add throttle scope to flowstart endpoint
+
+3.10.7
+----------
+* Change attribute in elastic return
+* Update weni-rp-apps to 2.8.7
+* Update floweditor to 2.17.0
+
+3.10.6
+----------
+* Add active_catalog key in update-catalog endpoint
+* Convert timeout variable to int
+
+3.10.5
+----------
+* Update weni-rp-apps version to 2.8.6
+* Create index to channel address
+
+3.10.4
+----------
+* Update weni-rp-apps version to 2.8.5
+* Add status choices in TemplateTranslation model
+
+3.10.3
+----------
+* Change queryset to bring data of 15 days
+
+3.10.2
+----------
+* Fix: Users endpoint optimization
+
 3.10.1
 ----------
 * Chore: Bump floweditor to 2.16.1

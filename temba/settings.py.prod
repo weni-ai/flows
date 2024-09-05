@@ -90,6 +90,7 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["v2.contacts"] = env("V2_CONTACTS", def
 REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["v2.messages"] = env("V2_MESSAGES", default="3000/hour")
 REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["v2.broadcasts"] = env("V2_BROADCASTS", default="36000/hour")
 REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["v2.runs"] = env("V2_RUNS", default="3000/hour")
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["v2.flowstart"] = env("V2_FLOWSTART", default="3000/hour")
 REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["v2.api"] = env("V2_API", default="3000/hour")
 REST_FRAMEWORK["PAGE_SIZE"] = env.int("REST_FRAMEWORK_PAGE_SIZE", default=250)
 REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"] = [
@@ -361,6 +362,7 @@ TEMPLATES[0]["OPTIONS"]["context_processors"] += [
     "temba.context_processors_weni.old_design_excluded_channels_codes",
     "temba.context_processors_weni.show_onboard_modal",
     "temba.context_processors_weni.firebase_credentials",
+    "temba.context_processors_weni.hotjar",
 ]
 WENI_DOMAINS = {"weni": env("WENI_DOMAIN", default="weni.ai")}
 
@@ -522,3 +524,6 @@ ROUTER_FIXED_ACCESS_TOKEN = env("ROUTER_FIXED_ACCESS_TOKEN", default="")
 
 # Access token for internal endpoints used by the billing
 BILLING_FIXED_ACCESS_TOKEN = env("BILLING_FIXED_ACCESS_TOKEN", default="")
+
+# Hotjar ID
+HOTJAR_ID = env.int("HOTJAR_ID", default=None)

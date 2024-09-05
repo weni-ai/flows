@@ -1,0 +1,2 @@
+from .delete_template_integration_consumer import DeleteFeatureTemplateIntegrationConsumer  # noqa
+from .feature_template_integration_consumer import IntegrateFeatureTemplateConsumer  # noqa

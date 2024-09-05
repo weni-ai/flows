@@ -510,7 +510,9 @@ class UpdateIsActiveCatalogTestCase(TembaTest):
             {"name": "Catalog3", "id": "catalog3", "is_active": False},
         ]
 
-        update_local_catalogs(channel, catalogs_data)
+        active_catalog = {"active_catalog": "catalog1"}
+
+        update_local_catalogs(channel, catalogs_data, active_catalog)
 
         self.assertEqual(Catalog.objects.count(), 3)
 
