@@ -4805,6 +4805,10 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
     serializer_class = WhatsappFlowReadSerializer
     pagination_class = CreatedOnCursorPagination
 
+    def get_queryset(self):
+        org = self.request.user.get_org()
+        return WhatsappFlow.objects.filter(org=org, is_active=True)
+
     def filter_queryset(self, queryset):
         params = self.request.query_params
 
@@ -4816,7 +4820,7 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
         if facebook_flow_id:
             queryset = queryset.filter(facebook_flow_id=facebook_flow_id)
 
-        return queryset
+        return self.filter_before_after(queryset, "created_on")
 
     @classmethod
     def get_read_explorer(cls):
