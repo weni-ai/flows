@@ -11,10 +11,7 @@ from django.test import TestCase
 from temba.flows.models import FlowRevision, IntegrationRequest
 from temba.tests.base import TembaTest
 from temba.tickets.models import Ticketer
-from temba.tickets.usecases.ticketer_creation import (
-    create_ticketer,
-    list_flow_definition_ticketers,
-)
+from temba.tickets.usecases.ticketer_creation import create_ticketer, list_flow_definition_ticketers
 
 
 class ListFlowDefinitionTestCase(TestCase):
@@ -30,9 +27,7 @@ class ListFlowDefinitionTestCase(TestCase):
             },
         ]
 
-        with open(
-            "temba/tickets/usecases/tests/flowrevision_definition.json", "r"
-        ) as file:
+        with open("temba/tickets/usecases/tests/flowrevision_definition.json", "r") as file:
             definition = json.loads(file.read())
 
         ticketers = list_flow_definition_ticketers(definition)
@@ -47,14 +42,10 @@ class TicketerCreationTestCase(TembaTest):
         self.project_uuid = str(uuid.uuid4())
         self.project_auth = "project-auth"
         self.name = "Integration Request Name"
-        self.queues = [
-            {"uuid": "1d8176f2-c852-4d92-8521-9dbad81ae531", "name": "Queue 1"}
-        ]
+        self.queues = [{"uuid": "1d8176f2-c852-4d92-8521-9dbad81ae531", "name": "Queue 1"}]
         self.user, _ = User.objects.get_or_create(email=self.user_email)
 
-        with open(
-            "temba/tickets/usecases/tests/flowrevision_definition.json", "r"
-        ) as file:
+        with open("temba/tickets/usecases/tests/flowrevision_definition.json", "r") as file:
             definition = json.loads(file.read())
 
         self.project = Project.objects.create(
