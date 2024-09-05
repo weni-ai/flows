@@ -6,12 +6,7 @@ import requests
 from django.conf import settings
 from django.utils import timezone
 
-from temba.wpp_flows.tasks import (
-    _get_token,
-    get_whatsapp_flows,
-    refresh_whatsapp_flows,
-    update_whatsapp_flows,
-)
+from temba.wpp_flows.tasks import _get_token, get_whatsapp_flows, refresh_whatsapp_flows, update_whatsapp_flows
 
 
 class RefreshWhatsappFlowsTest(unittest.TestCase):

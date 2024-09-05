@@ -6185,12 +6185,12 @@ msgid "No messages"
 msgstr "Žádné zprávy"
 
 #, python-format
-msgid "Found %(results_count)s message in last 90 days matching <i>%(search)s</i>."
-msgid_plural "Found %(results_count)s messages in last 90 days matching <i>%(search)s</i>."
-msgstr[0] "Nalezena %(results_count)s zpráva za posledních 90 dní odpovídající <i>%(search)s</i>."
-msgstr[1] "Nalezeny %(results_count)s zprávy za posledních 90 dní odpovídající <i>%(search)s</i>."
-msgstr[2] "Nalezeno %(results_count)s zpráv za posledních 90 dní odpovídajících <i>%(search)s</i>."
-msgstr[3] "Nalezeno %(results_count)s zpráv za posledních 90 dní odpovídajících <i>%(search)s</i>."
+msgid "Found %(results_count)s message in last 15 days matching <i>%(search)s</i>."
+msgid_plural "Found %(results_count)s messages in last 15 days matching <i>%(search)s</i>."
+msgstr[0] "Nalezena %(results_count)s zpráva za posledních 15 dní odpovídající <i>%(search)s</i>."
+msgstr[1] "Nalezeny %(results_count)s zprávy za posledních 15 dní odpovídající <i>%(search)s</i>."
+msgstr[2] "Nalezeno %(results_count)s zpráv za posledních 15 dní odpovídajících <i>%(search)s</i>."
+msgstr[3] "Nalezeno %(results_count)s zpráv za posledních 15 dní odpovídajících <i>%(search)s</i>."
 
 #, python-format
 msgid "%(results_count)s message since %(start_date)s."

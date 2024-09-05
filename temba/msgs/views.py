@@ -138,14 +138,14 @@ class InboxView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
     def get_queryset(self, **kwargs):
         qs = super().get_queryset(**kwargs)
 
-        # if we are searching, limit to last 90, and enforce distinct since we'll be joining on multiple tables
+        # if we are searching, limit to last 15, and enforce distinct since we'll be joining on multiple tables
         if "search" in self.request.GET:
-            last_90 = timezone.now() - timedelta(days=90)
+            last_15 = timezone.now() - timedelta(days=15)
 
             # we need to find get the field names we're ordering on without direction
             distinct_on = (f.lstrip("-") for f in self.derive_ordering())
 
-            qs = qs.filter(created_on__gte=last_90).distinct(*distinct_on)
+            qs = qs.filter(created_on__gte=last_15).distinct(*distinct_on)
 
         if self.show_channel_logs:
             qs = qs.prefetch_related("channel_logs")
