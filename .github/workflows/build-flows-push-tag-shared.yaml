@@ -144,7 +144,7 @@ jobs:
             repository=${{env.IMAGE_SOURCE_URL}}
           file: docker/Dockerfile
           # push: ${{ github.event_name != 'pull_request' }}
-          tags: "${{env.IMAGE_TAG}}"
+          # tags: "${{env.IMAGE_TAG}}"
           #tags: ${{ steps.meta.outputs.tags }}
           platforms: ${{ matrix.platform }}
           #no-cache: true
