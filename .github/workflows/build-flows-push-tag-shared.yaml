@@ -10,6 +10,14 @@ on:
 jobs:
   docker:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm/v6
+          - linux/arm/v7
+          - linux/arm64
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
@@ -62,6 +70,8 @@ jobs:
               FLOWEDITOR_BRANCH="main"
             fi
             echo "FLOWEDITOR_BRANCH=$FLOWEDITOR_BRANCH" | tee -a "${GITHUB_ENV}"
+            platform=${{ matrix.platform }}
+            echo "PLATFORM_PAIR=${platform//\//-}" | tee -a "${GITHUB_ENV}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -122,7 +132,8 @@ jobs:
           cache-target: /npm_cache
 
       - name: Build and push - Flows Image
-        uses: docker/build-push-action@v5
+        id: build
+        uses: docker/build-push-action@v6
         with:
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -132,16 +143,58 @@ jobs:
             commit=${{env.COMMIT_SHA}}
             repository=${{env.IMAGE_SOURCE_URL}}
           file: docker/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
+          # push: ${{ github.event_name != 'pull_request' }}
           tags: "${{env.IMAGE_TAG}}"
           #tags: ${{ steps.meta.outputs.tags }}
-          platforms: linux/amd64,linux/arm64
-          #platforms: linux/amd64,linux/arm64,linux/arm/v7,darwin/amd64,linux/arm/v8
+          platforms: ${{ matrix.platform }}
           #no-cache: true
           build-args: |
             FLOWEDITOR_VERSION=${{ env.FLOWEDITOR_VERSION }}
             FLOWEDITOR_REPO=${{ env.FLOWEDITOR_REPO }}
             FLOWEDITOR_BRANCH=${{ env.FLOWEDITOR_BRANCH }}
+          outputs: type=image,name=${{ secrets.ECR }}/push-backend,push-by-digest=true,name-canonical=true,push=true  
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"          
+        
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+  merge:
+    runs-on: ubuntu-latest
+    needs:
+      - docker
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+  
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+  
+      - name: Login to ECR
+        uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ${{ secrets.ECR }}
+          username: ${{ secrets.AWS_ACCESS_KEY_ID_SHARED }}
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY_SHARED }}
+
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ secrets.ECR }}/push-backend@sha256:%s ' *)  
 
       - name: Check out Kubernetes Manifests
         uses: actions/checkout@master
