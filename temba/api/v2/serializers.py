@@ -1869,5 +1869,6 @@ class WhatsappFlowReadSerializer(ReadSerializer):
         fields = (
             "id",
             "name",
+            "status",
             "assets",
         )
