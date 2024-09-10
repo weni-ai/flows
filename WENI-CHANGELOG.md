@@ -1,3 +1,7 @@
+3.13.4
+----------
+* Update vonage methods
+
 3.13.3
 ----------
 * Update floweditor to 3.1.1
