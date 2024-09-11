@@ -27,7 +27,7 @@
             -for folder in folders
               .lp-nav-item{'class': '{% if folder.url == request_url %}font-normal{% endif %}' }
                 .name{onclick:"goto(event)", href:'{{folder.url}}'}
-                  {{folder.label}}
+                    -trans folder.label
                 .count{onclick:"goto(event)", href:'{{folder.url}}'}
                   {{ folder.count | intcomma }}
 
@@ -177,7 +177,7 @@
                       %th
                       %th
                       %th.whitespace-nowrap
-                        Runs / Completion
+                        -trans "Runs / Completion"
 
                 %tbody
                   -for object in object_list
