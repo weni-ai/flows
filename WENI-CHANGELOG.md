@@ -1,3 +1,8 @@
+3.13.5
+----------
+* Update weni-rp-apps to 2.8.8
+* Update translations ES and pt_BR
+
 3.13.4
 ----------
 * Update vonage methods
