@@ -3,9 +3,9 @@ import time
 
 from django.http import HttpResponseRedirect
 from django.urls import resolve
+from django.utils.translation import ugettext_lazy as _
 
 from temba.orgs.context_processors import user_group_perms_processor
-from django.utils.translation import ugettext_lazy as _
 
 logger = logging.getLogger(__name__)
 
