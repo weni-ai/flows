@@ -7880,6 +7880,9 @@ msgstr "Quer adicionar um comentário?"
 msgid "None Value"
 msgstr "Nenhum"
 
+msgid "Last minute"
+msgstr "Último minuto"
+
 msgid "minutes"
 msgstr "minutos"
 
