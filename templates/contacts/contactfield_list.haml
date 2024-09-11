@@ -22,7 +22,7 @@
               -for category in cf_categories
                 .lp-nav-item{'class': '{% if request.path == category.url %}font-normal{% endif %}' }
                   .name{onclick:"goto(event)", href:'{{category.url}}'}
-                    {{category.label}}
+                    -trans category.label
                   .count{onclick:"goto(event)", href:'{{category.url}}'}
                     {{category.count|intcomma}}
 
@@ -30,7 +30,7 @@
               -for category in cf_types
                 .lp-nav-item{'class': '{% if selected_value_type == category.value_type %}font-normal{% endif %}' }
                   .name{onclick:"goto(event)", href:'{{category.url}}'}
-                    {{category.label}}
+                    {{ category.label }}
                   .count{onclick:"goto(event)", href:'{{category.url}}'}
                     {{category.count|intcomma}}
 

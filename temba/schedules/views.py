@@ -78,7 +78,7 @@ class ScheduleCRUDL(SmartCRUDL):
                 fields = ScheduleFormMixin.Meta.fields
 
         form_class = Form
-        submit_button_name = "Start"
+        submit_button_name = _("Start")
         success_message = ""
 
         def get_form_kwargs(self):

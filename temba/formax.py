@@ -5,6 +5,7 @@ from django.http import HttpResponseRedirect
 from django.urls import resolve
 
 from temba.orgs.context_processors import user_group_perms_processor
+from django.utils.translation import ugettext_lazy as _
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class Formax:
         self.org = context["user_org"]
 
     def add_section(
-        self, name, url, icon, action="formax", button="Save", nobutton=False, dependents=None, wide=False
+        self, name, url, icon, action="formax", button=_("Save"), nobutton=False, dependents=None, wide=False
     ):
         resolver = resolve(url)
         self.request.META["HTTP_X_FORMAX"] = 1

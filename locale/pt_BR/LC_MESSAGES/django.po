@@ -63,13 +63,13 @@ msgid "Message"
 msgstr "Mensagem"
 
 msgid "Run"
-msgstr "Rodar"
+msgstr "Execução"
 
 msgid "Archive"
 msgstr "Arquivo"
 
 msgid "Run Archives"
-msgstr "Executar Arquivos"
+msgstr "Arquivos de Execuções"
 
 msgid "Message Archives"
 msgstr "Arquivos de Mensagens"
@@ -2791,7 +2791,7 @@ msgid "Saturday"
 msgstr "Sábado"
 
 msgid "Download"
-msgstr "Download"
+msgstr "Baixar"
 
 msgid "Enter contacts and groups to start below"
 msgstr "Digite contatos ou grupos para iniciar abaixo"
@@ -7928,3 +7928,9 @@ msgstr "Anterior"
 
 msgid "Next"
 msgstr "Próximo"
+
+msgid "Flow Type"
+msgstr "Tipo do Fluxo"
+
+msgid "event"
+msgstr "evento"

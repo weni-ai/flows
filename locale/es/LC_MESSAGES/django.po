@@ -7942,3 +7942,9 @@ msgstr "Anterior"
 
 msgid "Next"
 msgstr "Siguiente"
+
+msgid "Flow Type"
+msgstr "Tipo de Flujo"
+
+msgid "event"
+msgstr "evento"
