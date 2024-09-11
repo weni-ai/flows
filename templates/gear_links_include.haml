@@ -41,37 +41,37 @@
         -with link=gear_links|first
           -if link.modax
             .button-light{onclick:'showModax("{{link.id}}")', class:'{{ link|gear_link_classes:True }}'}
-              {{link.title}}
+              -trans link.title
               %span{class:'gear-flag'}
                 {{link.flag}}
 
           -else          
             .button-light{onclick:'{%if link.on_click%}{{link.on_click}}{% else %}goto(event){%endif%}', href:'{{link.href}}', class:'{{ link|gear_link_classes:True }}', data-success-url:'{{ link.success_url }}'}
-              {{link.title}}
+              -trans link.title
 
       - else
         -with link=gear_links|first
           -if link.modax
             .button-light{onclick:'javascript:showModax("{{link.id}}")', class:'{{ link|gear_link_classes:True }}', data-success-url:'{{ link.success_url }}'}
-              {{link.title}}
+              -trans link.title
                 %span{class:'gear-flag'}
                   {{link.flag}}
 
           -else
             -if link.js_class
               .button-light{onclick:'{%if link.on_click%}{{link.on_click}}{% else %}void(0);{%endif%}', class:'{{ link|gear_link_classes:True }}', data-success-url:'{{ link.success_url }}'}
-                {{link.title}}
+                -trans link.title
 
             -else
               .button-light{onclick:'{%if link.on_click%}{{link.on_click}}{% else %}goto(event){%endif%}', href:'{{link.href}}', class:'{{ link|gear_link_classes:True }}', data-success-url:'{{ link.success_url }}'}
-                {{link.title}}
+                -trans link.title
 
         -with last_link=gear_links|last 
           -if last_link.button
             -for link in gear_links
               -if not forloop.first
                 .button-light.ml-4{onclick:'{%if link.on_click%}{{link.on_click}}{% else %}goto(event){%endif%}', href:'{{link.href}}', class:'{{ link|gear_link_classes:True }}', data-success-url:'{{ link.success_url }}'}
-                  {{link.title}}
+                  -trans link.title
 
           -else
             .btn-group.gear-menu.ml-3
@@ -86,29 +86,29 @@
                       %li.py-1
                         -if link.ngClick
                           .hover-linked.font-normal{onclick:"goto(event);", href:'{{link.href}}', ng-click:'{{link.ngClick}}', class:'{{ link|gear_link_classes }}', data-success-url:'{{ link.success_url }}'}
-                            {{link.title}}
+                            -trans link.title
                             .gear-flag
                               {{link.flag}}
                         -elif link.modax
                           .hover-linked.font-normal{onclick:'javascript:showModax("{{link.id}}")', class:'{{ link|gear_link_classes }}', data-success-url:'{{ link.success_url }}'}
-                            {{link.title}}
+                            -trans link.title
                             %span{class:'gear-flag'}
                               {{link.flag}}
 
                         -else
                           -if link.js_class
                             .hover-linked.font-normal{onclick:'{%if link.on_click%}{{link.on_click}}{% else %}void(0);{%endif%}', class:'{{ link|gear_link_classes }}', href:'{{link.href}}', data-success-url:'{{ link.success_url }}'}
-                              {{link.title}}
+                              -trans link.title
                               %span{class:'gear-flag'}
                                 {{link.flag}}
                           -elif link.copyUuid
                             .hover-linked.font-normal.copyUuid
-                              {{link.title}}
+                              -trans link.title
                               %span{class:'gear-flag'}
                                 {{link.flag}}
                           -else
                             .hover-linked.font-normal{onclick:"{%if link.on_click%}{{link.on_click}}{% else %}goto(event){%endif%}", href:'{{link.href}}', class:'{{ link|gear_link_classes }}', data-success-url:'{{ link.success_url }}'}
-                              {{link.title}}
+                              -trans link.title
                               %span{class:'gear-flag'}
                                 {{link.flag}}
 
