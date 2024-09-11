@@ -1,3 +1,4 @@
+-load i18n
 -load humanize
     - if paginator and paginator.num_pages > 1 
         
@@ -8,11 +9,13 @@
               %a{href:"{{request.path}}{{url_params|safe}}page={{page_obj.previous_page_number}}"}<
                 .icon-arrow-left-8
               %a{href:"{{request.path}}{{url_params|safe}}page={{page_obj.previous_page_number}}"}<
-                Previous
+                -blocktrans trimmed
+                  Previous
           - else 
             .prev.disabled.mr-4.text-gray-300
               .icon-arrow-left-8
-              Previous
+              -blocktrans trimmed
+                Previous
 
           - for page_num in paginator.page_range 
             - if page_obj.number < 5 
@@ -48,11 +51,13 @@
           - if page_obj.has_next 
             .next.ml-6
               %a{href:"{{request.path}}{{url_params|safe}}page={{page_obj.next_page_number}}"}
-                Next
+                -blocktrans trimmed
+                  Next
                 .icon-arrow-right-8
           - else 
             .next.disabled.text-gray-300.ml-4
-              Next
+              -blocktrans trimmed
+                Next
               .icon-arrow-right-8
 
 
