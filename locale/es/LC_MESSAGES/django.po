@@ -7894,6 +7894,9 @@ msgstr "¿Quieres agregar un comentario?"
 msgid "None Value"
 msgstr "Ninguno"
 
+msgid "Last minute"
+msgstr "Último minuto"
+
 msgid "minutes"
 msgstr "minutos"
 
