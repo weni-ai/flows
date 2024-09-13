@@ -1436,7 +1436,7 @@ class OrgCRUDL(SmartCRUDL):
                 return self.cleaned_data
 
         form_class = TwilioConnectForm
-        submit_button_name = "Save"
+        submit_button_name = _("Save")
         field_config = dict(account_sid=dict(label=""), account_token=dict(label=""))
         success_message = "Twilio Account successfully connected."
 
@@ -1554,7 +1554,7 @@ class OrgCRUDL(SmartCRUDL):
                 return self.cleaned_data
 
         form_class = Form
-        submit_button_name = "Save"
+        submit_button_name = _("Save")
         success_message = "Vonage Account successfully connected."
 
         def form_valid(self, form):
@@ -1659,7 +1659,7 @@ class OrgCRUDL(SmartCRUDL):
                 return self.cleaned_data
 
         form_class = PlivoConnectForm
-        submit_button_name = "Save"
+        submit_button_name = _("Save")
         success_url = "@channels.types.plivo.claim"
         field_config = dict(auth_id=dict(label=""), auth_token=dict(label=""))
         success_message = "Plivo credentials verified. You can now add a Plivo channel."

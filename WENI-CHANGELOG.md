@@ -1,3 +1,20 @@
+3.13.5
+----------
+* Update weni-rp-apps to 2.8.8
+* Update translations ES and pt_BR
+
+3.13.4
+----------
+* Update vonage methods
+
+3.13.3
+----------
+* Update floweditor to 3.1.1
+
+3.13.2
+----------
+* Update floweditor to 3.1.0
+
 3.13.1
 ----------
 * Update floweditor to 3.0.2

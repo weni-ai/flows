@@ -1918,7 +1918,7 @@ msgid "Allow sending to and calling international numbers."
 msgstr "Permitir enviar y llamar a números internacionales."
 
 msgid "Perform answering machine detection and hangup if machine detected."
-msgstr ""
+msgstr "Detectar contestador automático y colgar si se detecta."
 
 msgid "Phone number of this channel"
 msgstr "Número de teléfono de este canal"
@@ -2030,7 +2030,7 @@ msgid "Unable to access bothub with credentials, please check and try again"
 msgstr "No se puede acceder a bothub con las credenciales, verifique e intente nuevamente"
 
 msgid "Staging"
-msgstr ""
+msgstr "Entorno de prueba"
 
 msgid "Production"
 msgstr "Producción"
@@ -2039,34 +2039,34 @@ msgid "The name of your LUIS app"
 msgstr "El nombre de su aplicación LUIS"
 
 msgid "The ID of your LUIS app"
-msgstr ""
+msgstr "El ID de tu aplicación LUIS"
 
 msgid "The authoring resource endpoint URL"
-msgstr ""
+msgstr "La URL del endpoint del recurso de autoría"
 
 msgid "The authoring resource access key"
-msgstr ""
+msgstr "La clave de acceso del recurso de autoría"
 
 msgid "The prediction resource endpoint URL"
-msgstr ""
+msgstr "La URL del endpoint del recurso de predicción"
 
 msgid "The prediction resource access key"
-msgstr ""
+msgstr "La clave de acceso del recurso de predicción"
 
 msgid "The slot where the prediction resource has been published"
-msgstr ""
+msgstr "El slot donde se ha publicado el recurso de predicción"
 
 #, python-format
 msgid "App has not yet been published to %s slot."
-msgstr ""
+msgstr "La aplicación aún no ha sido publicada en el slot %s."
 
 #, python-format
 msgid "Check authoring credentials: %s"
-msgstr ""
+msgstr "Verifica las credenciales de autoría: %s"
 
 #, python-format
 msgid "Check prediction credentials: %s"
-msgstr ""
+msgstr "Verifica las credenciales de predicción: %s"
 
 msgid "Your app's name"
 msgstr "El nombre de tu aplicación"
@@ -2833,7 +2833,7 @@ msgid "This flow does not use message templates. You may still start this flow b
 msgstr "Este flujo no utiliza plantillas de mensajes. Aún puede iniciar este flujo, pero es posible que los contactos de WhatsApp que no hayan enviado un mensaje entrante en las últimas 24 horas no lo reciban."
 
 msgid "Please read the options below carefully as they have changed recently."
-msgstr ""
+msgstr "Por favor, lee atentamente las opciones a continuación, ya que han cambiado recientemente."
 
 msgid "The message template {ref['name']} does not exist on your account and cannot be sent."
 msgstr "La plantilla de mensaje {ref ['name']} no existe en su cuenta y no se puede enviar."
@@ -2913,7 +2913,7 @@ msgid "Error"
 msgstr "Error"
 
 msgid "Resent"
-msgstr ""
+msgstr "Reenviado"
 
 msgid "The date for the oldest message to export"
 msgstr "La fecha para el mensaje más antiguo para exportar"
@@ -2937,7 +2937,7 @@ msgid "Schedule for later"
 msgstr "Programar para más tarde"
 
 msgid "At least one recipient is required."
-msgstr ""
+msgstr "Se requiere al menos un destinatario."
 
 msgid "Inbox"
 msgstr "Bandeja de entrada"
@@ -3034,7 +3034,7 @@ msgstr "El nombre debe ser único"
 
 #, python-format
 msgid "This workspace has %d labels and the limit is %s. You must delete existing ones before you can create new ones."
-msgstr ""
+msgstr "Este espacio de trabajo tiene %d etiquetas y el límite es %s. Debes eliminar las existentes antes de poder crear nuevas."
 
 msgid "Folder"
 msgstr "Carpeta"
@@ -3097,10 +3097,10 @@ msgid "Surveyors"
 msgstr "Surveyors"
 
 msgid "Sorry, your workspace is currently suspended. To re-enable starting flows and sending messages, please contact support."
-msgstr ""
+msgstr "Lo sentimos, tu espacio de trabajo está suspendido actualmente. Para volver a habilitar el inicio de flujos y el envío de mensajes, por favor contacta al soporte."
 
 msgid "Sorry, your workspace is currently flagged. To re-enable starting flows and sending messages, please contact support."
-msgstr ""
+msgstr "Lo sentimos, tu espacio de trabajo está marcado actualmente. Para volver a habilitar el inicio de flujos y el envío de mensajes, por favor contacta al soporte."
 
 msgid "Plan"
 msgstr "Plan"
@@ -3758,7 +3758,7 @@ msgid "WhatsApp Contacts Refreshed"
 msgstr "Contactos de WhatsApp actualizados"
 
 msgid "WhatsApp Health Check"
-msgstr ""
+msgstr "Verificación de Salud de WhatsApp"
 
 msgid "Webhook Calls"
 msgstr "Llamadas de webhook"
@@ -4058,7 +4058,7 @@ msgid "Excludes contacts in these groups."
 msgstr "Excluye contactos en estos grupos."
 
 msgid "Must be a single word containing only letters and numbers, or a single emoji character."
-msgstr ""
+msgstr "Debe ser una sola palabra que contenga solo letras y números, o un único carácter emoji."
 
 msgid "Can't include and exclude the same group."
 msgstr "No se puede incluir y excluir el mismo grupo."
@@ -4121,7 +4121,7 @@ msgstr "No puede ser un host local o privado."
 
 #, python-format
 msgid "'%s' is not a valid URN."
-msgstr ""
+msgstr "'%s' no es un URN válido."
 
 msgid "Unique Identifier"
 msgstr "Identificador único"
@@ -4471,7 +4471,7 @@ msgid "No Matching calls"
 msgstr "Las llamadas no corresponden"
 
 msgid "No calls"
-msgstr ""
+msgstr "Sin llamadas"
 
 msgid "Contact"
 msgstr "Contacto"
@@ -5218,8 +5218,8 @@ msgid "To complete the configuration you will need to enter a few things on your
 msgstr "Para completar la configuración, deberá ingresar algunas cosas en su cuenta VK."
 
 #, python-format
-msgid "<div class='code mt-4'> Manage > API Usage > Callback API > Server Settings </div> <div class='mt-2'> Enter the Webhook URL below for the <div class='code inline py-1'>URL</div> field and the Verify Token in the <div class='code inline py-1'>Secret Key</div> field. </div> <div class='code mt-6'> Manage > API Usage > Callback API > Event Types </div> <div class='mt-2'> Check the option %(option)s </div>"
-msgstr " <div class='code mt-4'> Administrar> Uso de API> API de Callback> Configuración del servidor </div> <div class='mt-2'> Ingrese la URL del Webhook a continuación para la URL <div class='code inline py-1'> </div>f y el campo Verify a5b60dz4dz. </div> <div class='code mt-6'> Administrar> Uso de API> API de Callback> Tipos de eventos </div> <div class='mt-2'> Marque la opción %(option)s </div>"
+msgid "<div class='mt-4 code'> Manage > API Usage > Callback API > Server Settings </div> <div class='mt-2'> Enter the Webhook URL below for the <div class='inline py-1 code'>URL</div> field and the Verify Token in the <div class='inline py-1 code'>Secret Key</div> field. </div> <div class='mt-6 code'> Manage > API Usage > Callback API > Event Types </div> <div class='mt-2'> Check the option %(option)s </div>"
+msgstr " <div class='mt-4 code'> Administrar> Uso de API> API de Callback> Configuración del servidor </div> <div class='mt-2'> Ingrese la URL del Webhook a continuación para la URL <div class='inline py-1 code'> </div>f y el campo Verify a5b60dz4dz. </div> <div class='mt-6 code'> Administrar> Uso de API> API de Callback> Tipos de eventos </div> <div class='mt-2'> Marque la opción %(option)s </div>"
 
 msgid "Your WhatsApp channel is now connected, you should be able to send and receive messages as normal."
 msgstr "Su canal de WhatsApp ahora está conectado, debería poder enviar y recibir mensajes con normalidad."
@@ -5537,7 +5537,7 @@ msgid "Delete Groups"
 msgstr "Eliminar Grupos"
 
 msgid "Deleting groups will not delete the contacts inside the group. All contacts will remain in your account. Do you want to continue?"
-msgstr ""
+msgstr "Eliminar grupos no eliminará los contactos dentro del grupo. Todos los contactos permanecerán en tu cuenta. ¿Deseas continuar?"
 
 msgid "You can import contacts from an Excel spreadsheet or comma separated values file."
 msgstr "Puede importar contactos desde una hoja de cálculo de Excel o un archivo de valores separados por comas."
@@ -5581,7 +5581,7 @@ msgid "Preview"
 msgstr "Avance"
 
 msgid "Importing Contacts"
-msgstr ""
+msgstr "Importando Contactos"
 
 msgid "Preview Contact Import"
 msgstr "Vista previa de la importación de contactos"
@@ -7894,6 +7894,9 @@ msgstr "¿Quieres agregar un comentario?"
 msgid "None Value"
 msgstr "Ninguno"
 
+msgid "Last minute"
+msgstr "Último minuto"
+
 msgid "minutes"
 msgstr "minutos"
 
@@ -7927,3 +7930,21 @@ msgstr "Datos en la hoja de cálculo de Excel sobre mensajes de plantilla de Pro
 #, python-brace-format
 msgid "Selected groups have {group_totals_sum} contacts in total, which exceeds the maximum of {max_group_sum_size} contacts. Please select less or smaller groups and try again."
 msgstr "Los grupos seleccionados tienen {group_totals_sum} contactos en total, lo que excede el máximo de {max_group_sum_size} contactos. Seleccione menos grupos o más pequeños e inténtelo de nuevo."
+
+msgid "Runs / Completion"
+msgstr "Ejecuciones / Finalización"
+
+msgid "Copy UUID"
+msgstr "Copiar UUID"
+
+msgid "Previous"
+msgstr "Anterior"
+
+msgid "Next"
+msgstr "Siguiente"
+
+msgid "Flow Type"
+msgstr "Tipo de Flujo"
+
+msgid "event"
+msgstr "evento"

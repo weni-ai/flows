@@ -28,7 +28,7 @@
             .flex.flex-col
               -if org_perms.flows.flow_create
                 .w-64.mr-5
-                  %temba-modax{ header:"Create Campaign", endpoint:"/campaign/create/" }
+                  %temba-modax{ header:'{% trans "Create Campaign" %}', endpoint:"/campaign/create/" }
                     .button-primary.block
                       -trans "Create Campaign"
               
@@ -36,7 +36,7 @@
                 -for folder in folders
                   .lp-nav-item{'class': '{% if folder.url == request_url %}font-normal{% endif %}' }
                     .name{onclick:"goto(event)", href:'{{folder.url}}'}
-                      {{folder.label}}
+                      -trans folder.label
                     .count{onclick:"goto(event)", href:'{{folder.url}}'}
                       {{ folder.count | intcomma }}
 
@@ -81,7 +81,7 @@
                         -include "includes/recipients_group.haml" with group=obj.group
 
                     %td.whitespace-nowrap
-                      {{ obj.get_events|length }} event{{ obj.get_events|length|pluralize }}
+                      {{ obj.get_events|length }} {% trans "event" %}{{ obj.get_events|length|pluralize }}
 
                 - empty
                   %tr.empty_list

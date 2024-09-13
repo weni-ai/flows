@@ -132,7 +132,7 @@ class CampaignCRUDL(SmartCRUDL):
                 if self.has_org_perm("campaigns.campaign_archive"):
                     links.append(
                         dict(
-                            title="Archive",
+                            title=_("Archive"),
                             js_class="posterize archive-campaign",
                             href=reverse("campaigns.campaign_archive", args=[self.object.id]),
                         )

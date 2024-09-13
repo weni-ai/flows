@@ -42,7 +42,7 @@
             - for category in global_categories
               .lp-nav-item{'class': '{% if request.path == category.url %}font-normal{% endif %}' }
                 .name{onclick:"goto(event)", href:'{{category.url}}'}
-                  {{category.label}}
+                  -trans category.label
                 .count{onclick:"goto(event)", href:'{{category.url}}'}
                   {{ category.count | intcomma }}
 
@@ -52,7 +52,7 @@
               .flex.flex-col.pr-12
                 .page-title.leading-tight
                   -block title
-                    {{title}}
+                    -trans title
                 .subtitle
                   -block subtitle
 

@@ -605,7 +605,7 @@ class MsgCRUDL(SmartCRUDL):
 
     class Export(ModalMixin, OrgPermsMixin, SmartFormView):
         form_class = ExportForm
-        submit_button_name = "Export"
+        submit_button_name = _("Export")
         success_url = "@msgs.msg_inbox"
 
         def derive_label(self):

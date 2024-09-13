@@ -414,7 +414,7 @@ class FlowCRUDL(SmartCRUDL):
             )
 
             flow_type = forms.ChoiceField(
-                label=_("Type"),
+                label=_("Flow Type"),
                 help_text=_("Choose the method for your flow"),
                 choices=Flow.TYPE_CHOICES,
                 widget=SelectWidget(attrs={"widget_only": False}),
@@ -447,7 +447,9 @@ class FlowCRUDL(SmartCRUDL):
         form_class = FlowCreateForm
         success_url = "uuid@flows.flow_editor"
         success_message = ""
-        field_config = dict(name=dict(help=_("Choose a name to describe this flow, e.g. Demographic Survey")))
+        field_config = dict(
+            name=dict(label=_("Name"), help=_("Choose a name to describe this flow, e.g. Demographic Survey"))
+        )
 
         def derive_exclude(self):
             user = self.request.user
