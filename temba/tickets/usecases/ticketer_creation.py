@@ -89,6 +89,7 @@ def create_ticketer(
     )
 
     for queue in queues:
+        print('fila que chegou', queue)
         TicketerQueue.objects.get_or_create(
             uuid=queue.get("uuid"),
             defaults=dict(
