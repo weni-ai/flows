@@ -59,7 +59,7 @@ class Broadcast(models.Model):
         (STATUS_FAILED, "Failed"),
     )
 
-    MAX_TEXT_LEN = settings.MSG_FIELD_SIZE
+    MAX_TEXT_LEN = int(settings.MSG_FIELD_SIZE)
 
     TEMPLATE_STATE_LEGACY = "legacy"
     TEMPLATE_STATE_EVALUATED = "evaluated"
@@ -363,7 +363,7 @@ class Msg(models.Model):
     MEDIA_AUDIO = "audio"
     MEDIA_TYPES = [MEDIA_AUDIO, MEDIA_GPS, MEDIA_IMAGE, MEDIA_VIDEO]
 
-    MAX_TEXT_LEN = settings.MSG_FIELD_SIZE
+    MAX_TEXT_LEN = int(settings.MSG_FIELD_SIZE)
 
     id = models.BigAutoField(primary_key=True)
     uuid = models.UUIDField(null=True, default=uuid4)
