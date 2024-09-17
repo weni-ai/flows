@@ -1009,9 +1009,9 @@ TEST_EXCLUDE = ("smartmin",)
 # -----------------------------------------------------------------------------------
 _default_database_config = {
     "ENGINE": "django.contrib.gis.db.backends.postgis",
-    "NAME": "temba",
-    "USER": "temba",
-    "PASSWORD": "temba",
+    "NAME": "rapidpro",
+    "USER": "rapidpro",
+    "PASSWORD": "rapidpro",
     "HOST": "localhost",
     "PORT": "5432",
     "ATOMIC_REQUESTS": True,
@@ -1338,7 +1338,7 @@ IP_ADDRESSES = ("172.16.10.10", "162.16.10.20")
 # -----------------------------------------------------------------------------------
 # Data model limits
 # -----------------------------------------------------------------------------------
-MSG_FIELD_SIZE = 640  # used for broadcast text and message campaign events
+MSG_FIELD_SIZE = os.environ.get("MSG_FIELD_SIZE", default=640) # used for broadcast text and message campaign events
 FLOW_START_PARAMS_SIZE = 256  # used for params passed to flow start API endpoint
 GLOBAL_VALUE_SIZE = 10_000  # max length of global values
 
