@@ -1,3 +1,7 @@
+3.13.6
+----------
+* Change msg field size to variable
+
 3.13.5
 ----------
 * Update weni-rp-apps to 2.8.8
