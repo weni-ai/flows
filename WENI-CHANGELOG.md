@@ -1,3 +1,7 @@
+3.13.7
+----------
+* Update floweditor to 3.1.3
+
 3.13.6
 ----------
 * Change msg field size to variable
