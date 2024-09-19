@@ -13,7 +13,6 @@ from temba.utils.analytics import init_analytics
 
 from .views import WeniRedirect
 
-
 urlpatterns = [
     url(r"^", include("temba.airtime.urls")),
     url(r"^", include("temba.api.urls")),

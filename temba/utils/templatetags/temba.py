@@ -7,13 +7,12 @@ import pytz
 from django import template
 from django.conf import settings
 from django.template import TemplateSyntaxError
-from django.template.defaultfilters import register
+from django.template.defaultfilters import date as _date, register
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import escapejs
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext, ugettext_lazy as _, ungettext_lazy
-from django.template.defaultfilters import date as _date
 
 from temba.utils.dates import datetime_to_str
 
