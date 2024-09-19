@@ -627,7 +627,7 @@ class FlowCRUDL(SmartCRUDL):
         class MessagingForm(BaseForm):
             name = forms.CharField(
                 label=_("Name"),
-                help_text=_("Choose a name to describe this flow, e.g. Demographic Survey"),
+                help_text=_("The name for this flow"),
                 widget=InputWidget(),
             )
 
