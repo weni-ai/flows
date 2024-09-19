@@ -2309,9 +2309,9 @@ msgstr "Detenido"
 msgid "Archived"
 msgstr "Archivado"
 
-#, python-brace-format
-msgid "{label} for this contact"
-msgstr "{label} para este contacto"
+#, python-format
+msgid "%s for this contact"
+msgstr "%s para este contacto"
 
 msgid "Used by another contact"
 msgstr "Usado por otro contacto"
@@ -7948,3 +7948,30 @@ msgstr "Tipo de Flujo"
 
 msgid "event"
 msgstr "evento"
+
+msgid "Hide"
+msgstr "Esconder"
+
+msgid "Send a message"
+msgstr "Enviar un mensaje"
+
+msgid "Start a flow"
+msgstr "Iniciar un flujo"
+
+msgid "Before"
+msgstr "Antes"
+
+msgid "After"
+msgstr "Después"
+
+msgid "during the same hour"
+msgstr "durante la misma hora"
+
+msgid "at Midnight"
+msgstr "a Medianoche"
+
+msgid "at"
+msgstr "a"
+
+msgid "Ignore triggers"
+msgstr "Ignorar los desencadenantes"

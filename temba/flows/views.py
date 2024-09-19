@@ -625,6 +625,12 @@ class FlowCRUDL(SmartCRUDL):
                 widgets = {"name": InputWidget(), "ignore_triggers": CheckboxWidget()}
 
         class MessagingForm(BaseForm):
+            name = forms.CharField(
+                label=_("Name"),
+                help_text=_("Choose a name to describe this flow, e.g. Demographic Survey"),
+                widget=InputWidget(),
+            )
+
             keyword_triggers = forms.CharField(
                 required=False,
                 label=_("Global keyword triggers"),
@@ -649,6 +655,13 @@ class FlowCRUDL(SmartCRUDL):
                 widget=SelectWidget(attrs={"widget_only": False}),
             )
 
+            ignore_triggers = forms.BooleanField(
+                label=_("Ignore triggers"),
+                help_text=_("Ignore keyword triggers while in this flow"),
+                required=False,
+                widget=CheckboxWidget(),
+            )
+
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
 
@@ -666,7 +679,6 @@ class FlowCRUDL(SmartCRUDL):
             class Meta:
                 model = Flow
                 fields = ("name", "keyword_triggers", "expires_after_minutes", "ignore_triggers")
-                widgets = {"name": InputWidget(), "ignore_triggers": CheckboxWidget()}
 
         success_message = ""
         success_url = "uuid@flows.flow_editor"

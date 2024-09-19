@@ -237,13 +237,13 @@ class CampaignCRUDL(SmartCRUDL):
 
 class CampaignEventForm(forms.ModelForm):
     event_type = forms.ChoiceField(
-        choices=((CampaignEvent.TYPE_MESSAGE, "Send a message"), (CampaignEvent.TYPE_FLOW, "Start a flow")),
+        choices=((CampaignEvent.TYPE_MESSAGE, _("Send a message")), (CampaignEvent.TYPE_FLOW, _("Start a flow"))),
         required=True,
         widget=SelectWidget(attrs={"placeholder": _("Select the event type"), "widget_only": True}),
     )
 
     direction = forms.ChoiceField(
-        choices=(("B", "Before"), ("A", "After")),
+        choices=(("B", _("Before")), ("A", _("After"))),
         required=True,
         widget=SelectWidget(attrs={"placeholder": _("Relative date direction"), "widget_only": True}),
     )

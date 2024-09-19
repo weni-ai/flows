@@ -2314,9 +2314,9 @@ msgstr "Parado"
 msgid "Archived"
 msgstr "Arquivado"
 
-#, python-brace-format
-msgid "{label} for this contact"
-msgstr "{label} para este contato"
+#, python-format
+msgid "%s for this contact"
+msgstr "%s para este contato"
 
 msgid "Used by another contact"
 msgstr "Usado por outro contato"
@@ -5471,7 +5471,7 @@ msgid "Add a new way connect with this contact"
 msgstr "Adicione uma nova forma de se conectar com este contato"
 
 msgid "Create Field"
-msgstr "Campo Criado"
+msgstr "Criar campo"
 
 #, python-format
 msgid "You have reached the limit of %(limit)s fields per workspace. Please remove fields that you are no longer using."
@@ -7769,7 +7769,7 @@ msgid "A closed ticket"
 msgstr "Um ticket fechado"
 
 msgid "starts"
-msgstr "inicios"
+msgstr "inicia"
 
 msgid "is not scheduled"
 msgstr "não está agendado"
@@ -7934,3 +7934,30 @@ msgstr "Tipo do Fluxo"
 
 msgid "event"
 msgstr "evento"
+
+msgid "Hide"
+msgstr "Esconder"
+
+msgid "Send a message"
+msgstr "Enviar uma mensagem"
+
+msgid "Start a flow"
+msgstr "Iniciar um fluxo"
+
+msgid "Before"
+msgstr "Antes"
+
+msgid "After"
+msgstr "Depois"
+
+msgid "during the same hour"
+msgstr "durante a mesma hora"
+
+msgid "at Midnight"
+msgstr "à Meia-noite"
+
+msgid "at"
+msgstr "às"
+
+msgid "Ignore triggers"
+msgstr "Ignorar disparadores"
