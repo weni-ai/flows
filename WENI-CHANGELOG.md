@@ -1,3 +1,9 @@
+3.13.8
+----------
+* Update weni-rp-apps version to 2.8.9
+* Update pt_BR and es translations
+* Add more translations
+
 3.13.7
 ----------
 * Update floweditor to 3.1.3
