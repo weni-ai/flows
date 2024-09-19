@@ -7,7 +7,7 @@ import pytz
 from django import template
 from django.conf import settings
 from django.template import TemplateSyntaxError
-from django.template.defaultfilters import register
+from django.template.defaultfilters import date as _date, register
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import escapejs
@@ -229,14 +229,14 @@ def short_datetime(context, dtime):
         if dtime > twelve_hours_ago:
             return f"{dtime.strftime('%H')}:{dtime.strftime('%M')}"
         elif now.year == dtime.year:
-            return f"{int(dtime.strftime('%d'))} {dtime.strftime('%b')}"
+            return f"{int(_date(dtime, 'd'))} {_date(dtime, 'M')}"
         else:
             return f"{int(dtime.strftime('%d'))}/{int(dtime.strftime('%m'))}/{dtime.strftime('%y')}"
     elif org_format == "Y":
         if dtime > twelve_hours_ago:
             return f"{dtime.strftime('%H')}:{dtime.strftime('%M')}"
         elif now.year == dtime.year:
-            return f"{dtime.strftime('%b')} {int(dtime.strftime('%d'))}"
+            return f"{_date(dtime, 'M')} {int(_date(dtime, 'd'))}"
         else:
             return f"{dtime.strftime('%Y')}/{int(dtime.strftime('%m'))}/{int(dtime.strftime('%d'))}"
 
@@ -244,7 +244,7 @@ def short_datetime(context, dtime):
         if dtime > twelve_hours_ago:
             return f"{int(dtime.strftime('%I'))}:{dtime.strftime('%M')} {dtime.strftime('%p').lower()}"
         elif now.year == dtime.year:
-            return f"{dtime.strftime('%b')} {int(dtime.strftime('%d'))}"
+            return f"{_date(dtime, 'M')} {int(_date(dtime, 'd'))}"
         else:
             return f"{int(dtime.strftime('%m'))}/{int(dtime.strftime('%d'))}/{dtime.strftime('%y')}"
 

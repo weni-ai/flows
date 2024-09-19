@@ -439,9 +439,9 @@ class ContactField(SmartModel, DependencyMixin):
     SYSTEM_FIELDS = {
         KEY_ID: dict(label="ID", value_type=TYPE_NUMBER),
         KEY_NAME: dict(label="Name", value_type=TYPE_TEXT),
-        KEY_CREATED_ON: dict(label="Created On", value_type=TYPE_DATETIME),
+        KEY_CREATED_ON: dict(label=_("Created On"), value_type=TYPE_DATETIME),
         KEY_LANGUAGE: dict(label="Language", value_type=TYPE_TEXT),
-        KEY_LAST_SEEN_ON: dict(label="Last Seen On", value_type=TYPE_DATETIME),
+        KEY_LAST_SEEN_ON: dict(label=_("Last Seen On"), value_type=TYPE_DATETIME),
     }
 
     EXPORT_KEY = "key"
