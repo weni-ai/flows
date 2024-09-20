@@ -1,6 +1,7 @@
 from temba.contacts.models import URN
 
 from ...models import ChannelType
+from .views import ClaimView
 
 
 class EmailType(ChannelType):
@@ -18,3 +19,6 @@ class EmailType(ChannelType):
     schemes = [URN.EMAIL_SCHEME]
 
     show_config_page = False
+
+    claim_blurb = "Use an email API to connect."
+    claim_view = ClaimView
