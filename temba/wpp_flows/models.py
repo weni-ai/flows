@@ -35,5 +35,21 @@ class WhatsappFlow(models.Model):
     def trim(self, channel, ids):
         WhatsappFlow.objects.filter(channel=channel).exclude(facebook_flow_id__in=ids).update(is_active=False)
 
+    @classmethod
+    def is_status_valid(cls, status) -> bool:
+        for choice in WhatsappFlow.STATUS_CHOICES:
+            if status == choice[0]:
+                return True
+
+        return False
+
+    @classmethod
+    def update_status(cls, flow_id: str, status: str):
+        whatsapp_flow = cls.objects.get(facebook_flow_id=flow_id)
+        whatsapp_flow.status = status
+        whatsapp_flow.save()
+
+        return whatsapp_flow
+
     def __str__(self):
         return f"{self.name}"
