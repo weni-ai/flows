@@ -214,7 +214,7 @@ class TestWhatsappFlowsIntegration(TembaTest):
                                     "message": "Flow 1",
                                     "flow_id": "000000000",
                                     "old_status": "DRAFT",
-                                    "new_status": "PUBLISHEDD",
+                                    "new_status": "PUBLISHED",
                                 },
                                 "field": "flows",
                             }
@@ -225,6 +225,5 @@ class TestWhatsappFlowsIntegration(TembaTest):
             }
 
             response = self.client.post(url_with_token, data, content_type="application/json")
-            print(response)
 
             self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
