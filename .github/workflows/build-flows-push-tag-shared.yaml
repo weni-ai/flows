@@ -212,7 +212,7 @@ jobs:
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
-          docker buildx imagetools create -t "${{ env.IMAGE_TAG }}") \
+          docker buildx imagetools create -t "${{ env.IMAGE_TAG }}" \
             $(printf '${{ secrets.ECR }}/push-backend@sha256:%s ' *)  
 
       - name: Check out Kubernetes Manifests
