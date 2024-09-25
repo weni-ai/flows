@@ -30,8 +30,9 @@
   
 -block summary
   -if not use_weni_layout
-    -blocktrans with email=user.username
-      Your email address is <b>{{email}}</b>.
+    -trans "Your email address is "
+    <b>{{ user.username }}</b>.
+
 
 -block extra-script
   :javascript

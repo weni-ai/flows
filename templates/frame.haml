@@ -400,6 +400,20 @@
           });
         };
 
+        function translateCancelButton() {
+          document.querySelectorAll('temba-modax').forEach((modax) => {
+            modax.shadowRoot.querySelectorAll('temba-dialog').forEach((dialog) => {
+              dialog.shadowRoot.querySelectorAll('temba-button').forEach((button) => {
+                button.shadowRoot.querySelectorAll('div.button-name').forEach((buttonName) => {
+                  if (buttonName.innerText.toLowerCase() === 'cancel') {
+                    buttonName.innerHTML = gettext('Cancel');
+                  }
+                });
+              });
+            });
+          });
+        }
+
         function initializeObserver() {
           const targetNode = document.getElementById('pageBody');
           const config = { attributes: true, childList: true, subtree: true };
@@ -407,6 +421,7 @@
           const callback = function(mutationList, observer) {
             mutationList.forEach((mutation) => {
                 if (mutation.type === 'childList') {
+                  translateCancelButton();
                   translateAllLinks();
                 }
             })

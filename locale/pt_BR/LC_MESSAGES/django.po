@@ -2314,9 +2314,9 @@ msgstr "Parado"
 msgid "Archived"
 msgstr "Arquivado"
 
-#, python-brace-format
-msgid "{label} for this contact"
-msgstr "{label} para este contato"
+#, python-format
+msgid "%s for this contact"
+msgstr "%s para este contato"
 
 msgid "Used by another contact"
 msgstr "Usado por outro contato"
@@ -5471,7 +5471,7 @@ msgid "Add a new way connect with this contact"
 msgstr "Adicione uma nova forma de se conectar com este contato"
 
 msgid "Create Field"
-msgstr "Campo Criado"
+msgstr "Criar campo"
 
 #, python-format
 msgid "You have reached the limit of %(limit)s fields per workspace. Please remove fields that you are no longer using."
@@ -7067,18 +7067,6 @@ msgstr "Créditos complementares, obrigado por testar %(brand)s."
 msgid "Confirm your current password to save these changes"
 msgstr "Confirme sua senha atual para salvar essas alterações"
 
-#, python-format
-msgid ""
-"\n"
-"    Your email address is <b>%(email)s</b>.\n"
-"\n"
-"  "
-msgstr ""
-"\n"
-"    Seu endereço de e-mail é <b>%(email)s</b>.\n"
-"\n"
-"  "
-
 msgid "Reset Password"
 msgstr "Reconfigurar Senha"
 
@@ -7769,7 +7757,7 @@ msgid "A closed ticket"
 msgstr "Um ticket fechado"
 
 msgid "starts"
-msgstr "inicios"
+msgstr "inicia"
 
 msgid "is not scheduled"
 msgstr "não está agendado"
@@ -7934,3 +7922,45 @@ msgstr "Tipo do Fluxo"
 
 msgid "event"
 msgstr "evento"
+
+msgid "Hide"
+msgstr "Esconder"
+
+msgid "Send a message"
+msgstr "Enviar uma mensagem"
+
+msgid "Start a flow"
+msgstr "Iniciar um fluxo"
+
+msgid "Before"
+msgstr "Antes"
+
+msgid "After"
+msgstr "Depois"
+
+msgid "during the same hour"
+msgstr "durante a mesma hora"
+
+msgid "at Midnight"
+msgstr "à Meia-noite"
+
+msgid "at"
+msgstr "às"
+
+msgid "Ignore triggers"
+msgstr "Ignorar disparadores"
+
+msgid "Your email address is "
+msgstr "Seu endereço de e-mail é "
+
+msgid "The generated OTP"
+msgstr "O OTP gerado"
+
+msgid "Your current login password"
+msgstr "Sua senha atual de login"
+
+msgid "State and district names will be searched against this country."
+msgstr "Os nomes dos estados e distritos serão buscados neste país."
+
+msgid "Enter a name for your event. ex: new-registration"
+msgstr "Digite um nome para o seu evento. ex: novo-registro"

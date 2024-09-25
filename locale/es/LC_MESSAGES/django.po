@@ -2309,9 +2309,9 @@ msgstr "Detenido"
 msgid "Archived"
 msgstr "Archivado"
 
-#, python-brace-format
-msgid "{label} for this contact"
-msgstr "{label} para este contacto"
+#, python-format
+msgid "%s for this contact"
+msgstr "%s para este contacto"
 
 msgid "Used by another contact"
 msgstr "Usado por otro contacto"
@@ -7063,18 +7063,6 @@ msgstr "Créditos complementarios, gracias por probar %(brand)s."
 msgid "Confirm your current password to save these changes"
 msgstr "Confirme su contraseña actual para guardar estos cambios"
 
-#, python-format
-msgid ""
-"\n"
-"    Your email address is <b>%(email)s</b>.\n"
-"\n"
-"  "
-msgstr ""
-"\n"
-"   Tu correo electrónico es <b>%(email)s</b>.\n"
-"\n"
-"  "
-
 msgid "Reset Password"
 msgstr "Restablecer la contraseña"
 
@@ -7948,3 +7936,45 @@ msgstr "Tipo de Flujo"
 
 msgid "event"
 msgstr "evento"
+
+msgid "Hide"
+msgstr "Esconder"
+
+msgid "Send a message"
+msgstr "Enviar un mensaje"
+
+msgid "Start a flow"
+msgstr "Iniciar un flujo"
+
+msgid "Before"
+msgstr "Antes"
+
+msgid "After"
+msgstr "Después"
+
+msgid "during the same hour"
+msgstr "durante la misma hora"
+
+msgid "at Midnight"
+msgstr "a Medianoche"
+
+msgid "at"
+msgstr "a"
+
+msgid "Ignore triggers"
+msgstr "Ignorar los desencadenantes"
+
+msgid "Your email address is "
+msgstr "Su dirección de correo electrónico es "
+
+msgid "The generated OTP"
+msgstr "El OTP generado"
+
+msgid "Your current login password"
+msgstr "Su contraseña actual de inicio de sesión"
+
+msgid "State and district names will be searched against this country."
+msgstr "Los nombres de los estados y distritos se buscarán en este país."
+
+msgid "Enter a name for your event. ex: new-registration"
+msgstr "Ingrese un nombre para su evento. ej: nueva-registro"
