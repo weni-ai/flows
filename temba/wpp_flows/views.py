@@ -30,7 +30,7 @@ class WhatsappFlowsViewset(viewsets.ViewSet):
 
         entry = entry_list[0]
 
-        flow_id = entry.get("id")
+        flow_id = entry["changes"][0]["value"]["flow_id"]
         if flow_id is None:
             return Response("`id` is a required field", status=status.HTTP_400_BAD_REQUEST)
 
