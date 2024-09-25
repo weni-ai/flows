@@ -7453,3 +7453,18 @@ msgstr ""
 
 msgid "Copy UUID"
 msgstr ""
+
+msgid "Your email address is"
+msgstr ""
+
+msgid "The generated OTP"
+msgstr ""
+
+msgid "Your current login password"
+msgstr ""
+
+msgid "State and district names will be searched against this country."
+msgstr ""
+
+msgid "Enter a name for your event. ex: new-registration"
+msgstr ""

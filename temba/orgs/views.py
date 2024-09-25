@@ -871,13 +871,13 @@ class UserCRUDL(SmartCRUDL):
     class TwoFactorEnable(SpaMixin, ComponentFormMixin, InferOrgMixin, OrgPermsMixin, SmartFormView):
         class Form(forms.Form):
             otp = forms.CharField(
-                label="The generated OTP",
+                label=_("The generated OTP"),
                 widget=InputWidget(attrs={"placeholder": _("6-digit code")}),
                 max_length=6,
                 required=True,
             )
             password = forms.CharField(
-                label="Your current login password",
+                label=_("Your current login password"),
                 widget=InputWidget(attrs={"placeholder": _("Current password"), "password": True}),
                 required=True,
             )
@@ -3016,7 +3016,7 @@ class OrgCRUDL(SmartCRUDL):
             new_slug = forms.SlugField(
                 required=False,
                 label=_("New Event"),
-                help_text="Enter a name for your event. ex: new-registration",
+                help_text=_("Enter a name for your event. ex: new-registration"),
                 widget=InputWidget(),
                 max_length=Resthook._meta.get_field("slug").max_length,
             )
@@ -3542,7 +3542,7 @@ class OrgCRUDL(SmartCRUDL):
                 Org.get_possible_countries(),
                 required=False,
                 label=_("The country used for location values. (optional)"),
-                help_text="State and district names will be searched against this country.",
+                help_text=_("State and district names will be searched against this country."),
                 widget=SelectWidget(),
             )
 

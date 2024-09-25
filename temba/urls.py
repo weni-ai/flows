@@ -13,9 +13,6 @@ from temba.utils.analytics import init_analytics
 
 from .views import WeniRedirect
 
-# javascript translation packages
-js_info_dict = {"packages": ()}  # this is empty due to the fact that all translation are in one folder
-
 urlpatterns = [
     url(r"^", include("temba.airtime.urls")),
     url(r"^", include("temba.api.urls")),
@@ -49,7 +46,7 @@ urlpatterns = [
     url(r"^users/", include("smartmin.users.urls")),
     url(r"^imports/", include("smartmin.csv_imports.urls")),
     url(r"^assets/", include("temba.assets.urls")),
-    url(r"^jsi18n/$", JavaScriptCatalog.as_view(), js_info_dict, name="django.views.i18n.javascript_catalog"),
+    url(r"^jsi18n/$", JavaScriptCatalog.as_view(domain="django"), name="django.views.i18n.javascript_catalog"),
     url(r"^redirect/", WeniRedirect.as_view(), {}, "weni.redirect"),
 ]
 

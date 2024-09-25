@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import Model
 from django.utils import timezone
+from django.utils.text import format_lazy
 from django.utils.translation import ngettext, ugettext_lazy as _
 
 from temba import mailroom
@@ -394,7 +395,7 @@ class CampaignEvent(TembaModel):
 
     @classmethod
     def get_hour_choices(cls):
-        hours = [(-1, "during the same hour"), (0, "at Midnight")]
+        hours = [(-1, _("during the same hour")), (0, _("at Midnight"))]
         period = "a.m."
         for i in range(1, 24):
             hour = i
@@ -402,7 +403,8 @@ class CampaignEvent(TembaModel):
                 period = "p.m."
                 if i > 12:
                     hour -= 12
-            hours.append((i, "at %s:00 %s" % (hour, period)))
+
+            hours.append((i, format_lazy("{} {}:00 {}", _("at"), hour, period)))
         return hours
 
     @property
