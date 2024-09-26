@@ -313,6 +313,11 @@ CELERY_BEAT_SCHEDULE["refresh-whatsapp-catalog-and-products"] = {
     "schedule": timedelta(minutes=env.int("REFRESH_WPP_CATALOG_TASK_TIME", default=60)),
 }
 
+CELERY_BEAT_SCHEDULE["refresh-whatsapp-flows"] = {
+    "task": "refresh_whatsapp_flows",
+    "schedule": timedelta(minutes=env.int("REFRESH_WPP_FLOWS_TASK_TIME", default=720)),
+}
+
 # -----------------------------------------------------------------------------------
 # APPLICATION LOGS
 # -----------------------------------------------------------------------------------
@@ -524,6 +529,9 @@ ROUTER_FIXED_ACCESS_TOKEN = env("ROUTER_FIXED_ACCESS_TOKEN", default="")
 
 # Access token for internal endpoints used by the billing
 BILLING_FIXED_ACCESS_TOKEN = env("BILLING_FIXED_ACCESS_TOKEN", default="")
+
+# Access token for internal endpoints used by the billing
+COURIER_FIXED_ACCESS_TOKEN = env("COURIER_FIXED_ACCESS_TOKEN", default="")
 
 # Hotjar ID
 HOTJAR_ID = env.int("HOTJAR_ID", default=None)

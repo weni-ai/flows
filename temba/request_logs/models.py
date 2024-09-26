@@ -44,6 +44,7 @@ class HTTPLog(models.Model):
     WHATSAPP_CHECK_HEALTH = "whataspp_check_health"
     WHATSAPP_CATALOGS_SYNCED = "whatsapp_catalogs_synced"
     WHATSAPP_PRODUCTS_SYNCED = "whatsapp_products_synced"
+    WHATSAPP_FLOWS_SYNCED = "whatsapp_flows_synced"
     TEAMS_TOKENS_SYNCED = "teams_tokens_synced"
 
     # possible log type choices and descriptive names
