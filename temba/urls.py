@@ -41,6 +41,7 @@ urlpatterns = [
     url(r"^", include("temba.orgs.urls")),
     url(r"^", include("temba.externals.urls")),
     url(r"^", include("temba.wpp_products.urls")),
+    url(r"^", include("temba.wpp_flows.urls")),
     url(r"^", include("temba.templates.urls")),
     url(r"^relayers/relayer/sync/(\d+)/$", sync, {}, "sync"),
     url(r"^relayers/relayer/register/$", register, {}, "register"),
@@ -51,6 +52,7 @@ urlpatterns = [
     url(r"^jsi18n/$", JavaScriptCatalog.as_view(), js_info_dict, name="django.views.i18n.javascript_catalog"),
     url(r"^redirect/", WeniRedirect.as_view(), {}, "weni.redirect"),
 ]
+
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
