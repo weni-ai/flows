@@ -37,7 +37,7 @@ from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
 from temba.classifiers.models import Classifier
-from temba.contacts.models import Contact, ContactField, ContactGroup, ContactGroupCount, ContactURN
+from temba.contacts.models import URN, Contact, ContactField, ContactGroup, ContactGroupCount, ContactURN
 from temba.externals.models import ExternalService
 from temba.flows.models import Flow, FlowLabel, FlowRun, FlowStart
 from temba.globals.models import Global
@@ -1499,7 +1499,28 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
 
         # don't blow up if posted a URN that doesn't exist - we'll let the serializer create a new contact
         if self.request.method == "POST" and "urns__identity" in self.lookup_values:
-            return queryset.first()
+            org = self.request.user.get_org()
+            urn = self.lookup_values.get("urns__identity")
+
+            contact = queryset.first()
+
+            if not contact and org.config["verify_ninth_digit"]:
+                scheme, path, _, _ = URN.to_parts(urn)
+                if scheme == "whatsapp" and path.startswith("55"):
+                    if len(path) == 13 and path[4] == "9":
+                        # Generate without digit 9
+                        number = path[:4] + path[5:]
+                        self.lookup_values["urns__identity"] = scheme + ":" + number
+                        contact = self.get_queryset().filter(**self.lookup_values).first()
+
+                    else:
+                        # Generate with digit 9
+                        number = path[:4] + "9" + path[4:]
+
+                        self.lookup_values["urns__identity"] = scheme + ":" + number
+                        contact = self.get_queryset().filter(**self.lookup_values).first()
+
+            return contact
         else:
             return generics.get_object_or_404(queryset)
 
