@@ -9,7 +9,7 @@ from .models import Notification, NotificationCount
 logger = logging.getLogger(__name__)
 
 
-@nonoverlapping_task(track_started=True, name="send_notification_emails", lock_timeout=1800)
+@nonoverlapping_task(track_started=True, lock_timeout=1800)
 def send_notification_emails():
     pending = list(
         Notification.objects.filter(email_status=Notification.EMAIL_STATUS_PENDING)
@@ -33,6 +33,6 @@ def send_notification_emails():
         logger.info(f"{num_sent} notification emails sent in {time_taken} seconds ({num_errored} errored)")
 
 
-@nonoverlapping_task(track_started=True, name="squash_notificationcounts", lock_timeout=1800)
+@nonoverlapping_task(track_started=True, lock_timeout=1800)
 def squash_notificationcounts():
     NotificationCount.squash()

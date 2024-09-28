@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 EVENT_FIRES_TO_TRIM = 100_000
 
 
-@nonoverlapping_task(track_started=True, name="trim_event_fires_task")
+@nonoverlapping_task(track_started=True)
 def trim_event_fires_task():
     trim_before = timezone.now() - settings.RETENTION_PERIODS["eventfire"]
     start = timezone.now()
