@@ -535,3 +535,6 @@ COURIER_FIXED_ACCESS_TOKEN = env("COURIER_FIXED_ACCESS_TOKEN", default="")
 
 # Hotjar ID
 HOTJAR_ID = env.int("HOTJAR_ID", default=None)
+
+# E-mail domains allowed to edit immutable flows
+MUTABLE_EDITOR_DOMAINS = env.tuple("MUTABLE_EDITOR_DOMAINS", default=("@inspiria.studio", "@weni.ai"))
