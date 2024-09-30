@@ -162,6 +162,8 @@ class Flow(TembaModel):
 
     has_issues = models.BooleanField(default=False)
 
+    is_mutable = models.BooleanField(default=True)
+
     # dependencies on other assets
     channel_dependencies = models.ManyToManyField(Channel, related_name="dependent_flows")
     classifier_dependencies = models.ManyToManyField(Classifier, related_name="dependent_flows")

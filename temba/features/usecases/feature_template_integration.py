@@ -24,6 +24,9 @@ def integrate_feature_template_consumer(
     user, _ = get_or_create_user_by_email(user_email)
 
     new_flows = project.import_app(definition, user)
+
+    set_is_mutable_flow(new_flows)
+
     disable_flows_has_issues(project, definition)
 
     if parameters:
@@ -48,6 +51,12 @@ def format_new_flows_data(new_flows):
         flows_list.append(flow_data)
 
     return flows_list
+
+
+def set_is_mutable_flow(new_flows):
+    for flow in new_flows:
+        flow.is_mutable = False
+        flow.save()
 
 
 def publish_integrate_success(project_uuid, feature_version_uuid, feature_uuid, imported_data):  # pragma: no cover
