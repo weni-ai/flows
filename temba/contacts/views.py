@@ -1532,6 +1532,13 @@ class ContactCRUDL(SmartCRUDL):
         success_message = ""
         submit_button_name = _("Start")
 
+        def form_valid(self, form):
+            flow = form.cleaned_data["flow"]
+            if not (flow.is_mutable or self.request.user.email.endswith(settings.MUTABLE_EDITOR_DOMAINS)):
+                return HttpResponse("This flow is immutable, and not allowed to be manually started")
+
+            return super().form_valid(form)
+
         def save(self, obj):
             self.flow = self.form.cleaned_data["flow"]
             start = FlowStart.create(self.flow, self.request.user, FlowStart.TYPE_MANUAL, contacts=[obj])
