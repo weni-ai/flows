@@ -1,3 +1,8 @@
+3.14.1
+----------
+* Fix bug on create contact api
+* Add translations to onboard modal
+
 3.14.0
 ----------
 * Create whatsapp_flows model
