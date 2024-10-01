@@ -7964,3 +7964,30 @@ msgstr "Os nomes dos estados e distritos serão buscados neste país."
 
 msgid "Enter a name for your event. ex: new-registration"
 msgstr "Digite um nome para o seu evento. ex: novo-registro"
+
+msgid "How to use triggers"
+msgstr "Como utilizar disparadores"
+
+msgid "In triggers, one of the possibilities is to create a keyword to trigger a specific flow for your contacts."
+msgstr "Em disparadores, uma das possibilidades é criar uma palavra-chave para disparar um fluxo específico para seus contatos."
+
+msgid "Access the studio module and click on “Triggers”. Then, click the “Create triggers” button."
+msgstr "Acesse o módulo de estúdio e clique em “Disparadores”. Em seguida, clique no botão “Criar disparadores”."
+
+msgid "Choose the card, “Create a keyword that starts a flow”."
+msgstr "Escolha o card, “Crie uma palavra-chave que inicia um fluxo”."
+
+msgid "Add a keyword and define the flow that will be started, and click on “Create Triggers” and you're done!"
+msgstr "Adicione uma palavra-chave e defina o fluxo que será iniciado, e Clique em “Criar Disparadores” e pronto!"
+
+msgid "In triggers you can also schedule when a message flow should be triggered for your contacts."
+msgstr "Em disparadores você também pode agendar quando um fluxo de mensagem deverá ser disparado para seus contatos."
+
+msgid "For this, click on “Start a flow daily or by schedule”, define the day and time of the trigger."
+msgstr "Para isso, clique em “iniciar um fluxo diariamente ou segundo agendamento”, defina o dia e o horário de disparo."
+
+msgid "Choose the weekly frequency you want to trigger."
+msgstr "Escolha a frequência semanal que você deseja disparar."
+
+msgid "Add the contact groups to which you want to send the messages. Finally, click on “Create Trigger”."
+msgstr "Adicione os grupos de contatos aos quais deseja enviar as mensagens. Por fim, clique em “Criar Disparador”."

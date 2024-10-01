@@ -6,43 +6,55 @@
     #close-modal.weni-unnnic-icon-close-1.weni-unnnic-icon-sm{class: "weni-unnnic-modal-close"}
 
     %span{class: "weni-unnnic-modal-title"}
-      Como utilizar disparadores
+      -blocktrans trimmed
+        How to use triggers
     
     %div#step-1{class: "weni-unnnic-modal-content"}
       %img{class: "onboard-gif", src:"/sitestatic/brands/push/trigger1.gif"}
 
       %div{class: "onboard-scrollable"}
-        Em disparadores, uma das possibilidades é criar uma palavra-chave para disparar um fluxo específico para seus contatos.
+        -blocktrans trimmed
+          In triggers, one of the possibilities is to create a keyword to trigger a specific flow for your contacts.
         %ol{class: "onboard-list"}
           %li
-            Acesse o módulo de estúdio e clique em “Disparadores”. Em seguida, clique no botão “Criar disparadores”.
+            -blocktrans trimmed
+              Access the studio module and click on “Triggers”. Then, click the “Create triggers” button.
           %li
-            Escolha o card, “Crie uma palavra-chave que inicia um fluxo”.
+            -blocktrans trimmed
+              Choose the card, “Create a keyword that starts a flow”.
           %li
-            Adicione uma palavra-chave e defina o fluxo que será iniciado, e Clique em "criar disparadores" e pronto!
+            -blocktrans trimmed
+              Add a keyword and define the flow that will be started, and click on “Create Triggers” and you're done!
 
     %div#step-1-buttons{class: "weni-unnnic-modal-buttons"}
       %button{class: "weni-unnnic-button weni-unnnic-button--secondary weni-unnnic-button--size-large w-full", onclick:"nextStep()"}
-        Próximo
+        -blocktrans trimmed
+          Next
 
     %div#step-2.hidden{class: "weni-unnnic-modal-content"}
       %img{class: "onboard-gif", src:"/sitestatic/brands/push/trigger2.gif"}
 
       %div{class: "onboard-scrollable"}
-        Em disparadores você também pode agendar quando um fluxo de mensagem deverá ser disparado para seus contatos.
+        -blocktrans trimmed
+          In triggers you can also schedule when a message flow should be triggered for your contacts.
         %ol{class: "onboard-list"}
           %li
-            Para isso, clique em “iniciar um fluxo diariamente ou segundo agendamento”, defina o dia e o horário de disparo.
+            -blocktrans trimmed
+              For this, click on “Start a flow daily or by schedule”, define the day and time of the trigger.
           %li
-            Escolha a frequência semanal que você desejada, disparar.
+            -blocktrans trimmed
+              Choose the weekly frequency you want to trigger.
           %li
-            Adicione os grupos de contatos aos quais deseja enviar as mensagens. Por fim, clique em "criar disparador".
+            -blocktrans trimmed
+              Add the contact groups to which you want to send the messages. Finally, click on “Create Trigger”.
 
     %div#step-2-buttons.hidden{class: "weni-unnnic-modal-buttons"}
       %button{class: "weni-unnnic-button weni-unnnic-button--tertiary weni-unnnic-button--size-large w-full", onclick:"previousStep()"}
-        Voltar
+        -blocktrans trimmed
+          Back
       %button{class: "weni-unnnic-button weni-unnnic-button--secondary weni-unnnic-button--size-large w-full", onclick:"complete()"}
-        Começar
+        -blocktrans trimmed
+          Start
 
 -block extra-script
   :javascript
