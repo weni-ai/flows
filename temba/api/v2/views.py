@@ -1501,7 +1501,7 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
 
             contact = queryset.first()
 
-            if not contact and org.config["verify_ninth_digit"]:
+            if not contact and org.config.get("verify_ninth_digit", False):
                 scheme, path, _, _ = URN.to_parts(urn)
                 if scheme == "whatsapp" and path.startswith("55"):
                     if len(path) == 13 and path[4] == "9":
