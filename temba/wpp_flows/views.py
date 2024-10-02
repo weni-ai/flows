@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from django.conf import settings
 
 from temba.wpp_flows.models import WhatsappFlow
+from temba.wpp_flows.tasks import update_whatsapp_flow_by_id
 
 
 class WhatsappFlowsViewset(viewsets.ViewSet):
@@ -34,6 +35,13 @@ class WhatsappFlowsViewset(viewsets.ViewSet):
         if flow_id is None:
             return Response("`id` is a required field", status=status.HTTP_400_BAD_REQUEST)
 
+        webhook_type = entry["changes"][0]["value"]["event"]
+        if webhook_type != "FLOW_STATUS_CHANGE":
+            return Response(
+                "this event is not implemented in flows",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         new_status = entry["changes"][0]["value"]["new_status"]
 
         if not WhatsappFlow.is_status_valid(new_status):
@@ -42,6 +50,7 @@ class WhatsappFlowsViewset(viewsets.ViewSet):
         try:
             WhatsappFlow.update_status(flow_id, new_status)
         except WhatsappFlow.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            update_whatsapp_flow_by_id(flow_id)
+            return Response(status=status.HTTP_200_OK)
 
         return Response(status=status.HTTP_200_OK)
