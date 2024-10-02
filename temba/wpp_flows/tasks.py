@@ -1,3 +1,5 @@
+import logging
+
 import requests
 from django_redis import get_redis_connection
 
@@ -9,6 +11,8 @@ from celery import shared_task
 from temba.channels.models import Channel
 from temba.request_logs.models import HTTPLog
 from temba.wpp_flows.models import WhatsappFlow
+
+logger = logging.getLogger(__name__)
 
 
 @shared_task(track_started=True, name="refresh_whatsapp_flows")
@@ -52,7 +56,11 @@ def get_whatsapp_flows(channel):
             resp = requests.get(url, params=dict(limit=255), headers=headers)
             elapsed = (timezone.now() - start).total_seconds() * 1000
             HTTPLog.create_from_response(
-                HTTPLog.WHATSAPP_FLOWS_SYNCED, url, resp, channel=channel, request_time=elapsed
+                HTTPLog.WHATSAPP_FLOWS_SYNCED,
+                url,
+                resp,
+                channel=channel,
+                request_time=elapsed,
             )
             if resp.status_code != 200:  # pragma: no cover
                 return []
@@ -150,3 +158,53 @@ def extract_data_keys(json_data):
 
     extract_keys(json_data)
     return {"screens": list(set(screens_ids)), "variables": list(set(keys))}
+
+
+def get_whatsapp_flow_by_id(flow_id):
+    token = settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN
+    headers = {"Authorization": f"Bearer {token}"}
+
+    try:
+        url = f"{settings.WHATSAPP_API_URL}/{flow_id}?fields=id,name,categories,status,validation_errors,whatsapp_business_account"
+
+        headers = {"Authorization": f"Bearer {token}"}
+
+        resp = requests.get(url, params=dict(limit=255), headers=headers)
+
+        if resp.status_code != 200:  # pragma: no cover
+            return []
+
+        return resp.json()
+    except requests.RequestException as e:
+        logger.error("error getting whatsapp flow by id", e)
+        return []
+
+
+def update_whatsapp_flow_by_id(flow_id):
+    flow = get_whatsapp_flow_by_id(flow_id)
+
+    waba_id = flow["whatsapp_business_account"]["id"]
+    channels = Channel.objects.filter(is_active=True, channel_type__in=["WA", "WAC"])
+
+    for channel in channels:
+
+        if channel.config.get("wa_waba_id") == waba_id:
+            create_single_whatsapp_flow(flow, channel)
+
+
+def create_single_whatsapp_flow(flow, channel):
+    assets_data = get_assets_data(channel, flow.get("id"))
+    variables = extract_data_keys(assets_data)
+
+    WhatsappFlow.objects.create(
+        facebook_flow_id=flow.get("id"),
+        category=flow.get("categories"),
+        status=flow.get("status"),
+        name=flow.get("name"),
+        validation_errors=flow.get("validation_errors"),
+        screens=assets_data,
+        variables=variables,
+        org=channel.org,
+        channel=channel,
+        is_active=True,
+    )
