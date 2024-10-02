@@ -1060,7 +1060,9 @@ class FlowCRUDL(SmartCRUDL):
             context["styles"] = styles
             context["migrate"] = "migrate" in self.request.GET
 
-            if flow.is_archived:
+            if flow.is_archived or not (
+                flow.is_mutable or self.request.user.email.endswith(settings.MUTABLE_EDITOR_DOMAINS)
+            ):
                 context["mutable"] = False
                 context["can_start"] = False
                 context["can_simulate"] = False
@@ -1110,6 +1112,7 @@ class FlowCRUDL(SmartCRUDL):
                 flow.flow_type != Flow.TYPE_SURVEY
                 and self.has_org_perm("flows.flow_broadcast")
                 and not flow.is_archived
+                and (flow.is_mutable or self.request.user.email.endswith(settings.MUTABLE_EDITOR_DOMAINS))
             ):
                 links.append(
                     dict(

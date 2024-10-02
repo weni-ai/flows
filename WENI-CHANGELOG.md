@@ -1,3 +1,15 @@
+3.14.1
+----------
+* Fix bug on create contact api
+* Add translations to onboard modal
+
+3.14.0
+----------
+* Create whatsapp_flows model
+* Add task to sync whatsapp flows
+* Add whatsapp flows endpoint
+* Endpoint to whatsapp flows webhook
+
 3.13.8
 ----------
 * Update weni-rp-apps version to 2.8.9

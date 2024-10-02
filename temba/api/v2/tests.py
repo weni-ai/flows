@@ -29,6 +29,7 @@ from temba.api.v2.views import (
     FlowsLabelsEndpoint,
     ProductsEndpoint,
     TemplatesEndpoint,
+    WhatsappFlowsEndpoint,
 )
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
@@ -57,6 +58,7 @@ from temba.tickets.types.mailgun import MailgunType
 from temba.tickets.types.zendesk import ZendeskType
 from temba.triggers.models import Trigger
 from temba.utils import json
+from temba.wpp_flows.models import WhatsappFlow
 from temba.wpp_products.models import Catalog, Product
 
 from . import fields
@@ -2103,6 +2105,21 @@ class APITest(TembaTest):
         # try to delete a contact in another org
         response = self.deleteJSON(url, "uuid=%s" % hans.uuid)
         self.assert404(response)
+
+        # Add key to verify ninth digit
+        self.org.config["verify_ninth_digit"] = True
+        self.org.save()
+
+        # Verify brazilian whatsapp urn with ninth digit
+        self.create_contact("Julius", urns=["whatsapp:5521912345678"])
+        response = self.postJSON(url, "urn=%s" % quote_plus("whatsapp:552112345678"), {"name": "Julito"})
+        self.assertEqual(response.status_code, 200)
+
+        # Verify brazilian whatsapp urn without ninth digit
+        self.create_contact("Rochele", urns=["whatsapp:558912345678"])
+
+        response = self.postJSON(url, "urn=%s" % quote_plus("whatsapp:5589912345678"), {"name": "Rochel"})
+        self.assertEqual(response.status_code, 200)
 
     @mock_mailroom
     def test_contacts_lean(self, mr_mocks):
@@ -5507,4 +5524,54 @@ class FilterTemplatesEndpointTest(TembaTest):
         # verify filter with after
         response = self.client.get(url, data={"template": "template_test", "after": "2024-03-05"})
 
+        self.assertEqual(response.status_code, 200)
+
+
+class WhatsappFlowsEndpointViewSetTest(TembaTest):
+    def test_whatsapp_flow(self):
+        WhatsappFlow.objects.all().delete()
+        view = WhatsappFlowsEndpoint
+        view.permission_classes = []
+
+        self.client.force_login(self.user)
+        url = reverse("api.v2.whatsapp_flows") + ".json"
+
+        channel = self.create_channel(
+            "WAC",
+            "WhatsApp: 1234",
+            "1234",
+            org=self.org,
+            config={
+                Channel.CONFIG_BASE_URL: "https://nyaruka.com/whatsapp",
+                Channel.CONFIG_USERNAME: "temba",
+                Channel.CONFIG_PASSWORD: "tembapasswd2",
+                Channel.CONFIG_AUTH_TOKEN: "authtoken123",
+                CONFIG_FB_BUSINESS_ID: "1234",
+                CONFIG_FB_ACCESS_TOKEN: "token123",
+                CONFIG_FB_NAMESPACE: "my-custom-app-2",
+                CONFIG_FB_TEMPLATE_LIST_DOMAIN: "graph.facebook.com",
+            },
+        )
+
+        WhatsappFlow.objects.create(
+            facebook_flow_id="123456789",
+            category=["cat1"],
+            status="active",
+            name="Flow 1",
+            validation_errors=[],
+            screens={"id": "screen_1", "data": {"var1": "value1", "var2": "value2"}},
+            variables={"screens": ["screen_1"], "variables": ["var1", "var2"]},
+            org=self.org,
+            channel=channel,
+            is_active=True,
+        )
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(url, data={"id": "123456789"})
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(url, data={"name": "Flow 1"})
         self.assertEqual(response.status_code, 200)

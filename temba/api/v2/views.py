@@ -37,7 +37,7 @@ from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
 from temba.classifiers.models import Classifier
-from temba.contacts.models import Contact, ContactField, ContactGroup, ContactGroupCount, ContactURN
+from temba.contacts.models import URN, Contact, ContactField, ContactGroup, ContactGroupCount, ContactURN
 from temba.externals.models import ExternalService
 from temba.flows.models import Flow, FlowLabel, FlowRun, FlowStart
 from temba.globals.models import Global
@@ -47,6 +47,7 @@ from temba.orgs.models import OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.utils import splitting_getlist, str_to_bool
+from temba.wpp_flows.models import WhatsappFlow
 from temba.wpp_products.models import Product
 
 from ..models import SSLPermission
@@ -99,6 +100,7 @@ from .serializers import (
     TopicWriteSerializer,
     UserReadSerializer,
     WebHookEventReadSerializer,
+    WhatsappFlowReadSerializer,
     WorkspaceReadSerializer,
 )
 from .wenibrain.views import BrainInfoEndpoint
@@ -325,6 +327,7 @@ class ExplorerView(SmartTemplateView):
             IntelligencesEndpoint.get_read_explorer(),
             ExternalServicesEndpoint.get_read_explorer(),
             BrainInfoEndpoint.get_read_explorer(),
+            WhatsappFlowsEndpoint.get_read_explorer(),
         ]
         return context
 
@@ -1496,7 +1499,28 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
 
         # don't blow up if posted a URN that doesn't exist - we'll let the serializer create a new contact
         if self.request.method == "POST" and "urns__identity" in self.lookup_values:
-            return queryset.first()
+            org = self.request.user.get_org()
+            urn = self.lookup_values.get("urns__identity")
+
+            contact = queryset.first()
+
+            if not contact and org.config.get("verify_ninth_digit", False):
+                scheme, path, _, _ = URN.to_parts(urn)
+                if scheme == "whatsapp" and path.startswith("55"):
+                    if len(path) == 13 and path[4] == "9":
+                        # Generate without digit 9
+                        number = path[:4] + path[5:]
+                        self.lookup_values["urns__identity"] = scheme + ":" + number
+                        contact = self.get_queryset().filter(**self.lookup_values).first()
+
+                    else:
+                        # Generate with digit 9
+                        number = path[:4] + "9" + path[4:]
+
+                        self.lookup_values["urns__identity"] = scheme + ":" + number
+                        contact = self.get_queryset().filter(**self.lookup_values).first()
+
+            return contact
         else:
             return generics.get_object_or_404(queryset)
 
@@ -4754,6 +4778,78 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
             "title": "List Products",
             "url": reverse("api.v2.products"),
             "slug": "products-list",
+            "params": [],
+            "example": {},
+        }
+
+
+class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
+    """
+    This endpoint allows you to fetch the WhatsApp flows that have been synced.
+
+    ## Listing Whatsapp Flows
+
+    A `GET` request returns the whatsapp flows for your organization.
+
+    Each whatsapp flows has the following attributes:
+
+     * **id** - the id of meta flow
+     * **name** - the name of the whatsapp flow
+     * **assets** - a dictionary with screens and variables list
+
+    Example:
+
+        GET /api/v2/whatsapp_flows.json
+
+    Response is the list of whatsapp flows for your organization:
+
+        {
+            "next": "http://example.com/api/v2/whatsapp_flows.json?cursor=cD0yMDE1LTExLTExKzExJTNBM40NjQlMkIwMCUzRv",
+            "previous": null,
+            "results": [
+            {
+            "id": "1111111111111111111",
+            "name": "Flow Test",
+            "assets": {
+                "screens": [
+                    "WELCOME", "MIDDLE"
+                },
+                "variables": [
+                    "question1Checkbox", "checkbox_source"
+                ]
+            ],
+        }
+    """
+
+    permission = "templates.template_api"
+    model = WhatsappFlow
+    serializer_class = WhatsappFlowReadSerializer
+    pagination_class = CreatedOnCursorPagination
+
+    def get_queryset(self):
+        org = self.request.user.get_org()
+        return WhatsappFlow.objects.filter(org=org, is_active=True)
+
+    def filter_queryset(self, queryset):
+        params = self.request.query_params
+
+        name = params.get("name")
+        if name:
+            queryset = queryset.filter(name__icontains=name)
+
+        facebook_flow_id = params.get("id")
+        if facebook_flow_id:
+            queryset = queryset.filter(facebook_flow_id=facebook_flow_id)
+
+        return self.filter_before_after(queryset, "created_on")
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Whatsapp Flows",
+            "url": reverse("api.v2.whatsapp_flows"),
+            "slug": "whatsapp_flows-list",
             "params": [],
             "example": {},
         }
