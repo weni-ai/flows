@@ -1,3 +1,9 @@
+3.15.0
+----------
+* Sync a new whatsapp flow coming from webhook
+* Add is_mutable field in flow model
+* Update floweditor to 3.2.0
+
 3.14.1
 ----------
 * Fix bug on create contact api
