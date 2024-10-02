@@ -1237,13 +1237,6 @@ class FlowStartWriteSerializer(WriteSerializer):
         if not args:
             raise serializers.ValidationError("Must specify at least one group, contact or URN")
 
-        if not data.get("flow").is_mutable:
-            request = self.context.get("request")
-            if request and hasattr(request, "user"):
-                user = request.user
-                if not user.email.endswith(settings.MUTABLE_EDITOR_DOMAINS):
-                    raise serializers.ValidationError("Flow is  immutable and can't be manually started")
-
         return data
 
     def save(self):
