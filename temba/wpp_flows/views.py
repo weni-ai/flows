@@ -47,9 +47,9 @@ class WhatsappFlowsViewset(viewsets.ViewSet):
         if not WhatsappFlow.is_status_valid(new_status):
             return Response("status is not valid", status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            WhatsappFlow.update_status(flow_id, new_status)
-        except WhatsappFlow.DoesNotExist:
+        updated_status = WhatsappFlow.update_status(flow_id, new_status)
+
+        if not updated_status:
             update_whatsapp_flow_by_id(flow_id)
             return Response(status=status.HTTP_200_OK)
 

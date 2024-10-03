@@ -2106,6 +2106,21 @@ class APITest(TembaTest):
         response = self.deleteJSON(url, "uuid=%s" % hans.uuid)
         self.assert404(response)
 
+        # Add key to verify ninth digit
+        self.org.config["verify_ninth_digit"] = True
+        self.org.save()
+
+        # Verify brazilian whatsapp urn with ninth digit
+        self.create_contact("Julius", urns=["whatsapp:5521912345678"])
+        response = self.postJSON(url, "urn=%s" % quote_plus("whatsapp:552112345678"), {"name": "Julito"})
+        self.assertEqual(response.status_code, 200)
+
+        # Verify brazilian whatsapp urn without ninth digit
+        self.create_contact("Rochele", urns=["whatsapp:558912345678"])
+
+        response = self.postJSON(url, "urn=%s" % quote_plus("whatsapp:5589912345678"), {"name": "Rochel"})
+        self.assertEqual(response.status_code, 200)
+
     @mock_mailroom
     def test_contacts_lean(self, mr_mocks):
         url = reverse("api.v2.contacts_lean")
