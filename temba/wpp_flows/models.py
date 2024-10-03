@@ -41,11 +41,12 @@ class WhatsappFlow(models.Model):
 
     @classmethod
     def update_status(cls, flow_id: str, status: str):
-        whatsapp_flow = cls.objects.get(facebook_flow_id=flow_id)
-        whatsapp_flow.status = status
-        whatsapp_flow.save()
+        whatsapp_flows = cls.objects.filter(facebook_flow_id=flow_id)
+        for flow in whatsapp_flows:
+            flow.status = status
+            flow.save()
 
-        return whatsapp_flow
+        return whatsapp_flows
 
     @classmethod
     def trim(cls, channel, ids):

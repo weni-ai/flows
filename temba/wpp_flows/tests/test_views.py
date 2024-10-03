@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from django.test import override_settings
 from django.urls import reverse
 
+from temba.channels.models import Channel
 from temba.tests.base import TembaTest
 from temba.wpp_flows.models import WhatsappFlow
 from temba.wpp_flows.tasks import create_single_whatsapp_flow, get_whatsapp_flow_by_id, update_whatsapp_flow_by_id
@@ -25,6 +26,31 @@ class TestWhatsappFlowsIntegration(TembaTest):
             validation_errors=[],
             org=self.org,
             channel=self.channel,
+            is_active=True,
+            screens={},
+            variables=[],
+        )
+
+        self.channel2 = Channel.create(
+            self.org2,
+            self.user,
+            "RW",
+            "A",
+            name="Test Channel 2",
+            address="+250785551215",
+            device="Nexus 5X",
+            secret="123456778",
+            config={Channel.CONFIG_FCM_ID: "123"},
+        )
+
+        WhatsappFlow.objects.create(
+            facebook_flow_id="123456",
+            category=["OTHER"],
+            status="DRAFT",
+            name="Flow name",
+            validation_errors=[],
+            org=self.org2,
+            channel=self.channel2,
             is_active=True,
             screens={},
             variables=[],
@@ -235,7 +261,7 @@ class TestWhatsappFlowsIntegration(TembaTest):
     @patch("temba.wpp_flows.views.WhatsappFlow.update_status")
     @patch("temba.wpp_flows.views.update_whatsapp_flow_by_id")
     def test_whatsapp_flows_not_found(self, mock_update_flow, mock_update_status):
-        mock_update_status.side_effect = WhatsappFlow.DoesNotExist
+        mock_update_status.return_value = []
         mock_update_flow.return_value = None
 
         with override_settings(COURIER_FIXED_ACCESS_TOKEN="12345"):
@@ -266,7 +292,6 @@ class TestWhatsappFlowsIntegration(TembaTest):
             }
 
             response = self.client.post(url_with_token, data, content_type="application/json")
-
             mock_update_flow.assert_called_once_with("000000000")
 
             self.assertIsInstance(response, Response)
