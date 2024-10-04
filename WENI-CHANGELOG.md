@@ -1,3 +1,7 @@
+3.15.1
+----------
+* Fix bug updating whatsapp flow status
+
 3.15.0
 ----------
 * Sync a new whatsapp flow coming from webhook

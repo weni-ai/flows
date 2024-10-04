@@ -104,7 +104,7 @@ class TestWhatsappFlowsIntegration(TembaTest):
                                 "value": {
                                     "event": "FLOW_STATUS_CHANGE",
                                     "message": "Flow 1",
-                                    "flow_id": "6627390910605886",
+                                    "flow_id": "213456456",
                                     "old_status": "DRAFT",
                                     "new_status": "PUBLISHEDD",
                                 },
@@ -120,6 +120,70 @@ class TestWhatsappFlowsIntegration(TembaTest):
 
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_whatsapp_flows_update_deprecated_new_status(self):
+        with override_settings(COURIER_FIXED_ACCESS_TOKEN="12345"):
+            url = reverse("whatsapp_flows-list")
+            fake_token = "12345"
+            url_with_token = f"{url}?token={fake_token}"
+
+            data = {
+                "entry": [
+                    {
+                        "id": "123456",
+                        "time": 1684969340,
+                        "changes": [
+                            {
+                                "value": {
+                                    "event": "FLOW_STATUS_CHANGE",
+                                    "message": "Flow 1",
+                                    "flow_id": "123456",
+                                    "old_status": "DRAFT",
+                                    "new_status": "DEPRECATED",
+                                },
+                                "field": "flows",
+                            }
+                        ],
+                    }
+                ],
+                "object": "whatsapp_business_account",
+            }
+
+            response = self.client.post(url_with_token, data, content_type="application/json")
+
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_whatsapp_flows_update_deprecated_old_status(self):
+        with override_settings(COURIER_FIXED_ACCESS_TOKEN="12345"):
+            url = reverse("whatsapp_flows-list")
+            fake_token = "12345"
+            url_with_token = f"{url}?token={fake_token}"
+
+            data = {
+                "entry": [
+                    {
+                        "id": "123456",
+                        "time": 1684969340,
+                        "changes": [
+                            {
+                                "value": {
+                                    "event": "FLOW_STATUS_CHANGE",
+                                    "message": "Flow 1",
+                                    "flow_id": "123456",
+                                    "old_status": "DEPRECATED",
+                                    "new_status": "DRAFT",
+                                },
+                                "field": "flows",
+                            }
+                        ],
+                    }
+                ],
+                "object": "whatsapp_business_account",
+            }
+
+            response = self.client.post(url_with_token, data, content_type="application/json")
+
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+
     def test_whatsapp_flows_create_failure_no_token(self):
         with override_settings(COURIER_FIXED_ACCESS_TOKEN="12345"):
             url = reverse("whatsapp_flows-list")
@@ -134,7 +198,7 @@ class TestWhatsappFlowsIntegration(TembaTest):
                                 "value": {
                                     "event": "FLOW_STATUS_CHANGE",
                                     "message": "Flow 1",
-                                    "flow_id": "6627390910605886",
+                                    "flow_id": "123456",
                                     "old_status": "DRAFT",
                                     "new_status": "PUBLISHEDD",
                                 },
@@ -166,7 +230,7 @@ class TestWhatsappFlowsIntegration(TembaTest):
                                 "value": {
                                     "event": "FLOW_STATUS_CHANGE",
                                     "message": "Flow 1",
-                                    "flow_id": "6627390910605886",
+                                    "flow_id": "123456",
                                     "old_status": "DRAFT",
                                     "new_status": "PUBLISHEDD",
                                 },
@@ -242,7 +306,7 @@ class TestWhatsappFlowsIntegration(TembaTest):
                                 "value": {
                                     "event": "ANOTHER EVENT",
                                     "message": "Flow 1",
-                                    "flow_id": "123",
+                                    "flow_id": "123456",
                                     "old_status": "DRAFT",
                                     "new_status": "PUBLISHED",
                                 },

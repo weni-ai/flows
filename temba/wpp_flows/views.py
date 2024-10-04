@@ -43,11 +43,12 @@ class WhatsappFlowsViewset(viewsets.ViewSet):
             )
 
         new_status = entry["changes"][0]["value"]["new_status"]
+        old_status = entry["changes"][0]["value"]["old_status"]
 
         if not WhatsappFlow.is_status_valid(new_status):
             return Response("status is not valid", status=status.HTTP_400_BAD_REQUEST)
 
-        updated_status = WhatsappFlow.update_status(flow_id, new_status)
+        updated_status = WhatsappFlow.update_status(flow_id, new_status, old_status)
 
         if not updated_status:
             update_whatsapp_flow_by_id(flow_id)
