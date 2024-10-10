@@ -40,10 +40,17 @@ class WhatsappFlow(models.Model):
         return False
 
     @classmethod
-    def update_status(cls, flow_id: str, status: str):
+    def update_status(cls, flow_id: str, new_status: str, old_status: str) -> list:
         whatsapp_flows = cls.objects.filter(facebook_flow_id=flow_id)
         for flow in whatsapp_flows:
-            flow.status = status
+            flow.status = new_status
+
+            if old_status == "DEPRECATED":
+                flow.is_active = True
+
+            if new_status == "DEPRECATED":
+                flow.is_active = False
+
             flow.save()
 
         return whatsapp_flows
