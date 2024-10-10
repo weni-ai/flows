@@ -1983,7 +1983,7 @@ class ExportFlowResultsTask(BaseExportTask):
         logger.info(f"Results export #{self.id} for org #{self.org.id}: fetching runs from archives to export...")
 
         # firstly get runs from archives
-        from temba.archives.models import Archive
+        # from temba.archives.models import Archive
 
         # get the earliest created date of the flows being exported
         earliest_created_on = None
@@ -1995,15 +1995,15 @@ class ExportFlowResultsTask(BaseExportTask):
         where = {"flow__uuid__in": flow_uuids}
         if responded_only:
             where["responded"] = True
-        records = Archive.iter_all_records(self.org, Archive.TYPE_FLOWRUN, after=earliest_created_on, where=where)
+        # records = Archive.iter_all_records(self.org, Archive.TYPE_FLOWRUN, after=earliest_created_on, where=where)
         seen = set()
 
-        for record_batch in chunk_list(records, 1000):
-            matching = []
-            for record in record_batch:
-                seen.add(record["id"])
-                matching.append(record)
-            yield matching
+        # for record_batch in chunk_list(records, 1000):
+        #     matching = []
+        #     for record in record_batch:
+        #         seen.add(record["id"])
+        #         matching.append(record)
+        #     yield matching
 
         # secondly get runs from database
         runs = FlowRun.objects.filter(flow__in=flows).order_by("modified_on").using("readonly")
