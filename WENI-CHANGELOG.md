@@ -1,6 +1,9 @@
-3.15.2
+3.16.0
 ----------
 * Update floweditor to 3.3.0
+* Email channel type
+* Update is_active WhatsappFlow when deprecated status
+* Schedule whatsapp flows sync
 
 3.15.2
 ----------
