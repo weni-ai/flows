@@ -1,3 +1,11 @@
+3.15.2
+----------
+* Update floweditor to 3.3.0
+
+3.15.2
+----------
+* Update floweditor to 3.2.1
+
 3.15.1
 ----------
 * Fix bug updating whatsapp flow status
