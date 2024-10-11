@@ -1,3 +1,7 @@
+3.16.2
+----------
+* Update floweditor to 3.4.0
+
 3.16.1
 ----------
 * Fix whatsapp flow error when status is draft
