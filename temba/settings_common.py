@@ -1076,6 +1076,7 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": timedelta(seconds=900),
     },
     "refresh-whatsapp-flows": {"task": "refresh_whatsapp_flows", "schedule": crontab(hour=2, minute=30)},
+    "refresh-whatsapp-flows-assets": {"task": "refresh_whatsapp_flows_assets", "schedule": timedelta(minutes=15)},
     "send-notification-emails": {"task": "send_notification_emails", "schedule": timedelta(seconds=60)},
     "squash-channelcounts": {"task": "squash_channelcounts", "schedule": timedelta(seconds=60)},
     "squash-contactgroupcounts": {"task": "squash_contactgroupcounts", "schedule": timedelta(seconds=60)},
