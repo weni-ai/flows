@@ -222,12 +222,23 @@ def refresh_whatsapp_flows_assets():
 
     with r.lock("refresh_whatsapp_flows_assets", 1800):
         for flow in WhatsappFlow.objects.filter(is_active=True):
-            channel = flow.channel
+            _update_assets(flow)
 
-            assets_data = get_assets_data(channel, flow)
-            variables = extract_data_keys(assets_data)
-            
-            flow.screens = assets_data
-            flow.variables = variables
-            flow.modified_on = timezone.now()
-            flow.save()
+
+def refresh_whatsapp_flows_assets_for_a_flow(facebook_flow_id):
+    for flow in WhatsappFlow.objects.filter(facebook_flow_id=facebook_flow_id):
+        _update_assets(flow)
+
+
+def _update_assets(flow):
+    channel = flow.channel
+
+    assets_data = get_assets_data(channel, flow.facebook_flow_id)
+    variables = extract_data_keys(assets_data)
+
+    flow.screens = assets_data
+    flow.variables = variables
+    flow.modified_on = timezone.now()
+    flow.save()
+
+    return flow
