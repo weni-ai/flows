@@ -321,11 +321,7 @@ class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
                 return Contact.objects.none()
         else:
             # if user search is not defined, use DB to select contacts
-            qs = (
-                self.group.contacts.filter(org=self.request.user.get_org())
-                .order_by("-id")
-                .prefetch_related("org", "all_groups")
-            )
+            qs = self.group.contacts.all().order_by("-id").prefetch_related("org", "all_groups")
             patch_queryset_count(qs, self.group.get_member_count)
             return qs
 
