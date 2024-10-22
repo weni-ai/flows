@@ -1254,14 +1254,14 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
         """
         Initializes the URN caches on the given contacts.
         """
-        if not contacts:
-            return
-
         contact_map = dict()
         for contact in contacts:
             contact_map[contact.id] = contact
             # initialize URN list cache
             setattr(contact, "_urns_cache", list())
+
+        if not contact_map.keys():
+            return
 
         # cache all URN values (a priority ordered list on each contact)
         urns = (
