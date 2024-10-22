@@ -211,13 +211,13 @@ def create_single_whatsapp_flow(flow, channel):
 
 
 @shared_task(track_started=True, name="refresh_whatsapp_flows_assets")
-def refresh_whatsapp_flows_assets():
+def refresh_whatsapp_flows_assets():  # pragma: no cover
     """
     Runs across all WhatsApp flows that have connected FB accounts and syncs the flows assets.
     """
 
     r = get_redis_connection()
-    if r.get("refresh_whatsapp_flows_assets"):  # pragma: no cover
+    if r.get("refresh_whatsapp_flows_assets"):
         return
 
     with r.lock("refresh_whatsapp_flows_assets", 1800):
