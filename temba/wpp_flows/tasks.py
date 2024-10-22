@@ -208,3 +208,37 @@ def create_single_whatsapp_flow(flow, channel):
         channel=channel,
         is_active=True,
     )
+
+
+@shared_task(track_started=True, name="refresh_whatsapp_flows_assets")
+def refresh_whatsapp_flows_assets():  # pragma: no cover
+    """
+    Runs across all WhatsApp flows that have connected FB accounts and syncs the flows assets.
+    """
+
+    r = get_redis_connection()
+    if r.get("refresh_whatsapp_flows_assets"):
+        return
+
+    with r.lock("refresh_whatsapp_flows_assets", 1800):
+        for flow in WhatsappFlow.objects.filter(is_active=True):
+            _update_assets(flow)
+
+
+def refresh_whatsapp_flows_assets_for_a_flow(facebook_flow_id):
+    for flow in WhatsappFlow.objects.filter(facebook_flow_id=facebook_flow_id):
+        _update_assets(flow)
+
+
+def _update_assets(flow):
+    channel = flow.channel
+
+    assets_data = get_assets_data(channel, flow.facebook_flow_id)
+    variables = extract_data_keys(assets_data)
+
+    flow.screens = assets_data
+    flow.variables = variables
+    flow.modified_on = timezone.now()
+    flow.save()
+
+    return flow
