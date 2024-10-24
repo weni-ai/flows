@@ -7,11 +7,17 @@ from rest_framework.response import Response
 
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from temba.channels.models import Channel
 from temba.tests.base import TembaTest
 from temba.wpp_flows.models import WhatsappFlow
-from temba.wpp_flows.tasks import create_single_whatsapp_flow, get_whatsapp_flow_by_id, update_whatsapp_flow_by_id
+from temba.wpp_flows.tasks import (
+    create_single_whatsapp_flow,
+    get_whatsapp_flow_by_id,
+    refresh_whatsapp_flows_assets_for_a_flow,
+    update_whatsapp_flow_by_id,
+)
 
 
 class TestWhatsappFlowsIntegration(TembaTest):
@@ -360,6 +366,22 @@ class TestWhatsappFlowsIntegration(TembaTest):
 
             self.assertIsInstance(response, Response)
             self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @patch("temba.wpp_flows.tasks.get_assets_data")
+    @patch("temba.wpp_flows.tasks.extract_data_keys")
+    def test_refresh_whatsapp_flows_assets_for_a_flow(self, mock_extract_data, mock_get_assets):
+        mock_get_assets.return_value = {"screens": "mocked_screens"}
+        mock_extract_data.return_value = ["mocked_variables"]
+
+        refresh_whatsapp_flows_assets_for_a_flow(facebook_flow_id="123456")
+        flow1 = WhatsappFlow.objects.filter(facebook_flow_id="123456").first()
+
+        flow1.refresh_from_db()
+
+        self.assertTrue(flow1.modified_on <= timezone.now())
+
+        self.assertEqual(flow1.screens, {"screens": "mocked_screens"})
+        self.assertEqual(flow1.variables, ["mocked_variables"])
 
 
 class TestGetWhatsappFlowById(TembaTest):

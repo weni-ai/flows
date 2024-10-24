@@ -1,4 +1,10 @@
-3.16.3
+3.16.5
+----------
+* Add task to sync whatsapp flows assets
+* Fixing telegram lib version
+* Fix: Improve contact list response latency by removing reduntant org filtering
+
+3.16.4
 ----------
 * Update floweditor to 3.4.2
 
