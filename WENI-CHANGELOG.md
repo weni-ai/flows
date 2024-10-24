@@ -1,3 +1,7 @@
+3.16.6
+----------
+* Update keys in Email channel
+
 3.16.5
 ----------
 * Add task to sync whatsapp flows assets
