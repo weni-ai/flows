@@ -20,13 +20,13 @@ class EmailTypeTest(TembaTest):
         response = self.client.post(
             claim_url,
             {
-                "user_name": "email@gmail.com",
+                "username": "email@gmail.com",
                 "password": "*******",
                 "smtp_host": "smtp.gmail.com",
                 "smtp_port": 587,
                 "imap_host": "imap.gmail.com",
                 "imap_port": 993,
-                "token": "token",
+                "access_token": "token",
                 "refresh_token": "refresh_token",
             },
             follow=True,
@@ -38,14 +38,14 @@ class EmailTypeTest(TembaTest):
         self.assertEqual("email@gmail.com", channel.address)
         self.assertEqual(
             {
-                "user_name": "email@gmail.com",
+                "username": "email@gmail.com",
                 "password": "*******",
                 "smtp_host": "smtp.gmail.com",
                 "smtp_port": 587,
                 "imap_host": "imap.gmail.com",
                 "imap_port": 993,
                 "loc": "",
-                "token": "token",
+                "access_token": "token",
                 "refresh_token": "refresh_token",
                 "callback_domain": settings.HOSTNAME,
             },
