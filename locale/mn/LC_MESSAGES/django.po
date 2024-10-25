@@ -5216,8 +5216,8 @@ msgid "To complete the configuration you will need to enter a few things on your
 msgstr "Тохиргоог дуусгахын тулд та VK акаунтандаа хэдэн зүйлийг оруулах шаардлагатай болно."
 
 #, python-format
-msgid "<div class='mt-4 code'> Manage > API Usage > Callback API > Server Settings </div> <div class='mt-2'> Enter the Webhook URL below for the <div class='inline py-1 code'>URL</div> field and the Verify Token in the <div class='inline py-1 code'>Secret Key</div> field. </div> <div class='mt-6 code'> Manage > API Usage > Callback API > Event Types </div> <div class='mt-2'> Check the option %(option)s </div>"
-msgstr "<div class='mt-4 code'> Удирдах> API Хэрэглээ> Дуудлагын API> Сервер Тохиргоо </div> <div class='mt-2'> Webhook URL-ийг <div class='inline py-1 code '> URL </div> талбар ба <div class='inline py-1 code'> Нууц түлхүүр </div> талбар дахь токеныг баталгаажуул. </div> <div class='mt-6 code'> Удирдах> API Хэрэглээ> Дуудлагын API> Үйл ажиллагааны төрөл </div> <div class='mt-2'> %(option)s </div> сонголтыг шалгана уу. >"
+msgid "<div class='code mt-4'> Manage > API Usage > Callback API > Server Settings </div> <div class='mt-2'> Enter the Webhook URL below for the <div class='code inline py-1'>URL</div> field and the Verify Token in the <div class='code inline py-1'>Secret Key</div> field. </div> <div class='code mt-6'> Manage > API Usage > Callback API > Event Types </div> <div class='mt-2'> Check the option %(option)s </div>"
+msgstr "<div class='code mt-4'> Удирдах> API Хэрэглээ> Дуудлагын API> Сервер Тохиргоо </div> <div class='mt-2'> Webhook URL-ийг <div class='code inline py-1 '> URL </div> талбар ба <div class=' code inline py-1 '> Нууц түлхүүр </div> талбар дахь токеныг баталгаажуул. </div> <div class='code mt-6'> Удирдах> API Хэрэглээ> Дуудлагын API> Үйл ажиллагааны төрөл </div> <div class='mt-2'> %(option)s </div> сонголтыг шалгана уу. >"
 
 msgid "Your WhatsApp channel is now connected, you should be able to send and receive messages as normal."
 msgstr "Таны WhatsApp суваг одоо холбогдсон тул та ердийн байдлаар мессеж илгээх, хүлээн авах боломжтой."
@@ -7812,6 +7812,3 @@ msgstr "Төслийн Webhooks-ийн талаарх Excel хүснэгтийн
 
 msgid "Data in the Excel spreadsheet about Project template messages:"
 msgstr "Төслийн загвар мессежүүдийн талаарх Excel хүснэгтийн өгөгдөл:"
-
-msgid "Test"
-msgstr "Туршилт"

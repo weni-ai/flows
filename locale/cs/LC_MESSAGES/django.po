@@ -5256,8 +5256,8 @@ msgid "To complete the configuration you will need to enter a few things on your
 msgstr "Pro dokončení konfigurace je třeba na účtu VK zadat několik údajů."
 
 #, python-format
-msgid "<div class='mt-4 code'> Manage > API Usage > Callback API > Server Settings </div> <div class='mt-2'> Enter the Webhook URL below for the <div class='inline py-1 code'>URL</div> field and the Verify Token in the <div class='inline py-1 code'>Secret Key</div> field. </div> <div class='mt-6 code'> Manage > API Usage > Callback API > Event Types </div> <div class='mt-2'> Check the option %(option)s </div>"
-msgstr "<div class='mt-4 code'>Správa > Používání rozhraní API > Zpětné volání rozhraní API > Nastavení serveru</div> Do pole URL zadejte <div class='mt-2'>níže uvedenou adresu <div class='inline py-1 code'>URL</div> webhooku a do pole <div class='inline py-1 code'>Tajný klíč</div> zadejte ověřovací token</div>. <div class='mt-6 code'>Správa > Používání API > Callback API > Typy událostí</div> <div class='mt-2'>Zaškrtněte možnost %(option)s</div>"
+msgid "<div class='code mt-4'> Manage > API Usage > Callback API > Server Settings </div> <div class='mt-2'> Enter the Webhook URL below for the <div class='code inline py-1'>URL</div> field and the Verify Token in the <div class='code inline py-1'>Secret Key</div> field. </div> <div class='code mt-6'> Manage > API Usage > Callback API > Event Types </div> <div class='mt-2'> Check the option %(option)s </div>"
+msgstr "<div class='code mt-4'>Správa > Používání rozhraní API > Zpětné volání rozhraní API > Nastavení serveru</div> Do pole URL zadejte <div class='mt-2'>níže uvedenou adresu <div class='code inline py-1'>URL</div> webhooku a do pole <div class='code inline py-1'>Tajný klíč</div> zadejte ověřovací token</div>. <div class='code mt-6'>Správa > Používání API > Callback API > Typy událostí</div> <div class='mt-2'>Zaškrtněte možnost %(option)s</div>"
 
 msgid "Your WhatsApp channel is now connected, you should be able to send and receive messages as normal."
 msgstr "Váš kanál WhatsApp je nyní připojen a měli byste být schopni normálně odesílat a přijímat zprávy."
@@ -7886,6 +7886,3 @@ msgstr "Data v excelové tabulce o Project Webhoocích:"
 
 msgid "Data in the Excel spreadsheet about Project template messages:"
 msgstr "Data v excelové tabulce o zprávách šablony projektu:"
-
-msgid "Test"
-msgstr "Test"

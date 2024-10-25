@@ -8005,6 +8005,3 @@ msgstr "Elige la frecuencia semanal que deseas activar."
 
 msgid "Add the contact groups to which you want to send the messages. Finally, click on “Create Trigger”."
 msgstr "Añade los grupos de contactos a los que deseas enviar los mensajes. Finalmente, haz clic en “Crear Disparador”."
-
-msgid "Test"
-msgstr "Prueba"
