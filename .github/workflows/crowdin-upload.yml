@@ -3,7 +3,7 @@ name: Crowdin Upload
 on:
   push:
     paths: ['locale/**']
-    branches: [feat/crowdin-integration]
+    branches: [main]
 
 jobs:
   crowdin-upload:
