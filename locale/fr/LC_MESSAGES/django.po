@@ -5217,8 +5217,8 @@ msgid "To complete the configuration you will need to enter a few things on your
 msgstr "Pour terminer la configuration, vous devrez entrer quelques éléments sur votre compte VK."
 
 #, python-format
-msgid "<div class='code mt-4'> Manage > API Usage > Callback API > Server Settings </div> <div class='mt-2'> Enter the Webhook URL below for the <div class='code inline py-1'>URL</div> field and the Verify Token in the <div class='code inline py-1'>Secret Key</div> field. </div> <div class='code mt-6'> Manage > API Usage > Callback API > Event Types </div> <div class='mt-2'> Check the option %(option)s </div>"
-msgstr "<div class='code mt-4'> Gérer> Utilisation de l'API> API de rappel> Paramètres du serveur </div> <div class='mt-2'> Entrez l'URL du Webhook ci-dessous pour le champ <div class='code inline py-1'>URL</div> et le jeton de vérification dans le champ <div class='code inline py-1'>Secret Key</div> . </div> <div class='code mt-6'> Gérer> Utilisation de l'API> API de rappel> Types d'événements </div> <div class='mt-2'> Cochez l'option %(option)s </div>"
+msgid "<div class='mt-4 code'> Manage > API Usage > Callback API > Server Settings </div> <div class='mt-2'> Enter the Webhook URL below for the <div class='inline py-1 code'>URL</div> field and the Verify Token in the <div class='inline py-1 code'>Secret Key</div> field. </div> <div class='mt-6 code'> Manage > API Usage > Callback API > Event Types </div> <div class='mt-2'> Check the option %(option)s </div>"
+msgstr "<div class='mt-4 code'> Gérer> Utilisation de l'API> API de rappel> Paramètres du serveur </div> <div class='mt-2'> Entrez l'URL du Webhook ci-dessous pour le champ <div class='inline py-1 code'>URL</div> et le jeton de vérification dans le champ <div class='inline py-1 code'>Secret Key</div> . </div> <div class='mt-6 code'> Gérer> Utilisation de l'API> API de rappel> Types d'événements </div> <div class='mt-2'> Cochez l'option %(option)s </div>"
 
 msgid "Your WhatsApp channel is now connected, you should be able to send and receive messages as normal."
 msgstr "Votre chaîne WhatsApp est maintenant connectée, vous devriez pouvoir envoyer et recevoir des messages comme d'habitude."
@@ -7833,3 +7833,6 @@ msgstr "Données dans une feuille de calcul Excel sur les Webhooks du projet:"
 
 msgid "Data in the Excel spreadsheet about Project template messages:"
 msgstr "Données dans la feuille de calcul Excel sur les messages du modèle de projet :"
+
+msgid "Test"
+msgstr "Test"
