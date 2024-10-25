@@ -7991,3 +7991,6 @@ msgstr "Escolha a frequência semanal que você deseja disparar."
 
 msgid "Add the contact groups to which you want to send the messages. Finally, click on “Create Trigger”."
 msgstr "Adicione os grupos de contatos aos quais deseja enviar as mensagens. Por fim, clique em “Criar Disparador”."
+
+msgid "Test"
+msgstr "Teste"
