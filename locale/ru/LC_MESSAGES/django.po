@@ -5246,7 +5246,7 @@ msgid "To complete the configuration you will need to enter a few things on your
 msgstr ""
 
 #, python-format
-msgid "<div class='mt-4 code'> Manage > API Usage > Callback API > Server Settings </div> <div class='mt-2'> Enter the Webhook URL below for the <div class='inline py-1 code'>URL</div> field and the Verify Token in the <div class='inline py-1 code'>Secret Key</div> field. </div> <div class='mt-6 code'> Manage > API Usage > Callback API > Event Types </div> <div class='mt-2'> Check the option %(option)s </div>"
+msgid "<div class='code mt-4'> Manage > API Usage > Callback API > Server Settings </div> <div class='mt-2'> Enter the Webhook URL below for the <div class='code inline py-1'>URL</div> field and the Verify Token in the <div class='code inline py-1'>Secret Key</div> field. </div> <div class='code mt-6'> Manage > API Usage > Callback API > Event Types </div> <div class='mt-2'> Check the option %(option)s </div>"
 msgstr ""
 
 msgid "Your WhatsApp channel is now connected, you should be able to send and receive messages as normal."
@@ -7649,6 +7649,3 @@ msgstr "Данные в таблице Excel о веб-перехватчика�
 
 msgid "Data in the Excel spreadsheet about Project template messages:"
 msgstr "Данные в таблице Excel о сообщениях шаблона проекта:"
-
-msgid "Test"
-msgstr "Тест"
