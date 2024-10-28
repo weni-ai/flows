@@ -1,4 +1,5 @@
 import json
+from uuid import uuid4
 
 from weni.internal.models import Project, TicketerQueue
 
@@ -91,10 +92,11 @@ def create_ticketer(
     for queue in queues:
         print('fila que chegou', queue)
         TicketerQueue.objects.get_or_create(
-            uuid=queue.get("uuid"),
+            queue_uuid=queue.get("uuid"),
+            org=project.org,
             defaults=dict(
+                uuid=uuid4(),
                 name=queue.get("name"),
-                org=project.org,
                 created_by=user,
                 modified_by=user,
                 ticketer=ticketer,
