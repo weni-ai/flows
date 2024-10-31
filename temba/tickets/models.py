@@ -165,6 +165,7 @@ class Topic(SmartModel, DependencyMixin):
     org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="topics")
     name = models.CharField(max_length=MAX_NAME_LEN)
     is_default = models.BooleanField(default=False)
+    queue_uuid = models.UUIDField(default=uuid4)
 
     @classmethod
     def create_default_topic(cls, org):
