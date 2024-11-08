@@ -1,3 +1,7 @@
+3.16.7
+----------
+* Increase time sync intents task
+
 3.16.6
 ----------
 * Update keys in Email channel
