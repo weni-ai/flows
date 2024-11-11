@@ -5,7 +5,7 @@ from django.db import migrations, models
 import temba.utils.uuid
 
 
-def copy_uuid_to_queue_uuid(apps, schema_editor):
+def copy_uuid_to_queue_uuid(apps, schema_editor):  # pragma: no cover
     topic = apps.get_model("tickets", "Topic")
 
     for queue in topic.objects.all():
