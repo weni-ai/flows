@@ -118,8 +118,8 @@ class Broadcast(models.Model):
         cls,
         org,
         user,
-        text,
         *,
+        text=None,
         groups=None,
         contacts=None,
         urns: list[str] = None,
@@ -130,6 +130,8 @@ class Broadcast(models.Model):
         media: dict = None,
         send_all: bool = False,
         quick_replies: list[dict] = None,
+        broadcast_type: str,
+        msg: dict = None,
         template_state: str = TEMPLATE_STATE_LEGACY,
         status: str = STATUS_INITIALIZING,
         **kwargs,
@@ -140,7 +142,7 @@ class Broadcast(models.Model):
             text = {base_language: text}
 
         assert groups or contacts or contact_ids or urns, "can't create broadcast without recipients"
-        assert base_language in text, "base_language doesn't exist in text translations"
+        # assert base_language in text, "base_language doesn't exist in text translations"
         assert not media or base_language in media, "base_language doesn't exist in media translations"
 
         if quick_replies:
@@ -151,9 +153,13 @@ class Broadcast(models.Model):
                         % base_language
                     )
 
-        metadata = {Broadcast.METADATA_TEMPLATE_STATE: template_state}
-        if quick_replies:
-            metadata[Broadcast.METADATA_QUICK_REPLIES] = quick_replies
+        if broadcast_type == cls.BROADCAST_TYPE_DEFAULT:
+            metadata = {Broadcast.METADATA_TEMPLATE_STATE: template_state}
+            if quick_replies:
+                metadata[Broadcast.METADATA_QUICK_REPLIES] = quick_replies
+
+        if broadcast_type == cls.BROADCAST_TYPE_WHATSAPP:
+            metadata = msg
 
         broadcast = cls.objects.create(
             org=org,
@@ -167,6 +173,7 @@ class Broadcast(models.Model):
             modified_by=user,
             metadata=metadata,
             status=status,
+            broadcast_type=broadcast_type,
             **kwargs,
         )
 

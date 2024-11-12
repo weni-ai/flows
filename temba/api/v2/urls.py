@@ -49,6 +49,7 @@ from .views import (
     TicketsEndpoint,
     TopicsEndpoint,
     UsersEndpoint,
+    WhatsappBroadcastsEndpoint,
     WhatsappFlowsEndpoint,
     WorkspaceEndpoint,
 )
@@ -63,6 +64,7 @@ urlpatterns = [
     url(r"^archives$", ArchivesEndpoint.as_view(), name="api.v2.archives"),
     url(r"^boundaries$", BoundariesEndpoint.as_view(), name="api.v2.boundaries"),
     url(r"^broadcasts$", BroadcastsEndpoint.as_view(), name="api.v2.broadcasts"),
+    url(r"^whatsapp_broadcasts$", WhatsappBroadcastsEndpoint.as_view(), name="api.v2.whatsapp_broadcasts"),
     url(r"^campaigns$", CampaignsEndpoint.as_view(), name="api.v2.campaigns"),
     url(r"^campaign_events$", CampaignEventsEndpoint.as_view(), name="api.v2.campaign_events"),
     url(r"^channels$", ChannelsEndpoint.as_view(), name="api.v2.channels"),

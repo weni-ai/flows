@@ -100,6 +100,8 @@ from .serializers import (
     TopicWriteSerializer,
     UserReadSerializer,
     WebHookEventReadSerializer,
+    WhatsappBroadcastReadSerializer,
+    WhatsappBroadcastWriteSerializer,
     WhatsappFlowReadSerializer,
     WorkspaceReadSerializer,
 )
@@ -227,6 +229,7 @@ class RootView(views.APIView):
                 "archives": reverse("api.v2.archives", request=request),
                 "boundaries": reverse("api.v2.boundaries", request=request),
                 "broadcasts": reverse("api.v2.broadcasts", request=request),
+                "whastapp_broadcasts": reverse("api.v2.whatsapp_broadcasts", request=request),
                 "campaigns": reverse("api.v2.campaigns", request=request),
                 "campaign_events": reverse("api.v2.campaign_events", request=request),
                 "channels": reverse("api.v2.channels", request=request),
@@ -276,6 +279,8 @@ class ExplorerView(SmartTemplateView):
             BoundariesEndpoint.get_read_explorer(),
             BroadcastsEndpoint.get_read_explorer(),
             BroadcastsEndpoint.get_write_explorer(),
+            WhatsappBroadcastsEndpoint.get_read_explorer(),
+            WhatsappBroadcastsEndpoint.get_write_explorer(),
             CampaignsEndpoint.get_read_explorer(),
             CampaignsEndpoint.get_write_explorer(),
             CampaignEventsEndpoint.get_read_explorer(),
@@ -632,6 +637,8 @@ class BroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     def filter_queryset(self, queryset):
         org = self.request.user.get_org()
 
+        queryset = queryset.filter(broadcast_type=Broadcast.BROADCAST_TYPE_DEFAULT)
+
         # filter by id (optional)
         broadcast_id = self.get_int_param("id")
         if broadcast_id:
@@ -680,6 +687,138 @@ class BroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
             "slug": "broadcast-write",
             "fields": [
                 {"name": "text", "required": True, "help": "The text of the message you want to send"},
+                {"name": "urns", "required": False, "help": "The URNs of contacts you want to send to"},
+                {"name": "contacts", "required": False, "help": "The UUIDs of contacts you want to send to"},
+                {"name": "groups", "required": False, "help": "The UUIDs of contact groups you want to send to"},
+            ],
+        }
+
+
+class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
+    """
+    This endpoint allows you to send new message broadcasts and list existing broadcasts in your account.
+
+    ## Listing Broadcasts
+
+    A `GET` returns the outgoing message activity for your organization, listing the most recent messages first.
+
+     * **id** - the id of the broadcast (int), filterable as `id`.
+     * **urns** - the URNs that received the broadcast (array of strings)
+     * **contacts** - the contacts that received the broadcast (array of objects)
+     * **groups** - the groups that received the broadcast (array of objects)
+     * **text** - the message text (string or translations object)
+     * **status** - the status of the message (one of "queued", "sent", "failed").
+     * **created_on** - when this broadcast was either created (datetime) (filterable as `before` and `after`).
+
+    Example:
+
+        GET /api/v2/whatsapp_broadcasts.json
+
+    Response is a list of recent broadcasts:
+
+        {
+            "next": null,
+            "previous": null,
+            "results": [
+                {
+                    "id": 123456,
+                    "urns": ["tel:+250788123123", "tel:+250788123124"],
+                    "contacts": [{"uuid": "09d23a05-47fe-11e4-bfe9-b8f6b119e9ab", "name": "Joe"}]
+                    "groups": [],
+                    "text": "hello world",
+                    "created_on": "2013-03-02T17:28:12.123456Z"
+                },
+                ...
+
+    ## Sending Broadcasts
+
+    A `POST` allows you to create and send new broadcasts, with the following JSON data:
+
+      * **text** - the text of the message to send (string, limited to 640 characters)
+      * **urns** - the URNs of contacts to send to (array of up to 100 strings, optional)
+      * **contacts** - the UUIDs of contacts to send to (array of up to 100 strings, optional)
+      * **groups** - the UUIDs of contact groups to send to (array of up to 100 strings, optional)
+
+    Example:
+
+        POST /api/v2/whatsapp_broadcasts.json
+        {
+            "urns": ["tel:+250788123123", "tel:+250788123124"],
+            "contacts": ["09d23a05-47fe-11e4-bfe9-b8f6b119e9ab"],
+            "text": "hello @contact.name"
+        }
+
+    You will receive a response containing the message broadcast created:
+
+        {
+            "id": 1234,
+            "urns": ["tel:+250788123123", "tel:+250788123124"],
+            "contacts": [{"uuid": "09d23a05-47fe-11e4-bfe9-b8f6b119e9ab", "name": "Joe"}]
+            "groups": [],
+            "text": "hello world",
+            "created_on": "2013-03-02T17:28:12.123456Z"
+        }
+    """
+
+    permission = "msgs.broadcast_api"
+    model = Broadcast
+    serializer_class = WhatsappBroadcastReadSerializer
+    write_serializer_class = WhatsappBroadcastWriteSerializer
+    pagination_class = CreatedOnCursorPagination
+    throttle_scope = "v2.broadcasts"
+
+    def filter_queryset(self, queryset):
+        org = self.request.user.get_org()
+
+        queryset = queryset.filter(broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP)
+
+        # filter by id (optional)
+        broadcast_id = self.get_int_param("id")
+        if broadcast_id:
+            queryset = queryset.filter(id=broadcast_id)
+
+        queryset = queryset.prefetch_related(
+            Prefetch("contacts", queryset=Contact.objects.only("uuid", "name").order_by("pk")),
+            Prefetch("groups", queryset=ContactGroup.user_groups.only("uuid", "name").order_by("pk")),
+        )
+
+        if not org.is_anon:
+            queryset = queryset.prefetch_related(
+                Prefetch("urns", queryset=ContactURN.objects.only("scheme", "path", "display").order_by("pk"))
+            )
+
+        return self.filter_before_after(queryset, "created_on")
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Broadcasts",
+            "url": reverse("api.v2.whatsapp_broadcasts"),
+            "slug": "broadcast-list",
+            "params": [
+                {"name": "id", "required": False, "help": "A broadcast ID to filter by, ex: 123456"},
+                {
+                    "name": "before",
+                    "required": False,
+                    "help": "Only return broadcasts created before this date, ex: 2015-01-28T18:00:00.000",
+                },
+                {
+                    "name": "after",
+                    "required": False,
+                    "help": "Only return broadcasts created after this date, ex: 2015-01-28T18:00:00.000",
+                },
+            ],
+        }
+
+    @classmethod
+    def get_write_explorer(cls):
+        return {
+            "method": "POST",
+            "title": "Send Broadcasts",
+            "url": reverse("api.v2.whatsapp_broadcasts"),
+            "slug": "broadcast-write",
+            "fields": [
                 {"name": "urns", "required": False, "help": "The URNs of contacts you want to send to"},
                 {"name": "contacts", "required": False, "help": "The UUIDs of contacts you want to send to"},
                 {"name": "groups", "required": False, "help": "The UUIDs of contact groups you want to send to"},
