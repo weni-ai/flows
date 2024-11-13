@@ -90,7 +90,7 @@ class TicketerCreationTestCase(TembaTest):
 
         created_queues = TicketerQueue.objects.filter(ticketer=ticketer)
         self.assertEqual(created_queues.count(), len(self.queues))
-        self.assertEqual(str(created_queues.first().uuid), self.queues[0].get("uuid"))
+        self.assertEqual(str(created_queues.first().queue_uuid), self.queues[0].get("uuid"))
 
     def test_adding_new_queue_to_existing_ticketer(self):
         ticketer_uuid = str(uuid.uuid4())
@@ -121,4 +121,4 @@ class TicketerCreationTestCase(TembaTest):
 
         for queue in queues:
             queue_uuid = queue.get("uuid")
-            ticketer.queues.get(uuid=queue_uuid)
+            ticketer.queues.get(queue_uuid=queue_uuid)
