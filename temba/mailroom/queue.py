@@ -107,7 +107,6 @@ def queue_broadcast(broadcast):
             "group_ids": list(broadcast.groups.values_list("id", flat=True)),
             "broadcast_id": broadcast.id,
             "org_id": broadcast.org_id,
-            "channel_id": broadcast.channel.id,
             "msg": broadcast.metadata,
         }
 

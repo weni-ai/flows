@@ -284,23 +284,15 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     contacts = fields.ContactField(many=True, required=False)
     groups = fields.ContactGroupField(many=True, required=False)
     msg = serializers.DictField(required=False)
-    channel = serializers.UUIDField(required=False)
 
     def validate(self, data):
         if not (data.get("urns") or data.get("contacts") or data.get("groups")):
             raise serializers.ValidationError("Must provide either urns, contacts or groups")
 
-        channel_uuid = data.get("channel")
-        if channel_uuid:
-            try:
-                channel = Channel.objects.get(uuid=channel_uuid)
-                data["channel"] = channel
-
-            except Channel.DoesNotExist:
-                raise serializers.ValidationError(f"Template with UUID {channel_uuid} not found.")
-
-        if data.get("msg") and not (data.get("msg").get("text") or data.get("msg").get("attachments")):
-            raise serializers.ValidationError("Must provide either text or attachments")
+        if data.get("msg") and not (
+            data.get("msg").get("text") or data.get("msg").get("attachments") or data.get("msg").get("template")
+        ):
+            raise serializers.ValidationError("Must provide either text, attachments or template")
 
         template_data = data.get("msg", {}).get("template", {})
         if template_data:
@@ -335,7 +327,6 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             template_state=Broadcast.TEMPLATE_STATE_UNEVALUATED,
             msg=self.validated_data.get("msg", {}),
             broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
-            channel=self.validated_data.get("channel", None),
         )
         # send it
         on_transaction_commit(lambda: broadcast.send_async())
