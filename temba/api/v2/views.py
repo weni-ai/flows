@@ -696,9 +696,9 @@ class BroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
 
 class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     """
-    This endpoint allows you to send new message broadcasts and list existing broadcasts in your account.
+    This endpoint allows you to send new whatsapp message broadcasts and list existing broadcasts in your account.
 
-    ## Listing Broadcasts
+    ## Listing Whatsapp Broadcasts
 
     A `GET` returns the outgoing message activity for your organization, listing the most recent messages first.
 
@@ -709,6 +709,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
      * **text** - the message text (string or translations object)
      * **status** - the status of the message (one of "queued", "sent", "failed").
      * **created_on** - when this broadcast was either created (datetime) (filterable as `before` and `after`).
+     * **metadata** - the message that was send to microservice
 
     Example:
 
@@ -726,11 +727,18 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "contacts": [{"uuid": "09d23a05-47fe-11e4-bfe9-b8f6b119e9ab", "name": "Joe"}]
                     "groups": [],
                     "text": "hello world",
-                    "created_on": "2013-03-02T17:28:12.123456Z"
+                    "created_on": "2013-03-02T17:28:12.123456Z".
+                    "metadata": {
+                        "text": "Essa é uma mensagem de teste para @contact.name",
+                        "header": {
+                            "type": "text",
+                            "text": "Oi @contact.name"
+                        }
+                    },
                 },
                 ...
 
-    ## Sending Broadcasts
+    ## Sending Whatsapp Broadcasts
 
     A `POST` allows you to create and send new broadcasts, with the following JSON data:
 
@@ -738,6 +746,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
       * **urns** - the URNs of contacts to send to (array of up to 100 strings, optional)
       * **contacts** - the UUIDs of contacts to send to (array of up to 100 strings, optional)
       * **groups** - the UUIDs of contact groups to send to (array of up to 100 strings, optional)
+      * **msg** - the template, text and attachments that will be send to contacts
 
     Example:
 
@@ -745,7 +754,18 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
         {
             "urns": ["tel:+250788123123", "tel:+250788123124"],
             "contacts": ["09d23a05-47fe-11e4-bfe9-b8f6b119e9ab"],
-            "text": "hello @contact.name"
+            "text": "hello @contact.name",
+            "msg": {
+                "text": "Essa é uma mensagem de teste para @contact.name",
+                "template":{
+                    "uuid":"c3e129a2-5802-4248-a5f0-620566ef4345",
+                    "variables": ["123"]
+                    "header": {
+                        "type": "text",
+                        "text": "Oi @contact.name, tudo bem com voce?"
+                    }
+                }
+            }
         }
 
     You will receive a response containing the message broadcast created:
@@ -756,7 +776,18 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
             "contacts": [{"uuid": "09d23a05-47fe-11e4-bfe9-b8f6b119e9ab", "name": "Joe"}]
             "groups": [],
             "text": "hello world",
-            "created_on": "2013-03-02T17:28:12.123456Z"
+            "created_on": "2013-03-02T17:28:12.123456Z",
+            "metadata": {
+                "text": "Essa é uma mensagem de teste para @contact.name",
+                "template":{
+                    "uuid":"c3e129a2-5802-4248-a5f0-620566ef4345",
+                    "variables": ["123"]
+                    "header": {
+                        "type": "text",
+                        "text": "Oi @contact.name, tudo bem com voce?"
+                    }
+                }
+            }
         }
     """
 
@@ -822,6 +853,11 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                 {"name": "urns", "required": False, "help": "The URNs of contacts you want to send to"},
                 {"name": "contacts", "required": False, "help": "The UUIDs of contacts you want to send to"},
                 {"name": "groups", "required": False, "help": "The UUIDs of contact groups you want to send to"},
+                {
+                    "name": "msg",
+                    "required": False,
+                    "help": "The template, text and attachments that will be send to contact",
+                },
             ],
         }
 

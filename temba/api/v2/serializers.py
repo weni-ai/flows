@@ -285,18 +285,19 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     groups = fields.ContactGroupField(many=True, required=False)
     msg = serializers.DictField(required=False)
 
+    def validate_msg(self, value):
+        if not (value.get("text") or value.get("attachments") or value.get("template")):
+            raise serializers.ValidationError("Must provide either text, attachments or template")
+        return value
+
     def validate(self, data):
         if not (data.get("urns") or data.get("contacts") or data.get("groups")):
             raise serializers.ValidationError("Must provide either urns, contacts or groups")
 
-        if data.get("msg") and not (
-            data.get("msg").get("text") or data.get("msg").get("attachments") or data.get("msg").get("template")
-        ):
-            raise serializers.ValidationError("Must provide either text, attachments or template")
+        template_data = data.get("msg", {}).get("template", None)
+        if template_data is not None:
+            uuid = template_data.get("uuid", None)
 
-        template_data = data.get("msg", {}).get("template", {})
-        if template_data:
-            uuid = template_data.get("uuid")
             if not uuid:
                 raise serializers.ValidationError("Template UUID is required.")
 
