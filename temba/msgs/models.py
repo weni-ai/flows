@@ -59,6 +59,14 @@ class Broadcast(models.Model):
         (STATUS_FAILED, "Failed"),
     )
 
+    BROADCAST_TYPE_DEFAULT = "D"
+    BROADCAST_TYPE_WHATSAPP = "W"
+
+    BROADCAST_TYPES_CHOICES = (
+        (BROADCAST_TYPE_DEFAULT, "default"),
+        (BROADCAST_TYPE_WHATSAPP, "whatsapp"),
+    )
+
     MAX_TEXT_LEN = int(settings.MSG_FIELD_SIZE)
 
     TEMPLATE_STATE_LEGACY = "legacy"
@@ -80,8 +88,8 @@ class Broadcast(models.Model):
     raw_urns = ArrayField(models.TextField(), null=True)
 
     # message content
-    base_language = models.CharField(max_length=4)
-    text = TranslatableField(max_length=MAX_TEXT_LEN)
+    base_language = models.CharField(max_length=4, blank=True, null=True)
+    text = TranslatableField(max_length=MAX_TEXT_LEN, blank=True, null=True)
     media = TranslatableField(max_length=2048, null=True)
 
     channel = models.ForeignKey(Channel, on_delete=models.PROTECT, null=True)
@@ -103,6 +111,7 @@ class Broadcast(models.Model):
     send_all = models.BooleanField(default=False)
 
     metadata = JSONAsTextField(null=True, default=dict)
+    broadcast_type = models.CharField(max_length=1, choices=BROADCAST_TYPES_CHOICES, default=BROADCAST_TYPE_DEFAULT)
 
     @classmethod
     def create(
