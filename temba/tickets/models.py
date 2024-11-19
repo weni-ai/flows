@@ -167,11 +167,6 @@ class Topic(SmartModel, DependencyMixin):
     is_default = models.BooleanField(default=False)
     queue_uuid = models.UUIDField(default=uuid4)
 
-    def save(self, *args, **kwargs):
-        if self.is_default and not self.queue_uuid:
-            self.queue_uuid = self.uuid
-        super().save(*args, **kwargs)
-
     @classmethod
     def create_default_topic(cls, org):
         assert not org.topics.filter(is_default=True).exists(), "org already has default topic"

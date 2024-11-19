@@ -1,3 +1,9 @@
+3.17.0
+----------
+* Create queue_uuid field in Topic model
+* Add queue_uuid in ticketer creation
+* Update weni-rp-apps version to 2.8.11
+
 3.16.7
 ----------
 * Increase time sync intents task

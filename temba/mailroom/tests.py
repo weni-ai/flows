@@ -526,6 +526,41 @@ class MailroomQueueTest(TembaTest):
             },
         )
 
+    def test_queue_whatsapp_broadcast(self):
+        jenny = self.create_contact("Jenny", phone="+5551912345678")
+        mequinho = self.create_group("Mequinho", [self.create_contact("Mequinho", phone="+5561987654321")])
+
+        bcast = Broadcast.create(
+            self.org,
+            self.admin,
+            groups=[mequinho],
+            contacts=[jenny],
+            urns=["whatsapp:5561912345678"],
+            base_language="eng",
+            broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
+            msg={"text": "Sending a whatsapp text"},
+        )
+
+        bcast.send_async()
+
+        self.assert_org_queued(self.org, "batch")
+        self.assert_queued_batch_task(
+            self.org,
+            {
+                "type": "send_whatsapp_broadcast",
+                "org_id": self.org.id,
+                "task": {
+                    "urns": ["whatsapp:5561912345678"],
+                    "contact_ids": [jenny.id],
+                    "group_ids": [mequinho.id],
+                    "broadcast_id": bcast.id,
+                    "org_id": self.org.id,
+                    "msg": {"text": "Sending a whatsapp text"},
+                },
+                "queued_on": matchers.ISODate(),
+            },
+        )
+
     def test_queue_flow_start(self):
         flow = self.get_flow("favorites")
         jim = self.create_contact("Jim", phone="+12065551212")
