@@ -283,7 +283,12 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     urns = fields.URNListField(required=False)
     contacts = fields.ContactField(many=True, required=False)
     groups = fields.ContactGroupField(many=True, required=False)
-    msg = serializers.DictField(required=False)
+    msg = serializers.DictField(required=True)
+
+    def validate_msg(self, value):
+        if not (value.get("text") or value.get("attachments") or value.get("template")):
+            raise serializers.ValidationError("Must provide either text, attachments or template")
+        return value
 
     def validate_msg(self, value):
         if not (value.get("text") or value.get("attachments") or value.get("template")):

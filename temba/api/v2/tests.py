@@ -961,8 +961,12 @@ class APITest(TembaTest):
             self.assertIsNone(response.json()["results"][0]["urns"])
 
         # try to create new broadcast with no recipients
-        response = self.postJSON(url, None, {"text": "Hello"})
+        response = self.postJSON(url, None, {"text": "Hello", "msg": {"text": "Test"}})
         self.assertResponseError(response, "non_field_errors", "Must provide either urns, contacts or groups")
+
+        # try to create new broadcast with no recipients
+        response = self.postJSON(url, None, {"text": "Hello"})
+        self.assertEqual(response.json(), {"msg": ["This field is required."]})
 
         # try to send msg with an existing template
         expected_metadata = {

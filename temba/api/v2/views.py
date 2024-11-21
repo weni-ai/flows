@@ -855,7 +855,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                 {"name": "groups", "required": False, "help": "The UUIDs of contact groups you want to send to"},
                 {
                     "name": "msg",
-                    "required": False,
+                    "required": True,
                     "help": "The template, text and attachments that will be send to contact",
                 },
             ],
