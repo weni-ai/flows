@@ -4238,12 +4238,6 @@ class FlowStartsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
         context["is_zapier"] = "Zapier" in self.request.META.get("HTTP_USER_AGENT", "")
         return context
 
-    # def post(self, request, *args, **kwargs):
-    #     print(type(request.data))
-    #     print(type(request.query_params.dict()))
-    #     request.data = request.data.update(request.query_params.dict()) #{**request.data, **request.query_params.dict()} # contater os requests
-    #     return super().post(request, *args, **kwargs)
-
     def post_save(self, instance):
         # actually start our flow
         instance.async_start()
