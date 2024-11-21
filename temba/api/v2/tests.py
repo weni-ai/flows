@@ -857,6 +857,186 @@ class APITest(TembaTest):
         response = self.postJSON(url, None, {"text": "Hello", "urns": ["twitter:franky"]})
         self.assertResponseError(response, "non_field_errors", Org.BLOCKER_FLAGGED)
 
+    @patch("temba.mailroom.queue_broadcast")
+    def test_whatsapp_broadcasts(self, mock_queue_broadcast):
+        url = reverse("api.v2.whatsapp_broadcasts")
+
+        self.assertEndpointAccess(url)
+
+        reporters = self.create_group("Reporters", [self.joe, self.frank])
+        ticketer = Ticketer.create(self.org, self.admin, "mailgun", "Support Tickets", {})
+        ticket = self.create_ticket(ticketer, self.joe, "Help!")
+
+        bcast1 = Broadcast.create(
+            self.org,
+            self.admin,
+            "Hello 1",
+            urns=["whatsapp:5561912345678"],
+            broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
+        )
+        bcast2 = Broadcast.create(
+            self.org, self.admin, "Hello 2", contacts=[self.joe], broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP
+        )
+        bcast3 = Broadcast.create(
+            self.org,
+            self.admin,
+            "Hello 3",
+            contacts=[self.frank],
+            status="S",
+            broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
+        )
+        bcast4 = Broadcast.create(
+            self.org,
+            self.admin,
+            "Hello 4",
+            urns=["twitter:franky"],
+            contacts=[self.joe],
+            groups=[reporters],
+            status="F",
+            ticket=ticket,
+            broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
+        )
+        Broadcast.create(
+            self.org2,
+            self.admin2,
+            "Different org...",
+            contacts=[self.hans],
+            broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
+        )
+
+        template = Template.objects.create(name="Template1", uuid="0ca51332-8c61-49a0-a4a8-c52c0bf57729", org=self.org)
+
+        # no filtering
+        with self.assertNumQueries(NUM_BASE_REQUEST_QUERIES + 4):
+            response = self.fetchJSON(url, readonly_models={Broadcast})
+
+        resp_json = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(resp_json["next"], None)
+        self.assertResultsById(response, [bcast4, bcast3, bcast2, bcast1])
+        self.assertEqual(
+            {
+                "id": bcast2.id,
+                "urns": [],
+                "contacts": [{"uuid": self.joe.uuid, "name": self.joe.name}],
+                "groups": [],
+                "text": {"base": "Hello 2"},
+                "status": "queued",
+                "created_on": format_datetime(bcast2.created_on),
+                "channel": None,
+                "metadata": {},
+            },
+            resp_json["results"][2],
+        )
+        self.assertEqual(
+            {
+                "id": bcast4.id,
+                "urns": ["twitter:franky"],
+                "contacts": [{"uuid": self.joe.uuid, "name": self.joe.name}],
+                "groups": [{"uuid": reporters.uuid, "name": reporters.name}],
+                "text": {"base": "Hello 4"},
+                "status": "failed",
+                "created_on": format_datetime(bcast4.created_on),
+                "channel": None,
+                "metadata": {},
+            },
+            resp_json["results"][0],
+        )
+
+        # filter by id
+        response = self.fetchJSON(url, "id=%d" % bcast3.pk)
+        self.assertResultsById(response, [bcast3])
+
+        # filter by after
+        response = self.fetchJSON(url, "after=%s" % format_datetime(bcast3.created_on))
+        self.assertResultsById(response, [bcast4, bcast3])
+
+        # filter by before
+        response = self.fetchJSON(url, "before=%s" % format_datetime(bcast2.created_on))
+        self.assertResultsById(response, [bcast2, bcast1])
+
+        with AnonymousOrg(self.org):
+            # URNs shouldn't be included
+            response = self.fetchJSON(url, "id=%d" % bcast1.id)
+            self.assertIsNone(response.json()["results"][0]["urns"])
+
+        # try to create new broadcast with no recipients
+        response = self.postJSON(url, None, {"text": "Hello", "msg": {"text": "Test"}})
+        self.assertResponseError(response, "non_field_errors", "Must provide either urns, contacts or groups")
+
+        # try to create new broadcast with no recipients
+        response = self.postJSON(url, None, {"text": "Hello"})
+        self.assertEqual(response.json(), {"msg": ["This field is required."]})
+
+        # try to send msg with an existing template
+        expected_metadata = {
+            "template": {"name": template.name, "uuid": template.uuid, "variables": []},
+            "text": "Send a message",
+        }
+
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "text": "Hi @(format_urn(urns.tel))",
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid, self.frank.uuid],
+                "groups": [reporters.uuid],
+                "ticket": str(ticket.uuid),
+                "msg": {"template": {"uuid": template.uuid}, "text": "Send a message"},
+            },
+        )
+
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+        self.assertEqual(expected_metadata, broadcast.metadata)
+
+        # try to send msg with an wrong template uuid
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid, self.frank.uuid],
+                "groups": [reporters.uuid],
+                "ticket": str(ticket.uuid),
+                "msg": {"template": {"uuid": "1bb5d3de-6ddf-437b-9009-a04201bef143"}, "text": "Send a message"},
+            },
+        )
+
+        self.assertResponseError(
+            response, "non_field_errors", "Template with UUID 1bb5d3de-6ddf-437b-9009-a04201bef143 not found."
+        )
+
+        # try to send msg with no template uuid
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid, self.frank.uuid],
+                "groups": [reporters.uuid],
+                "ticket": str(ticket.uuid),
+                "msg": {"template": {}, "text": "Send a message"},
+            },
+        )
+
+        self.assertResponseError(response, "non_field_errors", "Template UUID is required.")
+
+        # try to send msg with no template, text and attachments
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid, self.frank.uuid],
+                "groups": [reporters.uuid],
+                "ticket": str(ticket.uuid),
+                "msg": {},
+            },
+        )
+
+        self.assertEqual(response.json(), {"msg": ["Must provide either text, attachments or template"]})
+
     def test_archives(self):
         url = reverse("api.v2.archives")
 

@@ -35,6 +35,7 @@ class BatchTask(Enum):
     POPULATE_DYNAMIC_GROUP = "populate_dynamic_group"
     SCHEDULE_CAMPAIGN_EVENT = "schedule_campaign_event"
     IMPORT_CONTACT_BATCH = "import_contact_batch"
+    SEND_WHATSAPP_BROADCAST = "send_whatsapp_broadcast"
 
 
 def queue_msg_handling(msg):
@@ -84,19 +85,32 @@ def queue_broadcast(broadcast):
     Queues the passed in broadcast for sending by mailroom
     """
 
-    task = {
-        "translations": {lang: {"text": text} for lang, text in broadcast.text.items()},
-        "template_state": broadcast.get_template_state(),
-        "base_language": broadcast.base_language,
-        "urns": broadcast.raw_urns or [],
-        "contact_ids": list(broadcast.contacts.values_list("id", flat=True)),
-        "group_ids": list(broadcast.groups.values_list("id", flat=True)),
-        "broadcast_id": broadcast.id,
-        "org_id": broadcast.org_id,
-        "ticket_id": broadcast.ticket_id,
-    }
+    if broadcast.broadcast_type == "D":
+        task = {
+            "translations": {lang: {"text": text} for lang, text in broadcast.text.items()},
+            "template_state": broadcast.get_template_state(),
+            "base_language": broadcast.base_language,
+            "urns": broadcast.raw_urns or [],
+            "contact_ids": list(broadcast.contacts.values_list("id", flat=True)),
+            "group_ids": list(broadcast.groups.values_list("id", flat=True)),
+            "broadcast_id": broadcast.id,
+            "org_id": broadcast.org_id,
+            "ticket_id": broadcast.ticket_id,
+        }
 
-    _queue_batch_task(broadcast.org_id, BatchTask.SEND_BROADCAST, task, HIGH_PRIORITY)
+        _queue_batch_task(broadcast.org_id, BatchTask.SEND_BROADCAST, task, HIGH_PRIORITY)
+
+    if broadcast.broadcast_type == "W":
+        task = {
+            "urns": broadcast.raw_urns or [],
+            "contact_ids": list(broadcast.contacts.values_list("id", flat=True)),
+            "group_ids": list(broadcast.groups.values_list("id", flat=True)),
+            "broadcast_id": broadcast.id,
+            "org_id": broadcast.org_id,
+            "msg": broadcast.metadata,
+        }
+
+        _queue_batch_task(broadcast.org_id, BatchTask.SEND_WHATSAPP_BROADCAST, task, HIGH_PRIORITY)
 
 
 def queue_populate_dynamic_group(group):
