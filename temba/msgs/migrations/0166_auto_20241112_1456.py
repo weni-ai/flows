@@ -25,6 +25,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="broadcast",
             name="text",
-            field=temba.utils.models.TranslatableField(blank=True, max_length=640, null=True),
+            field=temba.utils.models.TranslatableField(blank=True, max_length=1500, null=True),
         ),
     ]
