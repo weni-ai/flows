@@ -826,7 +826,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
             "method": "GET",
             "title": "List Broadcasts",
             "url": reverse("api.v2.whatsapp_broadcasts"),
-            "slug": "broadcast-list",
+            "slug": "whatsapp_broadcast-list",
             "params": [
                 {"name": "id", "required": False, "help": "A broadcast ID to filter by, ex: 123456"},
                 {
@@ -848,7 +848,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
             "method": "POST",
             "title": "Send Broadcasts",
             "url": reverse("api.v2.whatsapp_broadcasts"),
-            "slug": "broadcast-write",
+            "slug": "whatsapp_broadcast-write",
             "fields": [
                 {"name": "urns", "required": False, "help": "The URNs of contacts you want to send to"},
                 {"name": "contacts", "required": False, "help": "The UUIDs of contacts you want to send to"},
@@ -4237,12 +4237,6 @@ class FlowStartsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
         context = super().get_serializer_context()
         context["is_zapier"] = "Zapier" in self.request.META.get("HTTP_USER_AGENT", "")
         return context
-
-    # def post(self, request, *args, **kwargs):
-    #     print(type(request.data))
-    #     print(type(request.query_params.dict()))
-    #     request.data = request.data.update(request.query_params.dict()) #{**request.data, **request.query_params.dict()} # contater os requests
-    #     return super().post(request, *args, **kwargs)
 
     def post_save(self, instance):
         # actually start our flow

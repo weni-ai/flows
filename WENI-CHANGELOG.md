@@ -1,3 +1,10 @@
+3.18.0
+----------
+* Add new field in Broadcast model to receive whatsapp broadcast
+* Add endpoints to whatsapp broadcast
+* Add CYCLE in flows_flowstart_contacts_id_seq
+* Update weni-rp-apps version to 2.8.12
+
 3.17.0
 ----------
 * Create queue_uuid field in Topic model

@@ -142,7 +142,8 @@ class Broadcast(models.Model):
             text = {base_language: text}
 
         assert groups or contacts or contact_ids or urns, "can't create broadcast without recipients"
-        # assert base_language in text, "base_language doesn't exist in text translations"
+        if broadcast_type == cls.BROADCAST_TYPE_DEFAULT:
+            assert base_language in text, "base_language doesn't exist in text translations"
         assert not media or base_language in media, "base_language doesn't exist in media translations"
 
         if quick_replies:
