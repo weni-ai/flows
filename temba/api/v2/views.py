@@ -826,7 +826,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
             "method": "GET",
             "title": "List Broadcasts",
             "url": reverse("api.v2.whatsapp_broadcasts"),
-            "slug": "broadcast-list",
+            "slug": "whatsapp_broadcast-list",
             "params": [
                 {"name": "id", "required": False, "help": "A broadcast ID to filter by, ex: 123456"},
                 {
@@ -848,7 +848,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
             "method": "POST",
             "title": "Send Broadcasts",
             "url": reverse("api.v2.whatsapp_broadcasts"),
-            "slug": "broadcast-write",
+            "slug": "whatsapp_broadcast-write",
             "fields": [
                 {"name": "urns", "required": False, "help": "The URNs of contacts you want to send to"},
                 {"name": "contacts", "required": False, "help": "The UUIDs of contacts you want to send to"},
