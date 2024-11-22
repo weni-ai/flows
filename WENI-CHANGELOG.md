@@ -1,3 +1,7 @@
+3.18.1
+----------
+* Fix error calling WhatsappBroadcasts in Interface API
+
 3.18.0
 ----------
 * Add new field in Broadcast model to receive whatsapp broadcast
