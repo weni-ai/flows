@@ -284,6 +284,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     contacts = fields.ContactField(many=True, required=False)
     groups = fields.ContactGroupField(many=True, required=False)
     msg = serializers.DictField(required=True)
+    channel = serializers.UUIDField(required=False)
 
     def validate_msg(self, value):
         if not (value.get("text") or value.get("attachments") or value.get("template")):
@@ -293,6 +294,16 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     def validate(self, data):
         if not (data.get("urns") or data.get("contacts") or data.get("groups")):
             raise serializers.ValidationError("Must provide either urns, contacts or groups")
+
+        channel_data = data.get("channel", None)
+        if channel_data:
+            try:
+                channel = Channel.objects.get(uuid=channel_data)
+                data["channel"] = channel
+                if channel.channel_type != "WAC":
+                    raise serializers.ValidationError("Channel must be a WhatsApp Cloud channel")
+            except Channel.DoesNotExist:
+                raise serializers.ValidationError("Channel not found")
 
         template_data = data.get("msg", {}).get("template", None)
         if template_data is not None:
@@ -311,6 +322,10 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             except Template.DoesNotExist:
                 raise serializers.ValidationError(f"Template with UUID {uuid} not found.")
 
+        if channel_data and template_data:
+            if not channel.template_translations.filter(template=template).exists():
+                raise serializers.ValidationError(f"Template {template.uuid} not found in channel {channel.uuid}")
+
         return data
 
     def save(self):
@@ -327,6 +342,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             urns=self.validated_data.get("urns", []),
             template_state=Broadcast.TEMPLATE_STATE_UNEVALUATED,
             msg=self.validated_data.get("msg", {}),
+            channel=self.validated_data.get("channel", None),
             broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
         )
         # send it
