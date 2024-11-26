@@ -529,6 +529,7 @@ class MailroomQueueTest(TembaTest):
     def test_queue_whatsapp_broadcast(self):
         jenny = self.create_contact("Jenny", phone="+5551912345678")
         mequinho = self.create_group("Mequinho", [self.create_contact("Mequinho", phone="+5561987654321")])
+        channel = self.create_channel("WAC", "WhatsApp: 1234", "1234", org=self.org)
 
         bcast = Broadcast.create(
             self.org,
@@ -539,6 +540,7 @@ class MailroomQueueTest(TembaTest):
             base_language="eng",
             broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
             msg={"text": "Sending a whatsapp text"},
+            channel=channel,
         )
 
         bcast.send_async()
@@ -556,6 +558,7 @@ class MailroomQueueTest(TembaTest):
                     "broadcast_id": bcast.id,
                     "org_id": self.org.id,
                     "msg": {"text": "Sending a whatsapp text"},
+                    "channel_id": channel.id,
                 },
                 "queued_on": matchers.ISODate(),
             },
