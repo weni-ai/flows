@@ -706,7 +706,6 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
      * **urns** - the URNs that received the broadcast (array of strings)
      * **contacts** - the contacts that received the broadcast (array of objects)
      * **groups** - the groups that received the broadcast (array of objects)
-     * **text** - the message text (string or translations object)
      * **status** - the status of the message (one of "queued", "sent", "failed").
      * **created_on** - when this broadcast was either created (datetime) (filterable as `before` and `after`).
      * **metadata** - the message that was send to microservice
@@ -726,7 +725,6 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "urns": ["tel:+250788123123", "tel:+250788123124"],
                     "contacts": [{"uuid": "09d23a05-47fe-11e4-bfe9-b8f6b119e9ab", "name": "Joe"}]
                     "groups": [],
-                    "text": "hello world",
                     "created_on": "2013-03-02T17:28:12.123456Z".
                     "metadata": {
                         "text": "Essa é uma mensagem de teste para @contact.name",
@@ -742,27 +740,127 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
 
     A `POST` allows you to create and send new broadcasts, with the following JSON data:
 
-      * **text** - the text of the message to send (string, limited to 640 characters)
       * **urns** - the URNs of contacts to send to (array of up to 100 strings, optional)
       * **contacts** - the UUIDs of contacts to send to (array of up to 100 strings, optional)
       * **groups** - the UUIDs of contact groups to send to (array of up to 100 strings, optional)
       * **msg** - the template, text and attachments that will be send to contacts
 
+
     Example:
+
+    **Not all fields below are required, it depends on the type and format of message you want to send.**
 
         POST /api/v2/whatsapp_broadcasts.json
         {
             "urns": ["tel:+250788123123", "tel:+250788123124"],
             "contacts": ["09d23a05-47fe-11e4-bfe9-b8f6b119e9ab"],
-            "text": "hello @contact.name",
             "msg": {
-                "text": "Essa é uma mensagem de teste para @contact.name",
+                "text": "This is a test message for @contact.name",
                 "template":{
                     "uuid":"c3e129a2-5802-4248-a5f0-620566ef4345",
-                    "variables": ["123"]
-                    "header": {
-                        "type": "text",
-                        "text": "Oi @contact.name, tudo bem com voce?"
+                    "variables": ["@contact.name"]
+                }
+                "attachments": ["image/png:https://example.com/image.png"]
+                "header": {
+                    "type": "text",
+                    "text": "Hello @contact.name"
+                },
+                "footer": "Test message",
+                "quick_replies": ["Yes", "No", "@contact.name"],
+                "buttons": [
+                    {
+                        "sub_type": "url",
+                        "parameters": [
+                            {
+                                "type": "text",
+                                "text": "url button parameter text"
+                            }
+                        ]
+                    }
+                ],
+                "interaction_type": "flow_msg | cta_url | location | order_details",
+                "flow_message": {
+                    "flow_id": "1234567890",
+                    "flow_data": {
+                        "foo": "bar"
+                    },
+                    "flow_screen": "WELCOME_SCREEN",
+                    "flow_cta": "Click here",
+                    "flow_mode": "draft | published"
+                },
+                "list_message": {
+                    "button_text": "See more",
+                    "list_items": [
+                        {
+                            "title": "Item 1",
+                            "description": "Description 1",
+                            "uuid": "1"
+                        },
+                        {
+                            "title": "Item 2",
+                            "description": "You can add up to 10 list items",
+                            "uuid": "2"
+                        },
+                    ]
+                },
+                "cta_message": {
+                    "url": "https://weni.ai",
+                    "display_text": "Go to Weni"
+                },
+                "order_details": {
+                    "reference_id": "unique-reference-id-123",
+                    "payment_settings": {
+                        "type": "digital-goods",
+                        "payment_link": "https://weni.ai",
+                        "pix_config": {
+                            "key": "1234567890",
+                            "key_type": "CPF",
+                            "merchant_name": "John Doe",
+                            "code": "00020126330014BR.GOV.BCB.PIX01111...."
+                        }
+                    },
+                    "total_amount": 92188,
+                    "order": {
+                        "items": [
+                            {
+                                "retailer_id": "123#sellerid",
+                                "name": "Product Item 1",
+                                "amount": {
+                                    "value": 64899,
+                                    "offset": 100
+                                },
+                                "quantity": 1
+                            },
+                            {
+                                "retailer_id": "456#sellerid",
+                                "name": "Product Item 2",
+                                "amount": {
+                                    "value": 29990,
+                                    "offset": 100
+                                },
+                                "quantity": 1,
+                                "sale_amount": {
+                                    "value": 25990,
+                                    "offset": 100
+                                }
+                            }
+                        ],
+                        "subtotal": 90889,
+                        "tax": {
+                            "description": "Tax description",
+                            "offset": 100,
+                            "value": 999
+                        },
+                        "discount": {
+                            "description": "Discount description",
+                            "offset": 100,
+                            "value": 200
+                        },
+                        "shipping": {
+                            "description": "Shipping description",
+                            "offset": 100,
+                            "value": 500
+                        }
                     }
                 }
             }
@@ -775,16 +873,114 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
             "urns": ["tel:+250788123123", "tel:+250788123124"],
             "contacts": [{"uuid": "09d23a05-47fe-11e4-bfe9-b8f6b119e9ab", "name": "Joe"}]
             "groups": [],
-            "text": "hello world",
             "created_on": "2013-03-02T17:28:12.123456Z",
             "metadata": {
-                "text": "Essa é uma mensagem de teste para @contact.name",
+                "text": "This is a test message for @contact.name",
                 "template":{
                     "uuid":"c3e129a2-5802-4248-a5f0-620566ef4345",
-                    "variables": ["123"]
-                    "header": {
-                        "type": "text",
-                        "text": "Oi @contact.name, tudo bem com voce?"
+                    "variables": ["@contact.name"]
+                }
+                "attachments": ["image/png:https://example.com/image.png"]
+                "header": {
+                    "type": "text",
+                    "text": "Hello @contact.name"
+                },
+                "footer": "Test message",
+                "quick_replies": ["Yes", "No", "@contact.name"],
+                "buttons": [
+                    {
+                        "sub_type": "url",
+                        "parameters": [
+                            {
+                                "type": "text",
+                                "text": "url button parameter text"
+                            }
+                        ]
+                    }
+                ],
+                "interaction_type": "flow_msg | cta_url | location | order_details",
+                "flow_message": {
+                    "flow_id": "1234567890",
+                    "flow_data": {
+                        "foo": "bar"
+                    },
+                    "flow_screen": "WELCOME_SCREEN",
+                    "flow_cta": "Click here",
+                    "flow_mode": "draft | published"
+                },
+                "list_message": {
+                    "button_text": "See more",
+                    "list_items": [
+                        {
+                            "title": "Item 1",
+                            "description": "Description 1",
+                            "uuid": "1"
+                        },
+                        {
+                            "title": "Item 2",
+                            "description": "You can add up to 10 list items",
+                            "uuid": "2"
+                        },
+                    ]
+                },
+                "cta_message": {
+                    "url": "https://weni.ai",
+                    "display_text": "Go to Weni"
+                },
+                "order_details": {
+                    "reference_id": "unique-reference-id-123",
+                    "payment_settings": {
+                        "type": "digital-goods",
+                        "payment_link": "https://weni.ai",
+                        "pix_config": {
+                            "key": "1234567890",
+                            "key_type": "CPF",
+                            "merchant_name": "John Doe",
+                            "code": "00020126330014BR.GOV.BCB.PIX01111...."
+                        }
+                    },
+                    "total_amount": 92188,
+                    "order": {
+                        "items": [
+                            {
+                                "retailer_id": "123#sellerid",
+                                "name": "Product Item 1",
+                                "amount": {
+                                    "value": 64899,
+                                    "offset": 100
+                                },
+                                "quantity": 1
+                            },
+                            {
+                                "retailer_id": "456#sellerid",
+                                "name": "Product Item 2",
+                                "amount": {
+                                    "value": 29990,
+                                    "offset": 100
+                                },
+                                "quantity": 1,
+                                "sale_amount": {
+                                    "value": 25990,
+                                    "offset": 100
+                                }
+                            }
+                        ],
+                        "subtotal": 90889,
+                        "tax": {
+                            "description": "Tax description",
+                            "offset": 100,
+                            "value": 999
+                        },
+                        "discount": {
+                            "description": "Discount description",
+                            "offset": 100,
+                            "value": 200
+                        },
+                        "shipping": {
+                            "description": "Shipping description",
+                            "offset": 100,
+                            "value": 500
+                        }
                     }
                 }
             }
@@ -828,7 +1024,11 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
             "url": reverse("api.v2.whatsapp_broadcasts"),
             "slug": "whatsapp_broadcast-list",
             "params": [
-                {"name": "id", "required": False, "help": "A broadcast ID to filter by, ex: 123456"},
+                {
+                    "name": "id",
+                    "required": False,
+                    "help": "A broadcast ID to filter by, ex: 123456",
+                },
                 {
                     "name": "before",
                     "required": False,
@@ -856,7 +1056,31 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                 {
                     "name": "msg",
                     "required": True,
-                    "help": "The template, text and attachments that will be send to contact",
+                    "help": "The template, text and attachments that will be sent to contact",
+                    "fields": [
+                        {
+                            "name": "template",
+                            "required": False,
+                            "help": "The template to be used",
+                            "fields": [
+                                {
+                                    "name": "uuid",
+                                    "required": True,
+                                    "help": "The UUID of the template",
+                                },
+                                {
+                                    "name": "variables",
+                                    "required": False,
+                                    "help": "The variables to be used in the template body",
+                                },
+                            ],
+                        },
+                        {
+                            "name": "attachments",
+                            "required": False,
+                            "help": 'The attachments to be sent. Ex: ["image/png:https://example.com/image.png"]',
+                        },
+                    ],
                 },
             ],
         }
