@@ -1,3 +1,9 @@
+3.18.2
+----------
+* Update floweditor to 3.4.3
+* feat: add channel option to whatsapp broadcasts
+* feat: update whatsapp broadcasts documentation
+
 3.18.1
 ----------
 * Fix error calling WhatsappBroadcasts in Interface API
