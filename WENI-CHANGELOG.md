@@ -1,3 +1,7 @@
+3.18.3
+----------
+* Update floweditor to 3.4.4
+
 3.18.2
 ----------
 * Update floweditor to 3.4.3
