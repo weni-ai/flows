@@ -58,7 +58,13 @@ from .models import (
     FlowVersionConflictException,
     get_flow_user,
 )
-from .tasks import squash_flowcounts, trim_flow_revisions, trim_flow_sessions_and_starts, update_run_expirations_task
+from .tasks import (
+    interrupt_flow_sessions,
+    squash_flowcounts,
+    trim_flow_revisions,
+    trim_flow_sessions_and_starts,
+    update_run_expirations_task,
+)
 from .views import FlowCRUDL
 
 
@@ -3774,6 +3780,53 @@ class FlowRunTest(TembaTest):
 
 
 class FlowSessionTest(TembaTest):
+    @mock_mailroom
+    def test_interrupt(self, mr_mocks):
+        contact = self.create_contact("Ding Liren", phone="+5561940028922")
+
+        FlowSession.objects.create(
+            uuid=uuid4(),
+            org=self.org,
+            contact=contact,
+            created_on=timezone.now() - timedelta(days=89),
+            output_url="http://weni.ai/session.json",
+            status=FlowSession.STATUS_WAITING,
+            wait_started_on=timezone.now(),
+        )
+
+        session2 = FlowSession.objects.create(
+            uuid=uuid4(),
+            org=self.org,
+            contact=contact,
+            created_on=timezone.now() - timedelta(days=92),
+            output_url="http://weni.ai/session.json",
+            status=FlowSession.STATUS_WAITING,
+            wait_started_on=timezone.now(),
+        )
+
+        session3 = FlowSession.objects.create(
+            uuid=uuid4(),
+            org=self.org,
+            contact=contact,
+            created_on=timezone.now() - timedelta(days=91),
+            output_url="http://weni.ai/session.json",
+            status=FlowSession.STATUS_WAITING,
+            wait_started_on=timezone.now(),
+        )
+
+        interrupt_flow_sessions()
+        self.assertEqual(
+            [
+                {
+                    "type": "interrupt_sessions",
+                    "org_id": self.org.id,
+                    "queued_on": matchers.Datetime(),
+                    "task": {"session_ids": [session2.id, session3.id]},
+                },
+            ],
+            mr_mocks.queued_batch_tasks,
+        )
+
     def test_trim(self):
         contact = self.create_contact("Ben Haggerty", phone="+250788123123")
         flow = self.get_flow("color")
