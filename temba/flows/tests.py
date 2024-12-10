@@ -3789,7 +3789,7 @@ class FlowSessionTest(TembaTest):
             org=self.org,
             contact=contact,
             created_on=timezone.now() - timedelta(days=89),
-            output_url="http://weni.ai/session.json",
+            output_url="https://weni.ai/session.json",
             status=FlowSession.STATUS_WAITING,
             wait_started_on=timezone.now(),
         )
@@ -3799,7 +3799,7 @@ class FlowSessionTest(TembaTest):
             org=self.org,
             contact=contact,
             created_on=timezone.now() - timedelta(days=92),
-            output_url="http://weni.ai/session.json",
+            output_url="https://weni.ai/session.json",
             status=FlowSession.STATUS_WAITING,
             wait_started_on=timezone.now(),
         )
@@ -3809,7 +3809,7 @@ class FlowSessionTest(TembaTest):
             org=self.org,
             contact=contact,
             created_on=timezone.now() - timedelta(days=91),
-            output_url="http://weni.ai/session.json",
+            output_url="https://weni.ai/session.json",
             status=FlowSession.STATUS_WAITING,
             wait_started_on=timezone.now(),
         )
