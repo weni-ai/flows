@@ -866,6 +866,7 @@ class APITest(TembaTest):
         reporters = self.create_group("Reporters", [self.joe, self.frank])
         ticketer = Ticketer.create(self.org, self.admin, "mailgun", "Support Tickets", {})
         ticket = self.create_ticket(ticketer, self.joe, "Help!")
+        channel = self.create_channel("WAC", "WhatsApp: 1234", "1234", org=self.org)
 
         bcast1 = Broadcast.create(
             self.org,
@@ -1036,6 +1037,127 @@ class APITest(TembaTest):
         )
 
         self.assertEqual(response.json(), {"msg": ["Must provide either text, attachments or template"]})
+
+        # send a msg with a defined channel
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid, self.frank.uuid],
+                "groups": [reporters.uuid],
+                "ticket": str(ticket.uuid),
+                "msg": {"text": "Send a message"},
+                "channel": channel.uuid,
+            },
+        )
+
+        expected_metadata = {"text": "Send a message"}
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+
+        self.assertEqual(expected_metadata, broadcast.metadata)
+        self.assertEqual(channel, broadcast.channel)
+
+        # send a msg with a non whatsapp cloud defined channel
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid, self.frank.uuid],
+                "groups": [reporters.uuid],
+                "ticket": str(ticket.uuid),
+                "msg": {"text": "Send a message"},
+                "channel": self.channel.uuid,
+            },
+        )
+
+        self.assertResponseError(response, "non_field_errors", "Channel must be a WhatsApp Cloud channel")
+
+        # send a msg with a non existing channel
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid, self.frank.uuid],
+                "groups": [reporters.uuid],
+                "ticket": str(ticket.uuid),
+                "msg": {"text": "Send a message"},
+                "channel": "1bb5d3de-6ddf-437b-9009-a04201bef149",
+            },
+        )
+
+        self.assertResponseError(response, "non_field_errors", "Channel not found")
+
+        # create a translation for a different channel othen than whatsapp, but linked to the same template
+        TemplateTranslation.get_or_create(
+            self.channel,
+            template.name,
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "1234",
+            "",
+            "AUTHENTICATION",
+        )
+
+        # send a template msg with a defined channel, but the template is not for the channel
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid, self.frank.uuid],
+                "groups": [reporters.uuid],
+                "ticket": str(ticket.uuid),
+                "msg": {"template": {"uuid": template.uuid}, "variables": ["1"]},
+                "channel": channel.uuid,
+            },
+        )
+
+        self.assertResponseError(
+            response,
+            "non_field_errors",
+            f"Template {template.uuid} not found in channel {channel.uuid}",
+        )
+
+        # now create a valid template translation for the WAC channel
+
+        TemplateTranslation.get_or_create(
+            channel,
+            template.name,
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "1234",
+            "",
+            "AUTHENTICATION",
+        )
+
+        # send a template msg with a defined channel, and the template is for the channel
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid, self.frank.uuid],
+                "groups": [reporters.uuid],
+                "ticket": str(ticket.uuid),
+                "msg": {"template": {"uuid": template.uuid, "variables": ["1"]}},
+                "channel": channel.uuid,
+            },
+        )
+
+        expected_metadata = {"template": {"name": template.name, "uuid": template.uuid, "variables": ["1"]}}
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+
+        self.assertEqual(expected_metadata, broadcast.metadata)
+        self.assertEqual(channel, broadcast.channel)
 
     def test_archives(self):
         url = reverse("api.v2.archives")

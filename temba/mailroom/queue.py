@@ -108,6 +108,7 @@ def queue_broadcast(broadcast):
             "broadcast_id": broadcast.id,
             "org_id": broadcast.org_id,
             "msg": broadcast.metadata,
+            "channel_id": broadcast.channel_id,
         }
 
         _queue_batch_task(broadcast.org_id, BatchTask.SEND_WHATSAPP_BROADCAST, task, HIGH_PRIORITY)
@@ -169,13 +170,13 @@ def queue_contact_import_batch(batch):
     _queue_batch_task(batch.contact_import.org.id, BatchTask.IMPORT_CONTACT_BATCH, task, DEFAULT_PRIORITY)
 
 
-def queue_interrupt(org, *, contacts=None, channel=None, flow=None, session=None):
+def queue_interrupt(org, *, contacts=None, channel=None, flow=None, sessions=None):
     """
     Queues an interrupt task for handling by mailroom
     """
 
     assert (
-        contacts or channel or flow or session
+        contacts or channel or flow or sessions
     ), "must specify either a set of contacts or a channel or a flow or a session"
 
     task = {}
@@ -185,8 +186,8 @@ def queue_interrupt(org, *, contacts=None, channel=None, flow=None, session=None
         task["channel_ids"] = [channel.id]
     if flow:
         task["flow_ids"] = [flow.id]
-    if session:
-        task["session_ids"] = [session.id]
+    if sessions:
+        task["session_ids"] = [session.id for session in sessions]
 
     _queue_batch_task(org.id, BatchTask.INTERRUPT_SESSIONS, task, HIGH_PRIORITY)
 

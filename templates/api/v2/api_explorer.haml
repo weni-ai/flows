@@ -67,6 +67,24 @@
                       (required)
                     -else
                       (optional)
+                -if item.fields
+                  -for subitem in item.fields
+                    %tr.relative(style="left: 96px;")
+                      %td.field.font-medium.text-gray-600.px-4.py-2(class="{% if subitem.required %}field-required{% endif %}")  {{ subitem.name }}
+                      %td.font-light {{ subitem.help }}
+                        -if subitem.required
+                          (required)
+                        -else
+                          (optional)
+                    -if subitem.fields
+                      -for subsubitem in subitem.fields
+                        %tr.relative(style="left: 192px;")
+                          %td.field.font-medium.text-gray-600.px-4.py-2(class="{% if subsubitem.required %}field-required{% endif %}")  {{ subsubitem.name }}
+                          %td.font-light {{ subsubitem.help }}
+                            -if subsubitem.required
+                              (required)
+                            -else
+                              (optional)
 
         .request-form.rounded-lg.border.p-6.bg-gray-100.mt-4
           .request-header.font-mono.mb-4
