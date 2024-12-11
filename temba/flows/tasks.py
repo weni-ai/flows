@@ -97,7 +97,7 @@ def trim_flow_sessions():
     logger.info(f"Deleting flow sessions which ended before {trim_before.isoformat()}...")
 
     while True:
-        session_ids = list(FlowSession.objects.filter(ended_on__lte=trim_before).values_list("id", flat=True)[:1000])
+        session_ids = list(FlowSession.objects.filter(ended_on__lte=trim_before).values_list("id", flat=True)[:100])
         if not session_ids:
             break
 
