@@ -1,3 +1,8 @@
+3.19.0
+----------
+* Change trim flow session task batch size
+* Add task to interrupt flow sessions
+
 3.18.3
 ----------
 * Update floweditor to 3.4.4
