@@ -1,5 +1,6 @@
 import logging
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta
 
 import iso8601
 import pytz
@@ -11,6 +12,7 @@ from django.utils.timesince import timesince
 
 from celery import shared_task
 
+from temba import mailroom
 from temba.utils import chunk_list
 from temba.utils.celery import nonoverlapping_task
 
@@ -78,6 +80,33 @@ def trim_flow_revisions():
 
     elapsed = timesince(start)
     logger.info(f"Trimmed {count} flow revisions since {last_trim} in {elapsed}")
+
+
+@nonoverlapping_task(track_started=True, name="interrupt_flow_sessions")
+def interrupt_flow_sessions():
+    """
+    Write ended_on in session not expired in 90 days
+    """
+    before = timezone.now() - timedelta(days=90)
+    num_interrupted = 0
+
+    sessions_list = defaultdict(list)
+    sessions = (
+        FlowSession.objects.filter(created_on__lte=before, status=FlowSession.STATUS_WAITING)
+        .only("id", "org")
+        .select_related("org")
+        .order_by("id")
+    )
+
+    for session in sessions:
+        sessions_list[session.org].append(session)
+
+    for org, sessions in sessions_list.items():
+        for batch in chunk_list(sessions, 100):
+            mailroom.queue_interrupt(org, sessions=batch)
+            num_interrupted += len(sessions)
+
+    return {"sessions interrupted": num_interrupted}
 
 
 @nonoverlapping_task(track_started=True, name="trim_flow_sessions_and_starts")

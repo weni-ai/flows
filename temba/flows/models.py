@@ -1306,7 +1306,7 @@ class FlowRun(RequireUpdateFieldsMixin, models.Model):
                 and self.session is not None
                 and self.session.status == FlowSession.STATUS_WAITING
             ):
-                mailroom.queue_interrupt(self.org, session=self.session)
+                mailroom.queue_interrupt(self.org, sessions=[self.session])
 
             self.delete()
 
