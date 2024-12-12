@@ -1021,7 +1021,7 @@ class APITest(TembaTest):
             },
         )
 
-        self.assertResponseError(response, "non_field_errors", "Template UUID is required.")
+        self.assertResponseError(response, "non_field_errors", "Template UUID or Name are required.")
 
         # try to send msg with no template, text and attachments
         response = self.postJSON(
@@ -1149,6 +1149,47 @@ class APITest(TembaTest):
                 "groups": [reporters.uuid],
                 "ticket": str(ticket.uuid),
                 "msg": {"template": {"uuid": template.uuid, "variables": ["1"]}},
+                "channel": channel.uuid,
+            },
+        )
+
+        expected_metadata = {"template": {"name": template.name, "uuid": template.uuid, "variables": ["1"]}}
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+
+        self.assertEqual(expected_metadata, broadcast.metadata)
+        self.assertEqual(channel, broadcast.channel)
+
+        # send a template msg from name without specifing the channel
+
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid, self.frank.uuid],
+                "groups": [reporters.uuid],
+                "ticket": str(ticket.uuid),
+                "msg": {"template": {"name": template.name, "variables": ["1"]}},
+            },
+        )
+
+        self.assertResponseError(
+            response,
+            "non_field_errors",
+            f"Channel is required to use template name",
+        )
+
+        # send a template msg from name specifing the channel
+
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid, self.frank.uuid],
+                "groups": [reporters.uuid],
+                "ticket": str(ticket.uuid),
+                "msg": {"template": {"name": template.name, "variables": ["1"]}},
                 "channel": channel.uuid,
             },
         )
