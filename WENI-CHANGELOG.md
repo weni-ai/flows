@@ -1,3 +1,7 @@
+3.19.1
+----------
+* Feat: Allow specifying whatsapp broadcast template by name
+
 3.19.0
 ----------
 * Change trim flow session task batch size
