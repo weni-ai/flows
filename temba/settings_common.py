@@ -1064,6 +1064,7 @@ CELERY_BEAT_SCHEDULE = {
     "check-elasticsearch-lag": {"task": "check_elasticsearch_lag", "schedule": timedelta(seconds=300)},
     # "check-topup-expiration": {"task": "check_topup_expiration_task", "schedule": crontab(hour=2, minute=0)},
     "delete-orgs": {"task": "delete_orgs_task", "schedule": crontab(hour=4, minute=0)},
+    "interrupt-flow-sessions": {"task": "interrupt_flow_sessions", "schedule": crontab(hour=22, minute=15)},
     "fail-old-messages": {"task": "fail_old_messages", "schedule": crontab(hour=0, minute=0)},
     "resolve-twitter-ids-task": {"task": "resolve_twitter_ids_task", "schedule": timedelta(seconds=900)},
     "refresh-jiochat-access-tokens": {"task": "refresh_jiochat_access_tokens", "schedule": timedelta(seconds=3600)},
