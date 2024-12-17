@@ -1,3 +1,8 @@
+3.20.0
+----------
+* Endpoint to assignee user in ticket
+* Update weni-rp-apps version to 2.8.13
+
 3.19.1
 ----------
 * Feat: Allow specifying whatsapp broadcast template by name
