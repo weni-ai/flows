@@ -334,8 +334,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 "uuid": str(template.uuid),
                 "variables": template_data.get("variables", []),
             }
-        except serializers.ValidationError as e:
-            raise e
+
         except Template.DoesNotExist:
             if uuid:
                 raise serializers.ValidationError(f"Template with UUID {uuid} not found.")
@@ -345,10 +344,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         if uuid:
             return Template.objects.get(uuid=uuid)
         if name:
-            if not org:
-                raise serializers.ValidationError("Organization context is required to fetch template by name.")
             return Template.objects.get(name=name, org=org)
-        raise serializers.ValidationError("Either UUID or Name must be provided to fetch a template.")
 
     def save(self):
         """
