@@ -312,34 +312,44 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
 
         template_data = data.get("msg", {}).get("template", None)
         if template_data is not None:
-            uuid = template_data.get("uuid", None)
-            name = template_data.get("name", None)
+            self._validate_and_assign_template(data, template_data, channel_data)
 
-            if not uuid and not name:
-                raise serializers.ValidationError("Template UUID or Name are required.")
-
-            if name and not channel_data:
-                raise serializers.ValidationError("Channel is required to use template name")
-
-            try:
-                if uuid:
-                    template = Template.objects.get(uuid=uuid)
-                elif name:
-                    template = Template.objects.get(name=name, org=self.context["org"])
-
-                data["msg"]["template"] = {
-                    "name": template.name,
-                    "uuid": str(template.uuid),
-                    "variables": data.get("msg", {}).get("template", {}).get("variables", []),
-                }
-            except Template.DoesNotExist:
-                raise serializers.ValidationError(f"Template with UUID {uuid} not found.")
-
-        if channel_data and template_data:
-            if not channel.template_translations.filter(template=template).exists():
-                raise serializers.ValidationError(f"Template {template.uuid} not found in channel {channel.uuid}")
+        if channel_data and "template" in data.get("msg", {}):
+            template = data["msg"]["template"]
+            if not channel.template_translations.filter(template__uuid=template["uuid"]).exists():
+                raise serializers.ValidationError(f"Template {template['uuid']} not found in channel {channel.uuid}")
 
         return data
+
+    def _validate_and_assign_template(self, data, template_data, channel_data):
+        uuid = template_data.get("uuid", None)
+        name = template_data.get("name", None)
+
+        if not uuid and not name:
+            raise serializers.ValidationError("Template UUID or Name are required.")
+
+        if name and not channel_data:
+            raise serializers.ValidationError("Channel is required to use template name")
+
+        try:
+            template = self._get_template(uuid=uuid, name=name, org=self.context.get("org"))
+
+            data["msg"]["template"] = {
+                "name": template.name,
+                "uuid": str(template.uuid),
+                "variables": template_data.get("variables", []),
+            }
+
+        except Template.DoesNotExist:
+            if uuid:
+                raise serializers.ValidationError(f"Template with UUID {uuid} not found.")
+            raise serializers.ValidationError(f"Template with name {name} not found.")
+
+    def _get_template(self, uuid=None, name=None, org=None):
+        if uuid:
+            return Template.objects.get(uuid=uuid)
+        if name:
+            return Template.objects.get(name=name, org=org)
 
     def save(self):
         """

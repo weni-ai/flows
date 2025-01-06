@@ -1,3 +1,7 @@
+3.20.1
+----------
+* Update weni-rp-apps version to 2.8.14
+
 3.20.0
 ----------
 * Endpoint to assignee user in ticket
