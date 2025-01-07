@@ -1301,6 +1301,9 @@ MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY", "")
 ZENDESK_CLIENT_ID = os.environ.get("ZENDESK_CLIENT_ID", "")
 ZENDESK_CLIENT_SECRET = os.environ.get("ZENDESK_CLIENT_SECRET", "")
 
+# Chatgpt token
+CHATGPT_KEY = os.environ.get("CHATGPT_KEY", "")
+
 
 # -----------------------------------------------------------------------------------
 #

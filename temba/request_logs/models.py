@@ -184,7 +184,7 @@ class HTTPLog(models.Model):
         return self._get_display_value(self.response, ContactURN.ANON_MASK)
 
     def _get_display_value(self, original, mask):
-        secrets = [settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN]
+        secrets = [settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN, settings.CHATGPT_KEY]
 
         for secret in secrets:
             if secret and original:
