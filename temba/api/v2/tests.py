@@ -1200,6 +1200,34 @@ class APITest(TembaTest):
         self.assertEqual(expected_metadata, broadcast.metadata)
         self.assertEqual(channel, broadcast.channel)
 
+        # Trying to get a not existing UUID
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid],
+                "msg": {"template": {"uuid": "1bb5d3de-6ddf-437b-9009-a04201bef143"}},
+                "channel": channel.uuid,
+            },
+        )
+        self.assertResponseError(
+            response, "non_field_errors", "Template with UUID 1bb5d3de-6ddf-437b-9009-a04201bef143 not found."
+        )
+
+        # Trying to get a not existing template name
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid],
+                "msg": {"template": {"name": "Away"}},
+                "channel": channel.uuid,
+            },
+        )
+        self.assertResponseError(response, "non_field_errors", "Template with name Away not found.")
+
     def test_archives(self):
         url = reverse("api.v2.archives")
 
