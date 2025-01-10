@@ -1,3 +1,8 @@
+3.20.2
+----------
+* Change template validation in WppBroadcast serializer
+* Hide chatgpt key in http logs
+
 3.20.1
 ----------
 * Update weni-rp-apps version to 2.8.14

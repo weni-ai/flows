@@ -1,9 +1,18 @@
 from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
 from rest_framework.mixins import CreateModelMixin
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from weni.internal.authenticators import InternalOIDCAuthentication
+from weni.internal.permissions import CanCommunicateInternally
 from weni.internal.views import InternalGenericViewSet
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+
+from temba.api.v2.internals.views import APIViewMixin
+from temba.api.v2.serializers import WhatsappBroadcastWriteSerializer
+from temba.orgs.models import Org
 
 from .serializers import BroadcastSerializer, UserAndProjectSerializer
 
@@ -37,3 +46,26 @@ class BroadcastsViewSet(CreateModelMixin, InternalGenericViewSet):
             raise AuthenticationFailed()
 
         return super().create(request, *args, **kwargs)
+
+
+class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+
+    def post(self, request, *args, **kwargs):
+        project_uuid = request.data.get("project")
+
+        if not project_uuid:
+            return Response({"error": "Project not provided"}, status=401)
+
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except Org.DoesNotExist:
+            return Response({"error": "Project not found"}, status=404)
+
+        serializer = WhatsappBroadcastWriteSerializer(data=request.data, context={"request": request, "org": org})
+
+        if serializer.is_valid():
+            return Response({"message": "Success"})
+
+        return Response(serializer.errors, status=400)
