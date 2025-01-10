@@ -1,3 +1,7 @@
+3.21.0
+----------
+* WhatsappBroadcast to be used internally
+
 3.20.2
 ----------
 * Change template validation in WppBroadcast serializer
