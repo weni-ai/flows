@@ -60,12 +60,16 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
 
         try:
             org = Org.objects.get(proj_uuid=project_uuid)
+            user, _ = User.objects.get_or_create(email=request.user.email)
         except Org.DoesNotExist:
             return Response({"error": "Project not found"}, status=404)
 
-        serializer = WhatsappBroadcastWriteSerializer(data=request.data, context={"request": request, "org": org})
+        serializer = WhatsappBroadcastWriteSerializer(
+            data=request.data, context={"request": request, "org": org, "user": user}
+        )
 
         if serializer.is_valid():
+            serializer.save()
             return Response({"message": "Success"})
 
         return Response(serializer.errors, status=400)
