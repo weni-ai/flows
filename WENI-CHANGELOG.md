@@ -1,3 +1,7 @@
+3.21.2
+----------
+* Adjust Internal whatsapp broadcasts tests
+
 3.21.1
 ----------
 * Fix error saving internal whatsapp broadcast
