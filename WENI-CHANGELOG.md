@@ -1,3 +1,15 @@
+3.21.2
+----------
+* Adjust Internal whatsapp broadcasts tests
+
+3.21.1
+----------
+* Fix error saving internal whatsapp broadcast
+
+3.21.0
+----------
+* WhatsappBroadcast to be used internally
+
 3.20.2
 ----------
 * Change template validation in WppBroadcast serializer
