@@ -1,3 +1,8 @@
+3.22.0
+----------
+* Update weni-rp-apps version to 2.8.15
+* Endpoint to get contacts internally
+
 3.21.2
 ----------
 * Adjust Internal whatsapp broadcasts tests
