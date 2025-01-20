@@ -54,3 +54,45 @@ class ChannelProjectViewTest(TembaTest):
             self.assertEqual(result_wac.get("waba"), str(channel_wac.config.get("wa_waba_id")))
             self.assertEqual(result_wac.get("phone_number"), str(channel_wac.config.get("wa_number")))
             self.assertEqual(result_wac.get("project_uuid"), str(project.project_uuid))
+
+
+class ChannelAllowedDomainsViewTest(TembaTest):
+    def test_request_without_channel_uuid(self):
+        url = "/api/v2/internals/channel_allowed_domains"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_request_with_channel_uuid(self):
+        wchan = self.create_channel(
+            "WWC", "WEBCHAT TEST CHANNEL", "wwctest", config={"allowed_domains": ["dash.weni.ai", "flows.weni.ai"]}
+        )
+
+        url = f"/api/v2/internals/channel_allowed_domains?channel={wchan.uuid}"
+
+        response = self.client.get(url)
+
+        data = response.json()
+
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0], "dash.weni.ai")
+
+    def test_request_with_channel_uuid_with_no_allowed_domains(self):
+        wchan = self.create_channel(
+            "WWC",
+            "WEBCHAT TEST CHANNEL2",
+            "wwctest2",
+        )
+
+        url = f"/api/v2/internals/channel_allowed_domains?channel={wchan.uuid}"
+
+        response = self.client.get(url)
+
+        data = response.json()
+
+        self.assertEqual(len(data), 0)
+
+    def test_request_with_channel_uuid_notfound(self):
+        url = f"/api/v2/internals/channel_allowed_domains?channel=2337712f-dcbc-48f3-9ae7-7f832445f6c9"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
