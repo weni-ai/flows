@@ -43,3 +43,23 @@ class ChannelProjectView(APIViewMixin, APIView):
             response["results"].append(channel_data)
 
         return Response(response)
+
+
+class ChannelAllowedDomainsView(APIViewMixin, APIView):
+    def get(self, request: Request):
+        params = request.query_params
+        channelUUID = params.get("channel")
+
+        if channelUUID is None:
+            return Response(status=400)
+        try:
+            channel = Channel.objects.get(uuid=channelUUID)
+        except Channel.DoesNotExist:
+            return Response(status=404)
+
+        response = []
+        allowedDomains = channel.config.get("allowed_domains")
+        if allowedDomains is not None and len(allowedDomains) > 0:
+            response = allowedDomains
+
+        return Response(response)
