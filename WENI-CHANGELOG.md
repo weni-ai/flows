@@ -1,3 +1,7 @@
+3.23.0
+----------
+* Add Endpoint to get webchat allowed domains
+
 3.22.0
 ----------
 * Update weni-rp-apps version to 2.8.15
