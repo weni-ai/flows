@@ -480,7 +480,7 @@ class WhatsAppCloudTypeTest(TembaTest):
         mock_get.assert_called_with(
             "https://graph.facebook.com/v16.0/12345/products",
             params={"limit": 255},
-            headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
+            headers={"Authorization": "***"},
         )
 
         # success no error and pagination
