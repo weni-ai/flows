@@ -1074,6 +1074,8 @@ class FlowCRUDL(SmartCRUDL):
             context["dev_mode"] = dev_mode
             context["is_starting"] = flow.is_starting()
             context["feature_filters"] = json.dumps(self.get_features(flow.org))
+            context["floweditor_sentry_dsn"] = settings.FLOWEDITOR_SENTRY_DSN
+
             return context
 
         def get_features(self, org) -> list:

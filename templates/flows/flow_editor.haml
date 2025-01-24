@@ -286,7 +286,9 @@
         },
 
         showNewUpdates: showUpdates,
-        initialGuide: initialGuide
+        initialGuide: initialGuide,
+
+        sentryDSN: '{{ floweditor_sentry_dsn }}',
       };
 
       showFlowEditor(document.getElementById('rp-flow-editor'), config);
