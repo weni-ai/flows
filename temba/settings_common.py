@@ -369,7 +369,7 @@ DEFAULT_PLAN = TOPUP_PLAN
 # Branding Configuration
 # -----------------------------------------------------------------------------------
 BRANDING = {
-    "rapidpro": {
+    "rapidpro.io": {
         "slug": "rapidpro",
         "name": "RapidPro",
         "org": "UNICEF",
@@ -1147,7 +1147,6 @@ COMPRESS_OFFLINE = False
 # build up our offline compression context based on available brands
 COMPRESS_OFFLINE_CONTEXT = []
 for brand in BRANDING.values():
-    print("Adding brand %s to offline context" % brand["slug"])
     context = dict(STATIC_URL=STATIC_URL, base_template="frame.html", debug=False, testing=False)
     context["brand"] = dict(slug=brand["slug"], styles=brand["styles"])
     COMPRESS_OFFLINE_CONTEXT.append(context)
