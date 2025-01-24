@@ -1,3 +1,8 @@
+3.23.1
+----------
+* Add sentry to floweditor
+* Update floweditor to 3.5.0
+
 3.23.0
 ----------
 * Add Endpoint to get webchat allowed domains
