@@ -250,8 +250,6 @@ INSTALLED_APPS += (
 # ------------------------------------------------------------------------------
 sentry_sdk.init(dsn=env("SENTRY_DSN", default=""), integrations=[DjangoIntegration()])
 
-FLOWEDITOR_SENTRY_DSN = env("FLOWEDITOR_SENTRY_DSN", default="")
-
 # LOGGING
 # ------------------------------------------------------------------------------
 LOGGING = {

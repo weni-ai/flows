@@ -369,7 +369,7 @@ DEFAULT_PLAN = TOPUP_PLAN
 # Branding Configuration
 # -----------------------------------------------------------------------------------
 BRANDING = {
-    "rapidpro.io": {
+    "rapidpro": {
         "slug": "rapidpro",
         "name": "RapidPro",
         "org": "UNICEF",
@@ -1147,6 +1147,7 @@ COMPRESS_OFFLINE = False
 # build up our offline compression context based on available brands
 COMPRESS_OFFLINE_CONTEXT = []
 for brand in BRANDING.values():
+    print("Adding brand %s to offline context" % brand["slug"])
     context = dict(STATIC_URL=STATIC_URL, base_template="frame.html", debug=False, testing=False)
     context["brand"] = dict(slug=brand["slug"], styles=brand["styles"])
     COMPRESS_OFFLINE_CONTEXT.append(context)
@@ -1396,3 +1397,5 @@ INTELLIGENCES_TOKEN = os.environ.get("INTELLIGENCES_TOKEN", default="")
 
 # Nexus url
 NEXUS_BASE_URL = os.environ.get("NEXUS_BASE_URL", default="https://nexus.dev.cloud.weni.ai")
+
+FLOWEDITOR_SENTRY_DSN = os.environ.get("FLOWEDITOR_SENTRY_DSN", default="")
