@@ -66,9 +66,12 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
 
         try:
             org = Org.objects.get(proj_uuid=project_uuid)
-            user, _ = User.objects.get_or_create(email=request.user.email)
+            user = User.objects.get(email=request.user.email)
         except Org.DoesNotExist:
             return Response({"error": "Project not found"}, status=404)
+
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
 
         serializer = ContactFieldWriteSerializer(
             data=request.data, context={"request": request, "org": org, "user": user}
