@@ -1,3 +1,17 @@
+3.23.1
+----------
+* Add sentry to floweditor
+* Update floweditor to 3.5.0
+
+3.23.0
+----------
+* Add Endpoint to get webchat allowed domains
+
+3.22.0
+----------
+* Update weni-rp-apps version to 2.8.15
+* Endpoint to get contacts internally
+
 3.21.2
 ----------
 * Adjust Internal whatsapp broadcasts tests
