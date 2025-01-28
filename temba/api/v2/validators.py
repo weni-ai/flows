@@ -4,7 +4,7 @@ from rest_framework.validators import UniqueValidator, qs_filter
 
 from django.conf import settings
 
-from temba.tests import requests
+import requests
 
 
 class UniqueForOrgValidator(UniqueValidator):
