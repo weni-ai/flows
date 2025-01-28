@@ -55,8 +55,6 @@ class InternalContactFieldsValuesSerializer(serializers.Serializer):
             if contact_field:
                 fields_to_update[contact_field] = value
 
-        contact.update_fields(fields_to_update)
-
         mods = contact.update_fields(fields_to_update)
         contact.modify(user, mods)
 
