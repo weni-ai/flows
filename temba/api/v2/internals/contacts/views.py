@@ -3,16 +3,21 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework import status
 from weni.internal.authenticators import InternalOIDCAuthentication
 from weni.internal.permissions import CanCommunicateInternally
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core import exceptions as django_exceptions
 
 from temba.api.v2.internals.contacts.serializers import InternalContactSerializer
 from temba.api.v2.internals.views import APIViewMixin
-from temba.api.v2.serializers import ContactFieldWriteSerializer
-from temba.contacts.models import Contact
+from temba.api.v2.serializers import (
+    ContactFieldReadSerializer,
+    ContactFieldWriteSerializer,
+)
+from temba.contacts.models import Contact, ContactField
 from temba.orgs.models import Org
 
 User = get_user_model()
@@ -58,20 +63,50 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
     permission_classes = [IsAuthenticated, CanCommunicateInternally]
 
+    def get(self, request, *args, **kwargs):
+        project_uuid = request.data.get("project")
+
+        if not project_uuid:
+            return Response(
+                {"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except (Org.DoesNotExist, django_exceptions.ValidationError):
+            return Response(
+                {"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        contact_fields = ContactField.user_fields.filter(org=org, is_active=True)
+        key = self.request.query_params.get("key")
+
+        if key:
+            contact_fields = contact_fields.filter(key=key)
+
+        serializer = ContactFieldReadSerializer(contact_fields, many=True)
+
+        return Response({"results": serializer.data})
+
     def post(self, request, *args, **kwargs):
         project_uuid = request.data.get("project")
 
         if not project_uuid:
-            return Response({"error": "Project not provided"}, status=401)
+            return Response(
+                {"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             org = Org.objects.get(proj_uuid=project_uuid)
             user = User.objects.get(email=request.user.email)
-        except Org.DoesNotExist:
-            return Response({"error": "Project not found"}, status=404)
+        except (Org.DoesNotExist, django_exceptions.ValidationError):
+            return Response(
+                {"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND
+            )
 
         except User.DoesNotExist:
-            return Response({"error": "User not found"}, status=404)
+            return Response(
+                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
+            )
 
         serializer = ContactFieldWriteSerializer(
             data=request.data, context={"request": request, "org": org, "user": user}
@@ -79,6 +114,6 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
 
         if serializer.is_valid():
             serializer.save()
-            return Response({"message": "Success"})
+            return Response(serializer.validated_data)
 
-        return Response(serializer.errors, status=400)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
