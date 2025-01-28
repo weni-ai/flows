@@ -70,7 +70,9 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, CanCommunicateInternally]
 
     def get(self, request, *args, **kwargs):
-        project_uuid = request.data.get("project")
+        query_params = request.query_params
+        project_uuid = query_params.get("project")
+        key = query_params.get("key")
 
         if not project_uuid:
             return Response(
@@ -84,7 +86,6 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
             )
 
         contact_fields = ContactField.user_fields.filter(org=org, is_active=True)
-        key = self.request.query_params.get("key")
 
         if key:
             contact_fields = contact_fields.filter(key=key)
