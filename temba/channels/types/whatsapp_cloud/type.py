@@ -172,11 +172,11 @@ class WhatsAppCloudType(ChannelType):
         start = timezone.now()
         try:
             product_data = []
-            url = f"{settings.WHATSAPP_API_URL}/{catalog_id}/products"
+            url = f"{settings.WHATSAPP_API_URL}/{catalog_id}/products?access_token={token}"
 
-            headers = {"Authorization": f"Bearer {token}"}
             while url:
-                resp = requests.get(url, params=dict(limit=255), headers=headers)
+                resp = requests.get(url)
+
                 elapsed = (timezone.now() - start).total_seconds() * 1000
                 HTTPLog.create_from_response(
                     HTTPLog.WHATSAPP_PRODUCTS_SYNCED, url, resp, channel=channel, request_time=elapsed
@@ -186,6 +186,7 @@ class WhatsAppCloudType(ChannelType):
 
                 product_data.extend(resp.json()["data"])
                 url = resp.json().get("paging", {}).get("next", None)
+
             return product_data, True
         except requests.RequestException as e:
             HTTPLog.create_from_exception(HTTPLog.WHATSAPP_PRODUCTS_SYNCED, url, e, start, channel=channel)
