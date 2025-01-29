@@ -1,3 +1,11 @@
+3.24.0
+----------
+* Remove error getting next page in products sync
+* Endpoint to create ContactField internally
+* Add endpoint to add and update field value
+* Add endpoint to list project contact fields
+* Fix error in sonarcloud
+
 3.23.1
 ----------
 * Add sentry to floweditor
