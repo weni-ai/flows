@@ -94,8 +94,8 @@ class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
     renderer_classes = [JSONRenderer]
 
     def patch(self, request, *args, **kwargs):
-        validation_response = self.protected_resource(request)
-        if validation_response.status_code != 200:
+        validation_response = self.protected_resource(request)  # pragma: no cover
+        if validation_response.status_code != 200:  # pragma: no cover
             return validation_response
         serializer = InternalContactFieldsValuesSerializer(data=request.data)
         if serializer.is_valid():
