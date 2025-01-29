@@ -1,13 +1,16 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from rest_framework import status
 from rest_framework.response import Response
 
+from django.contrib.auth import get_user_model
 from django.test import override_settings
 
 from temba.api.v2.validators import LambdaURLValidator
 from temba.tests import TembaTest
 from temba.tests.mailroom import mock_mailroom
+
+User = get_user_model()
 
 
 class InternalContactViewTest(TembaTest):
@@ -150,3 +153,91 @@ class UpdateContactFieldsViewTest(TembaTest):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"message": "Contact fields updated successfully"})
+
+
+class InternalContactFieldsEndpointTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        User.objects.create(username="Mordecai", email="mordecai@msn.com")
+
+    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.permission_classes", [])
+    def test_request_without_body(self):
+        url = "/api/v2/internals/contacts_fields"
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json(), {"error": "Project not provided"})
+
+    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.permission_classes", [])
+    def test_project_not_found(self):
+        url = "/api/v2/internals/contacts_fields"
+        body = {
+            "project": self.org.uuid,
+            "label": "Nick Name",
+            "value_type": "text",
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"error": "Project not found"})
+
+    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.permission_classes", [])
+    def test_user_not_found(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = False
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+
+            url = "/api/v2/internals/contacts_fields"
+            body = {
+                "project": self.org.proj_uuid,
+                "label": "Nick Name",
+                "value_type": "text",
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+            self.assertEqual(response.status_code, 404)
+            self.assertEqual(response.json(), {"error": "User not found"})
+
+    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.permission_classes", [])
+    def test_serializer_error(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mordecai@msn.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+
+            url = "/api/v2/internals/contacts_fields"
+            body = {
+                "project": self.org.proj_uuid,
+                "label": "Nick Name",
+                "value_type": "T",
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+            self.assertEqual(response.status_code, 400)
+
+    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.permission_classes", [])
+    def test_success(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mordecai@msn.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+
+            url = "/api/v2/internals/contacts_fields"
+            body = {
+                "project": self.org.proj_uuid,
+                "label": "Nick Name",
+                "value_type": "text",
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json(), {"message": "Success"})
