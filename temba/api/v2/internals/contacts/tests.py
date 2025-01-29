@@ -1,3 +1,4 @@
+from functools import wraps
 from unittest.mock import MagicMock, patch
 
 from rest_framework import status
@@ -7,10 +8,32 @@ from django.contrib.auth import get_user_model
 from django.test import override_settings
 
 from temba.api.v2.validators import LambdaURLValidator
+from temba.contacts.models import ContactField
 from temba.tests import TembaTest
 from temba.tests.mailroom import mock_mailroom
 
 User = get_user_model()
+
+
+CONTACT_FIELDS_ENDPOINT_PATH = "temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint"
+
+
+def skip_authentication(endpoint_path: str):
+    """
+    Decorator to disable authentication and permission checks for a specific endpoint.
+    :param endpoint_path: The path to the API endpoint where authentication and permissions should be skipped.
+    """
+
+    def decorator(func):
+        @patch(f"{endpoint_path}.authentication_classes", [])
+        @patch(f"{endpoint_path}.permission_classes", [])
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 class InternalContactViewTest(TembaTest):
@@ -49,6 +72,69 @@ class InternalContactViewTest(TembaTest):
             self.assertEqual(len(data.get("results")), 2)
 
             self.assertContains(response, str(contact1.uuid))
+
+
+class ListContactFieldsEndpointTest(TembaTest):
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    def test_get_contact_fields_without_project_returns_400(self):
+        url = "/api/v2/internals/contacts_fields"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 400)
+
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    def test_get_contact_fields_with_non_existent_project_returns_404(self):
+        url = "/api/v2/internals/contacts_fields?project=332035c8-0a85-44e7-bd1f-568a5afdb378"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 404)
+
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    def test_get_contact_fields_with_invalid_project_uuid_returns_404(self):
+        url = "/api/v2/internals/contacts_fields?project=123"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 404)
+
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    def test_get_contact_fields_with_no_fields_returns_empty_list(self):
+        url = f"/api/v2/internals/contacts_fields?project={self.org.proj_uuid}"
+        response = self.client.get(url)
+
+        data = response.json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data.get("results"), [])
+
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    def test_get_contact_fields_with_field_returns_expected_list(self):
+        ContactField.get_or_create(self.org, self.admin, "test1", value_type="T")
+
+        url = f"/api/v2/internals/contacts_fields?project={self.org.proj_uuid}"
+        response = self.client.get(url)
+
+        data = response.json()
+        expected_result = [{"key": "test1", "label": "Test1", "pinned": False, "value_type": "text"}]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data.get("results"), expected_result)
+
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    def test_get_contact_fields_with_multiple_fields(self):
+        ContactField.get_or_create(self.org, self.admin, "test1", value_type="T")
+        ContactField.get_or_create(self.org, self.admin, "test2", value_type="T")
+
+        url = f"/api/v2/internals/contacts_fields?project={self.org.proj_uuid}"
+        response = self.client.get(url)
+
+        data = response.json()
+        expected_result = [
+            {"key": "test1", "label": "Test1", "pinned": False, "value_type": "text"},
+            {"key": "test2", "label": "Test2", "pinned": False, "value_type": "text"},
+        ]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data.get("results"), expected_result)
 
 
 class UpdateContactFieldsViewTest(TembaTest):
@@ -166,7 +252,7 @@ class InternalContactFieldsEndpointTest(TembaTest):
         url = "/api/v2/internals/contacts_fields"
         response = self.client.post(url)
 
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {"error": "Project not provided"})
 
     @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.authentication_classes", [])
@@ -240,4 +326,4 @@ class InternalContactFieldsEndpointTest(TembaTest):
             response = self.client.post(url, data=body, content_type="application/json")
 
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json(), {"message": "Success"})
+            self.assertEqual(response.json(), {"label": "Nick Name", "value_type": "T"})
