@@ -37,7 +37,9 @@ def reverse(apps, schema_editor):  # pragma: no cover
 
 
 def apply_manual():  # pragma: no cover
-    populate_template()
+    from django.apps import apps
+
+    populate_template(apps, None)
 
 
 class Migration(migrations.Migration):
