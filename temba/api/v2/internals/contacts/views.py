@@ -69,15 +69,11 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
         key = query_params.get("key")
 
         if not project_uuid:
-            return Response(
-                {"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
         try:
             org = Org.objects.get(proj_uuid=project_uuid)
         except (Org.DoesNotExist, django_exceptions.ValidationError):
-            return Response(
-                {"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
         contact_fields = ContactField.user_fields.filter(org=org, is_active=True)
 
@@ -92,22 +88,16 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
         project_uuid = request.data.get("project")
 
         if not project_uuid:
-            return Response(
-                {"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             org = Org.objects.get(proj_uuid=project_uuid)
             user = User.objects.get(email=request.user.email)
         except (Org.DoesNotExist, django_exceptions.ValidationError):
-            return Response(
-                {"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
         except User.DoesNotExist:
-            return Response(
-                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = ContactFieldWriteSerializer(
             data=request.data, context={"request": request, "org": org, "user": user}
