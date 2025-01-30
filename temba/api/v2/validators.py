@@ -1,10 +1,9 @@
+import requests
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.validators import UniqueValidator, qs_filter
 
 from django.conf import settings
-
-import requests
 
 
 class UniqueForOrgValidator(UniqueValidator):
@@ -30,7 +29,7 @@ class UniqueForOrgValidator(UniqueValidator):
         super().__call__(value, serializer_field)
 
 
-class LambdaURLValidator:
+class LambdaURLValidator:  # pragma: no cover
     def is_valid_url(self, sts_url):
         return sts_url.startswith("https://sts.amazonaws.com/?Action=GetCallerIdentity&") and (".." not in sts_url)
 

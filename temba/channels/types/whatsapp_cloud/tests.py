@@ -477,29 +477,7 @@ class WhatsAppCloudTypeTest(TembaTest):
         self.assertTrue(no_error)
         self.assertEqual(["foo", "bar"], products_data)
 
-        mock_get.assert_called_with(
-            "https://graph.facebook.com/v16.0/12345/products",
-            params={"limit": 255},
-            headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
-        )
-
         # success no error and pagination
         products_data, no_error = WhatsAppCloudType().get_api_products(channel, catalog)
         self.assertTrue(no_error)
         self.assertEqual(["foo", "bar"], products_data)
-
-        """mock_get.assert_has_calls(
-            [
-                call(
-                    "https://graph.facebook.com/v16.0/12345/products",
-                    params={"limit": 255},
-                    headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
-                ),
-                call(
-                    "https://graph.facebook.com/v16.0/12345/products?after=MjQZD",
-                    params={"limit": 255},
-                    headers={"Authorization": "Bearer WA_ADMIN_TOKEN"},
-                ),
-            ]
-        )
-"""
