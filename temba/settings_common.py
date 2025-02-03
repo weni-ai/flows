@@ -1369,6 +1369,7 @@ RETENTION_PERIODS = {
     "httplog": timedelta(days=3),
     "syncevent": timedelta(days=7),
     "webhookevent": timedelta(hours=48),
+    "all_flowstart": timedelta(days=60),
 }
 
 # -----------------------------------------------------------------------------------
