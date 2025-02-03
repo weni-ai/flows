@@ -142,84 +142,60 @@ def trim_flow_sessions():
     logger.info(f"Deleted {num_deleted} flow sessions in {timesince(start)}")
 
 
+def trim_flow_starts_base(filter_kwargs, retention_period_key, log_name):
+    """
+    Cleanup completed flow starts based on given filter criteria and retention period.
+    """
+    trim_before = timezone.now() - settings.RETENTION_PERIODS[retention_period_key]
+    num_deleted = 0
+    start = timezone.now()
+
+    logger.info(f"Deleting {log_name} flow starts created before {trim_before.isoformat()}")
+
+    while True:
+        start_ids = list(
+            FlowStart.objects.filter(
+                **filter_kwargs,  # Usa os filtros passados como argumento
+                status__in=(FlowStart.STATUS_COMPLETE, FlowStart.STATUS_FAILED),
+                modified_on__lte=trim_before,
+            ).values_list("id", flat=True)[:1000]
+        )
+        if not start_ids:
+            break
+
+        # Detach any flows runs that belong to these starts
+        run_ids = FlowRun.objects.filter(start_id__in=start_ids).values_list("id", flat=True)[:100000]
+        while len(run_ids) > 0:
+            for chunk in chunk_list(run_ids, 1000):
+                FlowRun.objects.filter(id__in=chunk).update(start_id=None)
+
+            # Reselect for next batch
+            run_ids = FlowRun.objects.filter(start_id__in=start_ids).values_list("id", flat=True)[:100000]
+
+        FlowStart.contacts.through.objects.filter(flowstart_id__in=start_ids).delete()
+        FlowStart.groups.through.objects.filter(flowstart_id__in=start_ids).delete()
+        FlowStartCount.objects.filter(start_id__in=start_ids).delete()
+        FlowStart.objects.filter(id__in=start_ids).delete()
+        num_deleted += len(start_ids)
+
+        if num_deleted % 10000 == 0:  # pragma: no cover
+            logger.debug(f" > Deleted {num_deleted} {log_name} flow starts")
+
+    logger.info(f"Deleted {num_deleted} {log_name} flow starts in {timesince(start)}")
+
+
 def trim_flow_starts():
     """
     Cleanup completed non-user created flow starts
     """
-    trim_before = timezone.now() - settings.RETENTION_PERIODS["flowstart"]
-    num_deleted = 0
-    start = timezone.now()
-
-    logger.info(f"Deleting completed non-user created flow starts created before {trim_before.isoformat()}")
-
-    while True:
-        start_ids = list(
-            FlowStart.objects.filter(
-                start_type=FlowStart.TYPE_API,
-                status__in=(FlowStart.STATUS_COMPLETE, FlowStart.STATUS_FAILED),
-                modified_on__lte=trim_before,
-            ).values_list("id", flat=True)[:1000]
-        )
-        if not start_ids:
-            break
-
-        # detach any flows runs that belong to these starts
-        run_ids = FlowRun.objects.filter(start_id__in=start_ids).values_list("id", flat=True)[:100000]
-        while len(run_ids) > 0:
-            for chunk in chunk_list(run_ids, 1000):
-                FlowRun.objects.filter(id__in=chunk).update(start_id=None)
-
-            # reselect for our next batch
-            run_ids = FlowRun.objects.filter(start_id__in=start_ids).values_list("id", flat=True)[:100000]
-
-        FlowStart.contacts.through.objects.filter(flowstart_id__in=start_ids).delete()
-        FlowStart.groups.through.objects.filter(flowstart_id__in=start_ids).delete()
-        FlowStartCount.objects.filter(start_id__in=start_ids).delete()
-        FlowStart.objects.filter(id__in=start_ids).delete()
-        num_deleted += len(start_ids)
-
-        if num_deleted % 10000 == 0:  # pragma: no cover
-            logger.debug(f" > Deleted {num_deleted} flow starts")
-
-    logger.info(f"Deleted {num_deleted} completed non-user created flow starts in {timesince(start)}")
+    trim_flow_starts_base(
+        filter_kwargs={"start_type": FlowStart.TYPE_API}, retention_period_key="flowstart", log_name="non-user created"
+    )
 
 
+@nonoverlapping_task(track_started=True, name="trim_all_flow_starts")
 def trim_all_flow_starts():
     """
     Cleanup completed flow starts
     """
-    trim_before = timezone.now() - settings.RETENTION_PERIODS["all_flowstart"]
-    num_deleted = 0
-    start = timezone.now()
-
-    logger.info(f"Deleting completed flow starts created before {trim_before.isoformat()}")
-
-    while True:
-        start_ids = list(
-            FlowStart.objects.filter(
-                status__in=(FlowStart.STATUS_COMPLETE, FlowStart.STATUS_FAILED),
-                modified_on__lte=trim_before,
-            ).values_list("id", flat=True)[:1000]
-        )
-        if not start_ids:
-            break
-
-        # detach any flows runs that belong to these starts
-        run_ids = FlowRun.objects.filter(start_id__in=start_ids).values_list("id", flat=True)[:100000]
-        while len(run_ids) > 0:
-            for chunk in chunk_list(run_ids, 1000):
-                FlowRun.objects.filter(id__in=chunk).update(start_id=None)
-
-            # reselect for our next batch
-            run_ids = FlowRun.objects.filter(start_id__in=start_ids).values_list("id", flat=True)[:100000]
-
-        FlowStart.contacts.through.objects.filter(flowstart_id__in=start_ids).delete()
-        FlowStart.groups.through.objects.filter(flowstart_id__in=start_ids).delete()
-        FlowStartCount.objects.filter(start_id__in=start_ids).delete()
-        FlowStart.objects.filter(id__in=start_ids).delete()
-        num_deleted += len(start_ids)
-
-        if num_deleted % 10000 == 0:  # pragma: no cover
-            logger.debug(f" > Deleted {num_deleted} flow starts")
-
-    logger.info(f"Deleted {num_deleted} completed created flow starts in {timesince(start)}")
+    trim_flow_starts_base(filter_kwargs={}, retention_period_key="all_flowstart", log_name="all")
