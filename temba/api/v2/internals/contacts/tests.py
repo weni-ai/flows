@@ -136,6 +136,19 @@ class ListContactFieldsEndpointTest(TembaTest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(data.get("results"), expected_result)
 
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    def test_get_contact_fields_with_key_filter(self):
+        ContactField.get_or_create(self.org, self.admin, "test1", value_type="T")
+
+        url = f"/api/v2/internals/contacts_fields?project={self.org.proj_uuid}&key=test1"
+        response = self.client.get(url)
+
+        data = response.json()
+        expected_result = [{"key": "test1", "label": "Test1", "pinned": False, "value_type": "text"}]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data.get("results"), expected_result)
+
 
 class UpdateContactFieldsViewTest(TembaTest):
     @patch.object(LambdaURLValidator, "protected_resource")
@@ -246,8 +259,7 @@ class InternalContactFieldsEndpointTest(TembaTest):
         super().setUp()
         User.objects.create(username="Mordecai", email="mordecai@msn.com")
 
-    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.authentication_classes", [])
-    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.permission_classes", [])
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
     def test_request_without_body(self):
         url = "/api/v2/internals/contacts_fields"
         response = self.client.post(url)
@@ -255,8 +267,7 @@ class InternalContactFieldsEndpointTest(TembaTest):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {"error": "Project not provided"})
 
-    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.authentication_classes", [])
-    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.permission_classes", [])
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
     def test_project_not_found(self):
         url = "/api/v2/internals/contacts_fields"
         body = {
@@ -269,8 +280,7 @@ class InternalContactFieldsEndpointTest(TembaTest):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json(), {"error": "Project not found"})
 
-    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.authentication_classes", [])
-    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.permission_classes", [])
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
     def test_user_not_found(self):
         mock_user = MagicMock(spec=User)
         mock_user.is_authenticated = False
@@ -289,8 +299,7 @@ class InternalContactFieldsEndpointTest(TembaTest):
             self.assertEqual(response.status_code, 404)
             self.assertEqual(response.json(), {"error": "User not found"})
 
-    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.authentication_classes", [])
-    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.permission_classes", [])
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
     def test_serializer_error(self):
         mock_user = MagicMock(spec=User)
         mock_user.is_authenticated = True
@@ -308,8 +317,7 @@ class InternalContactFieldsEndpointTest(TembaTest):
 
             self.assertEqual(response.status_code, 400)
 
-    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.authentication_classes", [])
-    @patch("temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint.permission_classes", [])
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
     def test_success(self):
         mock_user = MagicMock(spec=User)
         mock_user.is_authenticated = True
