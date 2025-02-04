@@ -1,3 +1,8 @@
+3.24.1
+----------
+* Add test and use skip_authentication decorator
+* Fix lamba allowed hosts enviroment variable
+
 3.24.0
 ----------
 * Remove error getting next page in products sync
