@@ -61,6 +61,7 @@ from .models import (
 from .tasks import (
     interrupt_flow_sessions,
     squash_flowcounts,
+    trim_all_flow_starts,
     trim_flow_revisions,
     trim_flow_sessions_and_starts,
     update_run_expirations_task,
@@ -3931,6 +3932,50 @@ class FlowStartTest(TembaTest):
 
         # # and the 2 that are too new
         # self.assertEqual(2, FlowStart.objects.filter(created_by=None, modified_on=date2).count())
+
+    def test_trim_all_starts(self):
+        contact = self.create_contact("Benson", phone="+558491111111")
+        group = self.create_group("Viewes", contacts=[contact])
+        flow = self.get_flow("color")
+
+        def create_start(user, start_type, status, modified_on, **kwargs):
+            start = FlowStart.create(flow, user, start_type, **kwargs)
+            start.status = status
+            start.modified_on = modified_on
+            start.save(update_fields=("status", "modified_on"))
+
+            session = FlowSession.objects.create(uuid=uuid4(), org=self.org, contact=contact)
+            FlowRun.objects.create(org=self.org, contact=contact, flow=flow, session=session, start=start)
+
+            FlowStartCount.objects.create(start=start, count=1, is_squashed=False)
+
+        date1 = timezone.now() - timedelta(days=61)
+        date2 = timezone.now()
+
+        # some starts that won't be deleted because they are user created
+        create_start(self.admin, FlowStart.TYPE_API, FlowStart.STATUS_COMPLETE, date1, contacts=[contact])
+        create_start(self.admin, FlowStart.TYPE_MANUAL, FlowStart.STATUS_COMPLETE, date1, groups=[group])
+        create_start(self.admin, FlowStart.TYPE_MANUAL, FlowStart.STATUS_FAILED, date1, query="name ~ Ben")
+
+        # some starts that are mailroom created and will be deleted
+        create_start(None, FlowStart.TYPE_FLOW_ACTION, FlowStart.STATUS_COMPLETE, date1, contacts=[contact])
+        create_start(None, FlowStart.TYPE_TRIGGER, FlowStart.STATUS_FAILED, date1, groups=[group])
+
+        # some starts that are mailroom created but not completed so won't be deleted
+        create_start(None, FlowStart.TYPE_FLOW_ACTION, FlowStart.STATUS_STARTING, date1, contacts=[contact])
+        create_start(None, FlowStart.TYPE_TRIGGER, FlowStart.STATUS_PENDING, date1, groups=[group])
+        create_start(None, FlowStart.TYPE_TRIGGER, FlowStart.STATUS_PENDING, date1, groups=[group])
+
+        # some starts that are mailroom created but too new so won't be deleted
+        create_start(None, FlowStart.TYPE_FLOW_ACTION, FlowStart.STATUS_COMPLETE, date2, contacts=[contact])
+        create_start(None, FlowStart.TYPE_TRIGGER, FlowStart.STATUS_FAILED, date2, groups=[group])
+
+        trim_all_flow_starts()
+
+        # check that related objects still exist!
+        contact.refresh_from_db()
+        group.refresh_from_db()
+        flow.refresh_from_db()
 
 
 class ExportFlowResultsTest(TembaTest):
