@@ -1400,5 +1400,3 @@ NEXUS_BASE_URL = os.environ.get("NEXUS_BASE_URL", default="https://nexus.dev.clo
 FLOWEDITOR_SENTRY_DSN = os.environ.get("FLOWEDITOR_SENTRY_DSN", default="")
 
 INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
-
-LAMBDA_ALLOWED_ROLES = os.environ.get("LAMBDA_ALLOWED_ROLES", default=[])
