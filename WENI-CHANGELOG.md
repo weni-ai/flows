@@ -1,3 +1,8 @@
+3.24.2
+----------
+* Fix error getting data from /accounts in meta
+* Add cycle to campaigns_eventfire_id_seq
+
 3.24.1
 ----------
 * Add test and use skip_authentication decorator
