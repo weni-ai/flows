@@ -50,25 +50,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
                 if long_lived_auth_token == "":  # pragma: no cover
                     raise Exception("Empty user access token!")
 
-                url = f"https://graph.facebook.com/v7.0/{fb_user_id}/accounts"
-                params = {"access_token": long_lived_auth_token}
-
-                response = requests.get(url, params=params)
-
-                if response.status_code != 200:  # pragma: no cover
-                    raise Exception("Failed to get a page long lived token")
-
-                response_json = response.json()
-
-                page_access_token = ""
-                for elt in response_json["data"]:
-                    if elt["id"] == str(page_id):
-                        page_access_token = elt["access_token"]
-                        name = elt["name"]
-                        break
-
-                if page_access_token == "":  # pragma: no cover
-                    raise Exception("Empty page access token!")
+                page_access_token, name = get_page_access_token(fb_user_id, page_id, long_lived_auth_token)
 
                 url = f"https://graph.facebook.com/v7.0/{page_id}/subscribed_apps"
                 params = {"access_token": page_access_token}
@@ -113,6 +95,28 @@ class ClaimView(ClaimViewMixin, SmartFormView):
         )
 
         return super().form_valid(form)
+
+
+def get_page_access_token(fb_user_id, page_id, long_lived_auth_token):
+    url = f"https://graph.facebook.com/v7.0/{fb_user_id}/accounts"
+    params = {"access_token": long_lived_auth_token}
+
+    while url:
+        response = requests.get(url, params=params)
+        if response.status_code != 200:  # pragma: no cover
+            raise Exception("Failed to get a page long-lived token")
+
+        response_json = response.json()
+
+        for elt in response_json.get("data", []):
+            if "id" in elt and "access_token" in elt and "name" in elt:
+                if elt["id"] == str(page_id):
+                    return elt["access_token"], elt["name"]
+
+        url = response_json.get("paging", {}).get("next", None)
+        params = {}
+
+    raise Exception("Empty page access token!")
 
 
 class RefreshToken(ModalMixin, OrgObjPermsMixin, SmartModelActionView):

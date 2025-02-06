@@ -1,8 +1,10 @@
+import unittest
 from unittest.mock import patch
 
 from django.test import override_settings
 from django.urls import reverse
 
+from temba.channels.types.facebookapp.views import get_page_access_token
 from temba.tests import MockResponse, TembaTest
 from temba.utils import json
 
@@ -200,3 +202,51 @@ class FacebookTypeTest(TembaTest):
             },
             params={"access_token": f"page-long-life-{token}"},
         )
+
+
+class TestGetPageAccessToken(unittest.TestCase):
+    @patch("requests.get")
+    def test_pagination_third_page(self, mock_get):
+        mock_get.side_effect = [
+            unittest.mock.Mock(
+                status_code=200,
+                json=lambda: {
+                    "data": [{"id": "321", "access_token": "token321", "name": "Page 51"}],
+                    "paging": {"next": "https://next-page-1.com"},
+                },
+            ),
+            unittest.mock.Mock(
+                status_code=200,
+                json=lambda: {
+                    "data": [{"id": "000", "access_token": "token000", "name": "Page 005"}],
+                    "paging": {"next": "https://next-page-2.com"},
+                },
+            ),
+            unittest.mock.Mock(
+                status_code=200,
+                json=lambda: {
+                    "data": [{"id": "123", "access_token": "token123", "name": "Page 1"}],
+                    "paging": {"previous": "https://next-page-1.com"},
+                },
+            ),
+        ]
+
+        access_token, page_name = get_page_access_token("user123", "123", "long_token")
+        self.assertEqual(access_token, "token123")
+        self.assertEqual(page_name, "Page 1")
+
+    @patch("requests.get")
+    def test_exception_empty_token(self, mock_get):
+        mock_get.side_effect = [
+            unittest.mock.Mock(
+                status_code=200, json=lambda: {"data": [], "paging": {"next": "https://next-page-1.com"}}
+            ),
+            unittest.mock.Mock(
+                status_code=200, json=lambda: {"data": [], "paging": {"next": "https://next-page-2.com"}}
+            ),
+            unittest.mock.Mock(status_code=200, json=lambda: {"data": [], "paging": {}}),
+        ]
+
+        with self.assertRaises(Exception) as context:
+            get_page_access_token("user123", "123", "long_token")
+        self.assertEqual(str(context.exception), "Empty page access token!")
