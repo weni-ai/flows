@@ -61,6 +61,7 @@ from .models import (
 from .tasks import (
     interrupt_flow_sessions,
     squash_flowcounts,
+    trim_all_flow_starts,
     trim_flow_revisions,
     trim_flow_sessions_and_starts,
     update_run_expirations_task,
@@ -3917,20 +3918,20 @@ class FlowStartTest(TembaTest):
         group.refresh_from_db()
         flow.refresh_from_db()
 
-        # check user created starts still exist
-        # self.assertEqual(2, FlowStart.objects.filter(created_by=self.admin).count())
+        create_start(self.admin, FlowStart.TYPE_API, FlowStart.STATUS_COMPLETE, date1, contacts=[contact])
+        create_start(self.admin, FlowStart.TYPE_MANUAL, FlowStart.STATUS_COMPLETE, date1, groups=[group])
+        create_start(self.admin, FlowStart.TYPE_MANUAL, FlowStart.STATUS_FAILED, date1, query="name ~ Ben")
 
-        # # 5 mailroom created starts remain
-        # self.assertEqual(7, FlowStart.objects.filter(created_by=None).count())
+        # some starts that are mailroom created and will be deleted
+        create_start(None, FlowStart.TYPE_FLOW_ACTION, FlowStart.STATUS_COMPLETE, date1, contacts=[contact])
+        create_start(None, FlowStart.TYPE_TRIGGER, FlowStart.STATUS_FAILED, date1, groups=[group])
 
-        # # only runs from our remaining starts still have start ids
-        # self.assertEqual(8, FlowRun.objects.exclude(start=None).count())
+        trim_all_flow_starts()
 
-        # # the 3 that aren't complete...
-        # self.assertEqual(3, FlowStart.objects.filter(created_by=None).exclude(status="C").exclude(status="F").count())
-
-        # # and the 2 that are too new
-        # self.assertEqual(2, FlowStart.objects.filter(created_by=None, modified_on=date2).count())
+        # check that related objects still exist!
+        contact.refresh_from_db()
+        group.refresh_from_db()
+        flow.refresh_from_db()
 
 
 class ExportFlowResultsTest(TembaTest):
