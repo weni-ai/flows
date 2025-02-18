@@ -5,7 +5,7 @@ jobs:
     name: Test
     env:
       python-version: '3.9.x'
-      postgis-version: '3.1'
+      postgis-version: '15-3.5'
       redis-version: '3.2.4'
       node-version: '10'
       elastic-version: '7.10.1'
@@ -14,92 +14,102 @@ jobs:
       DJANGO_SETTINGS_MODULE: temba.settings_ci
     strategy:
       matrix:
-        pg-version: ['16']
+        pg-version: ['15']
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:15-3.5
+        env:
+          POSTGRES_DB: temba
+          POSTGRES_USER: temba
+          POSTGRES_PASSWORD: temba
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U temba -d temba"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v1
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Install PostgreSQL and PostGIS
-      uses: nyaruka/postgis-action@v2.1.0
-      with:
-        postgresql version: ${{ matrix.pg-version }}
-        postgis version: ${{ env.postgis-version }}
-        postgresql db: temba
-        postgresql user: temba
-        postgresql password: temba
-        postgresql arguments: '--jit=off'
+      - name: Install Linux packages
+        run: |
+          sudo apt update
+          sudo apt install -y --no-install-recommends libgdal-dev gettext
 
-    - name: Install Linux packages
-      run: |
-        sudo apt update
-        sudo apt install -y --no-install-recommends libgdal-dev gettext
+      - name: Install Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ env.python-version }}
 
-    - name: Install Python
-      uses: actions/setup-python@v1
-      with:
-        python-version: ${{ env.python-version }}
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.5
+          virtualenvs-in-project: true
 
-    - name: Install Poetry
-      uses: snok/install-poetry@v1
-      with:
-        version: 1.8.5
-        virtualenvs-in-project: true
+      - name: Install Redis
+        uses: zhulik/redis-action@v1.0.0
+        with:
+          redis version: ${{ env.redis-version }}
 
-    - name: Install Redis
-      uses: zhulik/redis-action@v1.0.0
-      with:
-        redis version: ${{ env.redis-version }}
+      - name: Install ElasticSearch
+        uses: nyaruka/elasticsearch-action@master
+        with:
+          elastic version: ${{ env.elastic-version }}
 
-    - name: Install ElasticSearch
-      uses: nyaruka/elasticsearch-action@master
-      with:
-        elastic version: ${{ env.elastic-version }}
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.node-version }}
 
-    - name: Install Node
-      uses: actions/setup-node@v1
-      with:
-        node-version: ${{ env.node-version }}
+      - name: Wait for PostgreSQL to start
+        run: sleep 10
 
-    - name: Initialize environment
-      run: |
-        poetry add git+https://github.com/noumar/iso639.git
-        #poetry add -n --lock $(cat ${{ github.workspace }}/docker/pip-requires.txt)
-        poetry install
-        npm install
-        sudo npm install -g less
-        ln -s ${{ github.workspace }}/temba/settings.py.dev ${{ github.workspace }}/temba/settings.py
-        poetry run python manage.py migrate
-        # fetch and extract rp-indexer
-        wget https://github.com/nyaruka/rp-indexer/releases/download/v${{ env.rpindexer-version }}/rp-indexer_${{ env.rpindexer-version }}_linux_amd64.tar.gz
-        tar -xvf rp-indexer_${{ env.rpindexer-version }}_linux_amd64.tar.gz rp-indexer
-        # fetch, extract and start mailroom
-        wget https://github.com/rapidpro/mailroom/releases/download/v${{ env.mailroom-version }}/mailroom_${{ env.mailroom-version }}_linux_amd64.tar.gz
-        tar -xvf mailroom_${{ env.mailroom-version }}_linux_amd64.tar.gz mailroom
-        ./mailroom -db=postgres://temba:temba@localhost:5432/temba?sslmode=disable -redis=redis://localhost:6379/10 -log-level=info > mailroom.log &
+      - name: Test PostgreSQL connection
+        run: |
+          PGPASSWORD=temba psql -h localhost -U temba -d temba -c "SELECT version();"
 
-    - name: Run pre-test checks
-      run: |
-        # test that everything is well formatted, no missing migrations etc
-        poetry run ./code_check.py --debug
-        # check we can collect and compress all static files
-        poetry run ./manage.py collectstatic --noinput --verbosity=0
-        poetry run ./manage.py compress --extension=".haml" --settings=temba.settings_compress
+      - name: Initialize environment
+        run: |
+          poetry add git+https://github.com/noumar/iso639.git
+          poetry install
+          npm install
+          sudo npm install -g less
+          ln -s ${{ github.workspace }}/temba/settings.py.dev ${{ github.workspace }}/temba/settings.py
+          poetry run python manage.py migrate
+          # fetch and extract rp-indexer
+          wget https://github.com/nyaruka/rp-indexer/releases/download/v${{ env.rpindexer-version }}/rp-indexer_${{ env.rpindexer-version }}_linux_amd64.tar.gz
+          tar -xvf rp-indexer_${{ env.rpindexer-version }}_linux_amd64.tar.gz rp-indexer
+          # fetch, extract and start mailroom
+          wget https://github.com/rapidpro/mailroom/releases/download/v${{ env.mailroom-version }}/mailroom_${{ env.mailroom-version }}_linux_amd64.tar.gz
+          tar -xvf mailroom_${{ env.mailroom-version }}_linux_amd64.tar.gz mailroom
+          ./mailroom -db=postgres://temba:temba@localhost:5432/temba?sslmode=disable -redis=redis://localhost:6379/10 -log-level=info > mailroom.log &
 
-    - name: Run tests
-      run: |
-        poetry run coverage run manage.py test --keepdb --noinput --verbosity=2
-        poetry run coverage report -i
-        poetry run coverage report -i --rcfile .coveragerc_todo
-        poetry run coverage xml
+      - name: Run pre-test checks
+        run: |
+          poetry run ./code_check.py --debug
+          poetry run ./manage.py collectstatic --noinput --verbosity=0
+          poetry run ./manage.py compress --extension=".haml" --settings=temba.settings_compress
 
-    - name: Mailroom log
-      if: failure()
-      run: cat mailroom.log
+      - name: Run tests
+        run: |
+          poetry run coverage run manage.py test --keepdb --noinput --verbosity=2
+          poetry run coverage report -i
+          poetry run coverage report -i --rcfile .coveragerc_todo
+          poetry run coverage xml
 
-    - name: Upload coverage
-      if: success()
-      uses: codecov/codecov-action@v3
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        fail_ci_if_error: true
+      - name: Mailroom log
+        if: failure()
+        run: cat mailroom.log
+
+      - name: Upload coverage
+        if: success()
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
