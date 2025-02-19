@@ -1,3 +1,8 @@
+3.24.3
+----------
+* Update weni-rp-apps version to 2.8.16
+* Add task to trim all completed flow starts
+
 3.24.2
 ----------
 * Fix error getting data from /accounts in meta
