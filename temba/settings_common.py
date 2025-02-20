@@ -756,6 +756,7 @@ GROUP_PERMISSIONS = {
         "tickets.topic.*",
         "triggers.trigger.*",
         "externals.external_services_api",
+        "wpp_flows.whatsapp_flows_api",
     ),
     "Editors": (
         "api.apitoken_refresh",
@@ -868,6 +869,7 @@ GROUP_PERMISSIONS = {
         "tickets.topic_api",
         "triggers.trigger.*",
         "externals.external_services_api",
+        "wpp_flows.whatsapp_flows_api",
     ),
     "Viewers": (
         "campaigns.campaign_archived",
@@ -957,6 +959,7 @@ GROUP_PERMISSIONS = {
         "triggers.trigger_list",
         "triggers.trigger_type",
         "externals.external_services_api",
+        "wpp_flows.whatsapp_flows_api",
     ),
     "Agents": (
         "contacts.contact_api",
