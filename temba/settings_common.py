@@ -757,6 +757,7 @@ GROUP_PERMISSIONS = {
         "tickets.topic.*",
         "triggers.trigger.*",
         "externals.external_services_api",
+        "wpp_flows.whatsapp_flows_api",
     ),
     "Editors": (
         "api.apitoken_refresh",
@@ -869,6 +870,7 @@ GROUP_PERMISSIONS = {
         "tickets.topic_api",
         "triggers.trigger.*",
         "externals.external_services_api",
+        "wpp_flows.whatsapp_flows_api",
     ),
     "Viewers": (
         "campaigns.campaign_archived",
@@ -958,6 +960,7 @@ GROUP_PERMISSIONS = {
         "triggers.trigger_list",
         "triggers.trigger_type",
         "externals.external_services_api",
+        "wpp_flows.whatsapp_flows_api",
     ),
     "Agents": (
         "contacts.contact_api",
@@ -1403,5 +1406,3 @@ NEXUS_BASE_URL = os.environ.get("NEXUS_BASE_URL", default="https://nexus.dev.clo
 FLOWEDITOR_SENTRY_DSN = os.environ.get("FLOWEDITOR_SENTRY_DSN", default="")
 
 INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
-
-LAMBDA_ALLOWED_ROLES = os.environ.get("LAMBDA_ALLOWED_ROLES", default=[])

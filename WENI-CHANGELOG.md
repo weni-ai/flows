@@ -1,3 +1,18 @@
+3.24.3
+----------
+* Update weni-rp-apps version to 2.8.16
+* Add task to trim all completed flow starts
+
+3.24.2
+----------
+* Fix error getting data from /accounts in meta
+* Add cycle to campaigns_eventfire_id_seq
+
+3.24.1
+----------
+* Add test and use skip_authentication decorator
+* Fix lamba allowed hosts enviroment variable
+
 3.24.0
 ----------
 * Remove error getting next page in products sync

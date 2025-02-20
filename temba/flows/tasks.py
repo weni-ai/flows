@@ -142,7 +142,7 @@ def trim_flow_sessions():
     logger.info(f"Deleted {num_deleted} flow sessions in {timesince(start)}")
 
 
-def trim_flow_starts_base(filter_kwargs, retention_period_key, log_name):
+def trim_flow_starts_base(filter_kwargs, exclude_kwargs, retention_period_key, log_name):
     """
     Cleanup completed flow starts based on given filter criteria and retention period.
     """
@@ -153,23 +153,25 @@ def trim_flow_starts_base(filter_kwargs, retention_period_key, log_name):
     logger.info(f"Deleting {log_name} flow starts created before {trim_before.isoformat()}")
 
     while True:
-        start_ids = list(
-            FlowStart.objects.filter(
-                **filter_kwargs,  # Usa os filtros passados como argumento
-                status__in=(FlowStart.STATUS_COMPLETE, FlowStart.STATUS_FAILED),
-                modified_on__lte=trim_before,
-            ).values_list("id", flat=True)[:1000]
+        query = FlowStart.objects.filter(
+            **filter_kwargs,
+            status__in=(FlowStart.STATUS_COMPLETE, FlowStart.STATUS_FAILED),
+            modified_on__lte=trim_before,
         )
+
+        if exclude_kwargs:
+            query = query.exclude(**exclude_kwargs)
+
+        start_ids = list(query.values_list("id", flat=True)[:1000])
+
         if not start_ids:
             break
 
-        # Detach any flows runs that belong to these starts
         run_ids = FlowRun.objects.filter(start_id__in=start_ids).values_list("id", flat=True)[:100000]
         while len(run_ids) > 0:
             for chunk in chunk_list(run_ids, 1000):
                 FlowRun.objects.filter(id__in=chunk).update(start_id=None)
 
-            # Reselect for next batch
             run_ids = FlowRun.objects.filter(start_id__in=start_ids).values_list("id", flat=True)[:100000]
 
         FlowStart.contacts.through.objects.filter(flowstart_id__in=start_ids).delete()
@@ -189,7 +191,10 @@ def trim_flow_starts():
     Cleanup completed non-user created flow starts
     """
     trim_flow_starts_base(
-        filter_kwargs={"start_type": FlowStart.TYPE_API}, retention_period_key="flowstart", log_name="non-user created"
+        filter_kwargs={"start_type": FlowStart.TYPE_API},
+        exclude_kwargs={},
+        retention_period_key="flowstart",
+        log_name="non-user created",
     )
 
 
@@ -198,4 +203,9 @@ def trim_all_flow_starts():
     """
     Cleanup completed flow starts
     """
-    trim_flow_starts_base(filter_kwargs={}, retention_period_key="all_flowstart", log_name="all")
+    trim_flow_starts_base(
+        filter_kwargs={},
+        exclude_kwargs={"start_type": FlowStart.TYPE_API},
+        retention_period_key="all_flowstart",
+        log_name="all",
+    )
