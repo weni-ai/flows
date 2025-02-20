@@ -5111,7 +5111,7 @@ class ESIntegrationTest(TembaNonAtomicTest):
         db_config = connection.settings_dict
         database_url = (
             f"postgres://{db_config['USER']}:{db_config['PASSWORD']}@{db_config['HOST']}:{db_config['PORT']}/"
-            f"{db_config['NAME']}"
+            f"{db_config['NAME']}?sslmode=disable"
         )
         print(f"Using database: {database_url}")
 

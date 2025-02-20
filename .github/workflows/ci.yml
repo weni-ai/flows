@@ -9,7 +9,7 @@ jobs:
       redis-version: '3.2.4'
       node-version: '10'
       elastic-version: '7.10.1'
-      rpindexer-version: '7.0.0'
+      rpindexer-version: '1.0.1'
       mailroom-version: '7.1.22'
       DJANGO_SETTINGS_MODULE: temba.settings_ci
     strategy:
@@ -71,7 +71,7 @@ jobs:
         ln -s ${{ github.workspace }}/temba/settings.py.dev ${{ github.workspace }}/temba/settings.py
         poetry run python manage.py migrate
         # fetch and extract rp-indexer
-        wget https://github.com/nyaruka/rp-indexer/releases/download/v${{ env.rpindexer-version }}/rp-indexer_${{ env.rpindexer-version }}_linux_amd64.tar.gz
+        wget https://github.com/weni-ai/rp-indexer/releases/download/${{ env.rpindexer-version }}/rp-indexer_${{ env.rpindexer-version }}_linux_amd64.tar.gz
         tar -xvf rp-indexer_${{ env.rpindexer-version }}_linux_amd64.tar.gz rp-indexer
         # fetch, extract and start mailroom
         wget https://github.com/rapidpro/mailroom/releases/download/v${{ env.mailroom-version }}/mailroom_${{ env.mailroom-version }}_linux_amd64.tar.gz
