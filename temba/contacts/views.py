@@ -390,6 +390,8 @@ class ContactForm(forms.ModelForm):
         self.org = self.user.get_org()
         del kwargs["user"]
         super().__init__(*args, **kwargs)
+        
+        print("______________UPDATE_CONTACT")
 
         # add all URN scheme fields if org is not anon
         extra_fields = []
@@ -436,6 +438,25 @@ class ContactForm(forms.ModelForm):
 
     def clean(self):
         country = self.org.default_country_code
+        
+        def validate_urn_whatsapp(key, scheme, path):
+            print("VALIDATE_WHATSAPP")
+            try:
+                if len(path) == 13 and path[4] == '9':
+                    path = path[:4] + path[5:]
+                else:
+                    path = path[:4] + "9" + path[4:]
+                normalized = URN.normalize(URN.from_parts(scheme, path), country)
+                existing_urn = ContactURN.lookup(self.org, normalized, normalize=False)
+
+                if existing_urn and existing_urn.contact and existing_urn.contact != self.instance:
+                    self._errors[key] = self.error_class([_("Used by another contact")])
+                    return False
+
+                return True
+            except ValueError:
+                self._errors[key] = self.error_class([_("Invalid input")])
+                return False
 
         def validate_urn(key, scheme, path):
             try:
@@ -454,19 +475,28 @@ class ContactForm(forms.ModelForm):
                     else:
                         self._errors[key] = self.error_class([_("Invalid format")])
                     return False
+
+                # validate whatsapp URN variations
+                if scheme == URN.WHATSAPP_SCHEME:
+                    return validate_urn_whatsapp(key, scheme, path)
+
                 return True
             except ValueError:
                 self._errors[key] = self.error_class([_("Invalid input")])
                 return False
+            
+            
 
         # validate URN fields
         for field_key, value in self.data.items():
+            print("VALIDATE_URN")
             if field_key.startswith("urn__") and value:
                 scheme = field_key.split("__")[1]
                 validate_urn(field_key, scheme, value)
 
         # validate new URN if provided
         if self.data.get("new_path", None):
+            print("NEW PATH")
             if validate_urn("new_path", self.data["new_scheme"], self.data["new_path"]):
                 self.cleaned_data["new_scheme"] = self.data["new_scheme"]
                 self.cleaned_data["new_path"] = self.data["new_path"]
