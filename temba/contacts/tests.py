@@ -3215,6 +3215,37 @@ class ContactTest(TembaTest):
         self.assertFalse(ChannelEvent.objects.filter(contact=self.frank))
         self.assertFalse(ChannelEvent.objects.filter(id=event.id))
 
+    @mock_mailroom
+    def test_update_wa_urn(self, mr_mocks):
+        # Test updating a contact with a WA URN
+        self.login(self.admin)
+
+        response = self.client.post(
+            reverse("contacts.contact_update", args=[self.joe.id]),
+            dict(name="Joey", new_scheme="whatsapp", new_path="5582988990000"),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(0, len(response.context["form"].errors))
+
+        self.joe.refresh_from_db()
+        self.assertEqual(1, self.joe.urns.count())
+        self.assertEqual({str(u) for u in self.joe.urns.all()}, {"whatsapp:5582988990000"})
+
+        contactNew = self.create_contact(name="Boy")
+        response = self.client.post(
+            reverse("contacts.contact_update", args=[contactNew.id]),
+            dict(
+                name="boy", urn__whatsapp__0="558288990000"
+            ),  # trying insert a new urn without extra 9 equal joes ones
+        )
+
+        self.assertEqual(1, len(response.context["form"].errors))
+        self.assertFormError(response, "form", "urn__whatsapp__0", "Used by another contact")
+
+        contactNew.refresh_from_db()
+        self.assertEqual(0, contactNew.urns.count())
+
     @patch("temba.mailroom.client.MailroomClient.contact_modify")
     def test_update_with_mailroom_error(self, mock_modify):
         mock_modify.side_effect = MailroomException("", "", {"error": "Error updating contact"})
