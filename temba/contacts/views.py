@@ -470,7 +470,7 @@ class ContactForm(forms.ModelForm):
                     return False
 
                 # validate whatsapp URN variations
-                if scheme == URN.WHATSAPP_SCHEME:
+                if scheme == URN.WHATSAPP_SCHEME and path[:2] == "55":
                     return validate_urn_whatsapp(key, scheme, path)
 
                 return True
