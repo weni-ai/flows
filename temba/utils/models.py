@@ -313,7 +313,7 @@ class SquashableModel(models.Model):
         for distinct_set in cls.get_unsquashed().order_by(*cls.squash_over).distinct(*cls.squash_over)[:5000]:
             with connection.cursor() as cursor:
                 sql, params = cls.get_squash_query(distinct_set)
-
+                cursor.execute("SET application_name = 'flows_nokill';")
                 cursor.execute(sql, params)
 
             num_sets += 1
