@@ -5220,7 +5220,6 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
         }
     """
 
-    permission = "templates.template_api"
     model = WhatsappFlow
     serializer_class = WhatsappFlowReadSerializer
     pagination_class = CreatedOnCursorPagination
