@@ -53,7 +53,7 @@ def export_flow_results_task(export_id):
     ExportFlowResultsTask.objects.select_related("org", "created_by").get(id=export_id).perform()
 
 
-@nonoverlapping_task(track_started=True, name="squash_flowcounts", lock_timeout=7200)
+@nonoverlapping_task(track_started=True, name="squash_flowcounts", lock_timeout=7200, use_watchdog=True)
 def squash_flowcounts():
     FlowNodeCount.squash()
     FlowRunCount.squash()
