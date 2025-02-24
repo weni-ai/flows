@@ -1,3 +1,10 @@
+3.24.4
+----------
+* Fix task name error
+* Update whatsapp flows api permission
+* Avoid timeout in flows tasks
+* Update postgres version to 15 in CI
+
 3.24.3
 ----------
 * Update weni-rp-apps version to 2.8.16

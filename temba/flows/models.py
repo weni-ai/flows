@@ -1686,6 +1686,7 @@ class FlowPathRecentRun(models.Model):
         newest_id = newest["id"] if newest else -1
 
         sql = """
+            SET application_name = 'flows_nokill';
             DELETE FROM %(table)s WHERE id IN (
               SELECT id FROM (
                   SELECT
