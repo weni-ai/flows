@@ -439,6 +439,7 @@ class Org(SmartModel):
                 plan=plan,
                 is_multi_user=self.is_multi_user,
                 is_multi_org=self.is_multi_org,
+                config={"verify_ninth_digit": True},
             )
 
             org.add_user(created_by, OrgRole.ADMINISTRATOR)
