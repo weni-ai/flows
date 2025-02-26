@@ -1,3 +1,7 @@
+3.25.0
+----------
+* Add watchdog mechanism to prevent task overlapping
+
 3.24.4
 ----------
 * Fix task name error
