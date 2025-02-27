@@ -371,6 +371,43 @@ class MailroomClientTest(TembaTest):
                 json={"org_id": 1, "user_id": 12, "ticket_ids": [123, 345], "force": True},
             )
 
+    def test_ticket_open(self):
+        with patch("requests.post") as mock_post:
+            response = """{
+                "assignee": {
+                    "email": "admin1@nyaruka.com",
+                    "name": "Andy Admin"
+                },
+                "body": "",
+                "external_id": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+                "ticketer": {
+                    "name": "Weni Chats",
+                    "uuid": "006d224e-107f-4e18-afb2-f41fe302abdc"
+                },
+                "topic": {
+                    "name": "General",
+                    "queue_uuid": "5c85fdf7-d54a-49dd-97ed-7e10077a1f6a",
+                    "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
+                },
+                "uuid": "692926ea-09d6-4942-bd38-d266ec8d3716"
+            }"""
+            mock_post.return_value = MockResponse(200, response)
+            response = get_client().ticket_open(1, 10000, 7, 1, 1, "")
+
+            self.assertEqual("692926ea-09d6-4942-bd38-d266ec8d3716", response["uuid"])
+            mock_post.assert_called_once_with(
+                "http://localhost:8090/mr/ticket/open",
+                headers={"User-Agent": "Temba"},
+                json={
+                    "org_id": 1,
+                    "contact_id": 10000,
+                    "ticketer_id": 7,
+                    "topic_id": 1,
+                    "assignee_id": 1,
+                    "extra": "",
+                },
+            )
+
     def test_ticket_reopen(self):
         with patch("requests.post") as mock_post:
             mock_post.return_value = MockResponse(200, '{"changed_ids": [123]}')
