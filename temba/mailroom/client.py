@@ -208,6 +208,17 @@ class MailroomClient:
 
         return self._request("ticket/close", payload)
 
+    def ticket_open(self, org_id: int, contact_id: int, ticketer_id: int, topic_id: int, assignee_id: int, extra: str):
+        payload = {
+            "org_id": org_id,
+            "contact_id": contact_id,
+            "ticketer_id": ticketer_id,
+            "topic_id": topic_id,
+            "assignee_id": assignee_id,
+            "extra": extra,
+        }
+        return self._request("ticket/open", payload)
+
     def ticket_reopen(self, org_id, user_id, ticket_ids):
         payload = {"org_id": org_id, "user_id": user_id, "ticket_ids": ticket_ids}
 
