@@ -52,7 +52,10 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
         serializer = OpenTicketSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        self.ticketer = Ticketer.objects.filter(config__sector_uuid=str(serializer.validated_data["sector"])).first()
+        self.ticketer = Ticketer.objects.filter(
+            config__sector_uuid=str(serializer.validated_data["sector"]),
+            org_id=serializer.validated_data["org_id"],
+        ).first()
         contact = Contact.objects.get(uuid=serializer.validated_data["contact"])
         topic_id = self.get_topic_id(request)
         assignee_id = self.get_assignee_id(request)

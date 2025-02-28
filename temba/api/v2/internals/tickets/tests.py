@@ -101,6 +101,7 @@ class OpenTicketTest(TembaTest):
 
         url = "/api/v2/internals/open_ticket"
         body = {
+            "project": self.org.proj_uuid,
             "sector": self.ticketer.config["sector_uuid"],
             "contact": self.joe.uuid,
             "assignee": "user_email@email.com",
@@ -131,14 +132,12 @@ class OpenTicketTest(TembaTest):
 
         url = "/api/v2/internals/open_ticket"
         body = {
+            "project": self.org.proj_uuid,
             "sector": self.ticketer.config["sector_uuid"],
             "contact": self.joe.uuid,
             "conversation_started_on": "2025-01-01 00:00:00",
         }
         response = self.client.post(url, data=body, content_type="application/json")
-
-        print("RESPONSE_DATA:")
-        print(response.data)
 
         self.assertEqual(response.status_code, 200)
 
@@ -151,6 +150,7 @@ class OpenTicketTest(TembaTest):
 
         url = "/api/v2/internals/open_ticket"
         body = {
+            "project": self.org.proj_uuid,
             "sector": self.ticketer.config["sector_uuid"],
             "contact": self.joe.uuid,
             "assignee": "",
@@ -170,6 +170,7 @@ class OpenTicketTest(TembaTest):
 
         url = "/api/v2/internals/open_ticket"
         body = {
+            "project": self.org.proj_uuid,
             "sector": self.ticketer.config["sector_uuid"],
             "contact_urn": self.joe.urns.first().path,
             "assignee": "user_email@email.com",
@@ -195,6 +196,7 @@ class OpenTicketTest(TembaTest):
 
         url = "/api/v2/internals/open_ticket"
         body = {
+            "project": self.org.proj_uuid,
             "sector": "1cfa4c9e-d69b-436c-971e-ca444334b60f",
             "contact": self.joe.uuid,
             "assignee": "user_email@email.com",
@@ -214,6 +216,7 @@ class OpenTicketTest(TembaTest):
 
         url = "/api/v2/internals/open_ticket"
         body = {
+            "project": self.org.proj_uuid,
             "sector": self.ticketer.config["sector_uuid"],
             "contact": self.joe.uuid,
             "assignee": "user_email@email.com",
@@ -243,6 +246,7 @@ class OpenTicketTest(TembaTest):
 
         url = "/api/v2/internals/open_ticket"
         body = {
+            "project": self.org.proj_uuid,
             "sector": self.ticketer.config["sector_uuid"],
             "contact": self.joe.uuid,
             "assignee": self.user.email,
@@ -268,6 +272,7 @@ class OpenTicketTest(TembaTest):
 
         url = "/api/v2/internals/open_ticket"
         body = {
+            "project": self.org.proj_uuid,
             "sector": self.ticketer.config["sector_uuid"],
             "contact": "0f3e1b46-a58e-4246-8fae-52bfd3087850",
             "assignee": "user_email@email.com",
@@ -284,6 +289,24 @@ class OpenTicketTest(TembaTest):
 
         url = "/api/v2/internals/open_ticket"
         body = {
+            "project": self.org.proj_uuid,
+            "sector": self.ticketer.config["sector_uuid"],
+            "contact_urn": "5582998765432",
+            "assignee": "user_email@email.com",
+            "queue": self.org.default_ticket_topic.queue_uuid,
+            "conversation_started_on": "2025-01-01 00:00:00",
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 400)
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_open_ticket_invalid_project(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/open_ticket"
+        body = {
+            "project": "91b45788-8beb-48dd-8355-64aab570e0c9",
             "sector": self.ticketer.config["sector_uuid"],
             "contact_urn": "5582998765432",
             "assignee": "user_email@email.com",
