@@ -16,9 +16,8 @@ from xlsxlite.writer import XLSXBook
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.contrib.postgres.fields import ArrayField
-from django.core.cache import cache
 from django.core.files.temp import NamedTemporaryFile
-from django.db import connection as db_connection, models, transaction
+from django.db import models, transaction
 from django.db.models import Max, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
@@ -1673,39 +1672,30 @@ class FlowPathRecentRun(models.Model):
 
     @classmethod
     def prune(cls):
-        """
-        Removes old recent run records leaving only PRUNE_TO most recent for each segment
-        """
-        last_id = cache.get(cls.LAST_PRUNED_KEY, -1)
+        BATCH_SIZE = 50
+        deleted_counter = 0
 
-        newest = cls.objects.order_by("-id").values("id").first()
-        newest_id = newest["id"] if newest else -1
+        while True:
+            recent_runs = FlowPathRecentRun.objects.order_by("id")[:BATCH_SIZE].only("id", "visited_on")
+            id_list = list(recent_runs.values_list("id", flat=True))
 
-        sql = """
-            SET application_name = 'flows_nokill';
-            DELETE FROM %(table)s WHERE id IN (
-              SELECT id FROM (
-                  SELECT
-                    r.id,
-                    dense_rank() OVER (PARTITION BY from_uuid, to_uuid ORDER BY visited_on DESC) AS pos
-                  FROM %(table)s r
-                  WHERE (from_uuid, to_uuid) IN (
-                    -- get the unique segments added to since last prune
-                    SELECT DISTINCT from_uuid, to_uuid FROM %(table)s WHERE id > %(last_id)d
-                  )
-              ) s WHERE s.pos > %(limit)d
-            )""" % {
-            "table": cls._meta.db_table,
-            "last_id": last_id,
-            "limit": cls.PRUNE_TO,
-        }
+            if len(id_list) == 0:
+                break
 
-        cursor = db_connection.cursor()
-        cursor.execute(sql)
+            recent_runs = FlowPathRecentRun.objects.filter(id__in=id_list).order_by("-visited_on")
 
-        cache.set(cls.LAST_PRUNED_KEY, newest_id)
+            visited_on = recent_runs.first().visited_on
 
-        return cursor.rowcount  # number of deleted entries
+            if timezone.now() - visited_on < timedelta(days=30):
+                break
+
+            recent_runs.delete()
+
+            id_list_len = len(id_list)
+            deleted_counter += id_list_len
+
+            logger.info(f"Deleted {deleted_counter} from flowpathrecentrun")
+        logger.info(f"Total deleted: {deleted_counter}")
 
     def __str__(self):  # pragma: no cover
         return f"run={self.run.uuid} flow={self.run.flow.uuid} segment={self.to_uuid}→{self.from_uuid}"
