@@ -61,9 +61,13 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
         assignee_id = self.get_assignee_id(request)
         extra = f'{{"history_after":"{serializer.validated_data["conversation_started_on"]}"}}'
 
-        return mailroom.get_client().ticket_open(
-            self.ticketer.org.id, contact.id, self.ticketer.id, topic_id, assignee_id, extra
-        )
+        try:
+            response = mailroom.get_client().ticket_open(
+                self.ticketer.org.id, contact.id, self.ticketer.id, topic_id, assignee_id, extra
+            )
+        except mailroom.MailroomException as e:
+            return Response(e.as_json(), status=status.HTTP_400_BAD_REQUEST)
+        return Response(response, status_code=status.HTTP_200_OK)
 
     def get_assignee_id(self, request):
         assignee = request.data.get("assignee")
