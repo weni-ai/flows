@@ -52,14 +52,15 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
         serializer = OpenTicketSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        self.ticketer = Ticketer.objects.filter(config__sector_uuid=str(serializer.validated_data["sector"])).first()
-        contact = Contact.objects.get(uuid=serializer.validated_data["contact"])        
+        self.ticketer = Ticketer.objects.filter(
+            config__sector_uuid=str(serializer.validated_data["sector"]),
+            org_id=serializer.validated_data["org_id"],
+        ).first()
+        contact = Contact.objects.get(uuid=serializer.validated_data["contact"])
         topic_id = self.get_topic_id(request)
         assignee_id = self.get_assignee_id(request)
         extra = f'{{"history_after":"{serializer.validated_data["conversation_started_on"]}"}}'
 
-        print("DETAILS:")
-        print(self.ticketer.org.id, contact.id, self.ticketer.id, topic_id, assignee_id, extra)
         return mailroom.get_client().ticket_open(
             self.ticketer.org.id, contact.id, self.ticketer.id, topic_id, assignee_id, extra
         )
@@ -81,6 +82,6 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
                 topic = Topic.objects.get(queue_uuid=queue)
                 return topic.id
             except Topic.DoesNotExist:
-                pass    
-        
+                pass
+
         return self.ticketer.org.topics.get(is_default=True).id
