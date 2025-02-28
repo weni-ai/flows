@@ -155,6 +155,7 @@ class Command(BaseCommand):
             created_on=timezone.now(),
             created_by=superuser,
             modified_by=superuser,
+            config={"verify_ninth_digit": True},
         )
         org.initialize(topup_size=100_000, sample_flows=False)
 
