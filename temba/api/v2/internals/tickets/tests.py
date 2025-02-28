@@ -74,23 +74,20 @@ class OpenTicketTest(TembaTest):
         )
 
     def ticket_open_return_value(self):
-        return Response(
-            {
-                "body": '{"history_after":"2025-01-01 00:00:00"}',
-                "external_id": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
-                "ticketer": {
-                    "name": self.ticketer.name,
-                    "uuid": self.ticketer.uuid,
-                },
-                "topic": {
-                    "name": "General",
-                    "queue_uuid": self.org.default_ticket_topic.queue_uuid,
-                    "uuid": self.org.default_ticket_topic.uuid,
-                },
-                "uuid": "970b8069-50f5-4f6f-8f41-6b2d9f33d623",
+        return {
+            "body": '{"history_after":"2025-01-01 00:00:00"}',
+            "external_id": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "ticketer": {
+                "name": self.ticketer.name,
+                "uuid": self.ticketer.uuid,
             },
-            status=status.HTTP_200_OK,
-        )
+            "topic": {
+                "name": "General",
+                "queue_uuid": self.org.default_ticket_topic.queue_uuid,
+                "uuid": self.org.default_ticket_topic.uuid,
+            },
+            "uuid": "970b8069-50f5-4f6f-8f41-6b2d9f33d623",
+        }
 
     @patch.object(LambdaURLValidator, "protected_resource")
     @patch("temba.mailroom.client.MailroomClient.ticket_open")
