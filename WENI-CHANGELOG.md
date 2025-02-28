@@ -1,3 +1,9 @@
+3.26.0
+----------
+* Set verify ninth digit as default in project creation
+* Change prune function to flow path recent run
+* Add api v2 internal endpoint for open ticket
+
 3.25.0
 ----------
 * Add watchdog mechanism to prevent task overlapping
