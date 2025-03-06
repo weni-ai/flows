@@ -46,6 +46,7 @@ class ProjectCreationUseCase:
                 config={
                     "is_template": project_dto.is_template,
                     "description": project_dto.description,
+                    "verify_ninth_digit": True,
                 },
             ),
         )
