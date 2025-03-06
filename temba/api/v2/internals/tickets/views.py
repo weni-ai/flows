@@ -93,7 +93,7 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
             except Topic.DoesNotExist:
                 pass
 
-        return self.ticketer.org.topics.get(is_default=True).id
+        return self.ticketer.org.topics.last().id
 
 
 class GetDepartmentsView(APIViewMixin, APIView, LambdaURLValidator):
