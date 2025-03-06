@@ -67,9 +67,9 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
             response = mailroom.get_client().ticket_open(
                 self.ticketer.org.id, contact.id, self.ticketer.id, topic_id, assignee_id, extra
             )
-        except mailroom.MailroomException as e:
-            return Response(e.as_json(), status=status.HTTP_400_BAD_REQUEST)
-        return Response(response, status_code=status.HTTP_200_OK)
+        except:
+            return Response("error on open ticket, check mailroom logs", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(response, status=status.HTTP_200_OK)
 
     def get_assignee_id(self, request):
         assignee = request.data.get("assignee")
@@ -90,4 +90,4 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
             except Topic.DoesNotExist:
                 pass
 
-        return self.ticketer.org.topics.get(is_default=True).id
+        return self.ticketer.org.topics.last().id
