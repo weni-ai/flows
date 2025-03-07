@@ -239,7 +239,7 @@ class OpenTicketTest(TembaTest):
     def test_open_ticket_invalid_topic(self, mock_ticket_open, mock_protected_resource):
         mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
         
-        mock_ticket_open.side_effect = HTTPError()
+        mock_ticket_open.side_effect = HTTPError("{\"error\":\"queue not found\"}")
 
         url = "/api/v2/internals/open_ticket"
         body = {
@@ -262,6 +262,7 @@ class OpenTicketTest(TembaTest):
         )
 
         self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.data, "{\"error\":\"queue not found\"}")
 
     @patch.object(LambdaURLValidator, "protected_resource")
     @patch("temba.mailroom.client.MailroomClient.ticket_open")
