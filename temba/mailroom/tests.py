@@ -2,11 +2,11 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django_redis import get_redis_connection
+from requests import HTTPError
 
 from django.conf import settings
 from django.test import override_settings
 from django.utils import timezone
-from requests import HTTPError
 
 from temba.campaigns.models import Campaign, CampaignEvent, EventFire
 from temba.channels.models import ChannelEvent, ChannelLog
@@ -408,14 +408,14 @@ class MailroomClientTest(TembaTest):
                     "extra": "",
                 },
             )
+
     def test_ticket_open_fail(self):
         with patch("requests.post") as mock_post:
             mock_post.return_value = MockResponse(500, '{"error": "some error ocurred"}')
-            
-            
+
             with self.assertRaises(HTTPError):
                 response = get_client().ticket_open(1, 10000, 7, 1, 1, "")
-            
+
             mock_post.assert_called_once_with(
                 "http://localhost:8090/mr/ticket/open",
                 headers={"User-Agent": "Temba"},
