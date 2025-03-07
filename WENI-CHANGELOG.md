@@ -1,3 +1,8 @@
+3.27.0
+----------
+* Internal endpoints to get Departments and Queues
+* Change filter to get not null msgs in contacts templates endpoint
+
 3.26.0
 ----------
 * Set verify ninth digit as default in project creation
