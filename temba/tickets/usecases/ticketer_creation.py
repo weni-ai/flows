@@ -90,7 +90,7 @@ def create_ticketer(
     )
 
     for queue in queues:
-        print('fila que chegou', queue)
+        print("fila que chegou", queue)
         TicketerQueue.objects.get_or_create(
             queue_uuid=queue.get("uuid"),
             org=project.org,

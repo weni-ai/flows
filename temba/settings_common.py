@@ -564,7 +564,7 @@ PERMISSIONS = {
     "tickets.ticketer": ("api", "connect", "configure"),
     "tickets.topic": ("api",),
     "triggers.trigger": ("archived", "type"),
-    "wpp_flows.whatsapp_flows":("api"),
+    "wpp_flows.whatsapp_flows": ("api"),
 }
 
 

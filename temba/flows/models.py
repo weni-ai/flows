@@ -343,7 +343,7 @@ class Flow(TembaModel):
                 )
 
             integrations = flow_def.get("integrations", {})
-            print('Integracoes do fluxo', integrations)
+            print("Integracoes do fluxo", integrations)
             for classifier in integrations.get("classifiers", []):  # pragma: no cover
                 name = classifier.get("name")
                 if IntegrationRequest.objects.filter(flow=flow, name=name, project=org.project):
@@ -361,10 +361,10 @@ class Flow(TembaModel):
                 name = ticketer.get("name")
                 ticketer_object = IntegrationRequest.objects.filter(flow=flow, name=name, project=org.project)
                 if ticketer_object:
-                    print('Ja existe uma integration request para esse ticketer, o id dele eh', ticketer_object.id)
+                    print("Ja existe uma integration request para esse ticketer, o id dele eh", ticketer_object.id)
                     continue
 
-                print('Criando uma nova integration Request')
+                print("Criando uma nova integration Request")
                 IntegrationRequest.objects.create(
                     flow=flow,
                     integration_uuid=ticketer.get("uuid"),

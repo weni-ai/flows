@@ -3214,28 +3214,26 @@ class ContactTest(TembaTest):
 
         self.assertFalse(ChannelEvent.objects.filter(contact=self.frank))
         self.assertFalse(ChannelEvent.objects.filter(id=event.id))
-        
+
     def test_update_wa_urn(self):
         # Test updating a contact with a WA URN
         self.login(self.admin)
-        
+
         response = self.client.post(
             reverse("contacts.contact_update", args=[self.joe.id]),
             dict(name="Joey", urn__whatsapp__0="5582988990000"),
         )
-        
+
         self.joe.refresh_from_db()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.joe.urns.count(), 2)
-        
-        contactNew = self.create_contact(
-            name="Boy"
-        )
+
+        contactNew = self.create_contact(name="Boy")
         response = self.client.post(
             reverse("contacts.contact_update", args=[contactNew.id]),
             dict(name="boy", urn__whatsapp__0="558288990000"),
         )
-        
+
         self.assertEqual(1, len(response.context["form"].errors))
 
     @patch("temba.mailroom.client.MailroomClient.contact_modify")

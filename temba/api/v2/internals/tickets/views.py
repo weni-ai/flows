@@ -21,7 +21,7 @@ from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.serializers import TopicReadSerializer
 from temba.api.v2.validators import LambdaURLValidator
 from temba.orgs.models import Org
-from temba.tickets.models import Ticket, Ticketer
+from temba.tickets.models import Ticket, Ticketer, Topic
 
 User = get_user_model()
 
@@ -51,7 +51,7 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
     renderer_classes = [JSONRenderer]
 
     def post(self, request, *args, **kwargs):
-        auth_bypass = request.data.get('auth_bypass')
+        auth_bypass = request.data.get("auth_bypass")
         if auth_bypass is None:
             validation_response = self.protected_resource(request)  # pragma: no cover
             if validation_response.status_code != 200:  # pragma: no cover

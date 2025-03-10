@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from django.contrib.auth.models import User
 
 from temba.api.v2.validators import LambdaURLValidator
-from temba.tests import MockResponse,TembaTest
+from temba.tests import TembaTest
 from temba.tickets.models import Ticket, Ticketer
 
 
@@ -267,7 +267,7 @@ class OpenTicketTest(TembaTest):
     @patch("temba.mailroom.client.MailroomClient.ticket_open")
     def test_open_ticket_invalid_topic(self, mock_ticket_open, mock_protected_resource):
         mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
-        
+
         mock_ticket_open.side_effect = HTTPError()
 
         url = "/api/v2/internals/open_ticket"

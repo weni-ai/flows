@@ -390,7 +390,7 @@ class ContactForm(forms.ModelForm):
         self.org = self.user.get_org()
         del kwargs["user"]
         super().__init__(*args, **kwargs)
-        
+
         # add all URN scheme fields if org is not anon
         extra_fields = []
         if not self.org.is_anon:
@@ -436,10 +436,10 @@ class ContactForm(forms.ModelForm):
 
     def clean(self):
         country = self.org.default_country_code
-        
+
         def validate_urn_whatsapp(key, scheme, path):
             try:
-                if len(path) == 13 and path[4] == '9':
+                if len(path) == 13 and path[4] == "9":
                     path = path[:4] + path[5:]
                 else:
                     path = path[:4] + "9" + path[4:]
@@ -481,8 +481,6 @@ class ContactForm(forms.ModelForm):
             except ValueError:
                 self._errors[key] = self.error_class([_("Invalid input")])
                 return False
-            
-            
 
         # validate URN fields
         for field_key, value in self.data.items():
