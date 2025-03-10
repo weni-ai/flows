@@ -20,9 +20,8 @@ from temba.api.v2.internals.tickets.serializers import (
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.serializers import TopicReadSerializer
 from temba.api.v2.validators import LambdaURLValidator
-from temba.contacts.models import Contact
 from temba.orgs.models import Org
-from temba.tickets.models import Ticket, Ticketer, Topic
+from temba.tickets.models import Ticket, Ticketer
 
 User = get_user_model()
 
@@ -61,21 +60,20 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
         serializer = OpenTicketSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        self.ticketer = Ticketer.objects.filter(
-            config__sector_uuid=str(serializer.validated_data["sector"]),
-            org_id=serializer.validated_data["org_id"],
-        ).first()
-        contact = Contact.objects.get(uuid=serializer.validated_data["contact"])
-        topic_id = self.get_topic_id(request)
+        ticketer_id = serializer.validated_data["ticketer_id"]
+        contact_id = serializer.validated_data["contact_id"]
+        topic_id = serializer.validated_data["topic_id"]
         assignee_id = self.get_assignee_id(request)
         extra = f'{{"history_after":"{serializer.validated_data["conversation_started_on"]}"}}'
 
+        ticketer = Ticketer.objects.get(id=ticketer_id)
+
         try:
             response = mailroom.get_client().ticket_open(
-                self.ticketer.org.id, contact.id, self.ticketer.id, topic_id, assignee_id, extra
+                ticketer.org.id, contact_id, ticketer_id, topic_id, assignee_id, extra
             )
-        except:
-            return Response("error on open ticket, check mailroom logs", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(response, status=status.HTTP_200_OK)
 
     def get_assignee_id(self, request):

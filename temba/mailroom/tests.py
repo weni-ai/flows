@@ -2,6 +2,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django_redis import get_redis_connection
+from requests import HTTPError
 
 from django.conf import settings
 from django.test import override_settings
@@ -416,6 +417,26 @@ class MailroomClientTest(TembaTest):
             with self.assertRaises(HTTPError):
                 response = get_client().ticket_open(1, 10000, 7, 1, 1, "")
             
+            mock_post.assert_called_once_with(
+                "http://localhost:8090/mr/ticket/open",
+                headers={"User-Agent": "Temba"},
+                json={
+                    "org_id": 1,
+                    "contact_id": 10000,
+                    "ticketer_id": 7,
+                    "topic_id": 1,
+                    "assignee_id": 1,
+                    "extra": "",
+                },
+            )
+
+    def test_ticket_open_fail(self):
+        with patch("requests.post") as mock_post:
+            mock_post.return_value = MockResponse(500, '{"error": "some error ocurred"}')
+
+            with self.assertRaises(HTTPError):
+                get_client().ticket_open(1, 10000, 7, 1, 1, "")
+
             mock_post.assert_called_once_with(
                 "http://localhost:8090/mr/ticket/open",
                 headers={"User-Agent": "Temba"},
