@@ -12,9 +12,13 @@ from django.core import exceptions as django_exceptions
 from django.shortcuts import get_object_or_404
 
 from temba import mailroom
-from temba.api.v2.internals.tickets.serializers import OpenTicketSerializer, TicketAssigneeSerializer
+from temba.api.v2.internals.tickets.serializers import (
+    GetDepartmentsSerializer,
+    OpenTicketSerializer,
+    TicketAssigneeSerializer,
+)
 from temba.api.v2.internals.views import APIViewMixin
-from temba.api.v2.serializers import TicketerReadSerializer, TopicReadSerializer
+from temba.api.v2.serializers import TopicReadSerializer
 from temba.api.v2.validators import LambdaURLValidator
 from temba.contacts.models import Contact
 from temba.orgs.models import Org
@@ -120,7 +124,7 @@ class GetDepartmentsView(APIViewMixin, APIView, LambdaURLValidator):
         if uuid:
             queryset = queryset.filter(uuid=uuid)
 
-        serializer = TicketerReadSerializer(
+        serializer = GetDepartmentsSerializer(
             queryset,
             many=True,
         )
