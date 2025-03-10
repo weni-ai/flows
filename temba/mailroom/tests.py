@@ -414,7 +414,7 @@ class MailroomClientTest(TembaTest):
             mock_post.return_value = MockResponse(500, '{"error": "some error ocurred"}')
 
             with self.assertRaises(HTTPError):
-                response = get_client().ticket_open(1, 10000, 7, 1, 1, "")
+                get_client().ticket_open(1, 10000, 7, 1, 1, "")
 
             mock_post.assert_called_once_with(
                 "http://localhost:8090/mr/ticket/open",
