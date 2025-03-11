@@ -2404,9 +2404,10 @@ class ContactsTemplatesEndpointNew(ListAPIMixin, BaseAPIView):
 
         queryset = queryset.annotate(
             num_non_empty_templates=Count(
-                "msgs", filter=Q(msgs__metadata__contains="templating", msgs__text__isnull=False)
+                "msgs", filter=Q(msgs__text__isnull=False, msgs__template__isnull=False) & ~Q(msgs__template="")
             )
         )
+
         queryset = queryset.filter(num_non_empty_templates__gt=0)
 
         return self.filter_before_after(queryset, "msgs__sent_on")

@@ -8,13 +8,16 @@ from weni.internal.authenticators import InternalOIDCAuthentication
 from weni.internal.permissions import CanCommunicateInternally
 
 from django.contrib.auth import get_user_model
+from django.core import exceptions as django_exceptions
 from django.shortcuts import get_object_or_404
 
 from temba import mailroom
 from temba.api.v2.internals.tickets.serializers import OpenTicketSerializer, TicketAssigneeSerializer
 from temba.api.v2.internals.views import APIViewMixin
+from temba.api.v2.serializers import TicketerReadSerializer, TopicReadSerializer
 from temba.api.v2.validators import LambdaURLValidator
-from temba.tickets.models import Ticket, Ticketer
+from temba.orgs.models import Org
+from temba.tickets.models import Ticket, Ticketer, Topic
 
 User = get_user_model()
 
@@ -76,3 +79,72 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
             except User.DoesNotExist:
                 pass
         return 0
+
+
+class GetDepartmentsView(APIViewMixin, APIView, LambdaURLValidator):
+    renderer_classes = [JSONRenderer]
+
+    def get(self, request, *args, **kwargs):
+        validation_response = self.protected_resource(request)  # pragma: no cover
+
+        if validation_response.status_code != 200:  # pragma: no cover
+            return validation_response
+
+        query_params = request.query_params
+        project_uuid = query_params.get("project")
+
+        org = validate_project_exists(project_uuid)
+
+        if not org:
+            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        queryset = Ticketer.objects.filter(org=org, is_active=True)
+
+        # filter by uuid (optional)
+        uuid = query_params.get("uuid")
+        if uuid:
+            queryset = queryset.filter(uuid=uuid)
+
+        serializer = TicketerReadSerializer(
+            queryset,
+            many=True,
+        )
+
+        return Response({"results": serializer.data})
+
+
+class GetQueuesView(APIViewMixin, APIView, LambdaURLValidator):
+    renderer_classes = [JSONRenderer]
+
+    def get(self, request, *args, **kwargs):
+        validation_response = self.protected_resource(request)  # pragma: no cover
+
+        if validation_response.status_code != 200:  # pragma: no cover
+            return validation_response
+
+        query_params = request.query_params
+        project_uuid = query_params.get("project")
+
+        org = validate_project_exists(project_uuid)
+
+        if not org:
+            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        queryset = Topic.objects.filter(org=org, is_active=True)
+
+        serializer = TopicReadSerializer(
+            queryset,
+            many=True,
+        )
+
+        return Response({"results": serializer.data})
+
+
+def validate_project_exists(project_uuid):
+    if not project_uuid:
+        return None
+
+    try:
+        return Org.objects.get(proj_uuid=project_uuid)
+    except (Org.DoesNotExist, django_exceptions.ValidationError):
+        return None

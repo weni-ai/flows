@@ -365,3 +365,87 @@ class OpenTicketTest(TembaTest):
         response = self.client.post(url, data=body, content_type="application/json")
 
         self.assertEqual(response.status_code, 400)
+
+
+class GetDepartmentsViewTest(TembaTest):
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_get_departments(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = f"/api/v2/internals/get_departments?project={self.org.proj_uuid}"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_get_departments_with_uuid(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+        ticketer = Ticketer.create(
+            self.org,
+            self.admin,
+            "wenichats",
+            "Viewers Ticketer",
+            {"sector_uuid": "bae31477-1a17-4302-9b1a-902f1b22fdce"},
+        )
+        url = f"/api/v2/internals/get_departments?project={self.org.proj_uuid}&uuid={ticketer.uuid}"
+        response = self.client.get(url)
+
+        expected_data = {
+            "uuid": str(ticketer.uuid),
+            "name": ticketer.name,
+            "type": str(ticketer.ticketer_type),
+            "created_on": ticketer.created_on.isoformat().replace("+00:00", "Z"),
+        }
+
+        self.assertEqual(response.status_code, 200)
+
+        response_results = [dict(item) for item in response.data.get("results", [])]
+
+        self.assertIn(expected_data, response_results)
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_get_departments_without_project(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/get_departments"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 404)
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_get_departments_with_invalid_project(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/get_departments?project=91b45788-8beb-48dd-8355-64aab570e0c9"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 404)
+
+
+class GetQueuesViewTest(TembaTest):
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_get_queues(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = f"/api/v2/internals/get_queues?project={self.org.proj_uuid}"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_get_queues_without_project(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/get_queues"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 404)
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_get_queues_with_invalid_project(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/get_queues?project=91b45788-8beb-48dd-8355-64aab570e0c9"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 404)
