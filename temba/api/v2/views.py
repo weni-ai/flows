@@ -15,6 +15,7 @@ from django.contrib.auth.models import User
 from django.db import connection
 from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404
 from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 
@@ -2399,8 +2400,9 @@ class ContactsTemplatesEndpointNew(ListAPIMixin, BaseAPIView):
                 queryset = queryset.filter(all_groups=group)
 
         template = params.get("template")
-        if template:
-            queryset = queryset.filter(msgs__template=template)
+        if template:  # pragma: no cover
+            template_object = get_object_or_404(Template, org=org, name=template)
+            queryset = queryset.filter(msgs__template=template_object.name)
 
         queryset = queryset.annotate(
             num_non_empty_templates=Count(
