@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from rest_framework import status
 from rest_framework.response import Response
+from weni.internal.models import TicketerQueue
 
 from django.contrib.auth.models import User
 
@@ -338,14 +339,29 @@ class GetDepartmentsViewTest(TembaTest):
             "Viewers Ticketer",
             {"sector_uuid": "bae31477-1a17-4302-9b1a-902f1b22fdce"},
         )
+
+        queue = TicketerQueue.objects.create(
+            created_by=self.user,
+            modified_by=self.user,
+            org=self.org,
+            name="Fake Queue",
+            ticketer=ticketer,
+        )
+
         url = f"/api/v2/internals/get_departments?project={self.org.proj_uuid}&uuid={ticketer.uuid}"
         response = self.client.get(url)
 
         expected_data = {
-            "uuid": str(ticketer.uuid),
-            "name": ticketer.name,
+            "ticketer_uuid": str(ticketer.uuid),
+            "ticketer_name": ticketer.name,
             "type": str(ticketer.ticketer_type),
             "created_on": ticketer.created_on.isoformat().replace("+00:00", "Z"),
+            "topics": [
+                {
+                    "topic_name": queue.name,
+                    "topic_uuid": str(queue.uuid),
+                }
+            ],
         }
 
         self.assertEqual(response.status_code, 200)
