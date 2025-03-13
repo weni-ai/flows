@@ -1,3 +1,7 @@
+3.27.2
+----------
+* Add validation on update or add urn for contact in edit contact form
+
 3.27.1
 ----------
 * Change get_departments endpoint to return related topics
