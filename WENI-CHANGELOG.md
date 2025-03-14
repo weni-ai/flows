@@ -1,3 +1,8 @@
+3.28.0
+----------
+* fix open ticket endpoint
+* Add locale field to template data
+
 3.27.2
 ----------
 * Add validation on update or add urn for contact in edit contact form
