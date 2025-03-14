@@ -971,7 +971,7 @@ class APITest(TembaTest):
 
         # try to send msg with an existing template
         expected_metadata = {
-            "template": {"name": template.name, "uuid": template.uuid, "variables": []},
+            "template": {"name": template.name, "uuid": template.uuid, "variables": [], "locale": None},
             "text": "Send a message",
         }
 
@@ -1113,7 +1113,7 @@ class APITest(TembaTest):
                 "contacts": [self.joe.uuid, self.frank.uuid],
                 "groups": [reporters.uuid],
                 "ticket": str(ticket.uuid),
-                "msg": {"template": {"uuid": template.uuid}, "variables": ["1"]},
+                "msg": {"template": {"uuid": template.uuid}, "variables": ["1"], "locale": None},
                 "channel": channel.uuid,
             },
         )
@@ -1148,7 +1148,7 @@ class APITest(TembaTest):
                 "contacts": [self.joe.uuid, self.frank.uuid],
                 "groups": [reporters.uuid],
                 "ticket": str(ticket.uuid),
-                "msg": {"template": {"uuid": template.uuid, "variables": ["1"]}},
+                "msg": {"template": {"uuid": template.uuid, "variables": ["1"], "locale": None}},
                 "channel": channel.uuid,
             },
         )
