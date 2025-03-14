@@ -438,22 +438,18 @@ class ContactForm(forms.ModelForm):
         country = self.org.default_country_code
 
         def validate_urn_whatsapp(key, scheme, path):
-            try:
-                if len(path) == 13 and path[4] == "9":
-                    path = path[:4] + path[5:]
-                else:
-                    path = path[:4] + "9" + path[4:]
-                normalized = URN.normalize(URN.from_parts(scheme, path), country)
-                existing_urn = ContactURN.lookup(self.org, normalized, normalize=False)
+            if len(path) == 13 and path[4] == "9":
+                path = path[:4] + path[5:]
+            else:
+                path = path[:4] + "9" + path[4:]
+            normalized = URN.normalize(URN.from_parts(scheme, path), country)
+            existing_urn = ContactURN.lookup(self.org, normalized, normalize=False)
 
-                if existing_urn and existing_urn.contact and existing_urn.contact != self.instance:
-                    self._errors[key] = self.error_class([_("Used by another contact")])
-                    return False
-
-                return True
-            except ValueError:
-                self._errors[key] = self.error_class([_("Invalid input")])
+            if existing_urn and existing_urn.contact and existing_urn.contact != self.instance:
+                self._errors[key] = self.error_class([_("Used by another contact")])
                 return False
+
+            return True
 
         def validate_urn(key, scheme, path):
             try:
@@ -474,7 +470,7 @@ class ContactForm(forms.ModelForm):
                     return False
 
                 # validate whatsapp URN variations
-                if scheme == URN.WHATSAPP_SCHEME:
+                if scheme == URN.WHATSAPP_SCHEME and path[:2] == "55":
                     return validate_urn_whatsapp(key, scheme, path)
 
                 return True

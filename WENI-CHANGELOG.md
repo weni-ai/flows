@@ -1,3 +1,12 @@
+3.27.2
+----------
+* Add validation on update or add urn for contact in edit contact form
+
+3.27.1
+----------
+* Change get_departments endpoint to return related topics
+* Add template validation in contacts templates endpoint
+
 3.27.0
 ----------
 * Internal endpoints to get Departments and Queues

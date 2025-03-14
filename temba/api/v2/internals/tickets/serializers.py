@@ -94,4 +94,7 @@ class GetTicketerQueueSerializer(ReadSerializer):
 
     class Meta:
         model = TicketerQueue
-        fields = ("topic_name", "topic_uuid", "created_on")
+        fields = (
+            "topic_name",
+            "topic_uuid",
+        )
