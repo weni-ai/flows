@@ -971,7 +971,7 @@ class APITest(TembaTest):
 
         # try to send msg with an existing template
         expected_metadata = {
-            "template": {"name": template.name, "uuid": template.uuid, "variables": []},
+            "template": {"name": template.name, "uuid": template.uuid, "variables": [], "locale": None},
             "text": "Send a message",
         }
 
@@ -1153,7 +1153,9 @@ class APITest(TembaTest):
             },
         )
 
-        expected_metadata = {"template": {"name": template.name, "uuid": template.uuid, "variables": ["1"]}}
+        expected_metadata = {
+            "template": {"name": template.name, "uuid": template.uuid, "variables": ["1"], "locale": None}
+        }
         broadcast = Broadcast.objects.get(id=response.json()["id"])
 
         self.assertEqual(expected_metadata, broadcast.metadata)
@@ -1194,7 +1196,9 @@ class APITest(TembaTest):
             },
         )
 
-        expected_metadata = {"template": {"name": template.name, "uuid": template.uuid, "variables": ["1"]}}
+        expected_metadata = {
+            "template": {"name": template.name, "uuid": template.uuid, "variables": ["1"], "locale": None}
+        }
         broadcast = Broadcast.objects.get(id=response.json()["id"])
 
         self.assertEqual(expected_metadata, broadcast.metadata)
