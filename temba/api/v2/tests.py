@@ -1148,7 +1148,7 @@ class APITest(TembaTest):
                 "contacts": [self.joe.uuid, self.frank.uuid],
                 "groups": [reporters.uuid],
                 "ticket": str(ticket.uuid),
-                "msg": {"template": {"uuid": template.uuid, "variables": ["1"]}},
+                "msg": {"template": {"uuid": template.uuid, "variables": ["1"], "locale": None}},
                 "channel": channel.uuid,
             },
         )
