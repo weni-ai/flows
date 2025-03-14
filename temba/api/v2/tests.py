@@ -971,7 +971,7 @@ class APITest(TembaTest):
 
         # try to send msg with an existing template
         expected_metadata = {
-            "template": {"name": template.name, "uuid": template.uuid, "variables": []},
+            "template": {"name": template.name, "uuid": template.uuid, "variables": [], "locale": None},
             "text": "Send a message",
         }
 
