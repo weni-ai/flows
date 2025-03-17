@@ -20,19 +20,29 @@ class TemplateViewSet(viewsets.ModelViewSet, InternalGenericViewSet):
 
     @action(detail=True, methods=["POST"], url_path="template-sync")
     def template_sync(self, request, pk):
+        """Syncs a template, updating or creating."""
         serializer = TemplateSyncSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
         channel = get_object_or_404(Channel, uuid=pk)
-        template_name = validated_data.get("template_name")
 
+        return self._handle_template_sync(validated_data, channel)
+
+    def _handle_template_sync(self, validated_data, channel):
+        """Handles the logic for syncing templates."""
+        template_name = validated_data.get("template_name")
         template = Template.objects.filter(name=template_name, org=channel.org).first()
 
         if template:
-            update_template_sync(template.id, validated_data.get("webhook"))
+            webhook = validated_data.get("webhook")
+            if not webhook:
+                return Response(
+                    {"detail": "Webhook is required for existing templates."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            update_template_sync(template.id, webhook)
             return Response(status=status.HTTP_200_OK)
 
-        else:
-            update_local_templates(channel, [validated_data.get("template_data")], True)
-            return Response(status=status.HTTP_204_NO_CONTENT)
+        update_local_templates(channel, [validated_data.get("template_data")], True)
+        return Response(status=status.HTTP_204_NO_CONTENT)
