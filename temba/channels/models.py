@@ -337,7 +337,7 @@ class Channel(TembaModel, DependencyMixin):
 
     org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="channels", null=True)
     channel_type = models.CharField(max_length=3)
-    name = models.CharField(max_length=64, null=True)
+    name = models.CharField(max_length=128, null=True)
 
     address = models.CharField(
         verbose_name=_("Address"),

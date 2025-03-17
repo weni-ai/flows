@@ -207,11 +207,25 @@ class OpenTicketTest(TembaTest):
         self.assertEqual(response.status_code, 400)
 
     @patch.object(LambdaURLValidator, "protected_resource")
-    @patch("temba.mailroom.client.MailroomClient.ticket_open")
-    def test_open_ticket_without_topic(self, mock_ticket_open, mock_protected_resource):
+    def test_open_ticket_not_found_ticketer(self, mock_protected_resource):
         mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
 
-        # mock_ticket_open.return_value = self.ticket_open_return_value()
+        url = "/api/v2/internals/open_ticket"
+        body = {
+            "project": self.org.proj_uuid,
+            "contact": self.joe.uuid,
+            "ticketer": "77305cb6-4867-48f0-8d53-8d853e4ead1c",
+            "assignee": "user_email@email.com",
+            "topic": self.org.default_ticket_topic.uuid,
+            "conversation_started_on": "2025-01-01 00:00:00",
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 400)
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_open_ticket_without_topic(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
 
         url = "/api/v2/internals/open_ticket"
         body = {
@@ -223,14 +237,22 @@ class OpenTicketTest(TembaTest):
         }
         response = self.client.post(url, data=body, content_type="application/json")
 
-        # mock_ticket_open.assert_called_once_with(
-        #     self.org.id,
-        #     self.joe.id,
-        #     self.ticketer.id,
-        #     self.org.default_ticket_topic.id,
-        #     0,
-        #     '{"history_after":"2025-01-01 00:00:00+02:00"}',
-        # )
+        self.assertEqual(response.status_code, 400)
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_open_ticket_not_found_topic(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/open_ticket"
+        body = {
+            "project": self.org.proj_uuid,
+            "ticketer": self.ticketer.uuid,
+            "contact": self.joe.uuid,
+            "topic": "90ea2409-59d9-4cb6-b1ea-b92eabb373d0",
+            "assignee": "user_email@email.com",
+            "conversation_started_on": "2025-01-01 00:00:00",
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
 
         self.assertEqual(response.status_code, 400)
 
@@ -263,35 +285,6 @@ class OpenTicketTest(TembaTest):
 
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.data, '{"error":"queue not found"}')
-
-    @patch.object(LambdaURLValidator, "protected_resource")
-    @patch("temba.mailroom.client.MailroomClient.ticket_open")
-    def test_open_ticket_invalid_topic(self, mock_ticket_open, mock_protected_resource):
-        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
-
-        mock_ticket_open.side_effect = HTTPError()
-
-        url = "/api/v2/internals/open_ticket"
-        body = {
-            "project": self.org.proj_uuid,
-            "sector": self.ticketer.config["sector_uuid"],
-            "contact": self.joe.uuid,
-            "assignee": "user_email@email.com",
-            "queue": "76d73017-7479-4817-960c-a154d3dac4a1",
-            "conversation_started_on": "2025-01-01 00:00:00",
-        }
-        response = self.client.post(url, data=body, content_type="application/json")
-
-        mock_ticket_open.assert_called_once_with(
-            self.org.id,
-            self.joe.id,
-            self.ticketer.id,
-            self.org.default_ticket_topic.id,
-            0,
-            '{"history_after":"2025-01-01 00:00:00+02:00"}',
-        )
-
-        self.assertEqual(response.status_code, 500)
 
     @patch.object(LambdaURLValidator, "protected_resource")
     @patch("temba.mailroom.client.MailroomClient.ticket_open")
