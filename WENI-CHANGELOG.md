@@ -1,3 +1,10 @@
+3.28.1
+----------
+* Update channel name length to 128
+* Refactor template sync logic and webhook validation
+* Add 401 unauthorized template
+* Bump weni-rp-apps version to 2.9.0
+
 3.28.0
 ----------
 * fix open ticket endpoint
