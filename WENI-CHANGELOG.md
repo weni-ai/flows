@@ -1,3 +1,7 @@
+3.28.2
+----------
+* Remove content validation in update template func
+
 3.28.1
 ----------
 * Update channel name length to 128
