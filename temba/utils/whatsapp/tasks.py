@@ -179,7 +179,7 @@ def update_local_templates(channel, templates_data, unique=False):
 
             content_parts.append(component["text"])
 
-        if not content_parts or not all_supported:
+        if not all_supported:
             continue
 
         content = "\n\n".join(content_parts)
