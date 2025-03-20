@@ -1,3 +1,7 @@
+3.28.3
+----------
+* Update floweditor to 3.5.1
+
 3.28.2
 ----------
 * Remove content validation in update template func
