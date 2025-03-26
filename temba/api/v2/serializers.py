@@ -599,6 +599,26 @@ class ChannelReadSerializer(ReadSerializer):
         fields = ("uuid", "name", "address", "country", "device", "last_seen", "created_on")
 
 
+class ToggleChannelWriteSerializer(WriteSerializer):
+    action = serializers.ChoiceField(required=True, choices=["enable", "disable"])
+
+    def save(self):
+        """
+        Update our channel is_active field
+        """
+        action = self.validated_data.get("action")
+
+        if self.instance:
+            if action == "enable":
+                self.instance.is_active = True
+            elif action == "disable":
+                self.instance.is_active = False
+
+            self.instance.save(update_fields=("is_active",))
+
+        return self.instance
+
+
 class ClassifierReadSerializer(ReadSerializer):
     type = serializers.SerializerMethodField()
     intents = serializers.SerializerMethodField()
