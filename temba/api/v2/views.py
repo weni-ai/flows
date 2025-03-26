@@ -97,6 +97,7 @@ from .serializers import (
     TicketBulkActionSerializer,
     TicketerReadSerializer,
     TicketReadSerializer,
+    ToggleChannelWriteSerializer,
     TopicReadSerializer,
     TopicWriteSerializer,
     UserReadSerializer,
@@ -1608,6 +1609,90 @@ class ChannelEventsEndpoint(ListAPIMixin, BaseAPIView):
                     "required": False,
                     "help": "Only return events created after this date, ex: 2015-01-28T18:00:00.000",
                 },
+            ],
+        }
+
+
+class ToggleChannelsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
+    """
+    This endpoint allows you to enable/disable channels in your account.
+
+    ## Toggle Channels
+
+    A **POST** will recieve a channel uuid and a action parameter to enable or disable the channel.
+
+    Example:
+
+        POST /api/v2/toggle_channels.json
+
+        body: action=enable
+
+    Response containing the channels for your organization:
+
+        {
+            "next": null,
+            "previous": null,
+            "results": [
+            {
+                "uuid": "09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                "name": "Android Phone",
+                "address": "+250788123123",
+                "country": "RW",
+                "device": {
+                    "name": "Nexus 5X",
+                    "power_level": 99,
+                    "power_status": "STATUS_DISCHARGING",
+                    "power_source": "BATTERY",
+                    "network_type": "WIFI",
+                },
+                "last_seen": "2016-03-01T05:31:27.456",
+                "created_on": "2014-06-23T09:34:12.866",
+                "is_active": true
+            }]
+        }
+
+    To disable a channel, the action parameter should be set to disable.
+
+    Example:
+
+        POST /api/v2/toggle_channels.json
+
+        body: action=disable
+
+    """
+
+    permission = "channels.channel_api"
+    model = Channel
+    serializer_class = ChannelReadSerializer
+    write_serializer_class = ToggleChannelWriteSerializer
+    pagination_class = CreatedOnCursorPagination
+
+    def filter_queryset(self, queryset):
+        params = self.request.query_params
+        queryset = queryset.filter(is_active=True)
+
+        # filter by UUID (optional)
+        uuid = params.get("uuid")
+        if uuid:
+            queryset = queryset.filter(uuid=uuid)
+
+        # filter by address (optional)
+        address = params.get("address")
+        if address:
+            queryset = queryset.filter(address=address)
+
+        return queryset
+
+    @classmethod
+    def get_write_explorer(cls):
+        return {
+            "method": "POST",
+            "title": "Update is_active channels",
+            "url": reverse("api.v2.toggle_channels"),
+            "slug": "channels-toggle",
+            "fields": [
+                {"name": "uuid", "required": True, "help": "The UUIDs of the contacts to update"},
+                {"action": "enable/disable", "required": True, "help": "The action to be performed on the channel"},
             ],
         }
 
