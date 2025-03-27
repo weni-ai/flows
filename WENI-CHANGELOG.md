@@ -1,3 +1,8 @@
+3.28.4
+----------
+* Update weni-rp-apps version to 2.9.1
+* Endpoint to enable/disable channel
+
 3.28.3
 ----------
 * Update floweditor to 3.5.1
