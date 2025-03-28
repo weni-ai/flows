@@ -1858,7 +1858,7 @@ python-versions = "*"
 
 [[package]]
 name = "weni-datalake-sdk"
-version = "0.0.6"
+version = "0.0.7"
 description = "Lib to connect python/django modules to redshift"
 category = "main"
 optional = false
@@ -1960,7 +1960,7 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=4.6)", "pytest-black (
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "66f91f4ed08df3909187b24618d62bce1869d0b80c26c36ff00bec903b1b703e"
+content-hash = "76dec3bea4b065aef10c05889e42c9c3e880ac018ff9270d138d773d81f9370d"
 
 [metadata.files]
 amqp = [
@@ -3066,8 +3066,8 @@ wcwidth = [
     {file = "wcwidth-0.2.5.tar.gz", hash = "sha256:c4d647b99872929fdb7bdcaa4fbe7f01413ed3d98077df798530e5b04f116c83"},
 ]
 weni-datalake-sdk = [
-    {file = "weni_datalake_sdk-0.0.6-py3-none-any.whl", hash = "sha256:c99a2a8ae533ab52dfb5823711c0c346c2847c6421fc662021e02bbcf158196e"},
-    {file = "weni_datalake_sdk-0.0.6.tar.gz", hash = "sha256:d01a04bd9c93779fdb5edf3141958cc041d3a85bb4f20c7ec043175615c2bc9c"},
+    {file = "weni_datalake_sdk-0.0.7-py3-none-any.whl", hash = "sha256:faf477bccb403e37f55e2973534ef359cf9a5074f1717b0824edfcb829e48dc5"},
+    {file = "weni_datalake_sdk-0.0.7.tar.gz", hash = "sha256:65096da8b90c5e4ca733a25fd373a74b3b4e79673221e7807b906a1e8f331074"},
 ]
 weni-rp-apps = [
     {file = "weni_rp_apps-2.9.1a1-py3-none-any.whl", hash = "sha256:5fcb5f8c0959a8823a32dd9703679d7f9b2859ced25e1af074bad2a86837ba1b"},
