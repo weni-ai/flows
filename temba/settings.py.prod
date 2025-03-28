@@ -542,6 +542,3 @@ MUTABLE_EDITOR_DOMAINS = env.tuple("MUTABLE_EDITOR_DOMAINS", default=("@inspiria
 
 # Lambda no token validation
 LAMBDA_ALLOWED_ROLES = env.list("LAMBDA_ALLOWED_ROLES", default=[])
-
-# Datalake url
-DATALAKE_SERVER_ADDRESS = env("DATALAKE_SERVER_ADDRESS", default="localhost")
