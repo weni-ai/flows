@@ -12,8 +12,7 @@ class MsgConsumer(EDAConsumer):
         print(f"[MsgConsumer] - Consuming a message. Body: {message.body}")
         try:
             body = JSONParser.parse(message.body)
-            data = dict(body)
-            send_data(MsgPath, data)
+            send_data(MsgPath, body)
 
             message.channel.basic_ack(message.delivery_tag)
 
