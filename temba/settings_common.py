@@ -1402,3 +1402,5 @@ NEXUS_BASE_URL = os.environ.get("NEXUS_BASE_URL", default="https://nexus.dev.clo
 FLOWEDITOR_SENTRY_DSN = os.environ.get("FLOWEDITOR_SENTRY_DSN", default="")
 
 INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
+
+DATALAKE_SERVER_ADDRESS = os.environ.get("DATALAKE_SERVER_ADDRESS", default="localhost:50051")
