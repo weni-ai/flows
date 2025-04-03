@@ -1,3 +1,8 @@
+3.28.5
+----------
+* Update floweditor to 3.6.0
+* Add instagram feature flag to floweditor
+
 3.28.4
 ----------
 * Update weni-rp-apps version to 2.9.1
