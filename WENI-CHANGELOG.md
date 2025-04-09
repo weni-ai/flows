@@ -1,3 +1,7 @@
+3.28.6
+----------
+* Not save products coming from integrations
+
 3.28.5
 ----------
 * Update floweditor to 3.6.0
