@@ -1305,6 +1305,8 @@ ZENDESK_CLIENT_SECRET = os.environ.get("ZENDESK_CLIENT_SECRET", "")
 # Chatgpt token
 CHATGPT_KEY = os.environ.get("CHATGPT_KEY", "")
 
+# PROMETHEUS AUTH
+PROMETHEUS_AUTH_TOKEN = os.environ.get("PROMETHEUS_AUTH_TOKEN", "")`
 
 # -----------------------------------------------------------------------------------
 #
