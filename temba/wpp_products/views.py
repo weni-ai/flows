@@ -5,11 +5,7 @@ from rest_framework.response import Response
 from weni.internal.views import InternalGenericViewSet
 
 from temba.channels.models import Channel
-from temba.utils.whatsapp.tasks import (
-    update_channel_catalogs_status,
-    update_local_catalogs,
-    update_local_products_vtex_task,
-)
+from temba.utils.whatsapp.tasks import update_channel_catalogs_status, update_local_catalogs
 from temba.wpp_products.models import Catalog
 from temba.wpp_products.serializers import UpdateCatalogSerializer
 
@@ -51,14 +47,12 @@ class ProductViewSet(viewsets.ViewSet, InternalGenericViewSet):
     @action(detail=False, methods=["POST"], url_path="update-products")
     def update_products(self, request, *args, **kwargs):
         catalog = request.data.get("catalog")
-        products = request.data.get("products")
 
         catalog_object = Catalog.objects.filter(facebook_catalog_id=catalog.get("facebook_catalog_id")).first()
         if not catalog_object:
-            catalog_object = Catalog.get_or_create(
-                catalog.get("name"), self.get_object(), False, catalog.get("facebook_catalog_id")
-            )
+            Catalog.get_or_create(catalog.get("name"), self.get_object(), False, catalog.get("facebook_catalog_id"))
 
-        update_local_products_vtex_task.delay(catalog_object.pk, products, self.get_object().pk)
+        # Remove task to save products temporarily
+        # update_local_products_vtex_task.delay(catalog_object.pk, products, self.get_object().pk)
 
         return Response(status=status.HTTP_200_OK)
