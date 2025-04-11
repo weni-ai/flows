@@ -1,7 +1,5 @@
-import os
-
+from django.conf import settings
 from django.http import HttpResponseForbidden
-from django.http import HttpResponse
 from django_prometheus.exports import ExportToDjangoView
 
 
@@ -11,6 +9,6 @@ def metrics_view(request):
 
     expected_token = f"Bearer {prometheus_auth_token}"
     if not auth_token or auth_token != expected_token:
-        return HttpResponseForbidden("Acesso negado")
+        return HttpResponseForbidden("Access denied")
 
     return ExportToDjangoView(request)
