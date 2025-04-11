@@ -12,7 +12,7 @@ from temba.channels.views import register, sync
 from temba.utils.analytics import init_analytics
 
 from .views import WeniRedirect
-from temba.apps.api.prometheus.metrics import metrics_view
+from temba.api.prometheus.metrics import metrics_view
 
 urlpatterns = [
     url(r"^", include("temba.airtime.urls")),
