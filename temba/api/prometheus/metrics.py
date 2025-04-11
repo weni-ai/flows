@@ -12,3 +12,4 @@ def metrics_view(request):
         return HttpResponseForbidden("Access denied")
 
     return ExportToDjangoView(request)
+    
