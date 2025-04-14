@@ -1672,7 +1672,7 @@ class FlowPathRecentRun(models.Model):
 
     @classmethod
     def prune(cls):
-        BATCH_SIZE = 50
+        BATCH_SIZE = settings.FLOW_PATH_RECENT_RUN_BATCH_SIZE
         deleted_counter = 0
 
         while True:
