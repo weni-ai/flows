@@ -1,3 +1,8 @@
+3.28.7
+----------
+* Add batch of flow path recent run to environ
+* Remove signup form from public index template
+
 3.28.6
 ----------
 * Not save products coming from integrations
