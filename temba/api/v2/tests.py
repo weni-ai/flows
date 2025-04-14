@@ -2028,6 +2028,54 @@ class APITest(TembaTest):
         response = self.fetchJSON(url, "after=%s" % format_datetime(call2.created_on))
         self.assertResultsById(response, [call4, call3, call2])
 
+    def test_toggle_channels(self):
+        url = reverse("api.v2.toggle_channels")
+
+        self.assertEndpointAccess(url)
+
+        channel = self.create_channel(
+            "WAC",
+            "WhatsApp: +61923456789",
+            "12345",
+            config={
+                Channel.CONFIG_BASE_URL: "https://nyaruka.com/whatsapp",
+                Channel.CONFIG_USERNAME: "temba",
+                Channel.CONFIG_PASSWORD: "tembapasswd2",
+                Channel.CONFIG_AUTH_TOKEN: "authtoken321",
+                CONFIG_FB_BUSINESS_ID: "4321",
+                CONFIG_FB_ACCESS_TOKEN: "token123",
+                CONFIG_FB_NAMESPACE: "my-custom-app-1",
+                CONFIG_FB_TEMPLATE_LIST_DOMAIN: "graph.facebook.com",
+            },
+        )
+
+        response = self.postJSON(
+            url,
+            "uuid=%s" % channel.uuid,
+            {"action": "disable"},
+        )
+        self.assertEqual(response.status_code, 200)
+
+        channel.refresh_from_db()
+        self.assertEqual(channel.is_active, False)
+
+        response = self.postJSON(
+            url,
+            "uuid=%s" % channel.uuid,
+            {"action": "enable"},
+        )
+        self.assertEqual(response.status_code, 200)
+        channel.refresh_from_db()
+        self.assertEqual(channel.is_active, True)
+
+        # filter by UUID
+        response = self.fetchJSON(url, "uuid=%s" % channel.uuid)
+        self.assertResultsByUUID(response, [channel])
+
+        # filter by address
+        response = self.fetchJSON(url, "address=12345")
+        self.assertResultsByUUID(response, [channel])
+
     @mock_mailroom
     def test_contacts(self, mr_mocks):
         url = reverse("api.v2.contacts")

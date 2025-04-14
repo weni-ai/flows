@@ -1684,7 +1684,7 @@ class ToggleChannelsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
         return queryset
 
     @classmethod
-    def get_write_explorer(cls):
+    def get_write_explorer(cls):  # pragma: no cover
         return {
             "method": "POST",
             "title": "Update is_active channels",
