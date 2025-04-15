@@ -1,3 +1,7 @@
+3.28.8
+----------
+* Fix: Convert batch size to int
+
 3.28.7
 ----------
 * Add batch of flow path recent run to environ
