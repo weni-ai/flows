@@ -9,7 +9,7 @@ on:
 
 jobs:
   call-workflow:
-    uses: weni-ai/actions-workflows/.github/workflows/reusable-workflow.yaml@CLOUD-2298
+    uses: weni-ai/actions-workflows/.github/workflows/reusable-workflow.yaml@main
     with:
       image_repository: push-backend
       dockerfile: "docker/Dockerfile"
