@@ -18,6 +18,7 @@ jobs:
       - name: Set up environment variables
         id: set-env
         run: |
+            echo "IMAGE_SOURCE_URL=https://github.com/weni-ai/flows" | tee -a "${GITHUB_OUTPUT}"
             FLOWEDITOR_VERSION=$(jq -r '.dependencies["@nyaruka/flow-editor"]' < package.json)
             echo "FLOWEDITOR_VERSION=${FLOWEDITOR_VERSION}" | tee -a "${GITHUB_OUTPUT}"
             echo "FLOWEDITOR_REPO=https://github.com/ilhasoft/floweditor" | tee -a "${GITHUB_OUTPUT}"
