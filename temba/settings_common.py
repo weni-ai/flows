@@ -1071,10 +1071,6 @@ CELERY_BEAT_SCHEDULE = {
     "refresh-wechat-access-tokens": {"task": "refresh_wechat_access_tokens", "schedule": timedelta(seconds=3600)},
     "refresh-whatsapp-tokens": {"task": "refresh_whatsapp_tokens", "schedule": crontab(hour=6, minute=0)},
     "refresh-whatsapp-templates": {"task": "refresh_whatsapp_templates", "schedule": timedelta(seconds=900)},
-    "refresh-whatsapp-catalog-and-products": {
-        "task": "refresh_whatsapp_catalog_and_products",
-        "schedule": timedelta(seconds=900),
-    },
     "refresh-whatsapp-flows": {"task": "refresh_whatsapp_flows", "schedule": crontab(hour=2, minute=30)},
     "refresh-whatsapp-flows-assets": {"task": "refresh_whatsapp_flows_assets", "schedule": timedelta(minutes=15)},
     "send-notification-emails": {"task": "send_notification_emails", "schedule": timedelta(seconds=60)},
