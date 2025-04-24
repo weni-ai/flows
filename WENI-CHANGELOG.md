@@ -1,3 +1,7 @@
+3.28.9
+----------
+* Remove call to refresh whatsapp products task
+
 3.28.8
 ----------
 * Fix: Convert batch size to int
