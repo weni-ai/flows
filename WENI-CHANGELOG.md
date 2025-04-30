@@ -1,3 +1,20 @@
+3.28.9
+----------
+* Remove call to refresh whatsapp products task
+
+3.28.8
+----------
+* Fix: Convert batch size to int
+
+3.28.7
+----------
+* Add batch of flow path recent run to environ
+* Remove signup form from public index template
+
+3.28.6
+----------
+* Not save products coming from integrations
+
 3.28.5
 ----------
 * Update floweditor to 3.6.0

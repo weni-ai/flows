@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from rest_framework import status
 
@@ -8,7 +8,7 @@ from django.utils import timezone
 from temba.tests.base import TembaTest
 from temba.wpp_products.models import Catalog
 from temba.wpp_products.serializers import UpdateCatalogSerializer
-from temba.wpp_products.views import CatalogViewSet
+from temba.wpp_products.views import CatalogViewSet, ProductViewSet
 
 
 class CatalogViewTest(TembaTest):
@@ -84,3 +84,40 @@ class CatalogViewTest(TembaTest):
             response = self.client.post(url, data, content_type="application/json")
 
             self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class ProductViewSetTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+
+        self.channel = self.create_channel("WAC", "WAC Test Channel", "5521999999999")
+
+        ProductViewSet.permission_classes = []
+        ProductViewSet.authentication_classes = []
+
+        self.client.force_login(self.user)
+
+        self.url = reverse("product-update-products")
+
+    @patch("temba.wpp_products.views.Catalog.get_or_create")
+    @patch("temba.wpp_products.views.Catalog.objects.filter")
+    def test_catalog_get_or_create_called_when_not_exists(self, mock_filter, mock_get_or_create):
+        catalog_data = {
+            "name": "Test Catalog",
+            "facebook_catalog_id": "123456789",
+        }
+
+        mock_filter.return_value.first.return_value = None
+
+        mock_get_or_create.return_value = MagicMock()
+
+        payload = {
+            "channel_uuid": str(self.channel.uuid),
+            "catalog": catalog_data,
+        }
+
+        response = self.client.post(self.url, payload, content_type="application/json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_filter.assert_called_once_with(facebook_catalog_id="123456789")
+        mock_get_or_create.assert_called_once_with("Test Catalog", self.channel, False, "123456789")
