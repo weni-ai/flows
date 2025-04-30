@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import amqp
 from sentry_sdk import capture_exception
 
@@ -32,7 +32,7 @@ class MessageTemplateWebhookConsumer(EDAConsumer):
             )
 
             # Add data to lake
-            send_message_template_status_data(MessageTemplateStatusPath, message_template_webhook_dto)
+            send_message_template_status_data(MessageTemplateStatusPath, asdict(message_template_webhook_dto))
 
             message.channel.basic_ack(message.delivery_tag)
 
