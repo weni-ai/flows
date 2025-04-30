@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import amqp
 from sentry_sdk import capture_exception
 
@@ -44,11 +44,7 @@ class MessageTemplateConsumer(EDAConsumer):
             )
 
             # Add data to lake
-            send_message_template_data(MessageTemplatePath, message_template_dto)
-            # Send status to datalake
-
-            # send_message_template_status_data(MessageTemplatePath, message_template_dto)
-
+            send_message_template_data(MessageTemplatePath, asdict(message_template_dto))
 
             message.channel.basic_ack(message.delivery_tag)
 
