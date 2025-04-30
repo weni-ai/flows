@@ -1,8 +1,12 @@
+from dataclasses import dataclass
 import amqp
 from sentry_sdk import capture_exception
 
 from temba.event_driven.consumers import EDAConsumer
 from temba.event_driven.parsers import JSONParser
+
+from weni_datalake_sdk.clients.client import send_message_template_status_data
+from weni_datalake_sdk.paths.message_template_path import MessageTemplateStatusPath
 
 
 @dataclass
@@ -21,14 +25,14 @@ class MessageTemplateWebhookConsumer(EDAConsumer):
             body = JSONParser.parse(message.body)
             message_template_webhook_dto = MessageTemplateWebhookDTO(
                 status=body.get("status"),
-                language=body.get("is_template"),
-                template_id=body.get("date_format"),
-                message_id=body.get("description"),
+                language=body.get("language"),
+                template_id=body.get("template_id"),
+                message_id=body.get("message_id"),
                 data=body,
             )
 
             # Add data to lake
-            # send_message_template_status_data(MessageTemplatePath, message_template_dto)
+            send_message_template_status_data(MessageTemplateStatusPath, message_template_webhook_dto)
 
             message.channel.basic_ack(message.delivery_tag)
 

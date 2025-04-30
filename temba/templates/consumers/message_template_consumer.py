@@ -5,6 +5,9 @@ from sentry_sdk import capture_exception
 from temba.event_driven.consumers import EDAConsumer
 from temba.event_driven.parsers import JSONParser
 
+from weni_datalake_sdk.clients.client import send_message_template_data
+from weni_datalake_sdk.paths.message_template_path import MessageTemplatePath
+
 
 @dataclass
 class MessageTemplateDTO:
@@ -27,21 +30,25 @@ class MessageTemplateConsumer(EDAConsumer):
         try:
             body = JSONParser.parse(message.body)
             message_template_dto = MessageTemplateDTO(
-                contact_urn=body.get("uuid"),
-                channel=body.get("name"),
-                language=body.get("is_template"),
-                template_id=body.get("date_format"),
-                template_type=body.get("template_type_uuid"),
-                template_name=body.get("timezone"),
-                message_id=body.get("description"),
-                direction=body.get("brain_on", False),
-                template_variables=body.get("brain_on", False),
-                text=body.get("brain_on", False),
+                contact_urn=body.get("contact_urn"),
+                channel=body.get("channel_uuid"),
+                language=body.get("language"),
+                template_id=body.get("template_id"),
+                template_type=body.get("template_type"),
+                template_name=body.get("template_name"),
+                message_id=body.get("message_id"),
+                direction=body.get("direction"),
+                template_variables=body.get("template_variables"),
+                text=body.get("text"),
                 data=body,
             )
 
             # Add data to lake
-            # send_message_template_data(MessageTemplatePath, message_template_dto)
+            send_message_template_data(MessageTemplatePath, message_template_dto)
+            # Send status to datalake
+
+            # send_message_template_status_data(MessageTemplatePath, message_template_dto)
+
 
             message.channel.basic_ack(message.delivery_tag)
 
@@ -49,3 +56,5 @@ class MessageTemplateConsumer(EDAConsumer):
             capture_exception(exception)
             message.channel.basic_reject(message.delivery_tag, requeue=False)
             print(f"[MessageTemplateConsumer] - Message rejected by: {exception}")
+
+    
