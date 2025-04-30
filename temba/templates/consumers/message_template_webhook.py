@@ -6,7 +6,7 @@ from temba.event_driven.consumers import EDAConsumer
 from temba.event_driven.parsers import JSONParser
 
 from weni_datalake_sdk.clients.client import send_message_template_status_data
-from weni_datalake_sdk.paths.message_template_path import MessageTemplateStatusPath
+from weni_datalake_sdk.paths.message_template_status_path import MessageTemplateStatusPath
 
 
 @dataclass
