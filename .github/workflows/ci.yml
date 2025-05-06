@@ -63,7 +63,6 @@ jobs:
 
     - name: Initialize environment
       run: |
-        poetry add git+https://github.com/noumar/iso639.git
         #poetry add -n --lock $(cat ${{ github.workspace }}/docker/pip-requires.txt)
         poetry install
         npm install
