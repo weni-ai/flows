@@ -1,3 +1,7 @@
+3.29.1
+----------
+* Update floweditor to 3.6.1
+
 3.29.0
 ----------
 * Update weni-rp-apps and add weni-datalake-sdk
