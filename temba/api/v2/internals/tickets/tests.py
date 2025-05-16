@@ -374,14 +374,14 @@ class OpenTicketTest(TembaTest):
     def test_open_ticket_returning_error(self, mock_ticket_open, mock_protected_resource):
         mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
 
-        # Simular MailroomException
-        error_data = {
-            "endpoint": "ticket/open",
-            "request": {"org_id": self.org.id},
-            "response": {"error": "Invalid topic ID"},
+        error_response = {
+            "error": "{\"detail\":\"The contact already have an open room in the project\"}"
         }
+        
         mock_ticket_open.side_effect = MailroomException(
-            "ticket/open", {"org_id": self.org.id}, {"error": "Invalid topic ID"}
+            "ticket/open", 
+            {"org_id": self.org.id}, 
+            error_response
         )
 
         url = "/api/v2/internals/open_ticket"
@@ -395,12 +395,11 @@ class OpenTicketTest(TembaTest):
         }
         response = self.client.post(url, data=body, content_type="application/json")
 
-        # Verificar se a exceção foi lançada corretamente
         mock_ticket_open.assert_called_once()
 
-        # Verificar resposta HTTP 500 e conteúdo do erro
         self.assertEqual(response.status_code, 500)
-        self.assertEqual(response.data, error_data)
+        
+        self.assertEqual(response.data, error_response)
 
 
 class GetDepartmentsViewTest(TembaTest):

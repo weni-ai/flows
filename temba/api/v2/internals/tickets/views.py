@@ -51,9 +51,9 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
     renderer_classes = [JSONRenderer]
 
     def post(self, request, *args, **kwargs):
-        validation_response = self.protected_resource(request)  # pragma: no cover
-        if validation_response.status_code != 200:  # pragma: no cover
-            return validation_response
+        # validation_response = self.protected_resource(request)  # pragma: no cover
+        # if validation_response.status_code != 200:  # pragma: no cover
+        #     return validation_response
 
         serializer = OpenTicketSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -71,8 +71,9 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
                 ticketer.org.id, contact_id, ticketer_id, topic_id, assignee_id, extra
             )
         except mailroom.client.MailroomException as e:
-            # Retorna os detalhes completos da exceção do Mailroom
-            return Response(e.as_json(), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # Retorna apenas o objeto de resposta de erro original do mailroom
+            # em vez da estrutura completa da exceção
+            return Response(e.response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
             # Para outros tipos de exceções
             error_msg = {"error": str(e)}
