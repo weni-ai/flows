@@ -70,8 +70,13 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
             response = mailroom.get_client().ticket_open(
                 ticketer.org.id, contact_id, ticketer_id, topic_id, assignee_id, extra
             )
+        except mailroom.client.MailroomException as e:
+            # Retorna os detalhes completos da exceção do Mailroom
+            return Response(e.as_json(), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            return Response(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # Para outros tipos de exceções
+            error_msg = {"error": str(e)}
+            return Response(error_msg, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(response, status=status.HTTP_200_OK)
 
     def get_assignee_id(self, request):
