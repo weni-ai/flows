@@ -1,3 +1,12 @@
+3.29.1
+----------
+* Update floweditor to 3.6.1
+
+3.29.0
+----------
+* Update weni-rp-apps and add weni-datalake-sdk
+* Add consumers to message template
+
 3.28.9
 ----------
 * Remove call to refresh whatsapp products task
