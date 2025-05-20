@@ -10,6 +10,8 @@ from django.contrib.auth.models import User
 from temba.api.v2.validators import LambdaURLValidator
 from temba.tests import TembaTest
 from temba.tickets.models import Ticket, Ticketer
+from temba.mailroom.client import MailroomClient
+from temba.mailroom.client import MailroomException
 
 
 class TicketAssigneeViewTest(TembaTest):
@@ -366,6 +368,38 @@ class OpenTicketTest(TembaTest):
         response = self.client.post(url, data=body, content_type="application/json")
 
         self.assertEqual(response.status_code, 400)
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    @patch("temba.mailroom.client.MailroomClient.ticket_open")
+    def test_open_ticket_returning_error(self, mock_ticket_open, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        error_response = {
+            "error": "{\"detail\":\"The contact already have an open room in the project\"}"
+        }
+        
+        mock_ticket_open.side_effect = MailroomException(
+            "ticket/open", 
+            {"org_id": self.org.id}, 
+            error_response
+        )
+
+        url = "/api/v2/internals/open_ticket"
+        body = {
+            "project": self.org.proj_uuid,
+            "ticketer": self.ticketer.uuid,
+            "contact": self.joe.uuid,
+            "assignee": "user_email@email.com",
+            "topic": self.org.default_ticket_topic.uuid,
+            "conversation_started_on": "2025-01-01 00:00:00",
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
+
+        mock_ticket_open.assert_called_once()
+
+        self.assertEqual(response.status_code, 500)
+        
+        self.assertEqual(response.data, error_response)
 
 
 class GetDepartmentsViewTest(TembaTest):
