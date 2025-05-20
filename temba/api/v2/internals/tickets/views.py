@@ -51,11 +51,9 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
     renderer_classes = [JSONRenderer]
 
     def post(self, request, *args, **kwargs):
-        auth_bypass = request.data.get("auth_bypass")
-        if auth_bypass is None:
-            validation_response = self.protected_resource(request)  # pragma: no cover
-            if validation_response.status_code != 200:  # pragma: no cover
-                return validation_response
+        # validation_response = self.protected_resource(request)  # pragma: no cover
+        # if validation_response.status_code != 200:  # pragma: no cover
+        #     return validation_response
 
         serializer = OpenTicketSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -72,8 +70,8 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
             response = mailroom.get_client().ticket_open(
                 ticketer.org.id, contact_id, ticketer_id, topic_id, assignee_id, extra
             )
-        except Exception as e:
-            return Response(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except mailroom.client.MailroomException as e:
+            return Response(e.response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(response, status=status.HTTP_200_OK)
 
     def get_assignee_id(self, request):
