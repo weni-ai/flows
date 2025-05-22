@@ -287,9 +287,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     channel = serializers.UUIDField(required=False)
 
     def validate_msg(self, value):
-        if not (
-            value.get("text") or value.get("attachments") or value.get("template") or value.get("action_type")
-        ):
+        if not (value.get("text") or value.get("attachments") or value.get("template") or value.get("action_type")):
             raise serializers.ValidationError("Must provide either text, attachments, template or action_type")
         return value
 
