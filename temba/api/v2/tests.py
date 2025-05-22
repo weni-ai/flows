@@ -1036,9 +1036,7 @@ class APITest(TembaTest):
             },
         )
 
-        self.assertEqual(
-            response.json(), {"msg": ["Must provide either text, attachments, template or typing_indicator"]}
-        )
+        self.assertEqual(response.json(), {"msg": ["Must provide either text, attachments, template or action_type"]})
 
         # send a msg with a defined channel
         response = self.postJSON(
