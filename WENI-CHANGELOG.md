@@ -1,3 +1,7 @@
+3.29.3
+----------
+* Update validation in WhatsappBroadcastWriteSerializer to action_type instead of typing_indicator
+
 3.29.2
 ----------
 * Bump weni-rp-apps version to 2.9.3
