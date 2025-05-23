@@ -1,3 +1,12 @@
+3.29.3
+----------
+* Update validation in WhatsappBroadcastWriteSerializer to action_type instead of typing_indicator
+
+3.29.2
+----------
+* Bump weni-rp-apps version to 2.9.3
+* Improve validation in WhatsappBroadcastWriteSerializer to require typing_indicator in message payload
+
 3.29.1
 ----------
 * Update floweditor to 3.6.1
