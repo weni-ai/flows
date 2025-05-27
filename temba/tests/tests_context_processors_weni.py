@@ -1,11 +1,9 @@
 from django.test import RequestFactory, TestCase, override_settings
 
 from temba.context_processors_weni import (
-    logrocket,
     old_design_excluded_channels_codes,
     show_sidemenu,
     use_weni_layout,
-    weni_announcement,
 )
 
 
@@ -68,30 +66,6 @@ class ContextProcessorsWeniTestCase(TestCase):
         request.path = "/admin/"
         result = show_sidemenu(request)
         self.assertEqual(result["show_sidemenu"], False)
-
-    @override_settings(
-        ANNOUNCEMENT_LEFT="Left announcement",
-        ANNOUNCEMENT_RIGHT="Right announcement",
-        ANNOUNCEMENT_LINK="https://example.com",
-        ANNOUNCEMENT_BUTTON="Click me",
-    )
-    def test_weni_announcement(self):
-        request = self.factory.get("/")
-
-        result = weni_announcement(request)
-        self.assertEqual(result["announcement_left"], "Left announcement")
-        self.assertEqual(result["announcement_right"], "Right announcement")
-        self.assertEqual(result["announcement_link"], "https://example.com")
-        self.assertEqual(result["announcement_button"], "Click me")
-
-    @override_settings(PARENT_IFRAME_DOMAIN="example.com", LOGROCKET_IDS={"example.com": "logrocket_id"})
-    def test_logrocket(self):
-        request = self.factory.get("/")
-        request.META["HTTP_HOST"] = "example.com"
-
-        result = logrocket(request)
-        self.assertEqual(result["parent_iframe_domain"], "example.com")
-        self.assertEqual(result["logrocket_id"], "logrocket_id")
 
     @override_settings(OLD_DESIGN_EXCLUDED_CHANNELS_CODES=["code1", "code2"])
     def test_old_design_excluded_channels_codes(self):

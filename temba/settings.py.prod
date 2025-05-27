@@ -358,8 +358,6 @@ LOGIN_REDIRECT_URL = env("LOGIN_REDIRECT_URL", default="/msg/inbox/")
 # Enable Weni Templates
 TEMPLATES[0]["OPTIONS"]["context_processors"] += [
     "temba.context_processors_weni.use_weni_layout",
-    "temba.context_processors_weni.weni_announcement",
-    "temba.context_processors_weni.logrocket",
     "temba.context_processors_weni.show_sidemenu",
     "temba.context_processors_weni.old_design_excluded_channels_codes",
     "temba.context_processors_weni.hotjar",
@@ -371,16 +369,6 @@ SIDEBAR_EXCLUDE_PATHS = env.list("SIDEBAR_EXCLUDE_PATHS", default=[])
 
 # Weni Sidebar allowlist
 SIDEBAR_ALLOWLIST = env.list("SIDEBAR_ALLOWLIST", default=[])
-
-# Weni announcement
-ANNOUNCEMENT_LEFT = env("ANNOUNCEMENT_LEFT")
-ANNOUNCEMENT_RIGHT = env("ANNOUNCEMENT_RIGHT")
-ANNOUNCEMENT_LINK = env("ANNOUNCEMENT_LINK")
-ANNOUNCEMENT_BUTTON = env("ANNOUNCEMENT_BUTTON")
-
-# LOGROCKET
-LOGROCKET_IDS = env.dict("LOGROCKET_IDS")
-PARENT_IFRAME_DOMAIN = env("PARENT_IFRAME_DOMAIN")
 
 # ------------------------------------------------------------------------------------------
 # Production-only: Adjust depending on your proxy
