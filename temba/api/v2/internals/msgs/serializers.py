@@ -2,30 +2,13 @@ import pytz
 from rest_framework import serializers
 
 from temba.api.v2 import fields
-from temba.api.v2.serializers import ReadSerializer
+from temba.api.v2.serializers import MsgReadSerializer, ReadSerializer
 from temba.msgs.models import Msg
 
 
 class InternalMsgReadSerializer(ReadSerializer):
-    STATUSES = {
-        Msg.STATUS_INITIALIZING: "initializing",
-        Msg.STATUS_PENDING: "queued",  # same as far as users are concerned
-        Msg.STATUS_QUEUED: "queued",
-        Msg.STATUS_WIRED: "wired",
-        Msg.STATUS_SENT: "sent",
-        Msg.STATUS_DELIVERED: "delivered",
-        Msg.STATUS_HANDLED: "handled",
-        Msg.STATUS_ERRORED: "errored",
-        Msg.STATUS_FAILED: "failed",
-        Msg.STATUS_RESENT: "resent",
-        Msg.STATUS_READ: "read",
-    }
-    TYPES = {Msg.TYPE_INBOX: "inbox", Msg.TYPE_FLOW: "flow", Msg.TYPE_IVR: "ivr"}
-    VISIBILITIES = {
-        Msg.VISIBILITY_VISIBLE: "visible",
-        Msg.VISIBILITY_ARCHIVED: "archived",
-        Msg.VISIBILITY_DELETED: "deleted",
-    }
+    STATUSES = MsgReadSerializer.STATUSES
+    VISIBILITIES = MsgReadSerializer.VISIBILITIES
 
     contact = fields.ContactField()
     urn = fields.URNField(source="contact_urn")

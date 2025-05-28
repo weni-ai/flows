@@ -5,7 +5,7 @@ from weni.internal.authenticators import InternalOIDCAuthentication
 from weni.internal.permissions import CanCommunicateInternally
 
 from django.contrib.auth.models import User
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch
 
 from temba.api.support import InvalidQueryError
 from temba.api.v2.internals.msgs.serializers import InternalMsgReadSerializer
@@ -74,16 +74,6 @@ class InternalMessagesView(APIViewMixin, APIView):
         else:
             queryset = Msg.objects.filter(org=org).exclude(visibility=Msg.VISIBILITY_DELETED).exclude(msg_type=None)
 
-        # Filter by id (optional)
-        msg_id = params.get("id")
-        if msg_id and msg_id.isdigit():
-            queryset = queryset.filter(id=msg_id)
-
-        # Filter by broadcast (optional)
-        broadcast_id = params.get("broadcast")
-        if broadcast_id:
-            queryset = queryset.filter(broadcast_id=broadcast_id)
-
         # Filter by contact_urn (optional)
         contact_urn = params.get("contact_urn")
         if contact_urn:
@@ -91,24 +81,6 @@ class InternalMessagesView(APIViewMixin, APIView):
                 org=org, is_active=True, urns__identity=self.normalize_urn(org, contact_urn)
             ).first()
             queryset = queryset.filter(contact=contact)
-
-        # Filter by contact (optional)
-        contact_uuid = params.get("contact")
-        if contact_uuid:
-            contact = Contact.objects.filter(org=org, is_active=True, uuid=contact_uuid).first()
-            if contact:
-                queryset = queryset.filter(contact=contact)
-            else:
-                queryset = queryset.filter(pk=-1)
-
-        # Filter by label name/uuid (optional)
-        label_ref = params.get("label")
-        if label_ref:
-            label = Label.label_objects.filter(org=org).filter(Q(name=label_ref) | Q(uuid=label_ref)).first()
-            if label:
-                queryset = queryset.filter(labels=label, visibility=Msg.VISIBILITY_VISIBLE)
-            else:
-                queryset = queryset.filter(pk=-1)
 
         # Use prefetch rather than select_related for foreign keys to avoid joins
         queryset = queryset.prefetch_related(
