@@ -1,3 +1,7 @@
+3.30.0
+----------
+* Endpoint to get messages with internal authentication
+
 3.29.3
 ----------
 * Update validation in WhatsappBroadcastWriteSerializer to action_type instead of typing_indicator
