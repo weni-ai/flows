@@ -71,7 +71,7 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
                 ticketer.org.id, contact_id, ticketer_id, topic_id, assignee_id, extra
             )
         except mailroom.MailroomException as e:
-            return Response(str(e.response))
+            return Response(str(e.response), status=status.HTTP_409_CONFLICT)
         return Response(response, status=status.HTTP_200_OK)
 
     def get_assignee_id(self, request):

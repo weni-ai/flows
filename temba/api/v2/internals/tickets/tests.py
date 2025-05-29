@@ -10,7 +10,6 @@ from django.contrib.auth.models import User
 from temba.api.v2.validators import LambdaURLValidator
 from temba.tests import TembaTest
 from temba.tickets.models import Ticket, Ticketer
-from temba.mailroom.client import MailroomClient
 from temba.mailroom.client import MailroomException
 
 
@@ -263,7 +262,8 @@ class OpenTicketTest(TembaTest):
     def test_open_ticket_invalid_topic(self, mock_ticket_open, mock_protected_resource):
         mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
 
-        mock_ticket_open.side_effect = HTTPError('{"error":"queue not found"}')
+        error_response = {"error": "queue not found"}
+        mock_ticket_open.side_effect = MailroomException("ticket_open", None, error_response)
 
         url = "/api/v2/internals/open_ticket"
         body = {
@@ -285,8 +285,8 @@ class OpenTicketTest(TembaTest):
             '{"history_after":"2025-01-01 00:00:00+02:00"}',
         )
 
-        self.assertEqual(response.status_code, 500)
-        self.assertEqual(response.data, '{"error":"queue not found"}')
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data, str(error_response))
 
     @patch.object(LambdaURLValidator, "protected_resource")
     @patch("temba.mailroom.client.MailroomClient.ticket_open")
