@@ -1,6 +1,5 @@
 from unittest.mock import patch
 
-from requests import HTTPError
 from rest_framework import status
 from rest_framework.response import Response
 from weni.internal.models import TicketerQueue
@@ -8,6 +7,7 @@ from weni.internal.models import TicketerQueue
 from django.contrib.auth.models import User
 
 from temba.api.v2.validators import LambdaURLValidator
+from temba.mailroom.client import MailroomException
 from temba.tests import TembaTest
 from temba.tickets.models import Ticket, Ticketer
 from temba.mailroom.client import MailroomException
@@ -285,7 +285,7 @@ class OpenTicketTest(TembaTest):
             '{"history_after":"2025-01-01 00:00:00+02:00"}',
         )
 
-        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data, str(error_response))
 
     @patch.object(LambdaURLValidator, "protected_resource")
