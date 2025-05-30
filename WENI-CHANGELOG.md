@@ -1,3 +1,7 @@
+3.31.2
+----------
+* Add router demo number environment variable
+
 3.31.1
 ----------
 * Update weni-rp-apps version to 2.9.4 in poetry.lock and pyproject.toml
