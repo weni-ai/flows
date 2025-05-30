@@ -1082,10 +1082,13 @@ class FlowCRUDL(SmartCRUDL):
             features = []
 
             facebook_channel = org.get_channel(Channel.ROLE_SEND, scheme=URN.FACEBOOK_SCHEME)
+            instagram_channel = org.get_channel(Channel.ROLE_SEND, scheme=URN.INSTAGRAM_SCHEME)
             whatsapp_channel = org.get_channel(Channel.ROLE_SEND, scheme=URN.WHATSAPP_SCHEME)
 
             if facebook_channel:
                 features.append("facebook")
+            if instagram_channel:
+                features.append("instagram")
             if whatsapp_channel:
                 features.append("whatsapp")
             if org.get_integrations(IntegrationType.Category.AIRTIME):

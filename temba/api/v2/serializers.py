@@ -287,8 +287,8 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     channel = serializers.UUIDField(required=False)
 
     def validate_msg(self, value):
-        if not (value.get("text") or value.get("attachments") or value.get("template")):
-            raise serializers.ValidationError("Must provide either text, attachments or template")
+        if not (value.get("text") or value.get("attachments") or value.get("template") or value.get("action_type")):
+            raise serializers.ValidationError("Must provide either text, attachments, template or action_type")
         return value
 
     def validate(self, data):
@@ -592,6 +592,26 @@ class ChannelReadSerializer(ReadSerializer):
     class Meta:
         model = Channel
         fields = ("uuid", "name", "address", "country", "device", "last_seen", "created_on")
+
+
+class ToggleChannelWriteSerializer(WriteSerializer):
+    action = serializers.ChoiceField(required=True, choices=["enable", "disable"])
+
+    def save(self):
+        """
+        Update our channel is_active field
+        """
+        action = self.validated_data.get("action")
+
+        if self.instance:
+            if action == "enable":
+                self.instance.is_active = True
+            elif action == "disable":
+                self.instance.is_active = False
+
+            self.instance.save(update_fields=("is_active",))
+
+        return self.instance
 
 
 class ClassifierReadSerializer(ReadSerializer):

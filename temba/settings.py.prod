@@ -303,14 +303,10 @@ CELERY_BEAT_SCHEDULE["retry-errored-messages"] = {
     "schedule": crontab(hour=1, minute=0),
 }
 CELERY_BEAT_SCHEDULE["refresh-whatsapp-tokens"] = {"task": "refresh_whatsapp_tokens", "schedule": timedelta(hours=12)}
+
 CELERY_BEAT_SCHEDULE["refresh-whatsapp-templates"] = {
     "task": "refresh_whatsapp_templates",
     "schedule": timedelta(minutes=env.int("REFRESH_WPP_TEMPLATES_TASK_TIME", default=60)),
-}
-
-CELERY_BEAT_SCHEDULE["refresh-whatsapp-catalog-and-products"] = {
-    "task": "refresh_whatsapp_catalog_and_products",
-    "schedule": timedelta(minutes=env.int("REFRESH_WPP_CATALOG_TASK_TIME", default=60)),
 }
 
 CELERY_BEAT_SCHEDULE["refresh-whatsapp-flows-assets"] = {
@@ -362,12 +358,8 @@ LOGIN_REDIRECT_URL = env("LOGIN_REDIRECT_URL", default="/msg/inbox/")
 # Enable Weni Templates
 TEMPLATES[0]["OPTIONS"]["context_processors"] += [
     "temba.context_processors_weni.use_weni_layout",
-    "temba.context_processors_weni.weni_announcement",
-    "temba.context_processors_weni.logrocket",
     "temba.context_processors_weni.show_sidemenu",
     "temba.context_processors_weni.old_design_excluded_channels_codes",
-    "temba.context_processors_weni.show_onboard_modal",
-    "temba.context_processors_weni.firebase_credentials",
     "temba.context_processors_weni.hotjar",
 ]
 WENI_DOMAINS = {"weni": env("WENI_DOMAIN", default="weni.ai")}
@@ -377,16 +369,6 @@ SIDEBAR_EXCLUDE_PATHS = env.list("SIDEBAR_EXCLUDE_PATHS", default=[])
 
 # Weni Sidebar allowlist
 SIDEBAR_ALLOWLIST = env.list("SIDEBAR_ALLOWLIST", default=[])
-
-# Weni announcement
-ANNOUNCEMENT_LEFT = env("ANNOUNCEMENT_LEFT")
-ANNOUNCEMENT_RIGHT = env("ANNOUNCEMENT_RIGHT")
-ANNOUNCEMENT_LINK = env("ANNOUNCEMENT_LINK")
-ANNOUNCEMENT_BUTTON = env("ANNOUNCEMENT_BUTTON")
-
-# LOGROCKET
-LOGROCKET_IDS = env.dict("LOGROCKET_IDS")
-PARENT_IFRAME_DOMAIN = env("PARENT_IFRAME_DOMAIN")
 
 # ------------------------------------------------------------------------------------------
 # Production-only: Adjust depending on your proxy
@@ -494,17 +476,6 @@ CONTACT_IMPORT_MAX_RECORDS = env.int("CONTACT_IMPORT_MAX_RECORDS", default=25_00
 CONTACT_IMPORT_BATCH_SIZE = env.int("CONTACT_IMPORT_BATCH_SIZE", default=100)
 
 
-# ----------------------------------------------------------------------------------------
-# # FlowEditor feedback firebase database credentials
-# ----------------------------------------------------------------------------------------
-FIREBASE_API_KEY = env("FIREBASE_API_KEY", default="MISSING_FIREBASE_API_KEY")
-FIREBASE_AUTH_DOMAIN = env("FIREBASE_AUTH_DOMAIN", default="MISSING_FIREBASE_AUTH_DOMAIN")
-FIREBASE_PROJECT_ID = env("FIREBASE_PROJECT_ID", default="MISSING_FIREBASE_PROJECT_ID")
-FIREBASE_STORAGE_BUCKET = env("FIREBASE_STORAGE_BUCKET", default="MISSING_FIREBASE_STORAGE_BUCKET")
-FIREBASE_MESSAGING_SENDER_ID = env("FIREBASE_MESSAGING_SENDER_ID", default="MISSING_FIREBASE_MESSAGING_SENDER_ID")
-FIREBASE_APP_ID = env("FIREBASE_APP_ID", default="MISSING_FIREBASE_APP_ID")
-FIREBASE_MEASUREMENT_ID = env("FIREBASE_MEASUREMENT_ID", default="MISSING_FIREBASE_MEASUREMENT_ID")
-
 # Event Driven Architecture configurations
 
 USE_EDA = env.bool("USE_EDA", default=False)
@@ -527,6 +498,9 @@ MANUAL_FLOW_BROADCAST_MAX_GROUP_SUM_SIZE = env.int("MANUAL_FLOW_BROADCAST_MAX_GR
 
 # Access token for internal endpoints used by the router
 ROUTER_FIXED_ACCESS_TOKEN = env("ROUTER_FIXED_ACCESS_TOKEN", default="")
+
+# Phone number id for router demo number
+ROUTER_PHONE_NUMBER_ID = env("ROUTER_PHONE_NUMBER_ID", default="0")
 
 # Access token for internal endpoints used by the billing
 BILLING_FIXED_ACCESS_TOKEN = env("BILLING_FIXED_ACCESS_TOKEN", default="")
