@@ -26,6 +26,7 @@ from django.db.models import Count, Max, Min, Sum
 from django.db.models.functions import Lower
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.encoding import force_text
 from django.utils.functional import cached_property
 from django.utils.translation import ugettext_lazy as _
@@ -2257,16 +2258,45 @@ class FlowStartCRUDL(SmartCRUDL):
         def derive_queryset(self, *args, **kwargs):
             qs = super().derive_queryset(*args, **kwargs)
 
+            # Filter by start type
             if self.request.GET.get("type") == "manual":
                 qs = qs.filter(start_type=FlowStart.TYPE_MANUAL)
             else:
                 qs = qs.filter(start_type__in=(FlowStart.TYPE_MANUAL, FlowStart.TYPE_API, FlowStart.TYPE_API_ZAPIER))
 
+            # Filter by flow
+            flow_uuid = self.request.GET.get("flow")
+            if flow_uuid:
+                qs = qs.filter(flow__uuid=flow_uuid)
+
+            # Filter by group
+            group_uuid = self.request.GET.get("group")
+            if group_uuid:
+                qs = qs.filter(groups__uuid=group_uuid)
+
+            # Filter by time
+            minutes = self.request.GET.get("time")
+            if minutes:
+                try:
+                    minutes = int(minutes)
+                    since = timezone.now() - timedelta(minutes=minutes)
+                    qs = qs.filter(created_on__gte=since)
+                except ValueError:
+                    pass
+
             return qs.prefetch_related("contacts", "groups")
 
         def get_context_data(self, *args, **kwargs):
             context = super().get_context_data(*args, **kwargs)
+            org = self.request.user.get_org()
 
+            # Add flows for filter dropdown
+            context["flows"] = Flow.objects.filter(org=org, is_active=True).order_by("name")
+
+            # Add contact groups for filter dropdown
+            context["contact_groups"] = ContactGroup.user_groups.filter(org=org, is_active=True).order_by("name")
+
+            # Handle manual filter flag
             filtered = False
             if self.request.GET.get("type") == "manual":
                 context["url_params"] = "?type=manual&"
