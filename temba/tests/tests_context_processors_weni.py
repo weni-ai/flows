@@ -1,10 +1,6 @@
 from django.test import RequestFactory, TestCase, override_settings
 
-from temba.context_processors_weni import (
-    old_design_excluded_channels_codes,
-    show_sidemenu,
-    use_weni_layout,
-)
+from temba.context_processors_weni import old_design_excluded_channels_codes, show_sidemenu, use_weni_layout
 
 
 class MockUser:
@@ -72,4 +68,3 @@ class ContextProcessorsWeniTestCase(TestCase):
         request = self.factory.get("/")
         result = old_design_excluded_channels_codes(request)
         self.assertEqual(result["old_design_excluded_channels_codes"], ["code1", "code2"])
-

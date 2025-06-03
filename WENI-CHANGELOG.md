@@ -1,3 +1,16 @@
+3.31.2
+----------
+* Add router demo number environment variable
+
+3.31.1
+----------
+* Update weni-rp-apps version to 2.9.4 in poetry.lock and pyproject.toml
+* Add MailRoomException in open ticket api
+
+3.31.0
+----------
+* Feat: remove unused context processors
+
 3.30.0
 ----------
 * Endpoint to get messages with internal authentication
