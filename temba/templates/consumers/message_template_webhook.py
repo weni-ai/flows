@@ -11,22 +11,23 @@ from temba.event_driven.parsers import JSONParser
 
 @dataclass
 class MessageTemplateWebhookDTO:
+    contact_urn: str
     status: str
-    language: str
-    template_id: str
     message_id: str
+    template_type: str
+    channel: str
     data: dict
 
 
 class MessageTemplateWebhookConsumer(EDAConsumer):
     def consume(self, message: amqp.Message):  # pragma: no cover
-        print(f"[MessageTemplateWebhookConsumer] - Consuming a message. Body: {message.body}")
         try:
             body = JSONParser.parse(message.body)
             message_template_webhook_dto = MessageTemplateWebhookDTO(
+                contact_urn=body.get("contact_urn"),
                 status=body.get("status"),
-                language=body.get("language"),
-                template_id=body.get("template_id"),
+                template_type=body.get("template_type"),
+                channel=body.get("channel_uuid"),
                 message_id=body.get("message_id"),
                 data=body,
             )

@@ -13,33 +13,32 @@ from temba.event_driven.parsers import JSONParser
 class MessageTemplateDTO:  # pragma: no cover
     contact_urn: str
     channel: str
-    language: str
-    template_id: str
-    template_type: str
+    template_language: str
     template_name: str
+    template_uuid: str
     message_id: str
+    message_date: str
     direction: str
     template_variables: list
-    text: str
+    text: str | None
     data: dict
 
 
 class MessageTemplateConsumer(EDAConsumer):  # pragma: no cover
     def consume(self, message: amqp.Message):
-        print(f"[MessageTemplateConsumer] - Consuming a message. Body: {message.body}")
         try:
             body = JSONParser.parse(message.body)
             message_template_dto = MessageTemplateDTO(
                 contact_urn=body.get("contact_urn"),
                 channel=body.get("channel_uuid"),
-                language=body.get("language"),
-                template_id=body.get("template_id"),
-                template_type=body.get("template_type"),
+                template_language=body.get("template_language"),
                 template_name=body.get("template_name"),
+                template_uuid=body.get("template_uuid"),
                 message_id=body.get("message_id"),
+                message_date=body.get("message_date"),
                 direction=body.get("direction"),
                 template_variables=body.get("template_variables"),
-                text=body.get("text"),
+                text=body.get("text") or None,
                 data=body,
             )
 
