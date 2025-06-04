@@ -5936,6 +5936,7 @@ class FlowStartCRUDLTest(TembaTest, CRUDLTestMixin):
         other_org_flow = self.create_flow(org=self.org2)
         FlowStart.create(other_org_flow, self.admin2)
 
+        # no filtering
         response = self.assertListFetch(
             list_url, allow_viewers=True, allow_editors=True, context_objects=[start3, start2, start1]
         )
@@ -5947,11 +5948,41 @@ class FlowStartCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertContains(response, "contacts who haven't already been through this flow")
         self.assertContains(response, "<b>1,234</b> runs")
 
+        # filter by manual type
         response = self.assertListFetch(
             list_url + "?type=manual", allow_viewers=True, allow_editors=True, context_objects=[start1]
         )
         self.assertTrue(response.context["filtered"])
         self.assertEqual(response.context["url_params"], "?type=manual&")
+
+        # filter by flow
+        response = self.client.get(list_url + f"?flow={flow.uuid}")
+        self.assertEqual(list(response.context["object_list"]), [start3, start2, start1])
+
+        # filter by group
+        response = self.client.get(list_url + f"?group={group.uuid}")
+        self.assertEqual(list(response.context["object_list"]), [start3])
+
+        # filter by time (last hour)
+        now = timezone.now()
+        start2.created_on = now - timedelta(minutes=30)
+        start2.save(update_fields=["created_on"])
+        start3.created_on = now - timedelta(hours=2)
+        start3.save(update_fields=["created_on"])
+
+        # test with valid time parameter
+        response = self.client.get(list_url + "?time=60")
+        self.assertEqual(list(response.context["object_list"]), [start1, start2])  # ordered by -created_on
+
+        # test with invalid time parameter
+        response = self.client.get(list_url + "?time=invalid")
+        self.assertEqual(list(response.context["object_list"]), [start1, start2, start3])  # no time filtering applied
+
+        # check that we show flows and groups in context
+        self.login(self.admin)
+        response = self.client.get(list_url)
+        self.assertEqual(list(response.context["flows"]), [flow])
+        self.assertEqual(list(response.context["contact_groups"]), [group])
 
 
 class AssetServerTest(TembaTest):
