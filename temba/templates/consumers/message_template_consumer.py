@@ -20,7 +20,7 @@ class MessageTemplateDTO:  # pragma: no cover
     message_date: str
     direction: str
     template_variables: list
-    text: str | None
+    text: str
     data: dict
 
 
@@ -38,7 +38,7 @@ class MessageTemplateConsumer(EDAConsumer):  # pragma: no cover
                 message_date=body.get("message_date"),
                 direction=body.get("direction"),
                 template_variables=body.get("template_variables"),
-                text=body.get("text") or None,
+                text=body.get("text"),
                 data=body,
             )
 
