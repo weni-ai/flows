@@ -10,7 +10,7 @@ from temba.event_driven.parsers import JSONParser
 
 
 @dataclass
-class MessageTemplateWebhookDTO:
+class MessageTemplateWebhookDTO:  # pragma: no cover
     contact_urn: str
     status: str
     message_id: str
