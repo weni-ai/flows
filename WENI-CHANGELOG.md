@@ -1,3 +1,8 @@
+3.31.3
+----------
+* Adjust message template consumer fields to send to datalake
+* Bump weni-datalake-sdk version to 0.2.1
+
 3.31.2
 ----------
 * Add router demo number environment variable
