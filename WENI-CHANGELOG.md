@@ -1,3 +1,7 @@
+3.32.1
+----------
+* Add filters to flow start logs
+
 3.32.0
 ----------
 * Update weni-rp-apps version to 2.10.0
