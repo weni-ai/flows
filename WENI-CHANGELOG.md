@@ -1,3 +1,8 @@
+3.32.0
+----------
+* Update weni-rp-apps version to 2.10.0
+* Add django-prometheus
+
 3.31.3
 ----------
 * Adjust message template consumer fields to send to datalake
