@@ -46,11 +46,6 @@
     -# this view make it possible to process translations from javascript land
     <script src="{% url 'django.views.i18n.javascript_catalog' %}"></script>
 
-    -if logrocket_id and parent_iframe_domain
-      <!-- LogRocket Tracking -->
-      <script src="https://cdn.lr-in.com/LogRocket.min.js" crossorigin="anonymous"></script>
-      <script>window.LogRocket && window.LogRocket.init("{{logrocket_id}}", {mergeIframes: true, parentDomain: "{{parent_iframe_domain}}"});</script>
-
     <!-- Hotjar Tracking -->
     <script>
     (function (h, o, t, j, a, r) {

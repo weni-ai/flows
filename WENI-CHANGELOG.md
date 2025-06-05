@@ -1,3 +1,60 @@
+3.31.3
+----------
+* Adjust message template consumer fields to send to datalake
+* Bump weni-datalake-sdk version to 0.2.1
+
+3.31.2
+----------
+* Add router demo number environment variable
+
+3.31.1
+----------
+* Update weni-rp-apps version to 2.9.4 in poetry.lock and pyproject.toml
+* Add MailRoomException in open ticket api
+
+3.31.0
+----------
+* Feat: remove unused context processors
+
+3.30.0
+----------
+* Endpoint to get messages with internal authentication
+
+3.29.3
+----------
+* Update validation in WhatsappBroadcastWriteSerializer to action_type instead of typing_indicator
+
+3.29.2
+----------
+* Bump weni-rp-apps version to 2.9.3
+* Improve validation in WhatsappBroadcastWriteSerializer to require typing_indicator in message payload
+
+3.29.1
+----------
+* Update floweditor to 3.6.1
+
+3.29.0
+----------
+* Update weni-rp-apps and add weni-datalake-sdk
+* Add consumers to message template
+
+3.28.9
+----------
+* Remove call to refresh whatsapp products task
+
+3.28.8
+----------
+* Fix: Convert batch size to int
+
+3.28.7
+----------
+* Add batch of flow path recent run to environ
+* Remove signup form from public index template
+
+3.28.6
+----------
+* Not save products coming from integrations
+
 3.28.5
 ----------
 * Update floweditor to 3.6.0
