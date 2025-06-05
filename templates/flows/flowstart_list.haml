@@ -11,6 +11,34 @@
 
 
 -block content
+  %div.flex.gap-4.mb-6
+    %temba-select#flows.flex-grow(name="flow" label='{{_("Flow")|escapejs}}' searchable="true" onchange="handleSelectChange(this, `flow`)" value="{{ request.GET.flow }}" style="flex-grow: 4;")
+      %temba-option(name='{{_("All Flows")}}' value="")
+      -for flow in flows
+        %temba-option(name="{{flow.name}}" value="{{flow.uuid}}")
+
+    %temba-select#groups.flex-grow(name="group" label='{{_("Contact Group")|escapejs}}' searchable="true" onchange="handleSelectChange(this, `group`)" value="{{ request.GET.group }}")
+      %temba-option(name='{{_("All Groups")}}' value="")
+      -for group in contact_groups
+        %temba-option(name="{{group.name}}" value="{{group.uuid}}")
+
+    %temba-select#time.flex-grow(name="time" label='{{_("Time")|escapejs}}' searchable="true" onchange="handleSelectChange(this, `time`)" value="{{ request.GET.time }}")
+      %temba-option(name='{{_("All Time")}}' value="")
+      %temba-option(name='{{_("Last minute")}}' value="1")
+      %temba-option(name='2 {{_("minutes")}}' value="2")
+      %temba-option(name='5 {{_("minutes")}}' value="5")
+      %temba-option(name='15 {{_("minutes")}}' value="15")
+      %temba-option(name='30 {{_("minutes")}}' value="30")
+      %temba-option(name='1 {{_("hour")}}' value="60")
+      %temba-option(name='3 {{_("hours")}}' value="180")
+      %temba-option(name='12 {{_("hours")}}' value="720")
+      %temba-option(name='1 {{_("day")}}' value="1440")
+      %temba-option(name='2 {{_("days")}}' value="2880")
+      %temba-option(name='3 {{_("days")}}' value="4320")
+      %temba-option(name='1 {{_("week")}}' value="10080")
+      %temba-option(name='2 {{_("weeks")}}' value="20160")
+      %temba-option(name='1 {{_("month")}}' value="43200")
+
   %table.list.lined
     %thead
       %tr
@@ -73,3 +101,24 @@
 
   -block paginator
     -include "includes/pagination.haml"
+
+-block extra-script
+  {{ block.super }}
+
+  :javascript
+    function handleSelectChange(event, name) {
+      if (event.values.length) {
+        const value = event.values[0].value;
+        if (value) {
+          const params = new URLSearchParams(window.location.search);
+          params.set(name, value);
+          window.location.search = params.toString();
+        } else {
+          const params = new URLSearchParams(window.location.search);
+          if(params.has(name)) {
+            params.delete(name);
+            window.location.search = params.toString();
+          }
+        }
+      }
+    }
