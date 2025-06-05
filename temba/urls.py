@@ -8,6 +8,7 @@ from django.views.static import serve
 
 from celery.signals import worker_process_init
 
+from temba.api.prometheus.metrics import metrics_view
 from temba.channels.views import register, sync
 from temba.utils.analytics import init_analytics
 
@@ -48,6 +49,7 @@ urlpatterns = [
     url(r"^assets/", include("temba.assets.urls")),
     url(r"^jsi18n/$", JavaScriptCatalog.as_view(domain="django"), name="django.views.i18n.javascript_catalog"),
     url(r"^redirect/", WeniRedirect.as_view(), {}, "weni.redirect"),
+    url(r"^api/prometheus/metrics$", metrics_view, name="metrics_view"),
 ]
 
 

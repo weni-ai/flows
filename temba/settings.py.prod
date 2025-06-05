@@ -130,12 +130,15 @@ COMPRESS_OFFLINE_CONTEXT = dict(
 # ------------------------------------------------------------------------------
 # Firstly, we remove obsolete XFrameOptionsMiddleware from settings_common:
 MIDDLEWARE = tuple(m for m in MIDDLEWARE if "XFrameOptionsMiddleware" not in m)
+# PrometheusBeforeMiddleware is at the very beginning
+MIDDLEWARE = ("django_prometheus.middleware.PrometheusBeforeMiddleware",) + MIDDLEWARE
 # Now, we can add ours (including csp)
 MIDDLEWARE += (
     "corsheaders.middleware.CorsMiddleware",
     "elasticapm.contrib.django.middleware.TracingMiddleware",
     "elasticapm.contrib.django.middleware.Catch404Middleware",
     "csp.middleware.CSPMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 )
 
 # REDIS
@@ -244,6 +247,8 @@ INSTALLED_APPS += (
     # Templates (django-template-macros)
     "macros",
     "corsheaders",
+    # Metrics
+    "django_prometheus",
 )
 
 # SENTRY
