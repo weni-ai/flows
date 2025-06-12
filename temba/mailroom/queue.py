@@ -105,7 +105,7 @@ def queue_broadcast(broadcast):
         if not broadcast.metadata:
             broadcast.metadata = {}
 
-        # get the queue from the metadata
+        # pop the queue from the metadata
         queue = broadcast.metadata.pop("queue", None)
 
         task = {
