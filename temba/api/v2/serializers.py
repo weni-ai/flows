@@ -317,7 +317,9 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
 
         if data.get("queue"):
             if data.get("queue") not in ["wpp_broadcast_batch", "template_batch", "template_notification_batch"]:
-                raise serializers.ValidationError("Queue must be either wpp_broadcast_batch, template_batch or template_notification_batch")
+                raise serializers.ValidationError(
+                    "Queue must be either wpp_broadcast_batch, template_batch or template_notification_batch"
+                )
 
         return data
 
