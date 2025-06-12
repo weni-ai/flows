@@ -156,9 +156,6 @@ class Broadcast(models.Model):
                         % base_language
                     )
 
-        # ensure metadata is at least an empty dict before we try to access it
-        metadata = {}
-
         if broadcast_type == cls.BROADCAST_TYPE_DEFAULT:
             metadata = {Broadcast.METADATA_TEMPLATE_STATE: template_state}
             if quick_replies:
@@ -166,6 +163,10 @@ class Broadcast(models.Model):
 
         if broadcast_type == cls.BROADCAST_TYPE_WHATSAPP:
             metadata = msg
+
+        # ensure metadata is at least an empty dict before we try to access it
+        if not metadata:
+            metadata = {}
 
         if queue:
             metadata[Broadcast.METADATA_QUEUE] = queue
