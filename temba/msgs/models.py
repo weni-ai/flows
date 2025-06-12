@@ -156,6 +156,9 @@ class Broadcast(models.Model):
                         % base_language
                     )
 
+        # ensure metadata is at least an empty dict before we try to access it
+        metadata = {}
+
         if broadcast_type == cls.BROADCAST_TYPE_DEFAULT:
             metadata = {Broadcast.METADATA_TEMPLATE_STATE: template_state}
             if quick_replies:
