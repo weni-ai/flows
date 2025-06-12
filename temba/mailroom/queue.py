@@ -101,6 +101,10 @@ def queue_broadcast(broadcast):
         _queue_batch_task(broadcast.org_id, BatchTask.SEND_BROADCAST, task, HIGH_PRIORITY)
 
     if broadcast.broadcast_type == "W":
+        # ensure metadata is at least an empty dict before we try to access it
+        if not broadcast.metadata:
+            broadcast.metadata = {}
+
         task = {
             "urns": broadcast.raw_urns or [],
             "contact_ids": list(broadcast.contacts.values_list("id", flat=True)),
