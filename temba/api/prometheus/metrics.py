@@ -1,6 +1,7 @@
+from django_prometheus.exports import ExportToDjangoView
+
 from django.conf import settings
 from django.http import HttpResponseForbidden
-from django_prometheus.exports import ExportToDjangoView
 
 
 def metrics_view(request):
@@ -12,4 +13,3 @@ def metrics_view(request):
         return HttpResponseForbidden("Access denied")
 
     return ExportToDjangoView(request)
-    

@@ -1,3 +1,17 @@
+3.32.1
+----------
+* Add filters to flow start logs
+
+3.32.0
+----------
+* Update weni-rp-apps version to 2.10.0
+* Add django-prometheus
+
+3.31.3
+----------
+* Adjust message template consumer fields to send to datalake
+* Bump weni-datalake-sdk version to 0.2.1
+
 3.31.2
 ----------
 * Add router demo number environment variable

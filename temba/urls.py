@@ -8,11 +8,11 @@ from django.views.static import serve
 
 from celery.signals import worker_process_init
 
+from temba.api.prometheus.metrics import metrics_view
 from temba.channels.views import register, sync
 from temba.utils.analytics import init_analytics
 
 from .views import WeniRedirect
-from temba.api.prometheus.metrics import metrics_view
 
 urlpatterns = [
     url(r"^", include("temba.airtime.urls")),

@@ -1869,7 +1869,7 @@ python-versions = "*"
 
 [[package]]
 name = "weni-datalake-sdk"
-version = "0.2.1a2"
+version = "0.2.1"
 description = "Lib to connect python/django modules to redshift"
 category = "main"
 optional = false
@@ -1885,7 +1885,7 @@ pytest = ">=7.4,<8.0"
 
 [[package]]
 name = "weni-rp-apps"
-version = "2.10.0a0"
+version = "2.10.0"
 description = "Weni apps for Rapidpro Platform"
 category = "main"
 optional = false
@@ -1971,7 +1971,7 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=4.6)", "pytest-black (
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "bb6d580d6d0e8cc31127796782f1813a397b713260d37e2b81aa1ac4d772aa17"
+content-hash = "3527161f397cd2e4c0b807cc8ea97b809943c01904921c314d4dc5a02a968cb4"
 
 [metadata.files]
 amqp = [
@@ -3081,12 +3081,12 @@ wcwidth = [
     {file = "wcwidth-0.2.5.tar.gz", hash = "sha256:c4d647b99872929fdb7bdcaa4fbe7f01413ed3d98077df798530e5b04f116c83"},
 ]
 weni-datalake-sdk = [
-    {file = "weni_datalake_sdk-0.2.1a2-py3-none-any.whl", hash = "sha256:2434ca080841efbd761630af0cd6ff4855a38a2376a1a2c1a10d941577f7627e"},
-    {file = "weni_datalake_sdk-0.2.1a2.tar.gz", hash = "sha256:dd13adbd0450c77323fc15ffaeb86f1bf901a6c0c2280939b84c20b0f852cfb6"},
+    {file = "weni_datalake_sdk-0.2.1-py3-none-any.whl", hash = "sha256:8eb6731c126a161436a44691ef352cb185d1608044c1b8f4cba5cac33957dfe8"},
+    {file = "weni_datalake_sdk-0.2.1.tar.gz", hash = "sha256:784ff2d61de37b82e096db3ffd14d273e109f4777973eb05b7f0e61b17d0834c"},
 ]
 weni-rp-apps = [
-    {file = "weni_rp_apps-2.10.0a0-py3-none-any.whl", hash = "sha256:1a2fd50b0be9f4b078a334b3edc5ee21e6288e8aa54a4b2fca6f2fe010b37a39"},
-    {file = "weni_rp_apps-2.10.0a0.tar.gz", hash = "sha256:8b73acf47984b9a8dbd2e14e65af04f7b43c726ef396af7f9ddf439ef45187d3"},
+    {file = "weni_rp_apps-2.10.0-py3-none-any.whl", hash = "sha256:73c490c2022cf01dc56024e8a9ac62594cb6c55a81199a9761b1b9f3fb4156d6"},
+    {file = "weni_rp_apps-2.10.0.tar.gz", hash = "sha256:40dc5c27351fbe0a44b30001c88095257fe8562a044fb1afe759a2aff8f15b2b"},
 ]
 werkzeug = [
     {file = "werkzeug-3.1.3-py3-none-any.whl", hash = "sha256:54b78bf3716d19a65be4fceccc0d1d7b89e608834989dfae50ea87564639213e"},
