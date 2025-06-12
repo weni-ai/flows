@@ -105,6 +105,9 @@ def queue_broadcast(broadcast):
         if not broadcast.metadata:
             broadcast.metadata = {}
 
+        # get the queue from the metadata
+        queue = broadcast.metadata.pop("queue", None)
+
         task = {
             "urns": broadcast.raw_urns or [],
             "contact_ids": list(broadcast.contacts.values_list("id", flat=True)),
@@ -113,7 +116,7 @@ def queue_broadcast(broadcast):
             "org_id": broadcast.org_id,
             "msg": broadcast.metadata,
             "channel_id": broadcast.channel_id,
-            "queue": broadcast.metadata.get("queue", None),
+            "queue": queue,
         }
 
         _queue_batch_task(broadcast.org_id, BatchTask.SEND_WHATSAPP_BROADCAST, task, HIGH_PRIORITY)
