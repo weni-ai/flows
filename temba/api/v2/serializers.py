@@ -2017,7 +2017,6 @@ class WhatsappFlowReadSerializer(ReadSerializer):
 
 
 class EventFilterSerializer(serializers.Serializer):
-    project = serializers.UUIDField(required=True)
     date_start = serializers.DateTimeField(required=True)
     date_end = serializers.DateTimeField(required=True)
     key = serializers.CharField(required=False)

@@ -1,4 +1,5 @@
 import base64
+import os
 import time
 import uuid
 from collections import OrderedDict
@@ -5998,3 +5999,114 @@ class WhatsappFlowsEndpointViewSetTest(TembaTest):
 
         response = self.client.get(url, data={"name": "Flow 1"})
         self.assertEqual(response.status_code, 200)
+
+
+class EventsEndpointTest(APITest):
+    @patch("temba.api.v2.views.get_events")
+    def test_events_endpoint(self, mock_get_events):
+        url = reverse("api.v2.events")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_get_events.return_value = [{"event": "test"}]
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"event": "test"}])
+
+        mock_get_events.assert_called_once()
+        call_args, call_kwargs = mock_get_events.call_args
+        self.assertEqual(call_kwargs["project"], str(self.org.proj_uuid))
+        self.assertEqual(call_kwargs["date_start"], iso8601.parse_date(start_date))
+        self.assertEqual(call_kwargs["date_end"], iso8601.parse_date(end_date))
+
+    @patch("temba.api.v2.views.get_events")
+    def test_json_payload_parsing(self, mock_get_events):
+        url = reverse("api.v2.events")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_get_events.return_value = [{"payload": '{"key": "value"}'}]
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}"
+
+        response = self.fetchJSON(url, query)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"payload": {"key": "value"}}])
+
+    @patch("temba.api.v2.views.get_events")
+    def test_invalid_json_payload(self, mock_get_events):
+        url = reverse("api.v2.events")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_get_events.return_value = [{"payload": '{"key": "value"invalid}'}]
+
+        self.login(self.admin)
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}"
+
+        response = self.fetchJSON(url, query)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"payload": '{"key": "value"invalid}'}])
+
+    @patch("temba.api.v2.views.get_events")
+    def test_get_events_exception(self, mock_get_events):
+        url = reverse("api.v2.events")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        error_message = "Something went wrong"
+        mock_get_events.side_effect = Exception(error_message)
+
+        self.login(self.admin)
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}"
+
+        response = self.fetchJSON(url, query)
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {"error": error_message})
+
+    @override_settings(AWS_DEFAULT_REGION="test-region", EVENTS_METRIC_NAME="test-metric")
+    @patch("temba.api.v2.views.get_events")
+    def test_env_vars_from_settings(self, mock_get_events):
+        temp_env = {}
+        env_keys = ["AWS_DEFAULT_REGION", "EVENTS_METRIC_NAME"]
+        for key in env_keys:
+            if key in os.environ:
+                temp_env[key] = os.environ.pop(key)
+
+        try:
+            url = reverse("api.v2.events")
+            self.org.proj_uuid = uuid.uuid4()
+            self.org.save()
+            mock_get_events.return_value = []
+
+            self.login(self.admin)
+            start_date = "2024-01-01T00:00:00Z"
+            end_date = "2024-01-31T23:59:59Z"
+            query = f"date_start={start_date}&date_end={end_date}"
+
+            self.fetchJSON(url, query)
+
+            self.assertEqual(os.environ.get("AWS_DEFAULT_REGION"), "test-region")
+            self.assertEqual(os.environ.get("EVENTS_METRIC_NAME"), "test-metric")
+
+        finally:
+            for key in env_keys:
+                if key in os.environ:
+                    os.environ.pop(key, None)
+            os.environ.update(temp_env)
