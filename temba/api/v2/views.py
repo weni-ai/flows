@@ -5383,12 +5383,16 @@ class EventsEndpoint(BaseAPIView):
 
             processed_events = []
             for event in events:
-                if "payload" in event and isinstance(event["payload"], str):
-                    try:
-                        event["payload"] = json.loads(event["payload"])
-                    except ValueError:
-                        pass
-                processed_events.append(event)
+                processed_event = {}
+                for key, value in event.items():
+                    if isinstance(value, str):
+                        try:
+                            processed_event[key] = json.loads(value)
+                        except (json.JSONDecodeError, TypeError):
+                            processed_event[key] = value
+                    else:
+                        processed_event[key] = value
+                processed_events.append(processed_event)
 
             return Response(processed_events)
         except Exception as e:
