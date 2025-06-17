@@ -2,6 +2,7 @@ import itertools
 import json
 import os
 from enum import Enum
+from unittest.mock import patch
 
 from rest_framework import generics, status, views
 from rest_framework.pagination import CursorPagination
@@ -5350,48 +5351,45 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
 class EventsEndpoint(BaseAPIView):
     permission = "orgs.org_api"
 
+    def _get_env_vars(self):
+        env_vars = {}
+        vars_to_check = [
+            "REDSHIFT_QUERY_BASE_URL",
+            "REDSHIFT_SECRET",
+            "REDSHIFT_ROLE_ARN",
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "AWS_DEFAULT_REGION",
+            "EVENTS_METRIC_NAME",
+        ]
+        for var in vars_to_check:
+            if hasattr(settings, var):
+                env_vars[var] = getattr(settings, var)
+        return env_vars
+
     def get(self, request, *args, **kwargs):
         serializer = EventFilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         try:
-            if not os.environ.get("REDSHIFT_QUERY_BASE_URL") and hasattr(settings, "REDSHIFT_QUERY_BASE_URL"):
-                os.environ["REDSHIFT_QUERY_BASE_URL"] = settings.REDSHIFT_QUERY_BASE_URL
+            env_vars = self._get_env_vars()
+            with patch.dict(os.environ, env_vars):
+                org = request.user.get_org()
+                validated_data = serializer.validated_data.copy()
+                validated_data["project"] = str(org.proj_uuid)
 
-            if not os.environ.get("REDSHIFT_SECRET") and hasattr(settings, "REDSHIFT_SECRET"):
-                os.environ["REDSHIFT_SECRET"] = settings.REDSHIFT_SECRET
+                events = get_events(**validated_data)
 
-            if not os.environ.get("REDSHIFT_ROLE_ARN") and hasattr(settings, "REDSHIFT_ROLE_ARN"):
-                os.environ["REDSHIFT_ROLE_ARN"] = settings.REDSHIFT_ROLE_ARN
+                processed_events = []
+                for event in events:
+                    if "payload" in event and isinstance(event["payload"], str):
+                        try:
+                            event["payload"] = json.loads(event["payload"])
+                        except ValueError:
+                            pass
+                    processed_events.append(event)
 
-            if not os.environ.get("AWS_ACCESS_KEY_ID") and hasattr(settings, "AWS_ACCESS_KEY_ID"):
-                os.environ["AWS_ACCESS_KEY_ID"] = settings.AWS_ACCESS_KEY_ID
-
-            if not os.environ.get("AWS_SECRET_ACCESS_KEY") and hasattr(settings, "AWS_SECRET_ACCESS_KEY"):
-                os.environ["AWS_SECRET_ACCESS_KEY"] = settings.AWS_SECRET_ACCESS_KEY
-
-            if not os.environ.get("AWS_DEFAULT_REGION") and hasattr(settings, "AWS_DEFAULT_REGION"):
-                os.environ["AWS_DEFAULT_REGION"] = settings.AWS_DEFAULT_REGION
-
-            if not os.environ.get("EVENTS_METRIC_NAME") and hasattr(settings, "EVENTS_METRIC_NAME"):
-                os.environ["EVENTS_METRIC_NAME"] = settings.EVENTS_METRIC_NAME
-
-            org = request.user.get_org()
-            validated_data = serializer.validated_data.copy()
-            validated_data["project"] = str(org.proj_uuid)
-
-            events = get_events(**validated_data)
-
-            processed_events = []
-            for event in events:
-                if "payload" in event and isinstance(event["payload"], str):
-                    try:
-                        event["payload"] = json.loads(event["payload"])
-                    except ValueError:
-                        pass
-                processed_events.append(event)
-
-            return Response(processed_events)
+                return Response(processed_events)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
