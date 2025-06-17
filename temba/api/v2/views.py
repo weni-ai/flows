@@ -5352,45 +5352,45 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
 class EventsEndpoint(BaseAPIView):
     permission = "orgs.org_api"
 
-    def _get_env_vars(self):
-        env_vars = {}
-        vars_to_check = [
-            "REDSHIFT_QUERY_BASE_URL",
-            "REDSHIFT_SECRET",
-            "REDSHIFT_ROLE_ARN",
-            "AWS_ACCESS_KEY_ID",
-            "AWS_SECRET_ACCESS_KEY",
-            "AWS_DEFAULT_REGION",
-            "EVENTS_METRIC_NAME",
-        ]
-        for var in vars_to_check:
-            if hasattr(settings, var):
-                env_vars[var] = getattr(settings, var)
-        return env_vars
+    # def _get_env_vars(self):
+    #     env_vars = {}
+    #     vars_to_check = [
+    #         "REDSHIFT_QUERY_BASE_URL",
+    #         "REDSHIFT_SECRET",
+    #         "REDSHIFT_ROLE_ARN",
+    #         "AWS_ACCESS_KEY_ID",
+    #         "AWS_SECRET_ACCESS_KEY",
+    #         "AWS_DEFAULT_REGION",
+    #         "EVENTS_METRIC_NAME",
+    #     ]
+    #     for var in vars_to_check:
+    #         if hasattr(settings, var):
+    #             env_vars[var] = getattr(settings, var)
+    #     return env_vars
 
     def get(self, request, *args, **kwargs):
         serializer = EventFilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         try:
-            env_vars = self._get_env_vars()
-            with patch.dict(os.environ, env_vars):
-                org = request.user.get_org()
-                validated_data = serializer.validated_data.copy()
-                validated_data["project"] = str(org.proj_uuid)
+            # env_vars = self._get_env_vars()
+            # with patch.dict(os.environ, env_vars):
+            org = request.user.get_org()
+            validated_data = serializer.validated_data.copy()
+            validated_data["project"] = str(org.proj_uuid)
 
-                events = get_events(**validated_data)
+            events = get_events(**validated_data)
 
-                processed_events = []
-                for event in events:
-                    if "payload" in event and isinstance(event["payload"], str):
-                        try:
-                            event["payload"] = json.loads(event["payload"])
-                        except ValueError:
-                            pass
-                    processed_events.append(event)
+            processed_events = []
+            for event in events:
+                if "payload" in event and isinstance(event["payload"], str):
+                    try:
+                        event["payload"] = json.loads(event["payload"])
+                    except ValueError:
+                        pass
+                processed_events.append(event)
 
-                return Response(processed_events)
+            return Response(processed_events)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
