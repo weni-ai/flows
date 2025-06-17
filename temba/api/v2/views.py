@@ -1,4 +1,5 @@
 import itertools
+import json
 import os
 from enum import Enum
 
@@ -50,7 +51,7 @@ from temba.msgs.models import Broadcast, Label, LabelCount, Msg, SystemLabel
 from temba.orgs.models import OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
-from temba.utils import json, splitting_getlist, str_to_bool
+from temba.utils import splitting_getlist, str_to_bool
 from temba.wpp_flows.models import WhatsappFlow
 from temba.wpp_products.models import Product
 
@@ -5376,7 +5377,11 @@ class EventsEndpoint(BaseAPIView):
             if not os.environ.get("EVENTS_METRIC_NAME") and hasattr(settings, "EVENTS_METRIC_NAME"):
                 os.environ["EVENTS_METRIC_NAME"] = settings.EVENTS_METRIC_NAME
 
-            events = get_events(**serializer.validated_data)
+            org = request.user.get_org()
+            validated_data = serializer.validated_data.copy()
+            validated_data["project"] = str(org.proj_uuid)
+
+            events = get_events(**validated_data)
 
             processed_events = []
             for event in events:
@@ -5399,7 +5404,6 @@ class EventsEndpoint(BaseAPIView):
             "url": reverse("api.v2.events"),
             "slug": "events-list",
             "params": [
-                {"name": "project", "required": True, "help": "The project UUID to filter events"},
                 {
                     "name": "date_start",
                     "required": True,
