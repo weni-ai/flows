@@ -1,4 +1,5 @@
 import itertools
+import os
 from enum import Enum
 
 from rest_framework import generics, status, views
@@ -8,8 +9,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from smartmin.views import SmartFormView, SmartTemplateView
+from weni_datalake_sdk.clients.redshift.events import get_events
 
 from django import forms
+from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
 from django.db import connection
@@ -47,7 +50,7 @@ from temba.msgs.models import Broadcast, Label, LabelCount, Msg, SystemLabel
 from temba.orgs.models import OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
-from temba.utils import splitting_getlist, str_to_bool
+from temba.utils import json, splitting_getlist, str_to_bool
 from temba.wpp_flows.models import WhatsappFlow
 from temba.wpp_products.models import Product
 
@@ -75,6 +78,7 @@ from .serializers import (
     ContactTemplateSerializer,
     ContactTemplateSerializerNew,
     ContactWriteSerializer,
+    EventFilterSerializer,
     ExternalServicesReadSerializer,
     FilterTemplateSerializer,
     FilterTemplateSerializerNew,
@@ -335,6 +339,7 @@ class ExplorerView(SmartTemplateView):
             ExternalServicesEndpoint.get_read_explorer(),
             BrainInfoEndpoint.get_read_explorer(),
             WhatsappFlowsEndpoint.get_read_explorer(),
+            EventsEndpoint.get_read_explorer(),
         ]
         return context
 
@@ -5300,7 +5305,7 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
             "assets": {
                 "screens": [
                     "WELCOME", "MIDDLE"
-                },
+                ],
                 "variables": [
                     "question1Checkbox", "checkbox_source"
                 ]
@@ -5338,4 +5343,77 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
             "slug": "whatsapp_flows-list",
             "params": [],
             "example": {},
+        }
+
+
+class EventsEndpoint(BaseAPIView):
+    permission = "orgs.org_api"
+
+    def get(self, request, *args, **kwargs):
+        serializer = EventFilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            if not os.environ.get("REDSHIFT_QUERY_BASE_URL") and hasattr(settings, "REDSHIFT_QUERY_BASE_URL"):
+                os.environ["REDSHIFT_QUERY_BASE_URL"] = settings.REDSHIFT_QUERY_BASE_URL
+
+            if not os.environ.get("REDSHIFT_SECRET") and hasattr(settings, "REDSHIFT_SECRET"):
+                os.environ["REDSHIFT_SECRET"] = settings.REDSHIFT_SECRET
+
+            if not os.environ.get("REDSHIFT_ROLE_ARN") and hasattr(settings, "REDSHIFT_ROLE_ARN"):
+                os.environ["REDSHIFT_ROLE_ARN"] = settings.REDSHIFT_ROLE_ARN
+
+            if not os.environ.get("AWS_ACCESS_KEY_ID") and hasattr(settings, "AWS_ACCESS_KEY_ID"):
+                os.environ["AWS_ACCESS_KEY_ID"] = settings.AWS_ACCESS_KEY_ID
+
+            if not os.environ.get("AWS_SECRET_ACCESS_KEY") and hasattr(settings, "AWS_SECRET_ACCESS_KEY"):
+                os.environ["AWS_SECRET_ACCESS_KEY"] = settings.AWS_SECRET_ACCESS_KEY
+
+            if not os.environ.get("AWS_DEFAULT_REGION") and hasattr(settings, "AWS_DEFAULT_REGION"):
+                os.environ["AWS_DEFAULT_REGION"] = settings.AWS_DEFAULT_REGION
+
+            if not os.environ.get("EVENTS_METRIC_NAME") and hasattr(settings, "EVENTS_METRIC_NAME"):
+                os.environ["EVENTS_METRIC_NAME"] = settings.EVENTS_METRIC_NAME
+
+            events = get_events(**serializer.validated_data)
+
+            processed_events = []
+            for event in events:
+                if "payload" in event and isinstance(event["payload"], str):
+                    try:
+                        event["payload"] = json.loads(event["payload"])
+                    except ValueError:
+                        pass
+                processed_events.append(event)
+
+            return Response(processed_events)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Datalake Events",
+            "url": reverse("api.v2.events"),
+            "slug": "events-list",
+            "params": [
+                {"name": "project", "required": True, "help": "The project UUID to filter events"},
+                {
+                    "name": "date_start",
+                    "required": True,
+                    "help": "The start date for the filter, ex: 2025-06-03T00:00:00Z",
+                },
+                {
+                    "name": "date_end",
+                    "required": True,
+                    "help": "The end date for the filter, ex: 2025-06-20T23:59:59Z",
+                },
+                {"name": "key", "required": False, "help": "A key to filter by"},
+                {"name": "contact_urn", "required": False, "help": "A contact URN to filter by"},
+                {"name": "value_type", "required": False, "help": "A value_type to filter by"},
+                {"name": "value", "required": False, "help": "A value to filter by"},
+                {"name": "metadata", "required": False, "help": "A metadata to filter by"},
+                {"name": "event_name", "required": False, "help": "An event_name to filter by"},
+            ],
         }
