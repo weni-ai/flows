@@ -6086,10 +6086,10 @@ class EventsEndpointTest(APITest):
         self.org.save()
 
         mock_get_events.return_value = [{"key": "non-json-string"}]
-        
+
         url = reverse("api.v2.events")
         query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
-        
+
         response = self.fetchJSON(url, query)
 
         self.assertEqual(response.status_code, 200)

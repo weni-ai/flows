@@ -1,8 +1,6 @@
 import itertools
 import json
-import os
 from enum import Enum
-from unittest.mock import patch
 
 from rest_framework import generics, status, views
 from rest_framework.pagination import CursorPagination
@@ -14,7 +12,6 @@ from smartmin.views import SmartFormView, SmartTemplateView
 from weni_datalake_sdk.clients.redshift.events import get_events
 
 from django import forms
-from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
 from django.db import connection
