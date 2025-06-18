@@ -1,3 +1,7 @@
+3.33.0
+----------
+* Endpoint to get events
+
 3.32.1
 ----------
 * Add filters to flow start logs
