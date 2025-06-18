@@ -6082,7 +6082,31 @@ class EventsEndpointTest(APITest):
     @patch("temba.api.v2.views.get_events")
     def test_non_json_string_in_payload(self, mock_get_events):
         self.login(self.admin)
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
         mock_get_events.return_value = [{"key": "non-json-string"}]
-        response = self.fetchJSON("/api/v2/events.json?date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z")
+        
+        url = reverse("api.v2.events")
+        query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
+        
+        response = self.fetchJSON(url, query)
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [{"key": "non-json-string"}])
+
+    @patch("temba.api.v2.views.get_events")
+    def test_payload_with_other_types(self, mock_get_events):
+        self.login(self.admin)
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_get_events.return_value = [{"key_int": 123, "key_bool": False, "key_none": None}]
+
+        url = reverse("api.v2.events")
+        query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"key_int": 123, "key_bool": False, "key_none": None}])
