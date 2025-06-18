@@ -2014,3 +2014,14 @@ class WhatsappFlowReadSerializer(ReadSerializer):
             "status",
             "assets",
         )
+
+
+class EventFilterSerializer(serializers.Serializer):
+    date_start = serializers.DateTimeField(required=True)
+    date_end = serializers.DateTimeField(required=True)
+    key = serializers.CharField(required=False)
+    contact_urn = serializers.CharField(required=False)
+    value_type = serializers.CharField(required=False)
+    value = serializers.CharField(required=False)
+    metadata = serializers.CharField(required=False)
+    event_name = serializers.CharField(required=False)
