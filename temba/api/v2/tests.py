@@ -1,5 +1,4 @@
 import base64
-import os
 import time
 import uuid
 from collections import OrderedDict
@@ -6080,33 +6079,34 @@ class EventsEndpointTest(APITest):
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.json(), {"error": error_message})
 
-    @override_settings(AWS_DEFAULT_REGION="test-region", EVENTS_METRIC_NAME="test-metric")
     @patch("temba.api.v2.views.get_events")
-    def test_env_vars_from_settings(self, mock_get_events):
-        temp_env = {}
-        env_keys = ["AWS_DEFAULT_REGION", "EVENTS_METRIC_NAME"]
-        for key in env_keys:
-            if key in os.environ:
-                temp_env[key] = os.environ.pop(key)
+    def test_non_json_string_in_payload(self, mock_get_events):
+        self.login(self.admin)
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
 
-        try:
-            url = reverse("api.v2.events")
-            self.org.proj_uuid = uuid.uuid4()
-            self.org.save()
-            mock_get_events.return_value = []
+        mock_get_events.return_value = [{"key": "non-json-string"}]
 
-            self.login(self.admin)
-            start_date = "2024-01-01T00:00:00Z"
-            end_date = "2024-01-31T23:59:59Z"
-            query = f"date_start={start_date}&date_end={end_date}"
+        url = reverse("api.v2.events")
+        query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
 
-            self.fetchJSON(url, query)
+        response = self.fetchJSON(url, query)
 
-            self.assertEqual(os.environ.get("AWS_DEFAULT_REGION"), "test-region")
-            self.assertEqual(os.environ.get("EVENTS_METRIC_NAME"), "test-metric")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"key": "non-json-string"}])
 
-        finally:
-            for key in env_keys:
-                if key in os.environ:
-                    os.environ.pop(key, None)
-            os.environ.update(temp_env)
+    @patch("temba.api.v2.views.get_events")
+    def test_payload_with_other_types(self, mock_get_events):
+        self.login(self.admin)
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_get_events.return_value = [{"key_int": 123, "key_bool": False, "key_none": None}]
+
+        url = reverse("api.v2.events")
+        query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"key_int": 123, "key_bool": False, "key_none": None}])

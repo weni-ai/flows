@@ -1,8 +1,6 @@
 import itertools
 import json
-import os
 from enum import Enum
-from unittest.mock import patch
 
 from rest_framework import generics, status, views
 from rest_framework.pagination import CursorPagination
@@ -14,7 +12,6 @@ from smartmin.views import SmartFormView, SmartTemplateView
 from weni_datalake_sdk.clients.redshift.events import get_events
 
 from django import forms
-from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
 from django.db import connection
@@ -5352,29 +5349,11 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
 class EventsEndpoint(BaseAPIView):
     permission = "orgs.org_api"
 
-    # def _get_env_vars(self):
-    #     env_vars = {}
-    #     vars_to_check = [
-    #         "REDSHIFT_QUERY_BASE_URL",
-    #         "REDSHIFT_SECRET",
-    #         "REDSHIFT_ROLE_ARN",
-    #         "AWS_ACCESS_KEY_ID",
-    #         "AWS_SECRET_ACCESS_KEY",
-    #         "AWS_DEFAULT_REGION",
-    #         "EVENTS_METRIC_NAME",
-    #     ]
-    #     for var in vars_to_check:
-    #         if hasattr(settings, var):
-    #             env_vars[var] = getattr(settings, var)
-    #     return env_vars
-
     def get(self, request, *args, **kwargs):
         serializer = EventFilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         try:
-            # env_vars = self._get_env_vars()
-            # with patch.dict(os.environ, env_vars):
             org = request.user.get_org()
             validated_data = serializer.validated_data.copy()
             validated_data["project"] = str(org.proj_uuid)
