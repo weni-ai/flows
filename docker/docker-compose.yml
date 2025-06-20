@@ -55,3 +55,55 @@ services:
     environment:
       - RABBITMQ_DEFAULT_USER=guest
       - RABBITMQ_DEFAULT_PASS=guest
+
+  eda-default:
+    image: ${DOCKER_IMAGE_NAME:-ilhasoft/rapidpro}:${DOCKER_IMAGE_TAG:-latest}
+    command: ["edaconsume", "--consumer-group=default"]
+    environment:
+      - DEBUG=${DEBUG:-true}
+      - SECRET_KEY=${SECRET_KEY:-SECRET_KEY}
+      - EMAIL_HOST=${EMAIL_HOST:-localhost}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER:-admin@localhost.com}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-password}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - DATABASE_URL=${DATABASE_URL:-postgis://temba:temba@database_3:5432/temba}
+      - DATABASE_USE_SSL=${DATABASE_USE_SSL:-false}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-123456}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-123456}
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME:-123456}
+      - MAILROOM_URL=${MAILROOM_URL:-""}
+      - MAILROOM_AUTH_TOKEN=${MAILROOM_AUTH_TOKEN:-""}
+      - ELASTICSEARCH_URL=${ELASTICSEARCH_URL:-""}
+      - COMPRESS_ENABLED=${COMPRESS_ENABLED:-false}
+      - COMPRESS_OFFLINE=${COMPRESS_OFFLINE:-false}
+      - BRANDING_ENABLED=${BRANDING_ENABLED:-false}
+    depends_on:
+      - rabbitmq
+      - redis
+      - database
+
+  eda-template:
+    image: ${DOCKER_IMAGE_NAME:-ilhasoft/rapidpro}:${DOCKER_IMAGE_TAG:-latest}
+    command: ["edaconsume", "--consumer-group=template"]
+    environment:
+      - DEBUG=${DEBUG:-true}
+      - SECRET_KEY=${SECRET_KEY:-SECRET_KEY}
+      - EMAIL_HOST=${EMAIL_HOST:-localhost}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER:-admin@localhost.com}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-password}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - DATABASE_URL=${DATABASE_URL:-postgis://rapidpro:rapidpro@database:5432/rapidpro}
+      - DATABASE_USE_SSL=${DATABASE_USE_SSL:-false}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-123456}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-123456}
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME:-123456}
+      - MAILROOM_URL=${MAILROOM_URL:-""}
+      - MAILROOM_AUTH_TOKEN=${MAILROOM_AUTH_TOKEN:-""}
+      - ELASTICSEARCH_URL=${ELASTICSEARCH_URL:-""}
+      - COMPRESS_ENABLED=${COMPRESS_ENABLED:-false}
+      - COMPRESS_OFFLINE=${COMPRESS_OFFLINE:-false}
+      - BRANDING_ENABLED=${BRANDING_ENABLED:-false}
+    depends_on:
+      - rabbitmq
+      - redis
+      - database
