@@ -334,6 +334,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 "uuid": str(template.uuid),
                 "variables": template_data.get("variables", []),
                 "locale": template_data.get("locale", None),
+                "category": template_data.get("category", None),
             }
 
         except Template.DoesNotExist:
