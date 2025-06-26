@@ -82,7 +82,11 @@ elif [[ "celery-beat" == "$1" ]]; then
         -s "${CELERY_BEAT_DATABASE_FILE}"
 elif [[ "edaconsume" == "$1" ]]; then
     shift 1
-    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume "$@"
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume --group eda"$@"
+fi
+elif [[ "edaconsume" == "$1" ]]; then
+    shift 1
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume --group template"$@"
 fi
 
 exec "$@"

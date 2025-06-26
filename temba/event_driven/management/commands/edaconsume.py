@@ -4,23 +4,25 @@ from django.utils.module_loading import import_string
 
 
 class Command(BaseCommand):
+    allowed_groups = {
+        "eda": "temba.event_driven.handle.handle_default_consumers",
+        "template": "temba.event_driven.handle.handle_template_consumers",
+        "all": settings.EDA_CONSUMERS_HANDLE,
+    }
+
     def add_arguments(self, parser):
         parser.add_argument(
-            "--consumer-group",
+            "--group",
             dest="consumer_group",
-            default="default",
-            help="Specify the consumer group to run (default, template, all)",
+            default="eda",
+            help="Specify the consumer group to run (eda, template, all)",
         )
 
     def handle(self, *args, **options):
         consumer_group = options["consumer_group"]
 
-        if consumer_group == "template":
-            handler_path = "temba.event_driven.handle.handle_template_consumers"
-        elif consumer_group == "default":
-            handler_path = "temba.event_driven.handle.handle_default_consumers"
-        elif consumer_group == "all":
-            handler_path = settings.EDA_CONSUMERS_HANDLE
+        if consumer_group in self.allowed_groups:
+            handler_path = self.allowed_groups.get(consumer_group)
         else:
             self.stderr.write(self.style.ERROR(f"Invalid consumer group: {consumer_group}"))
             return
