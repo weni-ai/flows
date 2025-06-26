@@ -14,8 +14,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--group",
             dest="consumer_group",
-            default="default",
-            help="Specify the consumer group to run (default, template, all)",
+            default="eda",
+            help="Specify the consumer group to run (eda, template, all)",
         )
 
     def handle(self, *args, **options):
