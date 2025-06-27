@@ -76,6 +76,7 @@ class Broadcast(models.Model):
 
     METADATA_QUICK_REPLIES = "quick_replies"
     METADATA_TEMPLATE_STATE = "template_state"
+    METADATA_QUEUE = "queue"
 
     org = models.ForeignKey(Org, on_delete=models.PROTECT)
 
@@ -134,6 +135,7 @@ class Broadcast(models.Model):
         msg: dict = None,
         template_state: str = TEMPLATE_STATE_LEGACY,
         status: str = STATUS_INITIALIZING,
+        queue: str = None,
         **kwargs,
     ):
         # for convenience broadcasts can still be created with single translation and no base_language
@@ -161,6 +163,13 @@ class Broadcast(models.Model):
 
         if broadcast_type == cls.BROADCAST_TYPE_WHATSAPP:
             metadata = msg
+
+        # ensure metadata is at least an empty dict before we try to access it
+        if not metadata:
+            metadata = {}
+
+        if queue:
+            metadata[Broadcast.METADATA_QUEUE] = queue
 
         broadcast = cls.objects.create(
             org=org,
