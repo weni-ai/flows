@@ -41,7 +41,7 @@ urlpatterns = [
     url(r"^", include("temba.wpp_products.urls")),
     url(r"^", include("temba.wpp_flows.urls")),
     url(r"^", include("temba.templates.urls")),
-    url(r"^", include("temba.external_events.urls")),
+    url(r"^", include("temba.conversion_events.urls")),
     url(r"^relayers/relayer/sync/(\d+)/$", sync, {}, "sync"),
     url(r"^relayers/relayer/register/$", register, {}, "register"),
     url(r"users/user/forget/", RedirectView.as_view(pattern_name="orgs.user_forget", permanent=True)),
