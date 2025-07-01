@@ -358,10 +358,9 @@ class OpenTicketTest(TembaTest):
 
         url = "/api/v2/internals/open_ticket"
         body = {
-            "project": "91b45788-8beb-48dd-8355-64aab570e0c9",
+            "project": "30df650c-f15a-4996-b825-2a35cdc941cc",
             "ticketer": self.ticketer.uuid,
-            "contact_urn": "5582998765432",
-            "assignee": "user_email@email.com",
+            "contact": self.joe.uuid,
             "topic": self.org.default_ticket_topic.uuid,
             "conversation_started_on": "2025-01-01 00:00:00",
         }
@@ -400,6 +399,118 @@ class OpenTicketTest(TembaTest):
         self.assertEqual(response.status_code, 500)
         
         self.assertEqual(response.data, error_response)
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    @patch("temba.mailroom.client.MailroomClient.ticket_open")
+    def test_open_ticket_with_protocol(self, mock_ticket_open, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        mock_ticket_open.return_value = self.ticket_open_return_value()
+
+        url = "/api/v2/internals/open_ticket"
+        body = {
+            "project": self.org.proj_uuid,
+            "ticketer": self.ticketer.uuid,
+            "contact": self.joe.uuid,
+            "assignee": "user_email@email.com",
+            "topic": self.org.default_ticket_topic.uuid,
+            "conversation_started_on": "2025-01-01 00:00:00",
+            "protocol": "whatsapp"
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
+
+        mock_ticket_open.assert_called_once_with(
+            self.org.id,
+            self.joe.id,
+            self.ticketer.id,
+            self.org.default_ticket_topic.id,
+            0,
+            '{"history_after": "2025-01-01 00:00:00+02:00", "protocol": "whatsapp"}',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["uuid"], "970b8069-50f5-4f6f-8f41-6b2d9f33d623")
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    @patch("temba.mailroom.client.MailroomClient.ticket_open")
+    def test_open_ticket_with_empty_protocol(self, mock_ticket_open, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        mock_ticket_open.return_value = self.ticket_open_return_value()
+
+        url = "/api/v2/internals/open_ticket"
+        body = {
+            "project": self.org.proj_uuid,
+            "ticketer": self.ticketer.uuid,
+            "contact": self.joe.uuid,
+            "assignee": "user_email@email.com",
+            "topic": self.org.default_ticket_topic.uuid,
+            "conversation_started_on": "2025-01-01 00:00:00",
+            "protocol": ""
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
+
+        mock_ticket_open.assert_called_once_with(
+            self.org.id,
+            self.joe.id,
+            self.ticketer.id,
+            self.org.default_ticket_topic.id,
+            0,
+            '{"history_after": "2025-01-01 00:00:00+02:00"}',
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_open_ticket_with_protocol_too_long(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/open_ticket"
+        # Protocol with 65 characters (exceeds max_length=64)
+        long_protocol = "a" * 65
+        body = {
+            "project": self.org.proj_uuid,
+            "ticketer": self.ticketer.uuid,
+            "contact": self.joe.uuid,
+            "assignee": "user_email@email.com",
+            "topic": self.org.default_ticket_topic.uuid,
+            "conversation_started_on": "2025-01-01 00:00:00",
+            "protocol": long_protocol
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("protocol", response.data)
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    @patch("temba.mailroom.client.MailroomClient.ticket_open")
+    def test_open_ticket_with_null_protocol(self, mock_ticket_open, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        mock_ticket_open.return_value = self.ticket_open_return_value()
+
+        url = "/api/v2/internals/open_ticket"
+        body = {
+            "project": self.org.proj_uuid,
+            "ticketer": self.ticketer.uuid,
+            "contact": self.joe.uuid,
+            "assignee": "user_email@email.com",
+            "topic": self.org.default_ticket_topic.uuid,
+            "conversation_started_on": "2025-01-01 00:00:00",
+            "protocol": None
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
+
+        mock_ticket_open.assert_called_once_with(
+            self.org.id,
+            self.joe.id,
+            self.ticketer.id,
+            self.org.default_ticket_topic.id,
+            0,
+            '{"history_after": "2025-01-01 00:00:00+02:00"}',
+        )
+
+        self.assertEqual(response.status_code, 200)
 
 
 class GetDepartmentsViewTest(TembaTest):

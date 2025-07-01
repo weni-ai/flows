@@ -61,8 +61,13 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
         ticketer_id = serializer.validated_data["ticketer_id"]
         contact_id = serializer.validated_data["contact_id"]
         topic_id = serializer.validated_data["topic_id"]
+        protocol = serializer.validated_data.get("protocol")
         assignee_id = self.get_assignee_id(request)
-        extra = f'{{"history_after":"{serializer.validated_data["conversation_started_on"]}"}}'
+        
+        extra_data = {"history_after": str(serializer.validated_data["conversation_started_on"])}
+        if protocol:
+            extra_data["protocol"] = protocol
+        extra = str(extra_data).replace("'", '"')
 
         ticketer = Ticketer.objects.get(id=ticketer_id)
 
