@@ -41,7 +41,10 @@ class ConversionEventView(viewsets.ModelViewSet, InternalGenericViewSet):
             ctwa_data = self._get_ctwa_data(channel_uuid, contact_urn)
             if not ctwa_data:
                 return JsonResponse(
-                    {"error": "CTWA Data Not Found", "detail": f"No CTWA data found for channel {channel_uuid} and contact {contact_urn}"},
+                    {
+                        "error": "CTWA Data Not Found",
+                        "detail": f"No CTWA data found for channel {channel_uuid} and contact {contact_urn}",
+                    },
                     status=404,
                 )
 
