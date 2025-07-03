@@ -10,6 +10,7 @@ from temba.tests import TembaTest
 from temba.channels.models import Channel
 from temba.conversion_events.models import CTWA
 from temba.conversion_events.serializers import ConversionEventSerializer
+from temba.channels.types.whatsapp_cloud.type import WhatsAppCloudType
 
 
 class ConversionEventSerializerTest(TembaTest):
@@ -86,6 +87,10 @@ class ConversionEventViewTest(TembaTest):
 
     def setUp(self):
         super().setUp()
+        # Patch WhatsAppCloudType.activate para evitar erro de configuração obrigatória
+        self.activate_patcher = patch.object(WhatsAppCloudType, "activate", return_value=None)
+        self.activate_patcher.start()
+        self.addCleanup(self.activate_patcher.stop)
 
         # Create a channel
         self.channel = Channel.create(
@@ -106,7 +111,7 @@ class ConversionEventViewTest(TembaTest):
             contact_urn="whatsapp:+5511999999999",
         )
 
-        self.url = "/api/v2/conversion/"
+        self.url = "/conversion/"
         self.valid_payload = {
             "event_type": "lead",
             "channel_uuid": str(self.channel.uuid),
