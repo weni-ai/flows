@@ -15,6 +15,7 @@ class ConversionEventSerializer(serializers.Serializer):
 
     event_type = serializers.ChoiceField(choices=EVENT_TYPE_CHOICES, required=True)
     channel_uuid = serializers.UUIDField(required=True)
+    contact_urn = serializers.CharField(required=True, max_length=255)
     payload = serializers.JSONField(required=False, default=dict)
 
     def validate_channel_uuid(self, value):

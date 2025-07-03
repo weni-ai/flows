@@ -34,13 +34,14 @@ class ConversionEventView(viewsets.ModelViewSet, InternalGenericViewSet):
             validated_data = serializer.validated_data
             event_type = validated_data["event_type"]
             channel_uuid = validated_data["channel_uuid"]
+            contact_urn = validated_data["contact_urn"]
             payload = validated_data.get("payload", {})
 
             # Get CTWA data for Meta sending
-            ctwa_data = self._get_ctwa_data(channel_uuid)
+            ctwa_data = self._get_ctwa_data(channel_uuid, contact_urn)
             if not ctwa_data:
                 return JsonResponse(
-                    {"error": "CTWA Data Not Found", "detail": f"No CTWA data found for channel {channel_uuid}"},
+                    {"error": "CTWA Data Not Found", "detail": f"No CTWA data found for channel {channel_uuid} and contact {contact_urn}"},
                     status=404,
                 )
 
@@ -73,10 +74,10 @@ class ConversionEventView(viewsets.ModelViewSet, InternalGenericViewSet):
                 {"error": "Internal Server Error", "detail": "An unexpected error occurred"}, status=500
             )
 
-    def _get_ctwa_data(self, channel_uuid):
-        """Get CTWA data for lookup"""
+    def _get_ctwa_data(self, channel_uuid, contact_urn):
+        """Get CTWA data for lookup using both channel_uuid and contact_urn"""
         try:
-            return CTWA.objects.filter(channel_uuid=channel_uuid).first()
+            return CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).first()
 
         except Exception as e:
             logger.error(f"Error fetching CTWA data: {str(e)}")
