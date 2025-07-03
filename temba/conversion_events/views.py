@@ -41,7 +41,10 @@ class ConversionEventView(viewsets.ModelViewSet, InternalGenericViewSet):
             ctwa_data = self._get_ctwa_data(channel_uuid, contact_urn)
             if not ctwa_data:
                 return JsonResponse(
-                    {"error": "CTWA Data Not Found", "detail": f"No CTWA data found for channel {channel_uuid} and contact {contact_urn}"},
+                    {
+                        "error": "CTWA Data Not Found",
+                        "detail": f"No CTWA data found for channel {channel_uuid} and contact {contact_urn}",
+                    },
                     status=404,
                 )
 
@@ -117,7 +120,7 @@ class ConversionEventView(viewsets.ModelViewSet, InternalGenericViewSet):
             },
         }
 
-        return {"data": [meta_event], "partner_agent": getattr(settings, "META_PARTNER_AGENT", "RapidPro")}
+        return {"data": [meta_event], "partner_agent": getattr(settings, "META_PARTNER_AGENT", "Weni by VTEX")}
 
     def _send_to_meta(self, payload, dataset_id):
         """Send event to Meta Conversion API"""
@@ -140,13 +143,12 @@ class ConversionEventView(viewsets.ModelViewSet, InternalGenericViewSet):
             response = requests.post(url, json=payload, headers=headers, timeout=30)
 
             if response.status_code == 200:
-                result = response.json()
-                return result
+                return True, "Success"
             else:
                 error_detail = response.json()
-                return error_detail
+                return False, str(error_detail)
 
         except requests.RequestException as e:
-            return f"Network error sending to Meta: {str(e)}"
+            return False, f"Network error sending to Meta: {str(e)}"
         except Exception as e:
             return False, f"Error sending to Meta: {str(e)}"
