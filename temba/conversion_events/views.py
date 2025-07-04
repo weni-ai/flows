@@ -25,6 +25,9 @@ class ConversionEventView(viewsets.ModelViewSet, InternalGenericViewSet):
         Receive conversion event and send immediately to Meta
         """
         try:
+            # Validate JSON first
+            if not hasattr(request, "data") or request.data is None:
+                return JsonResponse({"error": "Invalid JSON", "detail": "Request body must be valid JSON"}, status=400)
 
             # Validate required data
             serializer = ConversionEventSerializer(data=request.data)
@@ -72,10 +75,15 @@ class ConversionEventView(viewsets.ModelViewSet, InternalGenericViewSet):
                 return JsonResponse({"error": "Meta API Error", "detail": error_msg}, status=500)
 
         except Exception as e:
-            logger.error(f"Unexpected error processing conversion event: {str(e)}")
-            return JsonResponse(
-                {"error": "Internal Server Error", "detail": "An unexpected error occurred"}, status=500
-            )
+            error_msg = str(e)
+            if any(keyword in error_msg.lower() for keyword in ["json", "parse", "expecting value"]):
+                logger.error(f"JSON parse error - {error_msg}")
+                return JsonResponse({"error": "Invalid JSON", "detail": "Request body must be valid JSON"}, status=400)
+            else:
+                logger.error(f"Unexpected error processing conversion event: {error_msg}")
+                return JsonResponse(
+                    {"error": "Internal Server Error", "detail": "An unexpected error occurred"}, status=500
+                )
 
     def _get_ctwa_data(self, channel_uuid, contact_urn):
         """Get CTWA data for lookup using both channel_uuid and contact_urn"""
