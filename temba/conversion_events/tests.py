@@ -141,7 +141,7 @@ class ConversionEventAPITest(TembaTest):
         OIDC_OP_AUTHORIZATION_ENDPOINT="http://example.com/oauth2/auth",
         OIDC_OP_TOKEN_ENDPOINT="http://example.com/oauth2/token",
         OIDC_OP_USER_ENDPOINT="http://example.com/oauth2/userinfo",
-        OIDC_OP_JWKS_ENDPOINT="http://example.com/oauth2/jwks"
+        OIDC_OP_JWKS_ENDPOINT="http://example.com/oauth2/jwks",
     )
     def test_endpoint_requires_internal_auth(self):
         """Test that the endpoint requires internal authentication"""
