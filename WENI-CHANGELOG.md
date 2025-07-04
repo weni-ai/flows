@@ -1,3 +1,8 @@
+3.34.0
+----------
+* Add conversion events module with API endpoint for conversion events
+* Update weni-ap-apps and weni-datalake-sdk
+
 3.33.0
 ----------
 * Endpoint to get events
