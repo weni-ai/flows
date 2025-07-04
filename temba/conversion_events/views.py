@@ -88,7 +88,7 @@ class ConversionEventView(viewsets.ModelViewSet, InternalGenericViewSet):
     def _get_ctwa_data(self, channel_uuid, contact_urn):
         """Get CTWA data for lookup using both channel_uuid and contact_urn"""
         try:
-            return CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).first()
+            return CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).order_by('-timestamp').first()
 
         except Exception as e:
             logger.error(f"Error fetching CTWA data: {str(e)}")
