@@ -135,6 +135,14 @@ class ConversionEventAPITest(TembaTest):
             "payload": {"custom": "data"},
         }
 
+    @override_settings(
+        OIDC_RP_CLIENT_ID="test-client-id",
+        OIDC_RP_CLIENT_SECRET="test-client-secret",
+        OIDC_OP_AUTHORIZATION_ENDPOINT="http://example.com/oauth2/auth",
+        OIDC_OP_TOKEN_ENDPOINT="http://example.com/oauth2/token",
+        OIDC_OP_USER_ENDPOINT="http://example.com/oauth2/userinfo",
+        OIDC_OP_JWKS_ENDPOINT="http://example.com/oauth2/jwks"
+    )
     def test_endpoint_requires_internal_auth(self):
         """Test that the endpoint requires internal authentication"""
         # Without authentication, should get 401
