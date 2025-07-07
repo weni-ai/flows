@@ -3,6 +3,10 @@
 * Update weni-rp-apps version to 2.10.2
 * Split EDA consumers
 
+3.34.1
+----------
+* Add protocol param to endpoint request to open ticket
+
 3.34.0
 ----------
 * Add conversion events module with API endpoint for conversion events
