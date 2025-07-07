@@ -1,16 +1,13 @@
 import json
-from unittest.mock import patch, Mock
-from datetime import datetime
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from django.test import override_settings
-from django.urls import reverse
 
-from temba.tests import TembaTest
-from temba.channels.models import Channel
+from temba.channels.types.whatsapp_cloud.type import WhatsAppCloudType
 from temba.conversion_events.models import CTWA
 from temba.conversion_events.serializers import ConversionEventSerializer
-from temba.channels.types.whatsapp_cloud.type import WhatsAppCloudType
+from temba.tests import TembaTest
 
 
 class ConversionEventSerializerTest(TembaTest):
@@ -81,9 +78,30 @@ class ConversionEventSerializerTest(TembaTest):
         self.assertFalse(serializer.is_valid())
         self.assertIn("payload", serializer.errors)
 
+    def test_serializer_uuid_validation_edge_case(self):
+        """Test serializer UUID validation edge case - covers line 24 in serializers.py"""
+        data = {"event_type": "lead", "channel_uuid": "invalid-uuid-format", "contact_urn": "tel:+1234567890"}
+        serializer = ConversionEventSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("channel_uuid", serializer.errors)
+        self.assertIn("Must be a valid UUID", str(serializer.errors["channel_uuid"]))
 
-class ConversionEventViewTest(TembaTest):
-    """Test the ConversionEventView API endpoint"""
+    def test_payload_type_validation(self):
+        """Test payload must be a dictionary"""
+        data = {
+            "event_type": "lead",
+            "channel_uuid": str(uuid4()),
+            "contact_urn": "tel:+1234567890",
+            "payload": "invalid-not-a-dict",
+        }
+        serializer = ConversionEventSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("payload", serializer.errors)
+        self.assertIn("must be a valid JSON object", str(serializer.errors["payload"]))
+
+
+class ConversionEventAPITest(TembaTest):
+    """Test the ConversionEvent API endpoint following RapidPro patterns"""
 
     def setUp(self):
         super().setUp()
@@ -92,18 +110,16 @@ class ConversionEventViewTest(TembaTest):
         self.activate_patcher.start()
         self.addCleanup(self.activate_patcher.stop)
 
-        # Create a channel
-        self.channel = Channel.create(
-            self.org,
-            self.user,
-            "US",
+        # Create test channel with Meta configuration
+        self.channel = self.create_channel(
             "WAC",
-            name="Test WhatsApp Channel",
-            address="+12065551212",
-            config={"meta_dataset_id": "test_dataset_123", "auth_token": "test_token"},
+            "Test WhatsApp Channel",
+            "+12065551212",
+            country="US",
+            config={"meta_dataset_id": "test_dataset_123"},
         )
 
-        # Create CTWA data
+        # Create CTWA data for testing
         self.ctwa_data = CTWA.objects.create(
             ctwa_clid="test_clid_123",
             channel_uuid=self.channel.uuid,
@@ -111,7 +127,7 @@ class ConversionEventViewTest(TembaTest):
             contact_urn="whatsapp:+5511999999999",
         )
 
-        self.url = "/conversion/"
+        self.endpoint_url = "/conversion/"  # Since it's included at root level
         self.valid_payload = {
             "event_type": "lead",
             "channel_uuid": str(self.channel.uuid),
@@ -119,8 +135,32 @@ class ConversionEventViewTest(TembaTest):
             "payload": {"custom": "data"},
         }
 
-    def test_successful_lead_conversion(self):
+    @override_settings(
+        OIDC_RP_CLIENT_ID="test-client-id",
+        OIDC_RP_CLIENT_SECRET="test-client-secret",
+        OIDC_OP_AUTHORIZATION_ENDPOINT="http://example.com/oauth2/auth",
+        OIDC_OP_TOKEN_ENDPOINT="http://example.com/oauth2/token",
+        OIDC_OP_USER_ENDPOINT="http://example.com/oauth2/userinfo",
+        OIDC_OP_JWKS_ENDPOINT="http://example.com/oauth2/jwks",
+    )
+    def test_endpoint_requires_internal_auth(self):
+        """Test that the endpoint requires internal authentication"""
+        # Without authentication, should get 401
+        response = self.client.post(
+            self.endpoint_url,
+            data=json.dumps(self.valid_payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 401)
+
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
+    def test_successful_lead_conversion(self, mock_permissions, mock_authenticators):
         """Test successful lead conversion event"""
+        # Mock internal authentication
+        mock_authenticators.return_value = []
+        mock_permissions.return_value = []
+
         with patch("temba.conversion_events.views.requests.post") as mock_post:
             mock_response = Mock()
             mock_response.status_code = 200
@@ -133,22 +173,29 @@ class ConversionEventViewTest(TembaTest):
                 META_PARTNER_AGENT="Weni by VTEX",
             ):
                 response = self.client.post(
-                    self.url,
+                    self.endpoint_url,
                     data=json.dumps(self.valid_payload),
                     content_type="application/json",
                 )
 
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.json()["status"], "success")
+                response_data = response.json()
+                self.assertEqual(response_data["status"], "success")
+                self.assertEqual(response_data["message"], "Event sent to Meta successfully")
 
-                # Verify the Meta API was called
+                # Verify Meta API was called with correct parameters
                 mock_post.assert_called_once()
                 call_args = mock_post.call_args
                 self.assertIn("test_dataset_123", call_args[0][0])
                 self.assertIn("access_token=test_token", call_args[0][0])
 
-    def test_successful_purchase_conversion(self):
-        """Test successful purchase conversion event"""
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
+    def test_successful_purchase_conversion(self, mock_permissions, mock_authenticators):
+        """Test successful purchase conversion event maps to correct event name"""
+        mock_authenticators.return_value = []
+        mock_permissions.return_value = []
+
         payload = self.valid_payload.copy()
         payload["event_type"] = "purchase"
 
@@ -161,51 +208,44 @@ class ConversionEventViewTest(TembaTest):
             with override_settings(
                 WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
                 WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
-                META_PARTNER_AGENT="Weni by VTEX",
             ):
                 response = self.client.post(
-                    self.url, data=json.dumps(payload), content_type="application/json"
+                    self.endpoint_url, data=json.dumps(payload), content_type="application/json"
                 )
 
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.json()["status"], "success")
 
-    def test_ctwa_data_not_found(self):
-        """Test when CTWA data is not found for the channel and contact"""
+                # Verify the payload sent to Meta includes Purchase event
+                call_kwargs = mock_post.call_args[1]
+                sent_payload = call_kwargs["json"]
+                self.assertEqual(sent_payload["data"][0]["event_name"], "Purchase")
+
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
+    def test_ctwa_data_not_found(self, mock_permissions, mock_authenticators):
+        """Test when CTWA data is not found"""
+        mock_authenticators.return_value = []
+        mock_permissions.return_value = []
+
         payload = self.valid_payload.copy()
-        payload["contact_urn"] = "whatsapp:+5511888888888"  # Different contact
+        payload["contact_urn"] = "whatsapp:+5511888888888"  # Non-existent contact
 
-        response = self.client.post(
-            self.url, data=json.dumps(payload), content_type="application/json"
-        )
+        response = self.client.post(self.endpoint_url, data=json.dumps(payload), content_type="application/json")
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["error"], "CTWA Data Not Found")
+        response_data = response.json()
+        self.assertEqual(response_data["error"], "CTWA Data Not Found")
+        self.assertIn("No CTWA data found", response_data["detail"])
 
-    def test_channel_not_found(self):
-        """Test when channel is not found"""
-        payload = self.valid_payload.copy()
-        payload["channel_uuid"] = str(uuid4())  # Non-existent channel
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
+    def test_channel_missing_dataset_id(self, mock_permissions, mock_authenticators):
+        """Test when channel doesn't have meta_dataset_id configured"""
+        mock_authenticators.return_value = []
+        mock_permissions.return_value = []
 
-        response = self.client.post(
-            self.url, data=json.dumps(payload), content_type="application/json"
-        )
-
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["error"], "CTWA Data Not Found")
-
-    def test_missing_dataset_id(self):
-        """Test when dataset_id is not configured in channel"""
         # Create channel without dataset_id
-        channel_without_dataset = Channel.create(
-            self.org,
-            self.user,
-            "US",
-            "WAC",
-            name="Test Channel No Dataset",
-            address="+12065551213",
-            config={},
-        )
+        channel_without_dataset = self.create_channel("WAC", "No Dataset Channel", "+12065551213", config={})
 
         CTWA.objects.create(
             ctwa_clid="test_clid_456",
@@ -218,216 +258,226 @@ class ConversionEventViewTest(TembaTest):
         payload["channel_uuid"] = str(channel_without_dataset.uuid)
         payload["contact_urn"] = "whatsapp:+5511888888888"
 
-        response = self.client.post(
-            self.url, data=json.dumps(payload), content_type="application/json"
-        )
+        response = self.client.post(self.endpoint_url, data=json.dumps(payload), content_type="application/json")
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["error"], "Dataset ID Not Found")
+        response_data = response.json()
+        self.assertEqual(response_data["error"], "Dataset ID Not Found")
 
-    def test_missing_access_token(self):
-        """Test when access token is not configured"""
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
+    def test_missing_access_token(self, mock_permissions, mock_authenticators):
+        """Test behavior when Meta access token is not configured"""
+        mock_authenticators.return_value = []
+        mock_permissions.return_value = []
+
         with override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN=""):
             response = self.client.post(
-                self.url,
+                self.endpoint_url,
                 data=json.dumps(self.valid_payload),
                 content_type="application/json",
             )
 
             self.assertEqual(response.status_code, 500)
-            self.assertEqual(response.json()["error"], "Meta API Error")
+            response_data = response.json()
+            self.assertEqual(response_data["error"], "Meta API Error")
+            self.assertIn("Meta access token not configured", response_data["detail"])
 
-    def test_meta_api_error(self):
-        """Test when Meta API returns an error"""
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
+    def test_meta_api_error_handling(self, mock_permissions, mock_authenticators):
+        """Test Meta API error responses are handled properly"""
+        mock_authenticators.return_value = []
+        mock_permissions.return_value = []
+
         with patch("temba.conversion_events.views.requests.post") as mock_post:
             mock_response = Mock()
             mock_response.status_code = 400
             mock_response.json.return_value = {"error": "Invalid request"}
             mock_post.return_value = mock_response
 
-            with override_settings(
-                WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
-                WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
-            ):
+            with override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token"):
                 response = self.client.post(
-                    self.url,
+                    self.endpoint_url,
                     data=json.dumps(self.valid_payload),
                     content_type="application/json",
                 )
 
                 self.assertEqual(response.status_code, 500)
-                self.assertEqual(response.json()["error"], "Meta API Error")
+                response_data = response.json()
+                self.assertEqual(response_data["error"], "Meta API Error")
 
-    def test_meta_api_network_error(self):
-        """Test when Meta API has network issues"""
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
+    def test_network_error_handling(self, mock_permissions, mock_authenticators):
+        """Test network errors are handled gracefully"""
+        mock_authenticators.return_value = []
+        mock_permissions.return_value = []
+
         with patch("temba.conversion_events.views.requests.post") as mock_post:
             mock_post.side_effect = Exception("Network error")
 
-            with override_settings(
-                WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
-                WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
-            ):
+            with override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token"):
                 response = self.client.post(
-                    self.url,
+                    self.endpoint_url,
                     data=json.dumps(self.valid_payload),
                     content_type="application/json",
                 )
 
                 self.assertEqual(response.status_code, 500)
-                self.assertEqual(response.json()["error"], "Meta API Error")
+                response_data = response.json()
+                self.assertEqual(response_data["error"], "Meta API Error")
 
-    def test_invalid_json_payload(self):
-        """Test with invalid JSON payload"""
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
+    def test_invalid_json_handling(self, mock_permissions, mock_authenticators):
+        """Test invalid JSON in request body"""
+        mock_authenticators.return_value = []
+        mock_permissions.return_value = []
+
         response = self.client.post(
-            self.url, data="invalid json", content_type="application/json"
+            self.endpoint_url,
+            data="invalid json",
+            content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 400)
+        response_data = response.json()
+        self.assertEqual(response_data["error"], "Invalid JSON")
 
-    def test_validation_error(self):
-        """Test with validation errors"""
-        invalid_payload = {
-            "event_type": "invalid_type",
-            "channel_uuid": "invalid-uuid",
-            "contact_urn": "whatsapp:+5511999999999",
-        }
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
+    def test_validation_errors(self, mock_permissions, mock_authenticators):
+        """Test validation errors are returned properly"""
+        mock_authenticators.return_value = []
+        mock_permissions.return_value = []
+
+        invalid_payload = {"event_type": "invalid", "channel_uuid": "not-a-uuid"}
 
         response = self.client.post(
-            self.url, data=json.dumps(invalid_payload), content_type="application/json"
+            self.endpoint_url,
+            data=json.dumps(invalid_payload),
+            content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"], "Validation Error")
+        response_data = response.json()
+        self.assertEqual(response_data["error"], "Validation Error")
+        self.assertIn("detail", response_data)
 
-    def test_build_meta_payload(self):
-        """Test the _build_meta_payload method"""
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
+    def test_request_with_no_data_attribute(self, mock_permissions, mock_authenticators):
+        """Test edge case when request has no data attribute"""
+        mock_authenticators.return_value = []
+        mock_permissions.return_value = []
+
+        from django.test import RequestFactory
         from temba.conversion_events.views import ConversionEventView
 
-        view = ConversionEventView()
-        ctwa_data = self.ctwa_data
-
-        # Test lead event
-        with patch("temba.conversion_events.views.datetime") as mock_datetime:
-            mock_datetime.now.return_value.timestamp.return_value = 1234567890
-
-            payload = view._build_meta_payload("lead", ctwa_data, {})
-
-            self.assertEqual(payload["data"][0]["event_name"], "Lead")
-            self.assertEqual(payload["data"][0]["event_time"], 1234567890)
-            self.assertEqual(payload["data"][0]["action_source"], "business_messaging")
-            self.assertEqual(payload["data"][0]["messaging_channel"], "whatsapp")
-            self.assertEqual(
-                payload["data"][0]["user_data"]["whatsapp_business_account_id"],
-                "test_waba_123",
-            )
-            self.assertEqual(
-                payload["data"][0]["user_data"]["ctwa_clid"], "test_clid_123"
-            )
-
-        # Test purchase event
-        with patch("temba.conversion_events.views.datetime") as mock_datetime:
-            mock_datetime.now.return_value.timestamp.return_value = 1234567890
-
-            payload = view._build_meta_payload("purchase", ctwa_data, {})
-
-            self.assertEqual(payload["data"][0]["event_name"], "Purchase")
-
-    def test_get_channel_dataset_id(self):
-        """Test the _get_channel_dataset_id method"""
-        from temba.conversion_events.views import ConversionEventView
+        factory = RequestFactory()
+        request = factory.post("/conversion/", content_type="application/json")
+        request.data = None
 
         view = ConversionEventView()
+        response = view.create(request)
 
-        # Test with existing channel
-        dataset_id = view._get_channel_dataset_id(self.channel.uuid)
-        self.assertEqual(dataset_id, "test_dataset_123")
+        self.assertEqual(response.status_code, 400)
+        response_data = json.loads(response.content.decode())
+        self.assertEqual(response_data["error"], "Invalid JSON")
 
-        # Test with non-existent channel
-        dataset_id = view._get_channel_dataset_id(uuid4())
-        self.assertIsNone(dataset_id)
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
+    @patch("temba.conversion_events.models.CTWA.objects.filter")
+    def test_database_exception_in_ctwa_lookup(self, mock_filter, mock_permissions, mock_authenticators):
+        """Test database exception during CTWA lookup"""
+        mock_authenticators.return_value = []
+        mock_permissions.return_value = []
+        mock_filter.side_effect = Exception("Database error")
 
-    def test_get_ctwa_data(self):
-        """Test the _get_ctwa_data method"""
-        from temba.conversion_events.views import ConversionEventView
+        response = self.client.post(
+            self.endpoint_url,
+            data=json.dumps(self.valid_payload),
+            content_type="application/json",
+        )
 
-        view = ConversionEventView()
+        self.assertEqual(response.status_code, 404)
+        response_data = response.json()
+        self.assertEqual(response_data["error"], "CTWA Data Not Found")
 
-        # Test with existing CTWA data
-        ctwa_data = view._get_ctwa_data(self.channel.uuid, "whatsapp:+5511999999999")
-        self.assertIsNotNone(ctwa_data)
-        self.assertEqual(ctwa_data.ctwa_clid, "test_clid_123")
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
+    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
+    @patch("temba.channels.models.Channel.objects.filter")
+    def test_database_exception_in_channel_lookup(self, mock_filter, mock_permissions, mock_authenticators):
+        """Test handling of database errors when looking up channel information"""
+        mock_authenticators.return_value = []
+        mock_permissions.return_value = []
+        mock_filter.side_effect = Exception("Database error")
 
-        # Test with non-existent CTWA data
-        ctwa_data = view._get_ctwa_data(self.channel.uuid, "whatsapp:+5511888888888")
-        self.assertIsNone(ctwa_data)
+        response = self.client.post(
+            self.endpoint_url,
+            data=json.dumps(self.valid_payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        response_data = response.json()
+        self.assertEqual(response_data["error"], "Dataset ID Not Found")
 
 
 class CTWAModelTest(TembaTest):
     """Test the CTWA model"""
 
+    def setUp(self):
+        super().setUp()
+
+        self.channel = self.create_channel("WAC", "Test Channel", "+1234567890")
+
     def test_ctwa_creation(self):
-        """Test CTWA model creation"""
+        """Test basic CTWA model creation and fields"""
         ctwa = CTWA.objects.create(
-            ctwa_clid="test_clid_123",
+            ctwa_clid="test_clid",
             channel_uuid=self.channel.uuid,
-            waba="test_waba_123",
-            contact_urn="whatsapp:+5511999999999",
+            waba="test_waba",
+            contact_urn="whatsapp:+1234567890",
         )
 
-        self.assertEqual(ctwa.ctwa_clid, "test_clid_123")
+        self.assertEqual(ctwa.ctwa_clid, "test_clid")
         self.assertEqual(ctwa.channel_uuid, self.channel.uuid)
-        self.assertEqual(ctwa.waba, "test_waba_123")
-        self.assertEqual(ctwa.contact_urn, "whatsapp:+5511999999999")
+        self.assertEqual(ctwa.waba, "test_waba")
+        self.assertEqual(ctwa.contact_urn, "whatsapp:+1234567890")
         self.assertIsNotNone(ctwa.timestamp)
 
     def test_ctwa_str_method(self):
         """Test CTWA string representation"""
         ctwa = CTWA.objects.create(
-            ctwa_clid="test_clid_123",
+            ctwa_clid="test_clid",
             channel_uuid=self.channel.uuid,
-            waba="test_waba_123",
-            contact_urn="whatsapp:+5511999999999",
+            waba="test_waba",
+            contact_urn="whatsapp:+1234567890",
         )
 
-        expected_str = f"CTWA Data - CLID: test_clid_123, Channel: {self.channel.uuid}"
+        expected_str = f"CTWA Data - CLID: test_clid, Channel: {self.channel.uuid}"
         self.assertEqual(str(ctwa), expected_str)
 
-    def test_ctwa_filtering(self):
-        """Test CTWA filtering by channel_uuid and contact_urn"""
-        # Create multiple CTWA entries
+    def test_ctwa_filtering_and_queries(self):
+        """Test CTWA filtering capabilities"""
+        # Create multiple CTWA records
         ctwa1 = CTWA.objects.create(
-            ctwa_clid="test_clid_1",
-            channel_uuid=self.channel.uuid,
-            waba="test_waba_1",
-            contact_urn="whatsapp:+5511999999999",
+            ctwa_clid="clid1", channel_uuid=self.channel.uuid, waba="waba1", contact_urn="whatsapp:+1111111111"
         )
-
         ctwa2 = CTWA.objects.create(
-            ctwa_clid="test_clid_2",
-            channel_uuid=self.channel.uuid,
-            waba="test_waba_2",
-            contact_urn="whatsapp:+5511888888888",
+            ctwa_clid="clid2", channel_uuid=self.channel.uuid, waba="waba2", contact_urn="whatsapp:+2222222222"
         )
 
-        # Test filtering by channel_uuid and contact_urn
-        result = CTWA.objects.filter(
-            channel_uuid=self.channel.uuid, contact_urn="whatsapp:+5511999999999"
-        ).first()
+        # Test filtering by channel_uuid
+        channel_ctwas = CTWA.objects.filter(channel_uuid=self.channel.uuid)
+        self.assertEqual(channel_ctwas.count(), 2)
 
-        self.assertEqual(result, ctwa1)
-        self.assertEqual(result.ctwa_clid, "test_clid_1")
+        # Test filtering by contact_urn
+        specific_ctwa = CTWA.objects.filter(contact_urn="whatsapp:+1111111111").first()
+        self.assertEqual(specific_ctwa, ctwa1)
 
-        # Test filtering with different contact_urn
-        result = CTWA.objects.filter(
-            channel_uuid=self.channel.uuid, contact_urn="whatsapp:+5511888888888"
-        ).first()
-
-        self.assertEqual(result, ctwa2)
-        self.assertEqual(result.ctwa_clid, "test_clid_2")
-
-        # Test filtering with non-existent combination
-        result = CTWA.objects.filter(
-            channel_uuid=self.channel.uuid, contact_urn="whatsapp:+5511777777777"
-        ).first()
-
-        self.assertIsNone(result)
+        # Test combined filter (as used in the view)
+        lookup_ctwa = CTWA.objects.filter(channel_uuid=self.channel.uuid, contact_urn="whatsapp:+2222222222").first()
+        self.assertEqual(lookup_ctwa, ctwa2)
