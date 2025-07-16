@@ -1227,61 +1227,33 @@ class FlowTest(TembaTest):
         FlowStartCount.squash()
         self.assertEqual(FlowStartCount.get_count(start), 10)
 
-    # def test_prune_recentruns(self):
-    #     flow = self.get_flow("color_v13")
-    #     flow_nodes = flow.get_definition()["nodes"]
-    #     color_prompt = flow_nodes[0]
-    #     color_other = flow_nodes[3]
-    #     color_split = flow_nodes[4]
-    #     other_exit = color_split["exits"][2]
+    def test_prune_recent_runs(self):
+        """
+        Test that prune() correctly handles cases where records older than 30 days
+        """
+        now = timezone.now()
 
-    #     # send 12 invalid color responses from two contacts
-    #     session = None
-    #     bob = self.create_contact("Bob", phone="+260964151234")
-    #     for m in range(12):
-    #         contact = self.contact if m % 2 == 0 else bob
-    #         session = (
-    #             MockSessionWriter(contact, flow)
-    #             .visit(color_prompt)
-    #             .send_msg("What is your favorite color?", self.channel)
-    #             .visit(color_split)
-    #             .wait()
-    #             .resume(msg=self.create_incoming_msg(contact, text=str(m + 1)))
-    #             .visit(color_other)
-    #             .visit(color_split)
-    #             .wait()
-    #             .save()
-    #         )
+        FlowPathRecentRun.objects.create(
+            from_uuid=uuid4(),
+            from_step_uuid=uuid4(),
+            to_uuid=uuid4(),
+            to_step_uuid=uuid4(),
+            run_id=1,
+            visited_on=now - timedelta(days=31),
+        )
 
-    #     # all 12 messages are stored for the other segment
-    #     other_recent = FlowPathRecentRun.objects.filter(from_uuid=other_exit["uuid"], to_uuid=color_other["uuid"])
-    #     self.assertEqual(12, len(other_recent))
+        FlowPathRecentRun.objects.create(
+            from_uuid=uuid4(),
+            from_step_uuid=uuid4(),
+            to_uuid=uuid4(),
+            to_step_uuid=uuid4(),
+            run_id=2,
+            visited_on=now - timedelta(days=31),
+        )
 
-    #     # and these are returned with most-recent first
-    #     other_recent = FlowPathRecentRun.get_recent([other_exit["uuid"]], color_other["uuid"], limit=None)
-    #     self.assertEqual(
-    #         ["12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1"], [r["text"] for r in other_recent]
-    #     )
+        FlowPathRecentRun.prune()
 
-    #     # even when limit is applied
-    #     other_recent = FlowPathRecentRun.get_recent([other_exit["uuid"]], color_other["uuid"], limit=5)
-    #     self.assertEqual(["12", "11", "10", "9", "8"], [r["text"] for r in other_recent])
-
-    #     squash_flowcounts()
-
-    #     # now only 5 newest are stored
-    #     other_recent = FlowPathRecentRun.objects.filter(from_uuid=other_exit["uuid"], to_uuid=color_other["uuid"])
-    #     self.assertEqual(5, len(other_recent))
-
-    #     other_recent = FlowPathRecentRun.get_recent([other_exit["uuid"]], color_other["uuid"])
-    #     self.assertEqual(["12", "11", "10", "9", "8"], [r["text"] for r in other_recent])
-
-    #     # send another message and prune again
-    #     (session.resume(msg=self.create_incoming_msg(bob, "13")).visit(color_other).visit(color_split).wait().save())
-    #     squash_flowcounts()
-
-    #     other_recent = FlowPathRecentRun.get_recent([other_exit["uuid"]], color_other["uuid"])
-    #     self.assertEqual(["13", "12", "11", "10", "9"], [r["text"] for r in other_recent])
+        self.assertEqual(FlowPathRecentRun.objects.count(), 0)
 
     def test_flow_keyword_update(self):
         self.login(self.admin)
