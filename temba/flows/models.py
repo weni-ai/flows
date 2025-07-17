@@ -1532,6 +1532,8 @@ class FlowCategoryCount(SquashableModel):
     # the number of results with this category
     count = models.IntegerField(default=0)
 
+    squash_batch_size = settings.FLOW_CATEGORY_COUNT_SQUASH_BATCH_SIZE
+
     @classmethod
     def get_squash_query(cls, distinct_set):
         sql = """

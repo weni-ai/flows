@@ -6,6 +6,7 @@ from collections import OrderedDict
 
 from smartmin.models import SmartModel
 
+from django.conf import settings
 from django.contrib.postgres.fields import HStoreField
 from django.core import checks
 from django.core.exceptions import ValidationError
@@ -297,6 +298,7 @@ class SquashableModel(models.Model):
     """
 
     squash_over = ()
+    squash_batch_size = None  # can be overridden by child classes
 
     id = models.BigAutoField(auto_created=True, primary_key=True)
     is_squashed = models.BooleanField(default=False)
@@ -310,7 +312,10 @@ class SquashableModel(models.Model):
         start = time.time()
         num_sets = 0
 
-        for distinct_set in cls.get_unsquashed().order_by(*cls.squash_over).distinct(*cls.squash_over)[:5000]:
+        # Get batch size from class attribute or settings (which may come from env var)
+        batch_size = cls.squash_batch_size or settings.SQUASH_BATCH_SIZE
+
+        for distinct_set in cls.get_unsquashed().order_by(*cls.squash_over).distinct(*cls.squash_over)[:batch_size]:
             with connection.cursor() as cursor:
                 sql, params = cls.get_squash_query(distinct_set)
                 cursor.execute("SET application_name = 'flows_nokill';")
@@ -320,7 +325,7 @@ class SquashableModel(models.Model):
 
         time_taken = time.time() - start
 
-        logging.debug("Squashed %d distinct sets of %s in %0.3fs" % (num_sets, cls.__name__, time_taken))
+        logger.info("Squashed %d distinct sets of %s in %0.3fs" % (num_sets, cls.__name__, time_taken))
 
     @classmethod
     @abstractmethod
