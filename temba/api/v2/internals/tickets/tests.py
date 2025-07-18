@@ -78,7 +78,7 @@ class OpenTicketTest(TembaTest):
 
     def ticket_open_return_value(self):
         return {
-            "body": '{"history_after":"2025-01-01 00:00:00"}',
+            "body": '{"history_after": "2025-01-01 00:00:00"}',
             "external_id": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
             "ticketer": {
                 "name": self.ticketer.name,
@@ -116,7 +116,7 @@ class OpenTicketTest(TembaTest):
             self.ticketer.id,
             self.org.default_ticket_topic.id,
             0,
-            '{"history_after":"2025-01-01 00:00:00+02:00"}',
+            '{"history_after": "2025-01-01 00:00:00+02:00"}',
         )
 
         self.assertEqual(response.status_code, 200)
@@ -186,7 +186,7 @@ class OpenTicketTest(TembaTest):
             self.ticketer.id,
             self.org.default_ticket_topic.id,
             0,
-            '{"history_after":"2025-01-01 00:00:00+02:00"}',
+            '{"history_after": "2025-01-01 00:00:00+02:00"}',
         )
 
         self.assertEqual(response.status_code, 200)
@@ -282,7 +282,7 @@ class OpenTicketTest(TembaTest):
             self.ticketer.id,
             self.org.default_ticket_topic.id,
             0,
-            '{"history_after":"2025-01-01 00:00:00+02:00"}',
+            '{"history_after": "2025-01-01 00:00:00+02:00"}',
         )
 
         self.assertEqual(response.status_code, 400)
@@ -313,7 +313,7 @@ class OpenTicketTest(TembaTest):
             self.ticketer.id,
             self.org.default_ticket_topic.id,
             self.user.id,
-            '{"history_after":"2025-01-01 00:00:00+02:00"}',
+            '{"history_after": "2025-01-01 00:00:00+02:00"}',
         )
 
         self.assertEqual(response.status_code, 200)
@@ -415,7 +415,7 @@ class OpenTicketTest(TembaTest):
             "assignee": "user_email@email.com",
             "topic": self.org.default_ticket_topic.uuid,
             "conversation_started_on": "2025-01-01 00:00:00",
-            "protocol": "whatsapp"
+            "protocol": "whatsapp",
         }
         response = self.client.post(url, data=body, content_type="application/json")
 
@@ -446,7 +446,7 @@ class OpenTicketTest(TembaTest):
             "assignee": "user_email@email.com",
             "topic": self.org.default_ticket_topic.uuid,
             "conversation_started_on": "2025-01-01 00:00:00",
-            "protocol": ""
+            "protocol": "",
         }
         response = self.client.post(url, data=body, content_type="application/json")
 
@@ -475,7 +475,7 @@ class OpenTicketTest(TembaTest):
             "assignee": "user_email@email.com",
             "topic": self.org.default_ticket_topic.uuid,
             "conversation_started_on": "2025-01-01 00:00:00",
-            "protocol": long_protocol
+            "protocol": long_protocol,
         }
         response = self.client.post(url, data=body, content_type="application/json")
 
@@ -497,7 +497,7 @@ class OpenTicketTest(TembaTest):
             "assignee": "user_email@email.com",
             "topic": self.org.default_ticket_topic.uuid,
             "conversation_started_on": "2025-01-01 00:00:00",
-            "protocol": None
+            "protocol": None,
         }
         response = self.client.post(url, data=body, content_type="application/json")
 
