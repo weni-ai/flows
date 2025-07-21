@@ -1,3 +1,8 @@
+3.35.1
+----------
+* Add config for batch size for squashable models
+* Optimization on FLowPathRecentRun prune
+
 3.35.0
 ----------
 * Update weni-rp-apps version to 2.10.2
