@@ -143,6 +143,8 @@ STATICFILES_FINDERS = (
 # Make this unique, and don't share it with anybody.
 SECRET_KEY = "your own secret key"
 
+WENI_REDIRECT_WHITELIST_PATHS = os.environ.get("WENI_REDIRECT_WHITELIST_PATHS", default=["/redirect", "/api"])
+
 # -----------------------------------------------------------------------------------
 # Directory Configuration
 # -----------------------------------------------------------------------------------
