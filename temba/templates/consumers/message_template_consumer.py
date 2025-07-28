@@ -2,7 +2,7 @@ from dataclasses import asdict, dataclass
 
 import amqp
 from sentry_sdk import capture_exception
-from weni_datalake_sdk.clients.client import send_message_template_data
+from weni_datalake_sdk.clients.client import send_message_template_data_async
 from weni_datalake_sdk.paths.message_template_path import MessageTemplatePath
 
 from temba.event_driven.consumers import EDAConsumer
@@ -43,7 +43,7 @@ class MessageTemplateConsumer(EDAConsumer):  # pragma: no cover
             )
 
             # Add data to lake
-            send_message_template_data(MessageTemplatePath, asdict(message_template_dto))
+            send_message_template_data_async(MessageTemplatePath, asdict(message_template_dto))
 
             message.channel.basic_ack(message.delivery_tag)
 
