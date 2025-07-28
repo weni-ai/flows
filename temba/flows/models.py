@@ -1536,6 +1536,8 @@ class FlowCategoryCount(SquashableModel):
     # the number of results with this category
     count = models.IntegerField(default=0)
 
+    squash_batch_size = settings.FLOW_CATEGORY_COUNT_SQUASH_BATCH_SIZE
+
     @classmethod
     def get_squash_query(cls, distinct_set):
         sql = """
@@ -1680,25 +1682,25 @@ class FlowPathRecentRun(models.Model):
         deleted_counter = 0
 
         while True:
-            recent_runs = FlowPathRecentRun.objects.order_by("id")[:BATCH_SIZE].only("id", "visited_on")
-            id_list = list(recent_runs.values_list("id", flat=True))
+            recent_runs = list(FlowPathRecentRun.objects.values("id", "visited_on")[:BATCH_SIZE])
 
-            if len(id_list) == 0:
+            if not recent_runs:
                 break
 
-            recent_runs = FlowPathRecentRun.objects.filter(id__in=id_list).order_by("-visited_on")
+            recent_runs.sort(key=lambda x: x["visited_on"], reverse=True)
 
-            visited_on = recent_runs.first().visited_on
+            most_recent_visited = recent_runs[0]["visited_on"]
 
-            if timezone.now() - visited_on < timedelta(days=30):
+            if timezone.now() - most_recent_visited < timedelta(days=30):
                 break
 
-            recent_runs.delete()
+            ids_to_delete = [run["id"] for run in recent_runs]
 
-            id_list_len = len(id_list)
-            deleted_counter += id_list_len
+            FlowPathRecentRun.objects.filter(id__in=ids_to_delete).delete()
 
+            deleted_counter += len(ids_to_delete)
             logger.info(f"Deleted {deleted_counter} from flowpathrecentrun")
+
         logger.info(f"Total deleted: {deleted_counter}")
 
     def __str__(self):  # pragma: no cover
