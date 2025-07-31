@@ -1,3 +1,7 @@
+3.35.5
+----------
+* Change CAPI endpoint authentication to JWT
+
 3.35.4
 ----------
 * Move squash FlowCategoryCount to a new task 
