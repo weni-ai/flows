@@ -2,7 +2,7 @@ from dataclasses import asdict, dataclass
 
 import amqp
 from sentry_sdk import capture_exception
-from weni_datalake_sdk.clients.client import send_message_template_status_data, send_message_template_status_data_async
+from weni_datalake_sdk.clients.client import send_message_template_status_data_async
 from weni_datalake_sdk.paths.message_template_status_path import MessageTemplateStatusPath
 
 from temba.event_driven.consumers import EDAConsumer

@@ -1,3 +1,7 @@
+3.35.3
+----------
+* Update weni-datalake-sdk version to 0.4.0
+
 3.35.2
 ----------
 * Add environment variable to RedirectMiddleware
