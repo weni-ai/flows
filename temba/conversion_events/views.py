@@ -3,18 +3,18 @@ from datetime import datetime
 
 import requests
 from rest_framework import viewsets
-from weni.internal.views import InternalGenericViewSet
 
 from django.conf import settings
 from django.http import JsonResponse
 
+from .jwt_auth import JWTModuleAuthMixin
 from .models import CTWA
 from .serializers import ConversionEventSerializer
 
 logger = logging.getLogger(__name__)
 
 
-class ConversionEventView(viewsets.ModelViewSet, InternalGenericViewSet):
+class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
     """
     API endpoint to receive conversion events (lead/purchase)
     and send immediately to Meta Conversion API

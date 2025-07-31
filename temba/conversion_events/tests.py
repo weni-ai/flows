@@ -2,9 +2,15 @@ import json
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
-from django.test import override_settings
+import jwt
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.test import APIRequestFactory
+
+from django.contrib.auth.models import AnonymousUser
+from django.test import TestCase, override_settings
 
 from temba.channels.types.whatsapp_cloud.type import WhatsAppCloudType
+from temba.conversion_events.jwt_auth import JWTModuleAuthentication, JWTModuleAuthMixin
 from temba.conversion_events.models import CTWA
 from temba.conversion_events.serializers import ConversionEventSerializer
 from temba.tests import TembaTest
@@ -100,16 +106,25 @@ class ConversionEventSerializerTest(TembaTest):
         self.assertIn("must be a valid JSON object", str(serializer.errors["payload"]))
 
 
+MOCK_PUBLIC_KEY = """-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuQw1Qw1Qw1Qw1Qw1Qw1Qw1Q\nw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw\n1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1QwIDAQAB\n-----END PUBLIC KEY-----"""
+
+
 class ConversionEventAPITest(TembaTest):
     """Test the ConversionEvent API endpoint following RapidPro patterns"""
 
     def setUp(self):
         super().setUp()
+        # Mock JWT authentication for all API tests
+        self.jwt_auth_patcher = patch(
+            "temba.conversion_events.jwt_auth.JWTModuleAuthentication.authenticate",
+            return_value=(AnonymousUser(), None),
+        )
+        self.jwt_auth_patcher.start()
+        self.addCleanup(self.jwt_auth_patcher.stop)
         # Patch WhatsAppCloudType.activate para evitar erro de configuração obrigatória
         self.activate_patcher = patch.object(WhatsAppCloudType, "activate", return_value=None)
         self.activate_patcher.start()
         self.addCleanup(self.activate_patcher.stop)
-
         # Create test channel with Meta configuration
         self.channel = self.create_channel(
             "WAC",
@@ -118,7 +133,6 @@ class ConversionEventAPITest(TembaTest):
             country="US",
             config={"meta_dataset_id": "test_dataset_123"},
         )
-
         # Create CTWA data for testing
         self.ctwa_data = CTWA.objects.create(
             ctwa_clid="test_clid_123",
@@ -126,7 +140,6 @@ class ConversionEventAPITest(TembaTest):
             waba="test_waba_123",
             contact_urn="whatsapp:+5511999999999",
         )
-
         self.endpoint_url = "/conversion/"  # Since it's included at root level
         self.valid_payload = {
             "event_type": "lead",
@@ -135,32 +148,7 @@ class ConversionEventAPITest(TembaTest):
             "payload": {"custom": "data"},
         }
 
-    @override_settings(
-        OIDC_RP_CLIENT_ID="test-client-id",
-        OIDC_RP_CLIENT_SECRET="test-client-secret",
-        OIDC_OP_AUTHORIZATION_ENDPOINT="http://example.com/oauth2/auth",
-        OIDC_OP_TOKEN_ENDPOINT="http://example.com/oauth2/token",
-        OIDC_OP_USER_ENDPOINT="http://example.com/oauth2/userinfo",
-        OIDC_OP_JWKS_ENDPOINT="http://example.com/oauth2/jwks",
-    )
-    def test_endpoint_requires_internal_auth(self):
-        """Test that the endpoint requires internal authentication"""
-        # Without authentication, should get 401
-        response = self.client.post(
-            self.endpoint_url,
-            data=json.dumps(self.valid_payload),
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, 401)
-
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
-    def test_successful_lead_conversion(self, mock_permissions, mock_authenticators):
-        """Test successful lead conversion event"""
-        # Mock internal authentication
-        mock_authenticators.return_value = []
-        mock_permissions.return_value = []
-
+    def test_successful_lead_conversion(self):
         with patch("temba.conversion_events.views.requests.post") as mock_post:
             mock_response = Mock()
             mock_response.status_code = 200
@@ -182,29 +170,19 @@ class ConversionEventAPITest(TembaTest):
                 response_data = response.json()
                 self.assertEqual(response_data["status"], "success")
                 self.assertEqual(response_data["message"], "Event sent to Meta successfully")
-
-                # Verify Meta API was called with correct parameters
                 mock_post.assert_called_once()
                 call_args = mock_post.call_args
                 self.assertIn("test_dataset_123", call_args[0][0])
                 self.assertIn("access_token=test_token", call_args[0][0])
 
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
-    def test_successful_purchase_conversion(self, mock_permissions, mock_authenticators):
-        """Test successful purchase conversion event maps to correct event name"""
-        mock_authenticators.return_value = []
-        mock_permissions.return_value = []
-
+    def test_successful_purchase_conversion(self):
         payload = self.valid_payload.copy()
         payload["event_type"] = "purchase"
-
         with patch("temba.conversion_events.views.requests.post") as mock_post:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"success": True}
             mock_post.return_value = mock_response
-
             with override_settings(
                 WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
                 WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
@@ -212,214 +190,132 @@ class ConversionEventAPITest(TembaTest):
                 response = self.client.post(
                     self.endpoint_url, data=json.dumps(payload), content_type="application/json"
                 )
-
                 self.assertEqual(response.status_code, 200)
-
-                # Verify the payload sent to Meta includes Purchase event
                 call_kwargs = mock_post.call_args[1]
                 sent_payload = call_kwargs["json"]
                 self.assertEqual(sent_payload["data"][0]["event_name"], "Purchase")
 
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
-    def test_ctwa_data_not_found(self, mock_permissions, mock_authenticators):
-        """Test when CTWA data is not found"""
-        mock_authenticators.return_value = []
-        mock_permissions.return_value = []
-
+    def test_ctwa_data_not_found(self):
         payload = self.valid_payload.copy()
         payload["contact_urn"] = "whatsapp:+5511888888888"  # Non-existent contact
-
         response = self.client.post(self.endpoint_url, data=json.dumps(payload), content_type="application/json")
-
         self.assertEqual(response.status_code, 404)
         response_data = response.json()
         self.assertEqual(response_data["error"], "CTWA Data Not Found")
         self.assertIn("No CTWA data found", response_data["detail"])
 
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
-    def test_channel_missing_dataset_id(self, mock_permissions, mock_authenticators):
-        """Test when channel doesn't have meta_dataset_id configured"""
-        mock_authenticators.return_value = []
-        mock_permissions.return_value = []
-
-        # Create channel without dataset_id
+    def test_channel_missing_dataset_id(self):
         channel_without_dataset = self.create_channel("WAC", "No Dataset Channel", "+12065551213", config={})
-
         CTWA.objects.create(
             ctwa_clid="test_clid_456",
             channel_uuid=channel_without_dataset.uuid,
             waba="test_waba_456",
             contact_urn="whatsapp:+5511888888888",
         )
-
         payload = self.valid_payload.copy()
         payload["channel_uuid"] = str(channel_without_dataset.uuid)
         payload["contact_urn"] = "whatsapp:+5511888888888"
-
         response = self.client.post(self.endpoint_url, data=json.dumps(payload), content_type="application/json")
-
         self.assertEqual(response.status_code, 404)
         response_data = response.json()
         self.assertEqual(response_data["error"], "Dataset ID Not Found")
 
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
-    def test_missing_access_token(self, mock_permissions, mock_authenticators):
-        """Test behavior when Meta access token is not configured"""
-        mock_authenticators.return_value = []
-        mock_permissions.return_value = []
-
+    def test_missing_access_token(self):
         with override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN=""):
             response = self.client.post(
                 self.endpoint_url,
                 data=json.dumps(self.valid_payload),
                 content_type="application/json",
             )
-
             self.assertEqual(response.status_code, 500)
             response_data = response.json()
             self.assertEqual(response_data["error"], "Meta API Error")
             self.assertIn("Meta access token not configured", response_data["detail"])
 
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
-    def test_meta_api_error_handling(self, mock_permissions, mock_authenticators):
-        """Test Meta API error responses are handled properly"""
-        mock_authenticators.return_value = []
-        mock_permissions.return_value = []
-
+    def test_meta_api_error_handling(self):
         with patch("temba.conversion_events.views.requests.post") as mock_post:
             mock_response = Mock()
             mock_response.status_code = 400
             mock_response.json.return_value = {"error": "Invalid request"}
             mock_post.return_value = mock_response
-
             with override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token"):
                 response = self.client.post(
                     self.endpoint_url,
                     data=json.dumps(self.valid_payload),
                     content_type="application/json",
                 )
-
                 self.assertEqual(response.status_code, 500)
                 response_data = response.json()
                 self.assertEqual(response_data["error"], "Meta API Error")
 
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
-    def test_network_error_handling(self, mock_permissions, mock_authenticators):
-        """Test network errors are handled gracefully"""
-        mock_authenticators.return_value = []
-        mock_permissions.return_value = []
-
+    def test_network_error_handling(self):
         with patch("temba.conversion_events.views.requests.post") as mock_post:
             mock_post.side_effect = Exception("Network error")
-
             with override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token"):
                 response = self.client.post(
                     self.endpoint_url,
                     data=json.dumps(self.valid_payload),
                     content_type="application/json",
                 )
-
                 self.assertEqual(response.status_code, 500)
                 response_data = response.json()
                 self.assertEqual(response_data["error"], "Meta API Error")
 
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
-    def test_invalid_json_handling(self, mock_permissions, mock_authenticators):
-        """Test invalid JSON in request body"""
-        mock_authenticators.return_value = []
-        mock_permissions.return_value = []
-
+    def test_invalid_json_handling(self):
         response = self.client.post(
             self.endpoint_url,
             data="invalid json",
             content_type="application/json",
         )
-
         self.assertEqual(response.status_code, 400)
         response_data = response.json()
         self.assertEqual(response_data["error"], "Invalid JSON")
 
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
-    def test_validation_errors(self, mock_permissions, mock_authenticators):
-        """Test validation errors are returned properly"""
-        mock_authenticators.return_value = []
-        mock_permissions.return_value = []
-
+    def test_validation_errors(self):
         invalid_payload = {"event_type": "invalid", "channel_uuid": "not-a-uuid"}
-
         response = self.client.post(
             self.endpoint_url,
             data=json.dumps(invalid_payload),
             content_type="application/json",
         )
-
         self.assertEqual(response.status_code, 400)
         response_data = response.json()
         self.assertEqual(response_data["error"], "Validation Error")
         self.assertIn("detail", response_data)
 
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
-    def test_request_with_no_data_attribute(self, mock_permissions, mock_authenticators):
-        """Test edge case when request has no data attribute"""
-        mock_authenticators.return_value = []
-        mock_permissions.return_value = []
-
+    def test_request_with_no_data_attribute(self):
         from django.test import RequestFactory
         from temba.conversion_events.views import ConversionEventView
 
         factory = RequestFactory()
         request = factory.post("/conversion/", content_type="application/json")
         request.data = None
-
         view = ConversionEventView()
         response = view.create(request)
-
         self.assertEqual(response.status_code, 400)
         response_data = json.loads(response.content.decode())
         self.assertEqual(response_data["error"], "Invalid JSON")
 
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
     @patch("temba.conversion_events.models.CTWA.objects.filter")
-    def test_database_exception_in_ctwa_lookup(self, mock_filter, mock_permissions, mock_authenticators):
-        """Test database exception during CTWA lookup"""
-        mock_authenticators.return_value = []
-        mock_permissions.return_value = []
+    def test_database_exception_in_ctwa_lookup(self, mock_filter):
         mock_filter.side_effect = Exception("Database error")
-
         response = self.client.post(
             self.endpoint_url,
             data=json.dumps(self.valid_payload),
             content_type="application/json",
         )
-
         self.assertEqual(response.status_code, 404)
         response_data = response.json()
         self.assertEqual(response_data["error"], "CTWA Data Not Found")
 
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_authenticators")
-    @patch("temba.conversion_events.views.InternalGenericViewSet.get_permissions")
     @patch("temba.channels.models.Channel.objects.filter")
-    def test_database_exception_in_channel_lookup(self, mock_filter, mock_permissions, mock_authenticators):
-        """Test handling of database errors when looking up channel information"""
-        mock_authenticators.return_value = []
-        mock_permissions.return_value = []
+    def test_database_exception_in_channel_lookup(self, mock_filter):
         mock_filter.side_effect = Exception("Database error")
-
         response = self.client.post(
             self.endpoint_url,
             data=json.dumps(self.valid_payload),
             content_type="application/json",
         )
-
         self.assertEqual(response.status_code, 404)
         response_data = response.json()
         self.assertEqual(response_data["error"], "Dataset ID Not Found")
@@ -481,3 +377,138 @@ class CTWAModelTest(TembaTest):
         # Test combined filter (as used in the view)
         lookup_ctwa = CTWA.objects.filter(channel_uuid=self.channel.uuid, contact_urn="whatsapp:+2222222222").first()
         self.assertEqual(lookup_ctwa, ctwa2)
+
+
+class JWTModuleAuthenticationTestCase(TestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.auth = JWTModuleAuthentication()
+        self.mock_public_key = (
+            "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...\n-----END PUBLIC KEY-----"
+        )
+        self.sample_payload = {
+            "project_uuid": "test-project-123",
+            "exp": 9999999999,
+        }
+
+    @patch("temba.conversion_events.jwt_auth.settings")
+    def test_authenticate_missing_public_key(self, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = None
+        request = self.factory.get("/")
+        request.headers = {}
+        with self.assertRaises(AuthenticationFailed) as context:
+            self.auth.authenticate(request)
+        self.assertIn("JWT_PUBLIC_KEY not configured", str(context.exception))
+
+    def test_authenticate_missing_authorization_header(self):
+        with patch("temba.conversion_events.jwt_auth.settings") as mock_settings:
+            mock_settings.JWT_PUBLIC_KEY = self.mock_public_key
+            request = self.factory.get("/")
+            request.headers = {}
+            with self.assertRaises(AuthenticationFailed) as context:
+                self.auth.authenticate(request)
+            self.assertIn("Missing or invalid Authorization header", str(context.exception))
+
+    def test_authenticate_invalid_authorization_header(self):
+        with patch("temba.conversion_events.jwt_auth.settings") as mock_settings:
+            mock_settings.JWT_PUBLIC_KEY = self.mock_public_key
+            request = self.factory.get("/")
+            request.headers = {"Authorization": "InvalidFormat"}
+            with self.assertRaises(AuthenticationFailed) as context:
+                self.auth.authenticate(request)
+            self.assertIn("Missing or invalid Authorization header", str(context.exception))
+
+    @patch("temba.conversion_events.jwt_auth.jwt.decode")
+    @patch("temba.conversion_events.jwt_auth.settings")
+    def test_authenticate_missing_project_uuid(self, mock_settings, mock_jwt_decode):
+        mock_settings.JWT_PUBLIC_KEY = self.mock_public_key
+        mock_jwt_decode.return_value = {"some_other_field": "value"}
+        request = self.factory.get("/")
+        request.headers = {"Authorization": "Bearer valid-token"}
+        with self.assertRaises(AuthenticationFailed) as context:
+            self.auth.authenticate(request)
+        self.assertIn("project_uuid not found in token payload", str(context.exception))
+
+    @patch("temba.conversion_events.jwt_auth.jwt.decode")
+    @patch("temba.conversion_events.jwt_auth.settings")
+    def test_authenticate_success(self, mock_settings, mock_jwt_decode):
+        mock_settings.JWT_PUBLIC_KEY = self.mock_public_key
+        mock_jwt_decode.return_value = self.sample_payload
+        request = self.factory.get("/")
+        request.headers = {"Authorization": "Bearer valid-token"}
+        result = self.auth.authenticate(request)
+        from django.contrib.auth.models import AnonymousUser
+
+        self.assertEqual(result, (AnonymousUser(), None))
+        self.assertEqual(request.project_uuid, "test-project-123")
+        self.assertEqual(request.jwt_payload, self.sample_payload)
+
+    @patch("temba.conversion_events.jwt_auth.jwt.decode")
+    @patch("temba.conversion_events.jwt_auth.settings")
+    def test_authenticate_expired_token(self, mock_settings, mock_jwt_decode):
+        mock_settings.JWT_PUBLIC_KEY = self.mock_public_key
+        mock_jwt_decode.side_effect = jwt.ExpiredSignatureError("Token expired")
+        request = self.factory.get("/")
+        request.headers = {"Authorization": "Bearer expired-token"}
+        with self.assertRaises(AuthenticationFailed) as context:
+            self.auth.authenticate(request)
+        self.assertIn("Token expired", str(context.exception))
+
+    @patch("temba.conversion_events.jwt_auth.jwt.decode")
+    @patch("temba.conversion_events.jwt_auth.settings")
+    def test_authenticate_invalid_token(self, mock_settings, mock_jwt_decode):
+        mock_settings.JWT_PUBLIC_KEY = self.mock_public_key
+        mock_jwt_decode.side_effect = jwt.InvalidTokenError("Invalid token")
+        request = self.factory.get("/")
+        request.headers = {"Authorization": "Bearer invalid-token"}
+        with self.assertRaises(AuthenticationFailed) as context:
+            self.auth.authenticate(request)
+        self.assertIn("Invalid token", str(context.exception))
+
+    def test_authenticate_verify_jwt_decode_called_correctly(self):
+        with patch("temba.conversion_events.jwt_auth.jwt.decode") as mock_jwt_decode, patch(
+            "temba.conversion_events.jwt_auth.settings"
+        ) as mock_settings:
+            mock_settings.JWT_PUBLIC_KEY = self.mock_public_key
+            mock_jwt_decode.return_value = self.sample_payload
+            request = self.factory.get("/")
+            request.headers = {"Authorization": "Bearer test-token"}
+            self.auth.authenticate(request)
+            mock_jwt_decode.assert_called_once_with(
+                "test-token",
+                self.mock_public_key,
+                algorithms=["RS256"],
+                options={"verify_aud": False},
+            )
+
+
+class DummyView(JWTModuleAuthMixin):
+    def __init__(self, request):
+        self.request = request
+
+
+class JWTModuleAuthMixinTestCase(TestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+
+    def test_project_uuid_property(self):
+        request = self.factory.get("/")
+        request.project_uuid = "uuid-123"
+        view = DummyView(request)
+        self.assertEqual(view.project_uuid, "uuid-123")
+
+    def test_jwt_payload_property(self):
+        request = self.factory.get("/")
+        request.jwt_payload = {"foo": "bar"}
+        view = DummyView(request)
+        self.assertEqual(view.jwt_payload, {"foo": "bar"})
+
+    def test_project_uuid_property_none(self):
+        request = self.factory.get("/")
+        view = DummyView(request)
+        self.assertIsNone(view.project_uuid)
+
+    def test_jwt_payload_property_none(self):
+        request = self.factory.get("/")
+        view = DummyView(request)
+        self.assertIsNone(view.jwt_payload)
