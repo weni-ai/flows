@@ -10,7 +10,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.test import TestCase, override_settings
 
 from temba.channels.types.whatsapp_cloud.type import WhatsAppCloudType
-from temba.conversion_events.jwt_auth import JWTModuleAuthentication
+from temba.conversion_events.jwt_auth import JWTModuleAuthentication, JWTModuleAuthMixin
 from temba.conversion_events.models import CTWA
 from temba.conversion_events.serializers import ConversionEventSerializer
 from temba.tests import TembaTest
@@ -147,8 +147,6 @@ class ConversionEventAPITest(TembaTest):
             "contact_urn": "whatsapp:+5511999999999",
             "payload": {"custom": "data"},
         }
-
-    # Remover o método generate_jwt_token, pois não é mais necessário
 
     def test_successful_lead_conversion(self):
         with patch("temba.conversion_events.views.requests.post") as mock_post:
@@ -482,3 +480,35 @@ class JWTModuleAuthenticationTestCase(TestCase):
                 algorithms=["RS256"],
                 options={"verify_aud": False},
             )
+
+
+class DummyView(JWTModuleAuthMixin):
+    def __init__(self, request):
+        self.request = request
+
+
+class JWTModuleAuthMixinTestCase(TestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+
+    def test_project_uuid_property(self):
+        request = self.factory.get("/")
+        request.project_uuid = "uuid-123"
+        view = DummyView(request)
+        self.assertEqual(view.project_uuid, "uuid-123")
+
+    def test_jwt_payload_property(self):
+        request = self.factory.get("/")
+        request.jwt_payload = {"foo": "bar"}
+        view = DummyView(request)
+        self.assertEqual(view.jwt_payload, {"foo": "bar"})
+
+    def test_project_uuid_property_none(self):
+        request = self.factory.get("/")
+        view = DummyView(request)
+        self.assertIsNone(view.project_uuid)
+
+    def test_jwt_payload_property_none(self):
+        request = self.factory.get("/")
+        view = DummyView(request)
+        self.assertIsNone(view.jwt_payload)
