@@ -19,7 +19,8 @@ from temba.api.v2.internals.contacts.serializers import (
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.serializers import ContactFieldReadSerializer, ContactFieldWriteSerializer
 from temba.api.v2.validators import LambdaURLValidator
-from temba.contacts.models import Contact, ContactField
+from temba.contacts.models import Contact, ContactField, ContactURN
+from temba.tickets.models import Ticket
 from temba.orgs.models import Org
 
 User = get_user_model()
@@ -124,3 +125,16 @@ class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
             serializer.update(instance=None, validated_data=serializer.validated_data)
             return Response({"message": "Contact fields updated successfully"}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ContactHasOpenTicketView(APIViewMixin, APIView):
+    def get(self, request: Request):
+        contact_urn = request.query_params.get("contact_urn")
+        if contact_urn is None:
+            return Response(status=400)
+        try:
+            contactURN = ContactURN.objects.get(identity=contact_urn)
+        except ContactURN.DoesNotExist:
+            return Response(status=404)
+        
+        has_open_ticket = Ticket.objects.filter(contact_id=contactURN.contact_id, status=Ticket.STATUS_OPEN).exists()
+        return Response({"has_open_ticket": has_open_ticket})
