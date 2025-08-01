@@ -1,3 +1,7 @@
+3.35.6
+----------
+* Schedule task squash_flow_category_counts
+
 3.35.5
 ----------
 * Change CAPI endpoint authentication to JWT
