@@ -11,6 +11,8 @@ from temba.api.v2.validators import LambdaURLValidator
 from temba.contacts.models import ContactField
 from temba.tests import TembaTest
 from temba.tests.mailroom import mock_mailroom
+from temba.tickets.models import Ticketer
+from temba.tickets.types.wenichats.type import WeniChatsType
 
 User = get_user_model()
 
@@ -335,3 +337,57 @@ class InternalContactFieldsEndpointTest(TembaTest):
 
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json(), {"label": "Nick Name", "value_type": "T"})
+
+
+class HasOpenTicketViewTest(TembaTest):
+    def test_missing_contact_urn_param(self):
+        """Test that the endpoint returns 400 when contact_urn parameter is missing"""
+        url = "/api/v2/internals/contact_has_open_ticket"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 400)
+
+    def test_contact_not_found(self):
+        """Test that the endpoint returns 404 when contact is not found"""
+        url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_contact_without_open_ticket(self):
+        """Test that the endpoint returns false when contact has no open tickets"""
+        self.create_contact("Bob", urns=["tel:+1234567890"])
+
+        url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"has_open_ticket": False})
+
+    def test_contact_with_open_ticket(self):
+        """Test that the endpoint returns true when contact has an open ticket"""
+        contact = self.create_contact("Bob", urns=["tel:+1234567890"])
+        ticketer = Ticketer.create(self.org, self.admin, WeniChatsType.slug, "bob@acme.com", {})
+        self.create_ticket(ticketer, contact, "Test ticket")
+
+        url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"has_open_ticket": True})
+
+    def test_contact_with_closed_ticket(self):
+        """Test that the endpoint returns false when contact has only closed tickets"""
+        contact = self.create_contact("Bob", urns=["tel:+1234567890"])
+        ticketer = Ticketer.create(self.org, self.admin, WeniChatsType.slug, "bob@acme.com", {})
+
+        ticket = self.create_ticket(ticketer, contact, "Test ticket")
+        ticket.status = "C"
+        ticket.save()
+
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, "C")
+
+        url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"has_open_ticket": False})
