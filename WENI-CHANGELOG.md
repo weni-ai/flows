@@ -1,3 +1,7 @@
+3.35.7
+----------
+* Add internal endpoint to check if contact has open ticket by URN as parameter
+
 3.35.6
 ----------
 * Schedule task squash_flow_category_counts
