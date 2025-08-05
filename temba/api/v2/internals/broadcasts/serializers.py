@@ -33,3 +33,36 @@ class BroadcastSerializer(WriteSerializer):
         on_transaction_commit(lambda: broadcast.send_async())
 
         return broadcast
+
+
+class BroadcastWithStatisticsSerializer(serializers.ModelSerializer):
+    statistics = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Broadcast
+        fields = [
+            "id",
+            "name",
+            "created_on",
+            "modified_on",
+            "text",
+            "media",
+            "broadcast_type",
+            "groups",
+            "statistics",
+            "template",
+        ]
+
+    def get_statistics(self, obj):
+        stat = obj.statistics.first()
+        return {
+            "processed": stat.processed if stat else 0,
+            "sent": stat.sent if stat else 0,
+            "delivered": stat.delivered if stat else 0,
+            "failed": stat.failed if stat else 0,
+            "contact_count": stat.contact_count if stat else 0,
+        }
+
+    def get_groups(self, obj):
+        groups = obj.user_groups.all()
+        return [g.name for g in groups]

@@ -12,9 +12,10 @@ from django.contrib.auth import get_user_model
 
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.serializers import WhatsappBroadcastWriteSerializer
+from temba.msgs.models import Broadcast
 from temba.orgs.models import Org
 
-from .serializers import BroadcastSerializer, UserAndProjectSerializer
+from .serializers import BroadcastSerializer, BroadcastWithStatisticsSerializer, UserAndProjectSerializer
 
 User = get_user_model()
 
@@ -73,3 +74,37 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
             return Response({"message": "Success"})
 
         return Response(serializer.errors, status=400)
+
+
+class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    serializer_class = BroadcastWithStatisticsSerializer
+
+    def get(self, request, *args, **kwargs):
+        project_uuid = request.query_params.get("project_uuid")
+        if not project_uuid:
+            return Response({"error": "Project UUID not provided"}, status=400)
+
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except Org.DoesNotExist:
+            return Response({"error": "Project not found"}, status=404)
+        qs = Broadcast.objects.filter(org=org)
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+        name = request.query_params.get("name")
+        broadcast_id = request.query_params.get("id")
+
+        if start_date:
+            qs = qs.filter(created_on__gte=start_date)
+        if end_date:
+            qs = qs.filter(created_on__lte=end_date)
+        if name:
+            qs = qs.filter(name__icontains=name)
+        if broadcast_id:
+            qs = qs.filter(id=broadcast_id)
+
+        qs = qs.order_by("-created_on")
+        data = BroadcastWithStatisticsSerializer(qs, many=True).data
+        return Response(data)
