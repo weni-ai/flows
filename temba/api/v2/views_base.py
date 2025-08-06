@@ -30,7 +30,7 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
     lookup_params = {"uuid": "uuid"}
 
     def dispatch(self, request, *args, **kwargs):
-        auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+        auth_header = request.headers.get("Authorization")
         logging.getLogger("apitoken_logger").info(
             f"[API TOKEN] Authorization header: {auth_header} | Path: {request.path} | user: {request.user.email}"
         )
