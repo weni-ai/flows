@@ -4,6 +4,7 @@ from weni.serializers import fields as weni_serializers
 from temba.api.v2 import fields
 from temba.api.v2.serializers import WriteSerializer
 from temba.msgs.models import Broadcast, Msg
+from temba.templates.models import Template
 from temba.utils import on_transaction_commit
 
 
@@ -37,6 +38,7 @@ class BroadcastSerializer(WriteSerializer):
 
 class BroadcastWithStatisticsSerializer(serializers.ModelSerializer):
     statistics = serializers.SerializerMethodField()
+    template = serializers.SerializerMethodField()
 
     class Meta:
         model = Broadcast
@@ -66,3 +68,11 @@ class BroadcastWithStatisticsSerializer(serializers.ModelSerializer):
     def get_groups(self, obj):
         groups = obj.user_groups.all()
         return [g.name for g in groups]
+
+    def get_template(self, obj):
+        if not obj.template_id:
+            return None
+        template = Template.objects.filter(id=obj.template_id).first()
+        if not template:
+            return None
+        return {"id": template.id, "name": template.name}
