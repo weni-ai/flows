@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.serializers import WhatsappBroadcastWriteSerializer
-from temba.msgs.models import Broadcast
+from temba.msgs.models import Broadcast, BroadcastStatistics
 from temba.orgs.models import Org
 
 from .serializers import BroadcastSerializer, BroadcastWithStatisticsSerializer, UserAndProjectSerializer
@@ -108,3 +108,21 @@ class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
         qs = qs.order_by("-created_on")
         data = BroadcastWithStatisticsSerializer(qs, many=True).data
         return Response(data)
+
+
+class InternalBroadcastStatisticMontlyEndpoint(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+
+    def get(self, request, *args, **kwargs):
+        project_uuid = request.query_params.get("project_uuid")
+        if not project_uuid:
+            return Response({"error": "Project UUID not provided"}, status=400)
+
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except Org.DoesNotExist:
+            return Response({"error": "Project not found"}, status=404)
+
+        last_month_data = BroadcastStatistics.last_30_days_stats(org)
+        return Response(last_month_data)
