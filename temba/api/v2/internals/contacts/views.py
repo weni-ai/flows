@@ -22,6 +22,7 @@ from temba.api.v2.validators import LambdaURLValidator
 from temba.contacts.models import Contact, ContactField, ContactURN
 from temba.tickets.models import Ticket
 from temba.orgs.models import Org
+from temba.tickets.models import Ticket
 
 User = get_user_model()
 

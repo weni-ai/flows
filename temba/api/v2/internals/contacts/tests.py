@@ -343,7 +343,6 @@ class InternalContactFieldsEndpointTest(TembaTest):
 
 
 class HasOpenTicketViewTest(TembaTest):
-
     def test_missing_contact_urn_param(self):
         """Test that the endpoint returns 400 when contact_urn parameter is missing"""
         url = "/api/v2/internals/contact_has_open_ticket"
@@ -359,10 +358,10 @@ class HasOpenTicketViewTest(TembaTest):
     def test_contact_without_open_ticket(self):
         """Test that the endpoint returns false when contact has no open tickets"""
         self.create_contact("Bob", urns=["tel:+1234567890"])
-                
+
         url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"has_open_ticket": False})
 
@@ -371,10 +370,10 @@ class HasOpenTicketViewTest(TembaTest):
         contact = self.create_contact("Bob", urns=["tel:+1234567890"])
         ticketer = Ticketer.create(self.org, self.admin, WeniChatsType.slug, "bob@acme.com", {})
         self.create_ticket(ticketer, contact, "Test ticket")
-        
+
         url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"has_open_ticket": True})
 
@@ -382,16 +381,16 @@ class HasOpenTicketViewTest(TembaTest):
         """Test that the endpoint returns false when contact has only closed tickets"""
         contact = self.create_contact("Bob", urns=["tel:+1234567890"])
         ticketer = Ticketer.create(self.org, self.admin, WeniChatsType.slug, "bob@acme.com", {})
-        
+
         ticket = self.create_ticket(ticketer, contact, "Test ticket")
         ticket.status = "C"
         ticket.save()
-        
+
         ticket.refresh_from_db()
         self.assertEqual(ticket.status, "C")
-        
+
         url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"has_open_ticket": False})

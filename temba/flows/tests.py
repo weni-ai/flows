@@ -60,6 +60,7 @@ from .models import (
 )
 from .tasks import (
     interrupt_flow_sessions,
+    squash_flow_category_counts,
     squash_flowcounts,
     trim_all_flow_starts,
     trim_flow_revisions,
@@ -977,6 +978,68 @@ class FlowTest(TembaTest):
         # no-op this time
         squash_flowcounts()
         self.assertEqual(max_id, FlowRunCount.objects.all().order_by("-id").first().id)
+
+    def test_squash_category_counts(self):
+        flow = self.get_flow("favorites")
+        flow2 = self.get_flow("pick_a_number")
+
+        FlowCategoryCount.objects.create(
+            flow=flow,
+            node_uuid="ce1cc75f-34c8-490e-98f3-fb72f78510b6",
+            result_key="color",
+            result_name="Color",
+            category_name="Blue",
+            count=2,
+        )
+        FlowCategoryCount.objects.create(
+            flow=flow,
+            node_uuid="ce1cc75f-34c8-490e-98f3-fb72f78510b6",
+            result_key="color",
+            result_name="Color",
+            category_name="Blue",
+            count=1,
+        )
+        FlowCategoryCount.objects.create(
+            flow=flow,
+            node_uuid="ce1cc75f-34c8-490e-98f3-fb72f78510b6",
+            result_key="color",
+            result_name="Color",
+            category_name="Red",
+            count=3,
+        )
+        FlowCategoryCount.objects.create(
+            flow=flow2,
+            node_uuid="6b754443-89b1-4476-98c6-aa5836e6f1d7",
+            result_key="number",
+            result_name="Number",
+            category_name="1",
+            count=10,
+        )
+        FlowCategoryCount.objects.create(
+            flow=flow2,
+            node_uuid="6b754443-89b1-4476-98c6-aa5836e6f1d7",
+            result_key="number",
+            result_name="Number",
+            category_name="1",
+            count=-1,
+        )
+
+        squash_flow_category_counts()
+        self.assertEqual(FlowCategoryCount.objects.all().count(), 3)
+
+        blue_count = FlowCategoryCount.objects.get(flow=flow, category_name="Blue")
+        red_count = FlowCategoryCount.objects.get(flow=flow, category_name="Red")
+        one_count = FlowCategoryCount.objects.get(flow=flow2, category_name="1")
+
+        self.assertEqual(blue_count.count, 3)
+        self.assertEqual(red_count.count, 3)
+        self.assertEqual(one_count.count, 9)
+
+        max_id = FlowCategoryCount.objects.all().order_by("-id").first().id
+
+        # no-op this time
+        squash_flow_category_counts()
+        self.assertEqual(max_id, FlowCategoryCount.objects.all().order_by("-id").first().id)
 
     def test_category_counts(self):
         def assertCount(counts, result_key, category_name, truth):

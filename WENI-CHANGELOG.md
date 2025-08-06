@@ -1,3 +1,19 @@
+3.35.7
+----------
+* Add internal endpoint to check if contact has open ticket by URN as parameter
+
+3.35.6
+----------
+* Schedule task squash_flow_category_counts
+
+3.35.5
+----------
+* Change CAPI endpoint authentication to JWT
+
+3.35.4
+----------
+* Move squash FlowCategoryCount to a new task 
+
 3.35.3
 ----------
 * Update weni-datalake-sdk version to 0.4.0

@@ -361,6 +361,7 @@ LOGGING = {
         "django.security.DisallowedHost": {"handlers": ["null"], "propagate": False},
         "django.db.backends": {"level": "ERROR", "handlers": ["console"], "propagate": False},
         "temba.formax": {"level": "DEBUG" if DEBUG else "ERROR", "handlers": ["console"], "propagate": False},
+        "apitoken_logger": {"level": "INFO","handlers": ["console"],"propagate": False},
     },
 }
 
@@ -1104,6 +1105,7 @@ CELERY_BEAT_SCHEDULE = {
     "trim-webhook-event": {"task": "trim_webhook_event_task", "schedule": crontab(hour=3, minute=0)},
     "update-org-activity": {"task": "update_org_activity_task", "schedule": crontab(hour=3, minute=5)},
     "refresh-teams-tokens": {"task": "refresh_teams_tokens", "schedule": crontab(hour=8, minute=0)},
+    "squash-flow-category-counts": {"task": "squash_flow_category_counts", "schedule": timedelta(seconds=60)},
 }
 
 # -----------------------------------------------------------------------------------
