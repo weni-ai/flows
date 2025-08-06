@@ -1,4 +1,5 @@
 import contextlib
+import logging
 from uuid import UUID
 
 import iso8601
@@ -27,6 +28,13 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
     model = None
     model_manager = "objects"
     lookup_params = {"uuid": "uuid"}
+
+    def dispatch(self, request, *args, **kwargs):
+        auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+        logging.getLogger("apitoken_logger").info(
+            f"[API TOKEN] Authorization header: {auth_header} | Path: {request.path} | user: {request.user.email}"
+        )
+        return super().dispatch(request, *args, **kwargs)
 
     def options(self, request, *args, **kwargs):
         """
