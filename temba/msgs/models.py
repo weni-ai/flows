@@ -124,6 +124,7 @@ class Broadcast(models.Model):
 
     name = models.CharField(max_length=255, null=True, blank=True)
     is_bulk_send = models.BooleanField(default=False)
+    template_id = models.IntegerField(null=True, blank=True)
 
     @classmethod
     def create(
