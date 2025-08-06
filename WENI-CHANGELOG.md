@@ -1,3 +1,7 @@
+3.35.8
+----------
+* Update floweditor to 3.6.2
+
 3.35.7
 ----------
 * Add internal endpoint to check if contact has open ticket by URN as parameter
