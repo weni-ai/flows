@@ -1,6 +1,10 @@
-3.35.8
+3.35.9
 ----------
 * Add logger to see API token and user
+
+3.35.8
+----------
+* Update floweditor to 3.6.2
 
 3.35.7
 ----------
