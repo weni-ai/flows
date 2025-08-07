@@ -116,11 +116,11 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
         event_time = int(datetime.now().timestamp())
 
         # Map event types for Meta
-        event_name_map = {"lead": "Lead", "purchase": "Purchase"}
+        event_name_map = {"lead": "LeadSubmitted", "purchase": "Purchase"}
 
         # Payload following the specified format for Meta
         meta_event = {
-            "event_name": event_name_map.get(event_type, "Lead"),
+            "event_name": event_name_map.get(event_type, "LeadSubmitted"),
             "event_time": event_time,
             "action_source": "business_messaging",
             "messaging_channel": "whatsapp",
