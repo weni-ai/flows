@@ -32,7 +32,7 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
     def dispatch(self, request, *args, **kwargs):
         auth_header = request.headers.get("Authorization")
         logging.getLogger("apitoken_logger").info(
-            f"[API TOKEN] Authorization header: {auth_header} | Path: {request.path} | user: {request.user.email}"
+            f"[API TOKEN] Authorization header: {auth_header} | Path: {request.path} | user: {request.user.id}"
         )
         return super().dispatch(request, *args, **kwargs)
 
