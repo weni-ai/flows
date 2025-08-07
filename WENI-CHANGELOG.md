@@ -1,3 +1,7 @@
+3.35.10
+----------
+* Fix: LeadSubmitted event name in Meta Conversion API
+
 3.35.9
 ----------
 * Add logger to see API token and user
