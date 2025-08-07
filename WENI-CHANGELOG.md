@@ -1,3 +1,7 @@
+3.35.8
+----------
+* Add logger to see API token and user
+
 3.35.7
 ----------
 * Add internal endpoint to check if contact has open ticket by URN as parameter
