@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
 from weni.internal.permissions import CanCommunicateInternally
 from weni.internal.views import InternalGenericViewSet
+from rest_framework.pagination import LimitOffsetPagination
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -14,6 +15,7 @@ from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.serializers import WhatsappBroadcastWriteSerializer
 from temba.msgs.models import Broadcast, BroadcastStatistics
 from temba.orgs.models import Org
+from temba.api.v2.views_base import CreatedOnCursorPagination
 
 from .serializers import BroadcastSerializer, BroadcastWithStatisticsSerializer, UserAndProjectSerializer
 
@@ -81,6 +83,10 @@ class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, CanCommunicateInternally]
     serializer_class = BroadcastWithStatisticsSerializer
 
+    class Pagination(LimitOffsetPagination):
+        default_limit = 10
+        max_limit = 100
+
     def get(self, request, *args, **kwargs):
         project_uuid = request.query_params.get("project_uuid")
         if not project_uuid:
@@ -106,8 +112,10 @@ class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
             qs = qs.filter(id=broadcast_id)
 
         qs = qs.order_by("-created_on")
-        data = BroadcastWithStatisticsSerializer(qs, many=True).data
-        return Response(data)
+        paginator = self.Pagination()
+        page = paginator.paginate_queryset(qs, request, view=self)
+        serializer = BroadcastWithStatisticsSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 
 class InternalBroadcastStatisticMontlyEndpoint(APIViewMixin, APIView):
