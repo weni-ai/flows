@@ -331,7 +331,7 @@ class BroadcastStatistics(models.Model):
 
         return {k: v or 0 for k, v in aggregated_broadcasts.items()}
 
-    @classmethod
+    @classmethod  # pragma: no cover
     def cost(cls):
         pass
 
