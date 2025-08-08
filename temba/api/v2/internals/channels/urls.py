@@ -4,7 +4,7 @@ from .views import ChannelAllowedDomainsView, ChannelProjectView, InternalChanne
 
 urlpatterns = [
     path("channel_projects", ChannelProjectView.as_view(), name="channel_projects"),
-    path("channels", InternalChannelView.as_view(), name="channels"),
+    path("channels-by-project", InternalChannelView.as_view(), name="channels-by-project"),
 ]
 
 urlpatterns.append(
