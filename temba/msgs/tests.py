@@ -16,6 +16,7 @@ from temba.contacts.search.omnibox import omnibox_serialize
 from temba.msgs.models import (
     Attachment,
     Broadcast,
+    BroadcastStatistics,
     ExportMessagesTask,
     Label,
     LabelCount,
@@ -2737,6 +2738,17 @@ class SystemLabelTest(TembaTest):
             },
         )
 
+    def test_last_30_days_stats_no_broadcasts(self):
+        # Remove todas as estatísticas e depois os broadcasts para evitar ProtectedError
+        BroadcastStatistics.objects.filter(org=self.org).delete()
+        Broadcast.objects.filter(org=self.org).delete()
+        stats = BroadcastStatistics.last_30_days_stats(self.org)
+        self.assertEqual(stats["total_processed"], 0)
+        self.assertEqual(stats["total_sent"], 0)
+        self.assertEqual(stats["total_delivered"], 0)
+        self.assertEqual(stats["total_failed"], 0)
+        self.assertEqual(stats["total_contacts"], 0)
+
 
 class TagsTest(TembaTest):
     def setUp(self):
@@ -2803,3 +2815,58 @@ class TagsTest(TembaTest):
         # exception if tag not used correctly
         self.assertRaises(ValueError, self.render_template, "{% load sms %}{% render with bob %}{% endrender %}")
         self.assertRaises(ValueError, self.render_template, "{% load sms %}{% render as %}{% endrender %}")
+
+
+class BroadcastStatisticsTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.joe = self.create_contact("Joe Blow", phone="123")
+        self.broadcast = Broadcast.create(
+            self.org,
+            self.user,
+            "Test broadcast",
+            contacts=[self.joe],
+        )
+        self.stats = BroadcastStatistics.objects.create(
+            broadcast=self.broadcast,
+            org=self.org,
+            processed=10,
+            sent=8,
+            delivered=6,
+            failed=2,
+            contact_count=5,
+        )
+
+    def test_str(self):
+        expected = f"BroadcastStatistics[broadcast_id={self.broadcast.id}, org={self.org}, processed=10, sent=8, delivered=6, failed=2, contact_count=5]"
+        self.assertEqual(str(self.stats), expected)
+
+    def test_last_30_days_stats(self):
+        stats = BroadcastStatistics.last_30_days_stats(self.org)
+        self.assertEqual(stats["total_processed"], 10)
+        self.assertEqual(stats["total_sent"], 8)
+        self.assertEqual(stats["total_delivered"], 6)
+        self.assertEqual(stats["total_failed"], 2)
+        self.assertEqual(stats["total_contacts"], 5)
+
+    def test_last_30_days_stats_no_broadcasts(self):
+        # Remove todas as estatísticas e depois os broadcasts para evitar ProtectedError
+        BroadcastStatistics.objects.filter(org=self.org).delete()
+        Broadcast.objects.filter(org=self.org).delete()
+        stats = BroadcastStatistics.last_30_days_stats(self.org)
+        self.assertEqual(stats["total_processed"], 0)
+        self.assertEqual(stats["total_sent"], 0)
+        self.assertEqual(stats["total_delivered"], 0)
+        self.assertEqual(stats["total_failed"], 0)
+        self.assertEqual(stats["total_contacts"], 0)
+
+    def test_success_rate_30_days(self):
+        rate = BroadcastStatistics.success_rate_30_days(self.org)
+        self.assertEqual(rate, 75.0)  # 6 delivered / 8 sent * 100
+
+    def test_success_rate_30_days_zero_sent(self):
+        self.stats.sent = 0
+        self.stats.delivered = 0
+        self.stats.save()
+        rate = BroadcastStatistics.success_rate_30_days(self.org)
+        self.assertEqual(rate, 0)
