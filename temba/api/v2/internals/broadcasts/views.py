@@ -132,5 +132,7 @@ class InternalBroadcastStatisticMontlyEndpoint(APIViewMixin, APIView):
         except Org.DoesNotExist:
             return Response({"error": "Project not found"}, status=404)
 
-        last_month_data = BroadcastStatistics.last_30_days_stats(org)
-        return Response(last_month_data)
+        result = {}
+        result["last_30_days_stats"] = BroadcastStatistics.last_30_days_stats(org)
+        result["success_rate_30_days"] = BroadcastStatistics.success_rate_30_days(org)
+        return Response(result)
