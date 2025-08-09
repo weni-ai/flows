@@ -1,13 +1,17 @@
 from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from weni.internal.authenticators import InternalOIDCAuthentication
+from weni.internal.permissions import CanCommunicateInternally
 
 from django.conf import settings
 
 from temba.api.v2.internals.channels.serializers import ChannelProjectSerializer
 from temba.api.v2.internals.views import APIViewMixin
 from temba.channels.models import Channel
+from temba.orgs.models import Org
 
 
 class ChannelProjectView(APIViewMixin, APIView):
@@ -34,12 +38,51 @@ class ChannelProjectView(APIViewMixin, APIView):
         response = {"results": []}
 
         for channel in channels:
-            channel_data = {"channel_uuid": str(channel.uuid), "project_uuid": str(channel.org.proj_uuid)}
+            channel_data = {
+                "channel_uuid": str(channel.uuid),
+                "project_uuid": str(channel.org.proj_uuid),
+            }
             if channel.channel_type == "WAC":
                 channel_data["waba"] = channel.config.get("wa_waba_id") if channel.config.get("wa_waba_id") else ""
                 channel_data["phone_number"] = (
                     channel.config.get("wa_number") if channel.config.get("wa_number") else ""
                 )
+            response["results"].append(channel_data)
+
+        return Response(response)
+
+
+class InternalChannelView(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+
+    def get(self, request: Request):
+        params = request.query_params
+        project_uuid = params.get("project_uuid")
+
+        if project_uuid is None:
+            return Response(status=400, data={"error": "project_uuid is required"})
+
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except Org.DoesNotExist:
+            return Response(status=404, data={"error": "Project not found"})
+
+        response = {"results": []}
+
+        channels = Channel.objects.filter(org=org, is_active=True)
+        for channel in channels:
+            channel_data = {
+                "uuid": str(channel.uuid),
+                "channel_type": channel.channel_type,
+                "name": channel.name,
+            }
+            if channel.channel_type == "WAC":
+                channel_data["waba"] = channel.config.get("wa_waba_id") if channel.config.get("wa_waba_id") else None
+                channel_data["phone_number"] = (
+                    channel.config.get("wa_number") if channel.config.get("wa_number") else None
+                )
+                channel_data["MMLite"] = True if channel.config.get("mmlite") else False
             response["results"].append(channel_data)
 
         return Response(response)
