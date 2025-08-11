@@ -2833,12 +2833,13 @@ class BroadcastStatisticsTest(TembaTest):
             processed=10,
             sent=8,
             delivered=6,
+            read=1,
             failed=2,
             contact_count=5,
         )
 
     def test_str(self):
-        expected = f"BroadcastStatistics[broadcast_id={self.broadcast.id}, org={self.org}, processed=10, sent=8, delivered=6, failed=2, contact_count=5]"
+        expected = f"BroadcastStatistics[broadcast_id={self.broadcast.id}, org={self.org}, processed=10, sent=8, delivered=6, failed=2, read=1, contact_count=5]"
         self.assertEqual(str(self.stats), expected)
 
     def test_last_30_days_stats(self):
@@ -2848,9 +2849,10 @@ class BroadcastStatisticsTest(TembaTest):
         self.assertEqual(stats["total_delivered"], 6)
         self.assertEqual(stats["total_failed"], 2)
         self.assertEqual(stats["total_contacts"], 5)
+        self.assertEqual(stats["total_read"], 1)
 
     def test_last_30_days_stats_no_broadcasts(self):
-        # Remove todas as estatísticas e depois os broadcasts para evitar ProtectedError
+        # Remove all broadcast statistics and broadcasts to avoid ProtectedError
         BroadcastStatistics.objects.filter(org=self.org).delete()
         Broadcast.objects.filter(org=self.org).delete()
         stats = BroadcastStatistics.last_30_days_stats(self.org)
@@ -2859,6 +2861,7 @@ class BroadcastStatisticsTest(TembaTest):
         self.assertEqual(stats["total_delivered"], 0)
         self.assertEqual(stats["total_failed"], 0)
         self.assertEqual(stats["total_contacts"], 0)
+        self.assertEqual(stats["total_read"], 0)
 
     def test_success_rate_30_days(self):
         rate = BroadcastStatistics.success_rate_30_days(self.org)
