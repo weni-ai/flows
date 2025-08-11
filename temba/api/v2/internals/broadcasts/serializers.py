@@ -45,12 +45,14 @@ class BroadcastWithStatisticsSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
+            "created_by",
             "created_on",
             "modified_on",
             "text",
             "media",
             "broadcast_type",
             "groups",
+            "status",
             "statistics",
             "template",
         ]
