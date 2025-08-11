@@ -298,6 +298,7 @@ class BroadcastStatistics(models.Model):
     sent = models.IntegerField(default=0)
     delivered = models.IntegerField(default=0)
     failed = models.IntegerField(default=0)
+    read = models.IntegerField(default=0)
     contact_count = models.IntegerField(default=0)
 
     def __str__(self):
@@ -308,6 +309,7 @@ class BroadcastStatistics(models.Model):
             f"sent={self.sent}, "
             f"delivered={self.delivered}, "
             f"failed={self.failed}, "
+            f"read={self.read}, "
             f"contact_count={self.contact_count}]"
         )
 
@@ -326,12 +328,13 @@ class BroadcastStatistics(models.Model):
             total_sent=Sum("sent"),
             total_delivered=Sum("delivered"),
             total_failed=Sum("failed"),
+            total_read=Sum("read"),
             total_contacts=Sum("contact_count"),
         )
 
         return {k: v or 0 for k, v in aggregated_broadcasts.items()}
 
-    @classmethod
+    @classmethod  # pragma: no cover
     def cost(cls):
         pass
 
