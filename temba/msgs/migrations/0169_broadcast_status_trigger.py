@@ -33,6 +33,13 @@ BEGIN
             SET processed = processed + 1
             WHERE broadcast_id = NEW.broadcast_id;
         END IF;
+
+        -- Increment the read field if status changed to 'V'
+        IF NEW.status = 'V' THEN
+            UPDATE msgs_broadcaststatistics
+            SET read = read + 1
+            WHERE broadcast_id = NEW.broadcast_id;
+        END IF;
     END IF;
     RETURN NEW;
 END;
