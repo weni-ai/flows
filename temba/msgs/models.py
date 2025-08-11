@@ -136,6 +136,9 @@ class Broadcast(models.Model):
         template_state: str = TEMPLATE_STATE_LEGACY,
         status: str = STATUS_INITIALIZING,
         queue: str = None,
+        name: str = None,
+        template_id: int = None,
+        is_bulk_send: bool = False,
         **kwargs,
     ):
         # for convenience broadcasts can still be created with single translation and no base_language
