@@ -2739,7 +2739,7 @@ class SystemLabelTest(TembaTest):
         )
 
     def test_last_30_days_stats_no_broadcasts(self):
-        # Remove todas as estatísticas e depois os broadcasts para evitar ProtectedError
+        # Remove all broadcast statistics and broadcasts to avoid ProtectedError
         BroadcastStatistics.objects.filter(org=self.org).delete()
         Broadcast.objects.filter(org=self.org).delete()
         stats = BroadcastStatistics.last_30_days_stats(self.org)
@@ -2826,6 +2826,7 @@ class BroadcastStatisticsTest(TembaTest):
             self.user,
             "Test broadcast",
             contacts=[self.joe],
+            is_bulk_send=True,
         )
         self.stats = BroadcastStatistics.objects.create(
             broadcast=self.broadcast,
