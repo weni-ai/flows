@@ -1,3 +1,4 @@
+import datetime as dt
 from functools import wraps
 from unittest.mock import MagicMock, patch
 
@@ -6,9 +7,11 @@ from rest_framework.response import Response
 
 from django.contrib.auth import get_user_model
 from django.test import override_settings
+from django.utils import timezone
 
 from temba.api.v2.validators import LambdaURLValidator
 from temba.contacts.models import ContactField
+from temba.msgs.models import Msg
 from temba.tests import TembaTest
 from temba.tests.mailroom import mock_mailroom
 from temba.tickets.models import Ticketer
@@ -391,3 +394,141 @@ class HasOpenTicketViewTest(TembaTest):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"has_open_ticket": False})
+
+
+class ContactsWithMessagesViewTest(TembaTest):
+    url = "/api/v2/internals/contacts_with_messages"
+
+    def setUp(self):
+        super().setUp()
+        self.contact1 = self.create_contact("Alice", urns=["tel:+1111111111"])
+        self.contact2 = self.create_contact("Bob", urns=["tel:+2222222222"])
+        self.contact3 = self.create_contact("Carol", urns=["tel:+3333333333"])
+        self.start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc)
+        self.end = dt.datetime(2025, 1, 2, 23, 59, tzinfo=timezone.utc)
+
+    def create_msg(self, contact, text, created_on):
+        return Msg.objects.create(org=self.org, contact=contact, text=text, created_on=created_on, direction="I")
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_missing_params(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("error", resp.json())
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_project_not_found(self):
+        resp = self.client.get(
+            self.url,
+            {"project": "00000000-0000-0000-0000-000000000000", "start_date": "2025-01-01", "end_date": "2025-01-02"},
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertIn("error", resp.json())
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_only_contacts_with_multiple_msgs(self):
+        # contact1: 2 msgs, contact2: 1 msg, contact3: 0 msgs
+        self.create_msg(self.contact1, "msg1", self.start)
+        self.create_msg(self.contact1, "msg2", self.end)
+        self.create_msg(self.contact2, "msg3", self.start)
+        resp = self.client.get(
+            self.url, {"project": str(self.org.proj_uuid), "start_date": "2025-01-01", "end_date": "2025-01-02"}
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"] if "results" in resp.json() else resp.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["contact_id"], self.contact1.id)
+        self.assertEqual(len(data[0]["messages"]), 2)
+        self.assertTrue(all(m["contact_id"] == self.contact1.id for m in data[0]["messages"]))
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_returns_all_msgs_for_qualified_contacts(self):
+        self.create_msg(self.contact1, "msg1", self.start)
+        self.create_msg(self.contact1, "msg2", self.end)
+        self.create_msg(self.contact1, "msg3", self.end)
+        resp = self.client.get(
+            self.url, {"project": str(self.org.proj_uuid), "start_date": "2025-01-01", "end_date": "2025-01-02"}
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"] if "results" in resp.json() else resp.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["contact_id"], self.contact1.id)
+        self.assertEqual(len(data[0]["messages"]), 3)
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_pagination_limit(self):
+        # create 3 contacts with 2 msgs each
+        cts = [self.create_contact(f"C{i}", urns=[f"tel:+{i}"]) for i in range(10, 13)]
+        for c in cts:
+            self.create_msg(c, "a", self.start)
+            self.create_msg(c, "b", self.end)
+        resp = self.client.get(
+            self.url,
+            {"project": str(self.org.proj_uuid), "start_date": "2025-01-01", "end_date": "2025-01-02", "limit": 2},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"] if "results" in resp.json() else resp.json()
+        self.assertEqual(len(data), 2)
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_accepts_datetime_and_date(self):
+        self.create_msg(self.contact1, "msg1", self.start)
+        self.create_msg(self.contact1, "msg2", self.end)
+        # date only
+        resp1 = self.client.get(
+            self.url, {"project": str(self.org.proj_uuid), "start_date": "2025-01-01", "end_date": "2025-01-02"}
+        )
+        # datetime
+        resp2 = self.client.get(
+            self.url,
+            {
+                "project": str(self.org.proj_uuid),
+                "start_date": "2025-01-01T00:00:00Z",
+                "end_date": "2025-01-02T23:59:59Z",
+            },
+        )
+        self.assertEqual(resp1.status_code, 200)
+        self.assertEqual(resp2.status_code, 200)
+        self.assertEqual(len(resp1.json()["results"] if "results" in resp1.json() else resp1.json()), 1)
+        self.assertEqual(len(resp2.json()["results"] if "results" in resp2.json() else resp2.json()), 1)
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_invalid_date_format(self):
+        resp = self.client.get(
+            self.url, {"project": str(self.org.proj_uuid), "start_date": "2025-01-01", "end_date": "not-a-date"}
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("error", resp.json())
+        self.assertIn("Invalid date format", resp.json()["error"])
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_missing_start_or_end_date(self):
+        # missing start_date
+        resp1 = self.client.get(self.url, {"project": str(self.org.proj_uuid), "end_date": "2025-01-02"})
+        self.assertEqual(resp1.status_code, 400)
+        self.assertIn("error", resp1.json())
+        self.assertIn("start_date and end_date are required", resp1.json()["error"])
+        # missing end_date
+        resp2 = self.client.get(self.url, {"project": str(self.org.proj_uuid), "start_date": "2025-01-01"})
+        self.assertEqual(resp2.status_code, 400)
+        self.assertIn("error", resp2.json())
+        self.assertIn("start_date and end_date are required", resp2.json()["error"])
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_accepts_naive_datetime(self):
+        self.create_msg(self.contact1, "msg1", self.start)
+        self.create_msg(self.contact1, "msg2", self.end)
+        # naive datetime (no timezone info)
+        resp = self.client.get(
+            self.url,
+            {
+                "project": str(self.org.proj_uuid),
+                "start_date": "2025-01-01T00:00:00",
+                "end_date": "2025-01-02T23:59:59",
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"] if "results" in resp.json() else resp.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["contact_id"], self.contact1.id)
+        self.assertEqual(len(data[0]["messages"]), 2)
