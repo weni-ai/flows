@@ -2826,6 +2826,7 @@ class BroadcastStatisticsTest(TembaTest):
             self.user,
             "Test broadcast",
             contacts=[self.joe],
+            is_bulk_send=True,
         )
         self.stats = BroadcastStatistics.objects.create(
             broadcast=self.broadcast,
