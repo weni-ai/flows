@@ -289,7 +289,6 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     name = serializers.CharField(required=False)
     template_id = serializers.IntegerField(required=False)
 
-
     def validate_msg(self, value):
         if not (value.get("text") or value.get("attachments") or value.get("template") or value.get("action_type")):
             raise serializers.ValidationError("Must provide either text, attachments, template or action_type")
