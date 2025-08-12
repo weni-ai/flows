@@ -1,3 +1,15 @@
+3.35.10
+----------
+* Fix: LeadSubmitted event name in Meta Conversion API
+
+3.35.9
+----------
+* Add logger to see API token and user
+
+3.35.8
+----------
+* Update floweditor to 3.6.2
+
 3.35.7
 ----------
 * Add internal endpoint to check if contact has open ticket by URN as parameter

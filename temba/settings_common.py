@@ -361,7 +361,7 @@ LOGGING = {
         "django.security.DisallowedHost": {"handlers": ["null"], "propagate": False},
         "django.db.backends": {"level": "ERROR", "handlers": ["console"], "propagate": False},
         "temba.formax": {"level": "DEBUG" if DEBUG else "ERROR", "handlers": ["console"], "propagate": False},
-        "apitoken_logger": {"level": "INFO","handlers": ["console"],"propagate": False},
+        "apitoken_logger": {"level": "INFO", "handlers": ["console"], "propagate": False},
     },
 }
 
