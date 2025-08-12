@@ -2,10 +2,10 @@ from django.urls import path
 
 from .views import (
     ContactHasOpenTicketView,
+    ContactsWithMessagesView,
     InternalContactFieldsEndpoint,
     InternalContactView,
     UpdateContactFieldsView,
-    ContactsWithMessagesView,
 )
 
 urlpatterns = [

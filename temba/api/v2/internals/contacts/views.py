@@ -1,5 +1,8 @@
+import datetime as dt
+
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.request import Request
@@ -13,22 +16,20 @@ from django.contrib.auth import get_user_model
 from django.core import exceptions as django_exceptions
 from django.db import models
 from django.utils import timezone
-from django.utils.dateparse import parse_datetime, parse_date
-import datetime as dt
+from django.utils.dateparse import parse_date, parse_datetime
 
 from temba.api.v2.internals.contacts.serializers import (
+    ContactWithMessagesListSerializer,
     InternalContactFieldsValuesSerializer,
     InternalContactSerializer,
-    ContactWithMessagesListSerializer,
 )
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.serializers import ContactFieldReadSerializer, ContactFieldWriteSerializer
 from temba.api.v2.validators import LambdaURLValidator
 from temba.contacts.models import Contact, ContactField, ContactURN
+from temba.msgs.models import Msg
 from temba.orgs.models import Org
 from temba.tickets.models import Ticket
-from temba.msgs.models import Msg
-from rest_framework.pagination import LimitOffsetPagination
 
 User = get_user_model()
 
@@ -156,14 +157,18 @@ class ContactsWithMessagesService:
         return contacts.prefetch_related(
             models.Prefetch(
                 "msgs",
-                queryset=Msg.objects.filter(created_on__gte=start_date, created_on__lte=end_date).order_by("created_on"),
-                to_attr="filtered_msgs"
+                queryset=Msg.objects.filter(created_on__gte=start_date, created_on__lte=end_date).order_by(
+                    "created_on"
+                ),
+                to_attr="filtered_msgs",
             )
         )
+
 
 class ContactsWithMessagesPagination(LimitOffsetPagination):
     default_limit = 10
     max_limit = 500
+
 
 class ContactsWithMessagesView(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
@@ -208,13 +213,15 @@ class ContactsWithMessagesView(APIViewMixin, APIView):
         for contact in contacts:
             filtered_msgs = getattr(contact, "filtered_msgs", [])
             if len(filtered_msgs) > 1:
-                contact_results.append({
-                    "contact_id": contact.id,
-                    "messages": [
-                        {"contact_id": contact.id, "msg_text": msg.text, "msg_created_on": msg.created_on}
-                        for msg in sorted(filtered_msgs, key=lambda x: x.created_on, reverse=True)
-                    ],
-                })
+                contact_results.append(
+                    {
+                        "contact_id": contact.id,
+                        "messages": [
+                            {"contact_id": contact.id, "msg_text": msg.text, "msg_created_on": msg.created_on}
+                            for msg in sorted(filtered_msgs, key=lambda x: x.created_on, reverse=True)
+                        ],
+                    }
+                )
 
         paginator = ContactsWithMessagesPagination()
         page = paginator.paginate_queryset(contact_results, request, view=self)
