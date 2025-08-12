@@ -318,9 +318,11 @@ class BroadcastStatistics(models.Model):
         """
         Returns the statistics for the last 30 days
         """
-        broadcasts_ids = Broadcast.objects.filter(
-            org=org, created_on__gte=timezone.now() - timedelta(days=30)
-        ).values_list("id", flat=True)
+        now = timezone.now()
+        start_date = (now - timedelta(days=30)).replace(hour=0, minute=0, second=0, microsecond=0)
+        broadcasts_ids = Broadcast.objects.filter(org=org, is_bulk_send=True, created_on__gte=start_date).values_list(
+            "id", flat=True
+        )
         stats_qs = cls.objects.filter(broadcast__in=broadcasts_ids)
 
         aggregated_broadcasts = stats_qs.aggregate(
