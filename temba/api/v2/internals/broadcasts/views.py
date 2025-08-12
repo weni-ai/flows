@@ -96,7 +96,7 @@ class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
             org = Org.objects.get(proj_uuid=project_uuid)
         except Org.DoesNotExist:
             return Response({"error": "Project not found"}, status=404)
-        qs = Broadcast.objects.filter(org=org)
+        qs = Broadcast.objects.filter(org=org, is_bulk_send=True)
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
         name = request.query_params.get("name")
