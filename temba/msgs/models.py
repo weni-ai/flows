@@ -194,19 +194,22 @@ class Broadcast(models.Model):
         # set our recipients
         broadcast._set_recipients(groups=groups, contacts=contacts, urns=urns, contact_ids=contact_ids)
 
-        # Populate contact_count when creating BroadcastStatistics if there are groups
-        contact_count = 0
-        if groups:
-            group_ids = [g.id if hasattr(g, "id") else g for g in groups]
-            contact_count = (
-                ContactGroupCount.objects.filter(group_id__in=group_ids).aggregate(total=models.Sum("count"))["total"]
-                or 0
-            )
-            BroadcastStatistics.objects.create(
-                broadcast=broadcast,
-                org=org,
-                contact_count=contact_count,
-            )
+        if broadcast.is_bulk_send:
+            # Populate contact_count when creating BroadcastStatistics if there are groups
+            contact_count = 0
+            if groups:
+                group_ids = [g.id if hasattr(g, "id") else g for g in groups]
+                contact_count = (
+                    ContactGroupCount.objects.filter(group_id__in=group_ids).aggregate(total=models.Sum("count"))[
+                        "total"
+                    ]
+                    or 0
+                )
+                BroadcastStatistics.objects.create(
+                    broadcast=broadcast,
+                    org=org,
+                    contact_count=contact_count,
+                )
 
         return broadcast
 

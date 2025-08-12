@@ -5,7 +5,10 @@ CREATE OR REPLACE FUNCTION update_broadcast_statistics_on_msg_status()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Only process if broadcast_id is not null and status changed
-    IF NEW.broadcast_id IS NOT NULL AND NEW.status IS DISTINCT FROM OLD.status THEN
+    IF NEW.broadcast_id IS NOT NULL
+    AND NEW.status IS DISTINCT FROM OLD.status
+    AND (SELECT is_bulk_send FROM msgs_broadcast WHERE id = NEW.broadcast_id) = TRUE
+    THEN
         -- Increment the sent field if status changed to 'S'
         IF NEW.status = 'S' THEN
             UPDATE msgs_broadcaststatistics
