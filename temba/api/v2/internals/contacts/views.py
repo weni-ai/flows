@@ -7,6 +7,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
 from weni.internal.permissions import CanCommunicateInternally
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.core.files.uploadedfile import UploadedFile
+from temba.contacts.models import ContactImport
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -139,3 +142,57 @@ class ContactHasOpenTicketView(APIViewMixin, APIView):
 
         has_open_ticket = Ticket.objects.filter(contact_id=contactURN.contact_id, status=Ticket.STATUS_OPEN).exists()
         return Response({"has_open_ticket": has_open_ticket})
+
+
+class ContactsImportUploadView(APIViewMixin, APIView):
+    parser_classes = [MultiPartParser, FormParser]
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+
+    def post(self, request, *args, **kwargs):
+        project_uuid = request.data.get("project")
+        file = request.FILES.get("file")
+        if not project_uuid or not file:
+            return Response({"error": "Project and file are required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except (Org.DoesNotExist, django_exceptions.ValidationError):
+            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            mappings, num_records = ContactImport.try_to_parse(org, file.file, file.name)
+        except Exception as e:
+            return Response({"error": f"File parsing failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        contact_import = ContactImport.objects.create(
+            org=org,
+            file=file,
+            original_filename=file.name,
+            mappings=mappings,
+            num_records=num_records,
+            status=ContactImport.STATUS_PENDING,
+            created_by=request.user,
+            modified_by=request.user,
+        )
+        return Response({
+            "import_id": contact_import.id,
+            "num_records": num_records,
+            "errors": [],
+        }, status=status.HTTP_200_OK)
+
+class ContactsImportConfirmView(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+
+    def post(self, request, *args, **kwargs):
+        import_id = request.data.get("import_id")
+        if not import_id:
+            return Response({"error": "import_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            contact_import = ContactImport.objects.get(id=import_id)
+        except ContactImport.DoesNotExist:
+            return Response({"error": "Import not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            contact_import.start()
+        except Exception as e:
+            return Response({"error": f"Import processing failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"success": True, "import_id": import_id}, status=status.HTTP_200_OK)
