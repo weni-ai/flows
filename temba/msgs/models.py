@@ -200,6 +200,9 @@ class Broadcast(models.Model):
             metadata=metadata,
             status=status,
             broadcast_type=broadcast_type,
+            name=name,
+            template_id=template_id,
+            is_bulk_send=is_bulk_send,
             **kwargs,
         )
 

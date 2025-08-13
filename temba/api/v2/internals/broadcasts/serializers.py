@@ -39,6 +39,7 @@ class BroadcastSerializer(WriteSerializer):
 class BroadcastWithStatisticsSerializer(serializers.ModelSerializer):
     statistics = serializers.SerializerMethodField()
     template = serializers.SerializerMethodField()
+    created_by = serializers.SerializerMethodField()
 
     class Meta:
         model = Broadcast
@@ -78,3 +79,6 @@ class BroadcastWithStatisticsSerializer(serializers.ModelSerializer):
         if not template:
             return None
         return {"id": template.id, "name": template.name}
+
+    def get_created_by(self, obj):
+        return obj.created_by.email if obj.created_by else None
