@@ -21,7 +21,7 @@ from django.utils.translation import ugettext_lazy as _
 from temba import mailroom
 from temba.assets.models import register_asset_store
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
-from temba.contacts.models import URN, Contact, ContactGroup, ContactURN
+from temba.contacts.models import URN, Contact, ContactGroup, ContactGroupCount, ContactURN
 from temba.orgs.models import DependencyMixin, Org, TopUp
 from temba.schedules.models import Schedule
 from temba.utils import chunk_list, on_transaction_commit
@@ -202,6 +202,23 @@ class Broadcast(models.Model):
 
         # set our recipients
         broadcast._set_recipients(groups=groups, contacts=contacts, urns=urns, contact_ids=contact_ids)
+
+        if broadcast.is_bulk_send:
+            # Populate contact_count when creating BroadcastStatistics if there are groups
+            contact_count = 0
+            if groups:
+                group_ids = [g.id if hasattr(g, "id") else g for g in groups]
+                contact_count = (
+                    ContactGroupCount.objects.filter(group_id__in=group_ids).aggregate(total=models.Sum("count"))[
+                        "total"
+                    ]
+                    or 0
+                )
+                BroadcastStatistics.objects.create(
+                    broadcast=broadcast,
+                    org=org,
+                    contact_count=contact_count,
+                )
 
         return broadcast
 
