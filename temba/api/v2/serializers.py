@@ -286,6 +286,8 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     msg = serializers.DictField(required=True)
     channel = serializers.UUIDField(required=False)
     queue = serializers.CharField(required=False)
+    name = serializers.CharField(required=False)
+    template_id = serializers.IntegerField(required=False)
 
     def validate_msg(self, value):
         if not (value.get("text") or value.get("attachments") or value.get("template") or value.get("action_type")):
@@ -371,6 +373,9 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             channel=self.validated_data.get("channel", None),
             broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
             queue=self.validated_data.get("queue", None),
+            name=self.validated_data.get("name", None),
+            template_id=self.validated_data.get("template_id", None),
+            is_bulk_send=True if self.validated_data.get("queue") == "template_batch" else False,
         )
         # send it
         on_transaction_commit(lambda: broadcast.send_async())
