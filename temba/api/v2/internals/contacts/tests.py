@@ -404,11 +404,23 @@ class ContactsWithMessagesViewTest(TembaTest):
 
     def setUp(self):
         super().setUp()
-        self.contact1 = self.create_contact("Alice", urns=["tel:+1111111111"])
-        self.contact2 = self.create_contact("Bob", urns=["tel:+2222222222"])
-        self.contact3 = self.create_contact("Carol", urns=["tel:+3333333333"])
         self.start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc)
         self.end = dt.datetime(2025, 1, 2, 23, 59, tzinfo=timezone.utc)
+        self.contact1 = super().create_contact("Alice", urns=["tel:+1111111111"])
+        self.contact1.created_on = self.start
+        self.contact1.save(update_fields=["created_on"])
+        self.contact2 = super().create_contact("Bob", urns=["tel:+2222222222"])
+        self.contact2.created_on = self.start
+        self.contact2.save(update_fields=["created_on"])
+        self.contact3 = super().create_contact("Carol", urns=["tel:+3333333333"])
+        self.contact3.created_on = self.start
+        self.contact3.save(update_fields=["created_on"])
+
+    def _create_contact_with_created_on(self, name, urns, created_on):
+        contact = super().create_contact(name, urns=urns)
+        contact.created_on = created_on
+        contact.save(update_fields=["created_on"])
+        return contact
 
     def create_msg(self, contact, text, created_on):
         return Msg.objects.create(org=self.org, contact=contact, text=text, created_on=created_on, direction="I")
@@ -460,8 +472,8 @@ class ContactsWithMessagesViewTest(TembaTest):
 
     @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
     def test_pagination_limit(self):
-        # create 3 contacts with 2 msgs each
-        cts = [self.create_contact(f"C{i}", urns=[f"tel:+{i}"]) for i in range(10, 13)]
+        # create 3 contacts with 2 msgs each, all with created_on dentro do período
+        cts = [self._create_contact_with_created_on(f"C{i}", [f"tel:+{i}"], self.start) for i in range(10, 13)]
         for c in cts:
             self.create_msg(c, "a", self.start)
             self.create_msg(c, "b", self.end)
@@ -535,3 +547,17 @@ class ContactsWithMessagesViewTest(TembaTest):
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]["contact_id"], self.contact1.id)
         self.assertEqual(len(data[0]["messages"]), 2)
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_no_contacts_with_multiple_msgs_in_period(self):
+        # Todos os contatos só têm uma mensagem no período
+        self.create_msg(self.contact1, "msg1", self.start)
+        self.create_msg(self.contact2, "msg2", self.start)
+        self.create_msg(self.contact3, "msg3", self.start)
+        resp = self.client.get(
+            self.url,
+            {"project": str(self.org.proj_uuid), "start_date": "2025-01-01", "end_date": "2025-01-02"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"] if "results" in resp.json() else resp.json()
+        self.assertEqual(len(data), 0)
