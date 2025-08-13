@@ -2,7 +2,7 @@ import datetime as dt
 
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
-from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.pagination import CursorPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.request import Request
@@ -153,21 +153,23 @@ class ContactHasOpenTicketView(APIViewMixin, APIView):
 class ContactsWithMessagesService:
     @staticmethod
     def get_contacts_with_messages(org, start_date, end_date):
-        contacts = org.contacts.filter(is_active=True)
+        contacts = org.contacts.filter(is_active=True, created_on__gte=start_date, created_on__lte=end_date)
         return contacts.prefetch_related(
             models.Prefetch(
                 "msgs",
-                queryset=Msg.objects.filter(
-                    created_on__gte=start_date, created_on__lte=end_date, direction=Msg.DIRECTION_IN
-                ).order_by("created_on"),
+                queryset=Msg.objects.filter(created_on__gte=start_date, created_on__lte=end_date).order_by(
+                    "created_on"
+                ),
                 to_attr="filtered_msgs",
             )
         )
 
 
-class ContactsWithMessagesPagination(LimitOffsetPagination):
-    default_limit = 10
-    max_limit = 500
+class ContactsWithMessagesCursorPagination(CursorPagination):
+    ordering = "created_on"
+    page_size = 10
+    page_size_query_param = "limit"
+    max_page_size = 500
 
 
 class ContactsWithMessagesView(APIViewMixin, APIView):
@@ -207,23 +209,36 @@ class ContactsWithMessagesView(APIViewMixin, APIView):
         if timezone.is_naive(end_dt):
             end_dt = timezone.make_aware(end_dt, timezone.utc)
 
-        contacts = ContactsWithMessagesService.get_contacts_with_messages(org, start_dt, end_dt)
-
-        contact_results = []
-        for contact in contacts:
+        # Take all contacts created in the period
+        all_contacts_qs = ContactsWithMessagesService.get_contacts_with_messages(org, start_dt, end_dt).order_by(
+            "created_on"
+        )
+        # Filter for contacts with >1 message in the period
+        valid_contact_ids = []
+        contact_msgs_map = {}
+        for contact in all_contacts_qs:
             filtered_msgs = getattr(contact, "filtered_msgs", [])
             if len(filtered_msgs) > 1:
-                contact_results.append(
-                    {
-                        "contact_id": contact.id,
-                        "messages": [
-                            {"contact_id": contact.id, "msg_text": msg.text, "msg_created_on": msg.created_on}
-                            for msg in sorted(filtered_msgs, key=lambda x: x.created_on, reverse=True)
-                        ],
-                    }
-                )
-
-        paginator = ContactsWithMessagesPagination()
-        page = paginator.paginate_queryset(contact_results, request, view=self)
-        serializer = ContactWithMessagesListSerializer(page, many=True)
+                valid_contact_ids.append(contact.id)
+                contact_msgs_map[contact.id] = filtered_msgs
+        # Build a queryset only with valid contacts
+        if valid_contact_ids:
+            filtered_contacts_qs = all_contacts_qs.filter(id__in=valid_contact_ids)
+        else:
+            filtered_contacts_qs = all_contacts_qs.none()
+        paginator = ContactsWithMessagesCursorPagination()
+        page = paginator.paginate_queryset(filtered_contacts_qs, request, view=self)
+        contact_results = []
+        for contact in page:
+            filtered_msgs = contact_msgs_map.get(contact.id, [])
+            contact_results.append(
+                {
+                    "contact_id": contact.id,
+                    "messages": [
+                        {"contact_id": contact.id, "msg_text": msg.text, "msg_created_on": msg.created_on}
+                        for msg in sorted(filtered_msgs, key=lambda x: x.created_on, reverse=True)
+                    ],
+                }
+            )
+        serializer = ContactWithMessagesListSerializer(contact_results, many=True)
         return paginator.get_paginated_response(serializer.data)
