@@ -157,9 +157,9 @@ class ContactsWithMessagesService:
         return contacts.prefetch_related(
             models.Prefetch(
                 "msgs",
-                queryset=Msg.objects.filter(created_on__gte=start_date, created_on__lte=end_date).order_by(
-                    "created_on"
-                ),
+                queryset=Msg.objects.filter(
+                    created_on__gte=start_date, created_on__lte=end_date, direction=Msg.DIRECTION_IN
+                ).order_by("created_on"),
                 to_attr="filtered_msgs",
             )
         )
