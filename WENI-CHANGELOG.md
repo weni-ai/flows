@@ -1,3 +1,7 @@
+3.37.0
+----------
+* Endpoint to get contacts with more than one message related
+
 3.36.0
 ----------
 * Add queue field to WhatsappBroadcastWriteSerializer
