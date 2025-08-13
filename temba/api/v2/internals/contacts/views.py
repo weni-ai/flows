@@ -24,11 +24,14 @@ from temba.api.v2.internals.contacts.serializers import (
     InternalContactSerializer,
 )
 from temba.api.v2.internals.views import APIViewMixin
-from temba.api.v2.serializers import ContactFieldReadSerializer, ContactFieldWriteSerializer
+from temba.api.v2.serializers import (
+    ContactFieldReadSerializer,
+    ContactFieldWriteSerializer,
+    ContactGroupWriteSerializer,
+)
 from temba.api.v2.validators import LambdaURLValidator
 from temba.contacts.models import Contact, ContactField, ContactURN
-from temba.tickets.models import Ticket
-from temba.msgs.models import Msg
+from temba.msgs.models import Broadcast, Msg
 from temba.orgs.models import Org
 from temba.tickets.models import Ticket
 
@@ -242,3 +245,59 @@ class ContactsWithMessagesView(APIViewMixin, APIView):
             )
         serializer = ContactWithMessagesListSerializer(contact_results, many=True)
         return paginator.get_paginated_response(serializer.data)
+
+class InternalContactGroupsView(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+
+    def post(self, request, *args, **kwargs):
+        name = request.data.get("name")
+        broadcast_id = request.data.get("broadcast_id")
+        msg_status = request.data.get("status")
+
+        # Validate required fields
+        if not name:
+            return Response({"error": "Name is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not broadcast_id:
+            return Response({"error": "Broadcast ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if msg_status:
+            valid_statuses = [s[0] for s in Msg.STATUS_CHOICES]
+            if msg_status not in valid_statuses:
+                return Response({"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "Status is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get org and user
+        try:
+            org = Broadcast.objects.get(id=broadcast_id).org
+            user = User.objects.get(email=request.user.email)
+        except (Org.DoesNotExist, django_exceptions.ValidationError, Broadcast.DoesNotExist):
+            return Response({"error": "Project or Broadcast not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Create group
+        group_serializer = ContactGroupWriteSerializer(data={"name": name}, context={"org": org, "user": user})
+        group_serializer.is_valid(raise_exception=True)
+        group = group_serializer.save()
+
+        msgs = Msg.objects.filter(broadcast_id=broadcast_id, status=msg_status)
+
+        contact_ids = msgs.values_list("contact_id", flat=True).distinct()
+        contacts = Contact.objects.filter(id__in=contact_ids)
+
+        # Add contacts to group
+        group.contacts.add(*contacts)
+
+        return Response(
+            {
+                "group_uuid": str(group.uuid),
+                "group_name": group.name,
+                "added_contacts": [str(c.uuid) for c in contacts],
+                "count": contacts.count(),
+            },
+            status=status.HTTP_201_CREATED,
+        )
