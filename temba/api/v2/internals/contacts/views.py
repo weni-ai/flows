@@ -221,10 +221,9 @@ class ContactsImportConfirmView(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, CanCommunicateInternally]
     parser_classes = [JSONParser]
 
-    def post(self, request, *args, **kwargs):
-        import_id = request.data.get("import_id")
+    def post(self, request, import_id=None):
         if not import_id:
-            return Response({"error": "import_id is required."}, status=400)
+            return Response({"error": "import_id is required in URL."}, status=400)
         try:
             contact_import = ContactImport.objects.get(id=import_id)
         except ContactImport.DoesNotExist:
