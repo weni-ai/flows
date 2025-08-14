@@ -2,11 +2,11 @@ from django.urls import path
 
 from .views import (
     ContactHasOpenTicketView,
+    ContactsImportConfirmView,
+    ContactsImportUploadView,
     InternalContactFieldsEndpoint,
     InternalContactView,
     UpdateContactFieldsView,
-    ContactsImportUploadView,
-    ContactsImportConfirmView,
 )
 
 urlpatterns = [
