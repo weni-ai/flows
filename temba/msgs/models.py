@@ -300,6 +300,9 @@ class BroadcastStatistics(models.Model):
     failed = models.IntegerField(default=0)
     read = models.IntegerField(default=0)
     contact_count = models.IntegerField(default=0)
+    cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    template_price = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+    currency = models.CharField(max_length=20, null=True, blank=True)
 
     def __str__(self):
         return (
@@ -310,6 +313,9 @@ class BroadcastStatistics(models.Model):
             f"delivered={self.delivered}, "
             f"failed={self.failed}, "
             f"read={self.read}, "
+            f"cost={self.cost}, "
+            f"template_price={self.template_price}, "
+            f"currency={self.currency}, "
             f"contact_count={self.contact_count}]"
         )
 
@@ -332,13 +338,10 @@ class BroadcastStatistics(models.Model):
             total_failed=Sum("failed"),
             total_read=Sum("read"),
             total_contacts=Sum("contact_count"),
+            total_cost=Sum("cost"),
         )
 
         return {k: v or 0 for k, v in aggregated_broadcasts.items()}
-
-    @classmethod  # pragma: no cover
-    def cost(cls):
-        pass
 
     @classmethod
     def success_rate_30_days(cls, org):
@@ -1507,3 +1510,11 @@ class MessageExportAssetStore(BaseExportAssetStore):
     directory = "message_exports"
     permission = "msgs.msg_export"
     extensions = ("xlsx",)
+
+
+# Novo: referência ao service de cost (não acoplar lógica aqui)
+class CostService:
+    @staticmethod
+    def get_cost():
+        # Implementação real estará em temba/msgs/cost_service.py
+        pass
