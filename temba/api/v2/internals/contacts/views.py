@@ -139,7 +139,7 @@ class InternalContactGroupsView(APIViewMixin, APIView):
         """
         Get all contact groups from an organization (org) from the project_uuid.
         """
-        project_uuid = request.query_params.get("project")
+        project_uuid = request.query_params.get("project_uuid")
         if not project_uuid:
             return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
 
