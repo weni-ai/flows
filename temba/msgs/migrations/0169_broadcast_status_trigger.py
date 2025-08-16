@@ -9,10 +9,11 @@ BEGIN
     AND NEW.status IS DISTINCT FROM OLD.status
     AND (SELECT is_bulk_send FROM msgs_broadcast WHERE id = NEW.broadcast_id) = TRUE
     THEN
-        -- Increment the sent field if status changed to 'S'
+        -- Increment the sent field and update cost if status changed to 'S'
         IF NEW.status = 'S' THEN
             UPDATE msgs_broadcaststatistics
-            SET sent = sent + 1
+            SET sent = sent + 1,
+                cost = cost + COALESCE(template_price, 0)
             WHERE broadcast_id = NEW.broadcast_id;
         END IF;
 
