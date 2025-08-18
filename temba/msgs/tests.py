@@ -2840,7 +2840,7 @@ class BroadcastStatisticsTest(TembaTest):
         )
 
     def test_str(self):
-        expected = f"BroadcastStatistics[broadcast_id={self.broadcast.id}, org={self.org}, processed=10, sent=8, delivered=6, failed=2, read=1, contact_count=5]"
+        expected = f"BroadcastStatistics[broadcast_id={self.broadcast.id}, org={self.org}, processed=10, sent=8, delivered=6, failed=2, read=1, cost=None, template_price=None, currency=None, contact_count=5]"
         self.assertEqual(str(self.stats), expected)
 
     def test_last_30_days_stats(self):
