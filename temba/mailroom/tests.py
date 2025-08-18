@@ -7,7 +7,6 @@ from requests import HTTPError
 from django.conf import settings
 from django.test import override_settings
 from django.utils import timezone
-from requests import HTTPError
 
 from temba.campaigns.models import Campaign, CampaignEvent, EventFire
 from temba.channels.models import ChannelEvent, ChannelLog

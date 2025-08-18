@@ -11,14 +11,14 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunSQL(
             """
-            ALTER TABLE channels_channellog 
-            ALTER COLUMN msg_id TYPE bigint 
+            ALTER TABLE channels_channellog
+            ALTER COLUMN msg_id TYPE bigint
             USING msg_id::bigint;
             """,
             """
-            ALTER TABLE channels_channellog 
-            ALTER COLUMN msg_id TYPE integer 
+            ALTER TABLE channels_channellog
+            ALTER COLUMN msg_id TYPE integer
             USING msg_id::integer;
-            """
+            """,
         ),
     ]

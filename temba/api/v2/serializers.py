@@ -294,11 +294,6 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             raise serializers.ValidationError("Must provide either text, attachments, template or action_type")
         return value
 
-    def validate_msg(self, value):
-        if not (value.get("text") or value.get("attachments") or value.get("template") or value.get("action_type")):
-            raise serializers.ValidationError("Must provide either text, attachments, template or action_type")
-        return value
-
     def validate(self, data):
         if not (data.get("urns") or data.get("contacts") or data.get("groups")):
             raise serializers.ValidationError("Must provide either urns, contacts or groups")

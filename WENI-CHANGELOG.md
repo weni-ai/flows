@@ -1,3 +1,7 @@
+3.36.0
+----------
+* Add queue field to WhatsappBroadcastWriteSerializer
+
 3.35.10
 ----------
 * Fix: LeadSubmitted event name in Meta Conversion API
