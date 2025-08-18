@@ -11,6 +11,7 @@ from weni.internal.views import InternalGenericViewSet
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
+from temba.api.v2.internals.org_permission import IsUserInOrg
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.serializers import WhatsappBroadcastWriteSerializer
 from temba.msgs.models import Broadcast, BroadcastStatistics
@@ -79,7 +80,7 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
 
 class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
     serializer_class = BroadcastWithStatisticsSerializer
 
     class Pagination(LimitOffsetPagination):
@@ -119,7 +120,7 @@ class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
 
 class InternalBroadcastStatisticMontlyEndpoint(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def get(self, request, *args, **kwargs):
         project_uuid = request.query_params.get("project_uuid")
