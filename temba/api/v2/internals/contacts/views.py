@@ -27,6 +27,7 @@ from temba.api.v2.internals.contacts.serializers import (
     InternalContactFieldsValuesSerializer,
     InternalContactSerializer,
 )
+from temba.api.v2.internals.org_permission import IsUserInOrg
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.serializers import (
     ContactFieldReadSerializer,
@@ -257,7 +258,7 @@ class ContactsWithMessagesView(APIViewMixin, APIView):
 
 class InternalContactGroupsView(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def get(self, request: Request):
         """
