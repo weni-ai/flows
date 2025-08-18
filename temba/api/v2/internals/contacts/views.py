@@ -16,6 +16,7 @@ from django.contrib.auth import get_user_model
 from django.core import exceptions as django_exceptions
 from django.core.exceptions import ValidationError
 
+from temba.api.v2.internals.org_permission import IsUserInOrg
 from temba.api.v2.internals.contacts.serializers import (
     InternalContactFieldsValuesSerializer,
     InternalContactSerializer,
@@ -151,7 +152,7 @@ class ContactHasOpenTicketView(APIViewMixin, APIView):
 class ContactsImportUploadView(APIViewMixin, APIView):
     parser_classes = [MultiPartParser, FormParser]
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def post(self, request, *args, **kwargs):
         project_uuid = request.data.get("project")
