@@ -4,10 +4,10 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
-from weni.internal.permissions import CanCommunicateInternally
 
 from django.conf import settings
 
+from temba.api.v2.internals.org_permission import IsUserInOrg
 from temba.api.v2.internals.channels.serializers import ChannelProjectSerializer
 from temba.api.v2.internals.views import APIViewMixin
 from temba.channels.models import Channel
@@ -54,7 +54,7 @@ class ChannelProjectView(APIViewMixin, APIView):
 
 class InternalChannelView(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def get(self, request: Request):
         params = request.query_params
