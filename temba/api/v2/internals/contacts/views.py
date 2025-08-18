@@ -30,7 +30,7 @@ from temba.api.v2.serializers import (
     ContactGroupWriteSerializer,
 )
 from temba.api.v2.validators import LambdaURLValidator
-from temba.contacts.models import Contact, ContactField, ContactURN
+from temba.contacts.models import Contact, ContactField, ContactGroup, ContactURN
 from temba.msgs.models import Broadcast, Msg
 from temba.orgs.models import Org
 from temba.tickets.models import Ticket
@@ -249,6 +249,35 @@ class ContactsWithMessagesView(APIViewMixin, APIView):
 class InternalContactGroupsView(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
     permission_classes = [IsAuthenticated, CanCommunicateInternally]
+
+    def get(self, request: Request):
+        """
+        Get all contact groups from an organization (org) from the project_uuid.
+        """
+        project_uuid = request.query_params.get("project_uuid")
+        if not project_uuid:
+            return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except (Org.DoesNotExist, django_exceptions.ValidationError):
+            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        groups = ContactGroup.user_groups.filter(org=org, is_active=True)
+        results = []
+        for group in groups:
+            results.append(
+                {
+                    "id": group.id,
+                    "uuid": str(group.uuid),
+                    "name": group.name,
+                    "status": group.status,
+                    "group_type": group.group_type,
+                    "query": group.query,
+                    "member_count": group.get_member_count(),
+                }
+            )
+        return Response({"results": results})
 
     def post(self, request, *args, **kwargs):
         name = request.data.get("name")

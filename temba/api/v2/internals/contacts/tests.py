@@ -561,3 +561,56 @@ class ContactsWithMessagesViewTest(TembaTest):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()["results"] if "results" in resp.json() else resp.json()
         self.assertEqual(len(data), 0)
+class InternalContactGroupsViewTest(TembaTest):
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.permission_classes", [])
+    def test_get_groups_success(self):
+        # Cria grupos
+        contact1 = self.create_contact("Alice")
+        contact2 = self.create_contact("Bob")
+        group1 = self.create_group("Group 1", contacts=[contact1, contact2])
+        group2 = self.create_group("Group 2")
+        group3 = self.create_group("Group 3", contacts=[contact1])
+
+        url = f"/api/v2/internals/contact_groups?project={self.org.proj_uuid}"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("results", data)
+        results = data["results"]
+        # Should return all created groups
+        group_uuids = {str(group1.uuid), str(group2.uuid), str(group3.uuid)}
+        self.assertEqual(set(r["uuid"] for r in results), group_uuids)
+        # Check main fields
+        for r in results:
+            self.assertIn("id", r)
+            self.assertIn("uuid", r)
+            self.assertIn("name", r)
+            self.assertIn("status", r)
+            self.assertIn("group_type", r)
+            self.assertIn("query", r)
+            self.assertIn("member_count", r)
+        # Check member_count
+        for r in results:
+            if r["uuid"] == str(group1.uuid):
+                self.assertEqual(r["member_count"], 2)
+            elif r["uuid"] == str(group2.uuid):
+                self.assertEqual(r["member_count"], 0)
+            elif r["uuid"] == str(group3.uuid):
+                self.assertEqual(r["member_count"], 1)
+
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.permission_classes", [])
+    def test_get_groups_no_project(self):
+        url = "/api/v2/internals/contact_groups"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"error": "Project not provided"})
+
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.permission_classes", [])
+    def test_get_groups_project_not_found(self):
+        url = "/api/v2/internals/contact_groups?project=00000000-0000-0000-0000-000000000000"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"error": "Project not found"})
