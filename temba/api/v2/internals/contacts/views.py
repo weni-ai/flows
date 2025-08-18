@@ -21,6 +21,7 @@ from django.db import models
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
+from temba.api.v2.internals.org_permission import IsUserInOrg
 from temba.api.v2.internals.contacts.serializers import (
     ContactWithMessagesListSerializer,
     InternalContactFieldsValuesSerializer,
@@ -343,7 +344,7 @@ class InternalContactGroupsView(APIViewMixin, APIView):
 class ContactsImportUploadView(APIViewMixin, APIView):
     parser_classes = [MultiPartParser, FormParser]
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def post(self, request, *args, **kwargs):
         project_uuid = request.data.get("project")
