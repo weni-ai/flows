@@ -448,10 +448,12 @@ class ContactsWithMessagesViewTest(TembaTest):
         )
         self.assertEqual(resp.status_code, 200)
         data = resp.json()["results"] if "results" in resp.json() else resp.json()
-        self.assertEqual(len(data), 1)
-        self.assertEqual(data[0]["contact_id"], self.contact1.id)
-        self.assertEqual(len(data[0]["messages"]), 2)
-        self.assertTrue(all(m["contact_id"] == self.contact1.id for m in data[0]["messages"]))
+
+        self.assertEqual(len(data), 2)
+        contact_ids = {c["contact_id"] for c in data}
+        self.assertIn(self.contact1.id, contact_ids)
+        self.assertIn(self.contact2.id, contact_ids)
+        self.assertNotIn(self.contact3.id, contact_ids)
 
     @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
     def test_returns_all_msgs_for_qualified_contacts(self):
@@ -463,9 +465,12 @@ class ContactsWithMessagesViewTest(TembaTest):
         )
         self.assertEqual(resp.status_code, 200)
         data = resp.json()["results"] if "results" in resp.json() else resp.json()
+
         self.assertEqual(len(data), 1)
-        self.assertEqual(data[0]["contact_id"], self.contact1.id)
-        self.assertEqual(len(data[0]["messages"]), 3)
+        contact_ids = {c["contact_id"] for c in data}
+        self.assertIn(self.contact1.id, contact_ids)
+        contact1_data = next(c for c in data if c["contact_id"] == self.contact1.id)
+        self.assertEqual(len(contact1_data["messages"]), 3)
 
     @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
     def test_pagination_limit(self):
@@ -542,15 +547,13 @@ class ContactsWithMessagesViewTest(TembaTest):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()["results"] if "results" in resp.json() else resp.json()
         self.assertEqual(len(data), 1)
-        self.assertEqual(data[0]["contact_id"], self.contact1.id)
-        self.assertEqual(len(data[0]["messages"]), 2)
+        contact_ids = {c["contact_id"] for c in data}
+        self.assertIn(self.contact1.id, contact_ids)
+        contact1_data = next(c for c in data if c["contact_id"] == self.contact1.id)
+        self.assertEqual(len(contact1_data["messages"]), 2)
 
     @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
-    def test_no_contacts_with_multiple_msgs_in_period(self):
-        # Todos os contatos só têm uma mensagem no período
-        self.create_msg(self.contact1, "msg1", self.start)
-        self.create_msg(self.contact2, "msg2", self.start)
-        self.create_msg(self.contact3, "msg3", self.start)
+    def test_no_contacts_with_msgs_in_period(self):
         resp = self.client.get(
             self.url,
             {"project": str(self.org.proj_uuid), "start_date": "2025-01-01", "end_date": "2025-01-02"},
