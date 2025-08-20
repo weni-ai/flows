@@ -1408,6 +1408,8 @@ INTELLIGENCES_TOKEN = os.environ.get("INTELLIGENCES_TOKEN", default="")
 # Nexus url
 NEXUS_BASE_URL = os.environ.get("NEXUS_BASE_URL", default="https://nexus.dev.cloud.weni.ai")
 
+BILLING_BASE_URL = os.environ.get("BILLING_BASE_URL", default="https://billing.stg.cloud.weni.ai")
+
 FLOWEDITOR_SENTRY_DSN = os.environ.get("FLOWEDITOR_SENTRY_DSN", default="")
 
 INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
