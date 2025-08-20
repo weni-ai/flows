@@ -22,8 +22,13 @@ class BillingInternalClient(BaseInternalClient):
         base_url = base_url or getattr(settings, "BILLING_BASE_URL", None)
         super().__init__(base_url=base_url, authenticator=authenticator)
 
-    def get_pricing(self):
-        response = requests.get(self.get_url("/api/v1/meta-pricing/"), headers=self.authenticator.headers, timeout=10)
+    def get_pricing(self, project=None):
+        params = {}
+        if project:
+            params["project"] = project
+        response = requests.get(
+            self.get_url("/api/v1/meta-pricing/"), headers=self.authenticator.headers, params=params, timeout=10
+        )
         response.raise_for_status()
         return response.json()
 
@@ -36,17 +41,18 @@ def get_template_price_and_currency_from_api(template_id=None):
     """
     try:
         client = BillingInternalClient()
-        data = client.get_pricing()
         template_price = 0
-        currency = data.get("currency", "BRL")
         if template_id:
             try:
                 template = Template.objects.get(pk=template_id)
+                project_uuid = template.org.proj_uuid
+                data = client.get_pricing(project=project_uuid)
+                currency = data.get("currency", "BRL")
                 category = template.category
                 if category not in CATEGORY_TO_BILLING_FIELD:
                     logger.warning(f"Category {category} not mapped to billing. Using 'marketing' as fallback.")
                 billing_field = CATEGORY_TO_BILLING_FIELD.get(category, "marketing")
-                template_price = float(data.get(billing_field, 0))
+                template_price = float(data.get("rates", {}).get(billing_field, 0))
             except Template.DoesNotExist:
                 template_price = float(data.get("marketing", 0))
         else:

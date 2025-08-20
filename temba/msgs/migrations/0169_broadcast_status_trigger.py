@@ -34,7 +34,8 @@ BEGIN
         -- Increment the processed field if status changed to 'Q'
         IF NEW.status = 'Q' THEN
             UPDATE msgs_broadcaststatistics
-            SET processed = processed + 1
+            SET processed = processed + 1,
+                modified_on = NOW()
             WHERE broadcast_id = NEW.broadcast_id;
         END IF;
 
