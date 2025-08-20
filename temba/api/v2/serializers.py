@@ -322,6 +322,8 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 raise serializers.ValidationError(
                     "Queue must be either wpp_broadcast_batch, template_batch or template_notification_batch"
                 )
+        
+        data["template_id"] = data["msg"].get("template_id")
 
         return data
 
@@ -337,6 +339,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
 
         try:
             template = self._get_template(uuid=uuid, name=name, org=self.context.get("org"))
+            template_id = template.id
 
             data["msg"]["template"] = {
                 "name": template.name,
@@ -345,7 +348,10 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 "locale": template_data.get("locale", None),
             }
 
+            data["msg"]["template_id"] = template_id
+
         except Template.DoesNotExist:
+            data["msg"]["template_id"] = None
             if uuid:
                 raise serializers.ValidationError(f"Template with UUID {uuid} not found.")
             raise serializers.ValidationError(f"Template with name {name} not found.")
@@ -361,6 +367,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         Create a new whatsapp broadcast to send out
         """
 
+        print(self.validated_data.get("template_id", None))
         # create the broadcast
         broadcast = Broadcast.create(
             self.context["org"],

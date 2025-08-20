@@ -40,6 +40,7 @@ class BroadcastWithStatisticsSerializer(serializers.ModelSerializer):
     statistics = serializers.SerializerMethodField()
     template = serializers.SerializerMethodField()
     created_by = serializers.SerializerMethodField()
+    groups = fields.ContactGroupField(many=True)
 
     class Meta:
         model = Broadcast
@@ -66,11 +67,11 @@ class BroadcastWithStatisticsSerializer(serializers.ModelSerializer):
             "delivered": stat.delivered if stat else 0,
             "failed": stat.failed if stat else 0,
             "contact_count": stat.contact_count if stat else 0,
+            "read": stat.read if stat else 0,
+            "cost": stat.cost if stat else 0,
+            "currency": stat.currency if stat else "BRL",
+            "template_price": stat.template_price if stat else 0,
         }
-
-    def get_groups(self, obj):
-        groups = obj.user_groups.all()
-        return [g.name for g in groups]
 
     def get_template(self, obj):
         if not obj.template_id:
