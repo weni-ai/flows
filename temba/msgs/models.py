@@ -345,6 +345,8 @@ class BroadcastStatistics(models.Model):
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     template_price = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
     currency = models.CharField(max_length=20, null=True, blank=True)
+    created_on = models.DateTimeField(default=timezone.now, db_index=True)
+    modified_on = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return (
