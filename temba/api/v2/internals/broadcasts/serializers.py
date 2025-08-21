@@ -71,6 +71,8 @@ class BroadcastWithStatisticsSerializer(serializers.ModelSerializer):
             "cost": stat.cost if stat else 0,
             "currency": stat.currency if stat else "BRL",
             "template_price": stat.template_price if stat else 0,
+            "created_on": stat.created_on if stat else None,
+            "modified_on": stat.modified_on if stat else None,
         }
 
     def get_template(self, obj):
