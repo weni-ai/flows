@@ -165,6 +165,8 @@ def update_local_templates(channel, templates_data, unique=False):
         status = STATUS_MAPPING[template_status]
 
         content_parts = []
+        body_text = None
+        footer_text = None
 
         all_supported = True
         for component in template["components"]:
@@ -176,6 +178,12 @@ def update_local_templates(channel, templates_data, unique=False):
 
             if component["type"] in ["HEADER", "FOOTER"] and _calculate_variable_count(component["text"]):
                 all_supported = False
+
+            # collect component texts
+            if component["type"] == "BODY":
+                body_text = component.get("text")
+            elif component["type"] == "FOOTER":
+                footer_text = component.get("text")
 
             content_parts.append(component["text"])
 
@@ -204,6 +212,8 @@ def update_local_templates(channel, templates_data, unique=False):
             external_id=template.get("id", missing_external_id),
             namespace=template.get("namespace", channel_namespace),
             category=template["category"],
+            body=body_text,
+            footer=footer_text,
         )
 
         for component in template["components"]:
