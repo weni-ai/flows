@@ -7,9 +7,9 @@ from weni.internal.authenticators import InternalOIDCAuthentication
 
 from django.conf import settings
 
-from temba.api.v2.internals.org_permission import IsUserInOrg
 from temba.api.v2.internals.channels.serializers import ChannelProjectSerializer
 from temba.api.v2.internals.views import APIViewMixin
+from temba.api.v2.permissions import IsUserInOrg
 from temba.channels.models import Channel
 from temba.orgs.models import Org
 
