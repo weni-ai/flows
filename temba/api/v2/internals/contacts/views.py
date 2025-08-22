@@ -21,7 +21,6 @@ from django.db import models
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
-from temba.api.v2.internals.org_permission import IsUserInOrg
 from temba.api.v2.internals.contacts.serializers import (
     ContactWithMessagesListSerializer,
     InternalContactFieldsValuesSerializer,
@@ -84,7 +83,7 @@ class InternalContactView(APIViewMixin, APIView):
 
 class InternalContactFieldsEndpoint(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, (CanCommunicateInternally | IsUserInOrg)]
+    permission_classes = [IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)]
 
     def get(self, request, *args, **kwargs):
         query_params = request.query_params
