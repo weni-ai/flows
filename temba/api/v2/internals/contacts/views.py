@@ -1,13 +1,10 @@
+import datetime as dt
 import logging
 
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
-from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-import datetime as dt
-
-from rest_framework import status
-from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
 from rest_framework.pagination import CursorPagination
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.request import Request
@@ -24,18 +21,17 @@ from django.db import models
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
-from temba.api.v2.internals.org_permission import IsUserInOrg
 from temba.api.v2.internals.contacts.serializers import (
     ContactWithMessagesListSerializer,
     InternalContactFieldsValuesSerializer,
     InternalContactSerializer,
 )
 from temba.api.v2.internals.views import APIViewMixin
+from temba.api.v2.permissions import IsUserInOrg
 from temba.api.v2.serializers import ContactFieldReadSerializer, ContactFieldWriteSerializer
 from temba.api.v2.validators import LambdaURLValidator
 from temba.contacts.models import Contact, ContactField, ContactImport, ContactURN
 from temba.contacts.views import ContactImportCRUDL
-from temba.contacts.models import Contact, ContactField, ContactURN
 from temba.msgs.models import Msg
 from temba.orgs.models import Org
 from temba.tickets.models import Ticket
@@ -83,7 +79,7 @@ class InternalContactView(APIViewMixin, APIView):
 
 class InternalContactFieldsEndpoint(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    permission_classes = [IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)]
 
     def get(self, request, *args, **kwargs):
         query_params = request.query_params
@@ -230,7 +226,7 @@ class ContactsImportUploadView(APIViewMixin, APIView):
 
 class ContactsImportConfirmView(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
     parser_classes = [JSONParser]
 
     def post(self, request, import_id=None):
@@ -273,6 +269,8 @@ class ContactsImportConfirmView(APIViewMixin, APIView):
         # Trigger the import task (asynchronous)
         obj.start_async()
         return Response({"success": True, "import_id": obj.id}, status=200)
+
+
 # Service function for business logic
 class ContactsWithMessagesService:
     @staticmethod
