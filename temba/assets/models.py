@@ -1,9 +1,12 @@
 import os
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.urls import reverse
 from django.utils.text import slugify
+
+from temba.utils.s3 import presigned
 
 ASSET_STORES_BY_KEY = {}
 ASSET_STORES_BY_MODEL = {}
@@ -25,9 +28,8 @@ class AssetException(Exception):
 
 class AssetAccessDenied(AssetException):
     """
-    User does not have permission to access the given asset
+    User does not have permission to access the asset
     """
-
     pass
 
 
@@ -35,7 +37,6 @@ class AssetEntityNotFound(AssetException):
     """
     Database entity associated with the asset could not be found
     """
-
     pass
 
 
@@ -43,7 +44,6 @@ class AssetFileNotFound(AssetException):
     """
     Asset file could not be found
     """
-
     pass
 
 
@@ -80,15 +80,12 @@ class BaseAssetStore:
         remainder, extension = path.rsplit(".", 1)
         filename = f"{self.key}_{pk}_{slugify(asset.org.name)}.{extension}"
 
-        # if our storage backend is S3
-        if settings.DEFAULT_FILE_STORAGE == "storages.backends.s3boto3.S3Boto3Storage":  # pragma: needs cover
-            url = default_storage.url(
-                path, parameters=dict(ResponseContentDisposition=f"attachment;filename={filename}"), http_method="GET"
-            )
-
-        # otherwise, let the backend generate the URL
-        else:
-            url = default_storage.url(path)
+        # Generate presigned URL with appropriate headers for download
+        url = presigned.generate_presigned_url(
+            path=path,
+            response_headers=presigned.get_download_headers(filename),
+            expires_in=3600  # 1 hour
+        )
 
         return asset, url, filename
 
