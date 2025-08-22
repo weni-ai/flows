@@ -84,11 +84,11 @@ class InternalContactView(APIViewMixin, APIView):
 
 class InternalContactFieldsEndpoint(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    permission_classes = [IsAuthenticated, (CanCommunicateInternally | IsUserInOrg)]
 
     def get(self, request, *args, **kwargs):
         query_params = request.query_params
-        project_uuid = query_params.get("project")
+        project_uuid = query_params.get("project") or query_params.get("project_uuid")
         key = query_params.get("key")
 
         if not project_uuid:
@@ -336,7 +336,7 @@ class ContactsImportUploadView(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def post(self, request, *args, **kwargs):
-        project_uuid = request.data.get("project")
+        project_uuid = request.data.get("project_uuid")
         file = request.FILES.get("file")
         if not project_uuid or not file:
             return Response({"error": "Project and file are required."}, status=400)
@@ -400,10 +400,13 @@ class ContactsImportUploadView(APIViewMixin, APIView):
 
 class ContactsImportConfirmView(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
     parser_classes = [JSONParser]
 
     def post(self, request, import_id=None):
+        project_uuid = request.data.get("project_uuid")
+        if not project_uuid:
+            return Response({"error": "Project is required."}, status=400)
         if not import_id:
             return Response({"error": "import_id is required in URL."}, status=400)
         try:

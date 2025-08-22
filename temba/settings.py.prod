@@ -276,7 +276,6 @@ LOGGING = {
         # OIDC
         "mozilla_django_oidc": {"level": "DEBUG", "handlers": ["console"], "propagate": False},
         "weni_django_oidc": {"level": "DEBUG", "handlers": ["console"], "propagate": False},
-        "apitoken_logger": {"level": "INFO","handlers": ["console"],"propagate": False},
     },
 }
 

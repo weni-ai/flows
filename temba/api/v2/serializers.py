@@ -316,7 +316,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             template = data["msg"]["template"]
             if not channel.template_translations.filter(template__uuid=template["uuid"]).exists():
                 raise serializers.ValidationError(f"Template {template['uuid']} not found in channel {channel.uuid}")
-            
+
         data["template_id"] = data["msg"].get("template_id")
 
         if data.get("queue"):
