@@ -112,18 +112,22 @@ class Archive(models.Model):
 
     def get_download_link(self):
         if self.url:
-            s3_client = s3.client()
             bucket, key = self.get_storage_location()
-            s3_params = {
-                "Bucket": bucket,
-                "Key": key,
-                # force browser to download and not uncompress our gzipped files
-                "ResponseContentDisposition": "attachment;",
-                "ResponseContentType": "application/octet",
-                "ResponseContentEncoding": "none",
-            }
-
-            return s3_client.generate_presigned_url("get_object", Params=s3_params, ExpiresIn=Archive.DOWNLOAD_EXPIRES)
+            
+            # Use our presigned URL module with appropriate headers
+            from temba.utils.s3 import presigned
+            
+            headers = presigned.get_download_headers(
+                filename=self.filename,
+                content_type="application/octet"
+            )
+            headers["ContentEncoding"] = "none"  # force browser to not uncompress
+            
+            return presigned.generate_presigned_url(
+                path=key,
+                expires_in=self.DOWNLOAD_EXPIRES,
+                response_headers=headers
+            )
         else:
             return ""
 
