@@ -1,3 +1,44 @@
+3.37.1
+----------
+* Update weni-rp-apps version to 2.10.3
+* Remove filter to get only contacts with more than one message in get contacts message api
+
+3.37.0
+----------
+* Endpoint to get contacts with more than one message related
+
+3.36.0
+----------
+* Add queue field to WhatsappBroadcastWriteSerializer
+
+3.35.10
+----------
+* Fix: LeadSubmitted event name in Meta Conversion API
+
+3.35.9
+----------
+* Add logger to see API token and user
+
+3.35.8
+----------
+* Update floweditor to 3.6.2
+
+3.35.7
+----------
+* Add internal endpoint to check if contact has open ticket by URN as parameter
+
+3.35.6
+----------
+* Schedule task squash_flow_category_counts
+
+3.35.5
+----------
+* Change CAPI endpoint authentication to JWT
+
+3.35.4
+----------
+* Move squash FlowCategoryCount to a new task 
+
 3.35.3
 ----------
 * Update weni-datalake-sdk version to 0.4.0

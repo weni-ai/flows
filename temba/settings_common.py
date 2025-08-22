@@ -3,6 +3,7 @@ import socket
 import sys
 import urllib
 from datetime import timedelta
+from pathlib import Path
 
 import iptools
 import sentry_sdk
@@ -1098,6 +1099,7 @@ CELERY_BEAT_SCHEDULE = {
     "trim-webhook-event": {"task": "trim_webhook_event_task", "schedule": crontab(hour=3, minute=0)},
     "update-org-activity": {"task": "update_org_activity_task", "schedule": crontab(hour=3, minute=5)},
     "refresh-teams-tokens": {"task": "refresh_teams_tokens", "schedule": crontab(hour=8, minute=0)},
+    "squash-flow-category-counts": {"task": "squash_flow_category_counts", "schedule": timedelta(seconds=60)},
 }
 
 # -----------------------------------------------------------------------------------
@@ -1348,7 +1350,7 @@ IP_ADDRESSES = ("172.16.10.10", "162.16.10.20")
 # -----------------------------------------------------------------------------------
 # Data model limits
 # -----------------------------------------------------------------------------------
-MSG_FIELD_SIZE = os.environ.get("MSG_FIELD_SIZE", 640)  # used for broadcast text and message campaign events
+MSG_FIELD_SIZE = os.environ.get("MSG_FIELD_SIZE", 1500)  # used for broadcast text and message campaign events
 FLOW_START_PARAMS_SIZE = 256  # used for params passed to flow start API endpoint
 GLOBAL_VALUE_SIZE = 10_000  # max length of global values
 
@@ -1417,3 +1419,15 @@ EVENTS_METRIC_NAME = os.environ.get("EVENTS_METRIC_NAME", default="")
 REDSHIFT_QUERY_BASE_URL = os.environ.get("REDSHIFT_QUERY_BASE_URL", default="")
 REDSHIFT_SECRET = os.environ.get("REDSHIFT_SECRET", default="")
 REDSHIFT_ROLE_ARN = os.environ.get("REDSHIFT_ROLE_ARN", default="")
+
+# Path to the JWT public key
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+JWT_PUBLIC_KEY_PATH = BASE_DIR / "temba" / "jwt_public_key.pem"
+
+# The public key is loaded a single time at application startup.
+try:
+    with open(JWT_PUBLIC_KEY_PATH, "rb") as f:
+        JWT_PUBLIC_KEY = f.read()
+except FileNotFoundError:
+    JWT_PUBLIC_KEY = None
