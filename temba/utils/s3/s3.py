@@ -2,35 +2,70 @@ from typing import Iterable
 from urllib.parse import urlparse
 
 import boto3
-from botocore.client import Config
+from botocore.config import Config
 
 from django.core.files.storage import DefaultStorage
+from django.conf import settings
 
 from temba.utils import json
+from . import presigned
 
 
 class PublicFileStorage(DefaultStorage):
-    default_acl = "public-read"
+    default_acl = "private"  # Changed from public-read to private
+    
+    def url(self, name, parameters=None, http_method=None, expires_in=3600):
+        """
+        Generate a presigned URL for the file.
+        
+        Args:
+            name: Name of the file in storage
+            parameters: Optional dict of response parameters
+            http_method: HTTP method to allow (default: GET)
+            expires_in: Seconds until URL expires (default: 1 hour)
+            
+        Returns:
+            str: Presigned URL for the file
+        """
+        return presigned.generate_presigned_url(
+            path=name,
+            expires_in=expires_in,
+            response_headers=parameters,
+            http_method=http_method or "GET"
+        )
 
 
 public_file_storage = PublicFileStorage()
-public_file_storage.default_acl = "public-read"
+public_file_storage.default_acl = "private"  # Changed from public-read to private
 
 _s3_client = None
 
 
 def client():  # pragma: no cover
     """
-    Returns our shared S3 client
+    Returns our shared S3 client using pod IAM role credentials or explicit credentials if provided
     """
-    from django.conf import settings
-
     global _s3_client
     if not _s3_client:
-        session = boto3.Session(
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID, aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
-        )
-        _s3_client = session.client("s3", config=Config(retries={"max_attempts": 3}))
+        # Configure session with explicit credentials if provided, otherwise use pod IAM role
+        session_kwargs = {}
+        if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
+            session_kwargs.update({
+                "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+                "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY
+            })
+        
+        session = boto3.Session(**session_kwargs)
+        
+        # Configure the client with retries and endpoint if specified
+        client_config = Config(retries={"max_attempts": 3})
+        client_kwargs = {"config": client_config}
+        
+        # Add custom endpoint if configured (useful for testing or non-AWS S3)
+        if getattr(settings, "AWS_S3_ENDPOINT_URL", None):
+            client_kwargs["endpoint_url"] = settings.AWS_S3_ENDPOINT_URL
+            
+        _s3_client = session.client("s3", **client_kwargs)
 
     return _s3_client
 
@@ -51,9 +86,8 @@ def get_body(url):
     Given an S3 URL, downloads the object and returns the read body
     """
     bucket, key = split_url(url)
-
-    obj = client().get_object(Bucket=bucket, Key=key)
-    return obj["Body"].read()
+    s3_obj = client().get_object(Bucket=bucket, Key=key)
+    return s3_obj["Body"].read()
 
 
 class EventStreamReader:

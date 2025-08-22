@@ -759,11 +759,24 @@ class FlowCRUDL(SmartCRUDL):
             return obj
 
     class UploadActionRecording(OrgObjPermsMixin, SmartUpdateView):
+        MEDIA_EXPIRES = 60 * 60 * 24 * 7  # 7 days
+
         def post(self, request, *args, **kwargs):  # pragma: needs cover
             path = self.save_recording_upload(
                 self.request.FILES["file"], self.request.POST.get("actionset"), self.request.POST.get("action")
             )
-            return JsonResponse(dict(path=path))
+            
+            # Generate presigned URL for the uploaded file
+            from temba.utils.s3 import presigned
+            url = presigned.generate_presigned_url(
+                path=path,
+                expires_in=self.MEDIA_EXPIRES,  # 7 days
+                response_headers=presigned.get_download_headers(
+                    filename=self.request.FILES["file"].name,
+                    content_type="audio/wav"
+                )
+            )
+            return JsonResponse(dict(path=url))
 
         def save_recording_upload(self, file, actionset_id, action_uuid):  # pragma: needs cover
             flow = self.get_object()
@@ -773,6 +786,7 @@ class FlowCRUDL(SmartCRUDL):
 
     class UploadMediaAction(OrgObjPermsMixin, SmartUpdateView):
         slug_url_kwarg = "uuid"
+        MEDIA_EXPIRES = 60 * 60 * 24 * 7  # 7 days
 
         def post(self, request, *args, **kwargs):
             return JsonResponse(self.save_media_upload(self.request.FILES["file"]))
@@ -786,10 +800,21 @@ class FlowCRUDL(SmartCRUDL):
             if extension == "m4a":
                 file.content_type = "audio/mp4"
 
-            url = public_file_storage.save(
+            path = public_file_storage.save(
                 "attachments/%d/%d/steps/%s/%s" % (flow.org.pk, flow.id, random_uuid_folder_name, file.name), file
             )
-            return {"type": file.content_type, "url": f"{settings.STORAGE_URL}/{url}"}
+            
+            # Generate presigned URL for the uploaded file
+            from temba.utils.s3 import presigned
+            url = presigned.generate_presigned_url(
+                path=path,
+                expires_in=self.MEDIA_EXPIRES,  # 7 days
+                response_headers=presigned.get_download_headers(
+                    filename=file.name,
+                    content_type=file.content_type
+                )
+            )
+            return {"type": file.content_type, "url": url}
 
     class BaseList(SpaMixin, OrgFilterMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
         title = _("Flows")
