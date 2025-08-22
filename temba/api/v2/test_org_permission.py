@@ -36,3 +36,5 @@ class IsUserInOrgPermissionTests(TembaTest):
     def test_allows_when_user_in_org_with_body_project_uuid(self):
         request = SimpleNamespace(query_params={}, data={"project_uuid": str(self.org.proj_uuid)}, user=self.user)
         self.assertTrue(self.permission.has_permission(request, view=object()))
+
+
