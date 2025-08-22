@@ -324,6 +324,9 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 raise serializers.ValidationError(
                     "Queue must be either wpp_broadcast_batch, template_batch or template_notification_batch"
                 )
+            if data.get("queue") == "template_batch":
+                if not data.get("name"):
+                    raise serializers.ValidationError("Name is required for template_batch queue")
 
         return data
 
