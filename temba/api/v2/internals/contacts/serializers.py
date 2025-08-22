@@ -59,3 +59,14 @@ class InternalContactFieldsValuesSerializer(serializers.Serializer):
         contact.modify(user, mods)
 
         return instance
+
+
+class ContactWithMessageSerializer(serializers.Serializer):
+    contact_id = serializers.IntegerField()
+    msg_text = serializers.CharField()
+    msg_created_on = serializers.DateTimeField()
+
+
+class ContactWithMessagesListSerializer(serializers.Serializer):
+    contact_id = serializers.IntegerField()
+    messages = ContactWithMessageSerializer(many=True)
