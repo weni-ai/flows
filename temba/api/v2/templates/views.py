@@ -6,7 +6,8 @@ from weni.internal.permissions import CanCommunicateInternally
 
 from django.db.models import F
 
-from temba.api.v2.permissions import IsUserInOrg
+
+from temba.api.v2.internals.org_permission import IsUserInOrg
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.views_base import CreatedOnCursorPagination
 from temba.orgs.models import Org
