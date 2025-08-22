@@ -37,4 +37,8 @@ class IsUserInOrgPermissionTests(TembaTest):
         request = SimpleNamespace(query_params={}, data={"project_uuid": str(self.org.proj_uuid)}, user=self.user)
         self.assertTrue(self.permission.has_permission(request, view=object()))
 
-
+    def test_denies_when_user_email_not_found(self):
+        # simulate a request with an email that doesn't exist in the auth user table
+        ghost_user = SimpleNamespace(email="ghost.user.notfound@example.com")
+        request = SimpleNamespace(query_params={"project": str(self.org.proj_uuid)}, data={}, user=ghost_user)
+        self.assertFalse(self.permission.has_permission(request, view=object()))
