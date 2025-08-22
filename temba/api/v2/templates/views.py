@@ -6,7 +6,7 @@ from weni.internal.permissions import CanCommunicateInternally
 
 from django.db.models import F
 
-from temba.api.v2.internals.org_permission import IsUserInOrg
+from temba.api.v2.permissions import IsUserInOrg
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.views_base import CreatedOnCursorPagination
 from temba.orgs.models import Org
@@ -21,6 +21,7 @@ class TemplatesTranslationsEndpoint(APIViewMixin, APIView):
     Each item includes header/body/footer/buttons.
     Query params:
       - project_uuid: required
+      - category: optional template category filter (e.g. MARKETING, marketing)
       - limit: optional page size
       - cursor: optional cursor for pagination
     """
@@ -50,6 +51,11 @@ class TemplatesTranslationsEndpoint(APIViewMixin, APIView):
             .annotate(sort_on=F("template__modified_on"))
             .order_by("-sort_on", "-id")
         )
+
+        # optional filter by template category (accepts either display or enum casing)
+        category = request.query_params.get("category")
+        if category:
+            queryset = queryset.filter(template__category=category.upper())
 
         pagination = self.Pagination()
         page = pagination.paginate_queryset(queryset, request, self)
