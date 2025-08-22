@@ -1,3 +1,12 @@
+3.37.1
+----------
+* Update weni-rp-apps version to 2.10.3
+* Remove filter to get only contacts with more than one message in get contacts message api
+
+3.37.0
+----------
+* Endpoint to get contacts with more than one message related
+
 3.36.0
 ----------
 * Add queue field to WhatsappBroadcastWriteSerializer
