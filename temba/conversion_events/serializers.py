@@ -9,7 +9,7 @@ class ConversionEventSerializer(serializers.Serializer):
     """
 
     EVENT_TYPE_CHOICES = [
-        ("lead", "Lead"),
+        ("lead", "LeadSubmitted"),
         ("purchase", "Purchase"),
     ]
 

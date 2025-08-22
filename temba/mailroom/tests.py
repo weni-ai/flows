@@ -599,6 +599,7 @@ class MailroomQueueTest(TembaTest):
             broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
             msg={"text": "Sending a whatsapp text"},
             channel=channel,
+            queue="wpp_broadcast_batch",
         )
 
         bcast.send_async()
@@ -617,6 +618,7 @@ class MailroomQueueTest(TembaTest):
                     "org_id": self.org.id,
                     "msg": {"text": "Sending a whatsapp text"},
                     "channel_id": channel.id,
+                    "queue": "wpp_broadcast_batch",
                 },
                 "queued_on": matchers.ISODate(),
             },
