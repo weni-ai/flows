@@ -149,11 +149,9 @@ class InternalChannelViewTest(TembaTest):
         from temba.channels.models import Channel
 
         Channel.objects.all().delete()
-        # Canal normal
         channel = self.create_channel("TG", "Test Channel", "test", org=self.org)
         channel.is_active = True
         channel.save()
-        # Canal WAC
         channel_wac = self.create_channel(
             "WAC",
             "Test WAC Channel",
@@ -168,11 +166,10 @@ class InternalChannelViewTest(TembaTest):
         data = response.json()
         self.assertIn("results", data)
         self.assertEqual(len(data["results"]), 2)
-        # Verifica canal normal
+
         normal = next(c for c in data["results"] if c["uuid"] == str(channel.uuid))
         self.assertEqual(normal["channel_type"], "TG")
         self.assertEqual(normal["name"], "Test Channel")
-        # Verifica canal WAC
         wac = next(c for c in data["results"] if c["uuid"] == str(channel_wac.uuid))
         self.assertEqual(wac["channel_type"], "WAC")
         self.assertEqual(wac["name"], "Test WAC Channel")
