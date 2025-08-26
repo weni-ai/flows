@@ -1,5 +1,4 @@
 import os
-from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.files.storage import default_storage
