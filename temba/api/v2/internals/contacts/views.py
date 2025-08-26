@@ -23,14 +23,15 @@ from temba.api.v2.internals.contacts.serializers import (
     InternalContactFieldsValuesSerializer,
     InternalContactSerializer,
 )
-from temba.api.v2.internals.org_permission import IsUserInOrg
 from temba.api.v2.internals.views import APIViewMixin
+from temba.api.v2.permissions import IsUserInOrg
 from temba.api.v2.serializers import (
     ContactFieldReadSerializer,
     ContactFieldWriteSerializer,
     ContactGroupWriteSerializer,
 )
 from temba.api.v2.validators import LambdaURLValidator
+from temba.api.v2.views_base import DefaultLimitOffsetPagination
 from temba.contacts.models import Contact, ContactField, ContactGroup, ContactURN
 from temba.msgs.models import Broadcast, Msg
 from temba.orgs.models import Org
@@ -158,8 +159,10 @@ class InternalContactGroupsView(APIViewMixin, APIView):
             return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
         groups = ContactGroup.user_groups.filter(org=org, is_active=True)
+        paginator = DefaultLimitOffsetPagination()
+        page = paginator.paginate_queryset(groups, request, view=self)
         results = []
-        for group in groups:
+        for group in page:
             results.append(
                 {
                     "id": group.id,
@@ -171,7 +174,7 @@ class InternalContactGroupsView(APIViewMixin, APIView):
                     "member_count": group.get_member_count(),
                 }
             )
-        return Response({"results": results})
+        return paginator.get_paginated_response(results)
 
     def post(self, request, *args, **kwargs):
         name = request.data.get("name")
