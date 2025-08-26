@@ -204,10 +204,10 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
 
             # Start with all payload data in metadata
             metadata = payload.copy() if payload else {}
-            
+
             # Add required fields to metadata
             metadata["channel"] = str(channel_uuid)
-            
+
             # Add CTWA ID only if available
             if ctwa_data:
                 metadata["ctwa_id"] = ctwa_data.ctwa_clid
