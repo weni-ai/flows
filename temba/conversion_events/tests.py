@@ -167,7 +167,7 @@ class ConversionEventAPITest(TembaTest):
                 "custom_field": "custom_value",
                 "order_form_id": "12345",
                 "value": "100.00",
-                "another_field": "another_value"
+                "another_field": "another_value",
             }
 
             with override_settings(
@@ -200,7 +200,6 @@ class ConversionEventAPITest(TembaTest):
                 self.assertEqual(event_data["key"], "capi")
                 self.assertEqual(event_data["value"], "lead")
                 self.assertEqual(event_data["project"], str(self.org.proj_uuid))
-                
                 # Verify all payload data is in metadata
                 self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
                 self.assertEqual(event_data["metadata"]["ctwa_id"], "test_clid_123")
@@ -220,11 +219,7 @@ class ConversionEventAPITest(TembaTest):
             # Use a different contact URN that doesn't have CTWA data
             payload = self.valid_payload.copy()
             payload["contact_urn"] = "whatsapp:+5511888888888"
-            payload["payload"] = {
-                "custom_field": "custom_value",
-                "order_form_id": "12345",
-                "value": "100.00"
-            }
+            payload["payload"] = {"custom_field": "custom_value", "order_form_id": "12345", "value": "100.00"}
 
             response = self.client.post(
                 self.endpoint_url,
@@ -243,7 +238,6 @@ class ConversionEventAPITest(TembaTest):
             event_data = datalake_call[0][1]
             self.assertEqual(event_data["event_name"], "conversion_lead")
             self.assertEqual(event_data["project"], str(self.org.proj_uuid))
-            
             # Verify all payload data is in metadata
             self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
             self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
