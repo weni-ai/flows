@@ -1,3 +1,9 @@
+3.37.2
+----------
+* Add isOrgUser permission
+* Remove API token logger
+* Internal endpoint to get channels
+
 3.37.1
 ----------
 * Update weni-rp-apps version to 2.10.3

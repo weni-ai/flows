@@ -149,11 +149,16 @@ class ConversionEventAPITest(TembaTest):
         }
 
     def test_successful_lead_conversion(self):
-        with patch("temba.conversion_events.views.requests.post") as mock_post:
+        with patch("temba.conversion_events.views.requests.post") as mock_post, \
+             patch("temba.conversion_events.views.send_event_data") as mock_send_event:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"success": True}
             mock_post.return_value = mock_response
+
+            # Set proj_uuid for the org
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
 
             with override_settings(
                 WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
@@ -169,56 +174,162 @@ class ConversionEventAPITest(TembaTest):
                 self.assertEqual(response.status_code, 200)
                 response_data = response.json()
                 self.assertEqual(response_data["status"], "success")
-                self.assertEqual(response_data["message"], "Event sent to Meta successfully")
+                self.assertEqual(response_data["message"], "Event sent to Meta and Datalake successfully")
+                
+                # Verify Meta API call
                 mock_post.assert_called_once()
                 call_args = mock_post.call_args
                 self.assertIn("test_dataset_123", call_args[0][0])
                 self.assertIn("access_token=test_token", call_args[0][0])
 
+                # Verify Datalake call
+                mock_send_event.assert_called_once()
+                datalake_call = mock_send_event.call_args
+                event_data = datalake_call[0][1]
+                self.assertEqual(event_data["event_name"], "conversion_lead")
+                self.assertEqual(event_data["key"], "capi")
+                self.assertEqual(event_data["value"], "lead")
+                self.assertEqual(event_data["project"], str(self.org.proj_uuid))
+                self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
+                self.assertEqual(event_data["metadata"]["ctwa_id"], "test_clid_123")
+
+    def test_successful_conversion_without_ctwa(self):
+        """Test successful conversion event without CTWA data - should only send to Datalake"""
+        with patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+            # Set proj_uuid for the org
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
+            # Use a different contact URN that doesn't have CTWA data
+            payload = self.valid_payload.copy()
+            payload["contact_urn"] = "whatsapp:+5511888888888"
+
+            response = self.client.post(
+                self.endpoint_url,
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
+
+            self.assertEqual(response.status_code, 200)
+            response_data = response.json()
+            self.assertEqual(response_data["status"], "success")
+            self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
+
+            # Verify Datalake call
+            mock_send_event.assert_called_once()
+            datalake_call = mock_send_event.call_args
+            event_data = datalake_call[0][1]
+            self.assertEqual(event_data["event_name"], "conversion_lead")
+            self.assertEqual(event_data["project"], str(self.org.proj_uuid))
+            self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
+            self.assertNotIn("ctwa_id", event_data["metadata"])
+
+    def test_datalake_error_handling(self):
+        """Test handling of Datalake API errors"""
+        self.org.proj_uuid = uuid4()
+        self.org.save(update_fields=["proj_uuid"])
+
+        with patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+            mock_send_event.side_effect = Exception("Datalake API error")
+
+            response = self.client.post(
+                self.endpoint_url,
+                data=json.dumps(self.valid_payload),
+                content_type="application/json",
+            )
+
+            self.assertEqual(response.status_code, 500)
+            response_data = response.json()
+            self.assertEqual(response_data["error"], "API Error")
+            self.assertIn("Error sending to Datalake", response_data["detail"])
+
     def test_successful_purchase_conversion(self):
         payload = self.valid_payload.copy()
         payload["event_type"] = "purchase"
-        with patch("temba.conversion_events.views.requests.post") as mock_post:
+        with patch("temba.conversion_events.views.requests.post") as mock_post, \
+             patch("temba.conversion_events.views.send_event_data") as mock_send_event:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"success": True}
             mock_post.return_value = mock_response
+
+            # Set proj_uuid for the org
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
             with override_settings(
                 WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
                 WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
             ):
                 response = self.client.post(
-                    self.endpoint_url, data=json.dumps(payload), content_type="application/json"
+                    self.endpoint_url,
+                    data=json.dumps(payload),
+                    content_type="application/json",
                 )
                 self.assertEqual(response.status_code, 200)
                 call_kwargs = mock_post.call_args[1]
                 sent_payload = call_kwargs["json"]
                 self.assertEqual(sent_payload["data"][0]["event_name"], "Purchase")
 
+                # Verify Datalake call
+                mock_send_event.assert_called_once()
+                datalake_call = mock_send_event.call_args
+                event_data = datalake_call[0][1]
+                self.assertEqual(event_data["event_name"], "conversion_purchase")
+                self.assertEqual(event_data["value"], "purchase")
+
     def test_ctwa_data_not_found(self):
-        payload = self.valid_payload.copy()
-        payload["contact_urn"] = "whatsapp:+5511888888888"  # Non-existent contact
-        response = self.client.post(self.endpoint_url, data=json.dumps(payload), content_type="application/json")
-        self.assertEqual(response.status_code, 404)
-        response_data = response.json()
-        self.assertEqual(response_data["error"], "CTWA Data Not Found")
-        self.assertIn("No CTWA data found", response_data["detail"])
+        """Test that event is still sent to Datalake when CTWA data is not found"""
+        with patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+            # Set proj_uuid for the org
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
+            payload = self.valid_payload.copy()
+            payload["contact_urn"] = "whatsapp:+5511888888888"  # Non-existent contact
+            response = self.client.post(self.endpoint_url, data=json.dumps(payload), content_type="application/json")
+            
+            self.assertEqual(response.status_code, 200)
+            response_data = response.json()
+            self.assertEqual(response_data["status"], "success")
+            self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
+
+            # Verify Datalake call
+            mock_send_event.assert_called_once()
+            datalake_call = mock_send_event.call_args
+            event_data = datalake_call[0][1]
+            self.assertNotIn("ctwa_id", event_data["metadata"])
 
     def test_channel_missing_dataset_id(self):
-        channel_without_dataset = self.create_channel("WAC", "No Dataset Channel", "+12065551213", config={})
-        CTWA.objects.create(
-            ctwa_clid="test_clid_456",
-            channel_uuid=channel_without_dataset.uuid,
-            waba="test_waba_456",
-            contact_urn="whatsapp:+5511888888888",
-        )
-        payload = self.valid_payload.copy()
-        payload["channel_uuid"] = str(channel_without_dataset.uuid)
-        payload["contact_urn"] = "whatsapp:+5511888888888"
-        response = self.client.post(self.endpoint_url, data=json.dumps(payload), content_type="application/json")
-        self.assertEqual(response.status_code, 404)
-        response_data = response.json()
-        self.assertEqual(response_data["error"], "Dataset ID Not Found")
+        """Test that event is still sent to Datalake when channel has no dataset_id"""
+        with patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+            # Set proj_uuid for the org
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
+            channel_without_dataset = self.create_channel("WAC", "No Dataset Channel", "+12065551213", config={})
+            CTWA.objects.create(
+                ctwa_clid="test_clid_456",
+                channel_uuid=channel_without_dataset.uuid,
+                waba="test_waba_456",
+                contact_urn="whatsapp:+5511888888888",
+            )
+            payload = self.valid_payload.copy()
+            payload["channel_uuid"] = str(channel_without_dataset.uuid)
+            payload["contact_urn"] = "whatsapp:+5511888888888"
+            
+            response = self.client.post(self.endpoint_url, data=json.dumps(payload), content_type="application/json")
+            
+            self.assertEqual(response.status_code, 200)
+            response_data = response.json()
+            self.assertEqual(response_data["status"], "success")
+            self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
+
+            # Verify Datalake call
+            mock_send_event.assert_called_once()
+            datalake_call = mock_send_event.call_args
+            event_data = datalake_call[0][1]
+            self.assertEqual(event_data["metadata"]["channel"], str(channel_without_dataset.uuid))
 
     def test_missing_access_token(self):
         with override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN=""):
