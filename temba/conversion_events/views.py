@@ -195,11 +195,8 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                 "channel": channel_uuid,
                 "order_form_id": payload.get("order_form_id"),
                 "value": payload.get("value"),
+                "ctwa_id": ctwa_data.ctwa_clid if ctwa_data else None,  # Add ctwa_id to metadata
             }
-
-            # Add CTWA ID if available
-            if ctwa_data:
-                metadata["ctwa_id"] = ctwa_data.ctwa_clid
 
             data = {
                 "event_name": f"conversion_{event_type}",
