@@ -193,6 +193,7 @@ class ConversionEventAPITest(TembaTest):
                 self.assertEqual(event_data["project"], str(self.org.proj_uuid))
                 self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
                 self.assertEqual(event_data["metadata"]["ctwa_id"], "test_clid_123")
+                self.assertNotIn("ctwa_id", event_data)  # Verify ctwa_id is not in main payload
 
     def test_successful_conversion_without_ctwa(self):
         """Test successful conversion event without CTWA data - should only send to Datalake"""
@@ -223,7 +224,8 @@ class ConversionEventAPITest(TembaTest):
             self.assertEqual(event_data["event_name"], "conversion_lead")
             self.assertEqual(event_data["project"], str(self.org.proj_uuid))
             self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
-            self.assertNotIn("ctwa_id", event_data["metadata"])
+            self.assertIsNone(event_data["metadata"]["ctwa_id"])  # Verify ctwa_id is None in metadata
+            self.assertNotIn("ctwa_id", event_data)  # Verify ctwa_id is not in main payload
 
     def test_datalake_error_handling(self):
         """Test handling of Datalake API errors"""
