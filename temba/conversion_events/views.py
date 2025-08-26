@@ -191,12 +191,14 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                 logger.error(f"Org or proj_uuid not found for channel {channel_uuid}")
                 return False
 
-            metadata = {
+            # Start with all payload data in metadata
+            metadata = payload.copy() if payload else {}
+            
+            # Add required fields to metadata
+            metadata.update({
                 "channel": channel_uuid,
-                "order_form_id": payload.get("order_form_id"),
-                "value": payload.get("value"),
-                "ctwa_id": ctwa_data.ctwa_clid if ctwa_data else None,  # Add ctwa_id to metadata
-            }
+                "ctwa_id": ctwa_data.ctwa_clid if ctwa_data else None,
+            })
 
             data = {
                 "event_name": f"conversion_{event_type}",

@@ -161,6 +161,15 @@ class ConversionEventAPITest(TembaTest):
             self.org.proj_uuid = uuid4()
             self.org.save(update_fields=["proj_uuid"])
 
+            # Add custom data to payload
+            payload = self.valid_payload.copy()
+            payload["payload"] = {
+                "custom_field": "custom_value",
+                "order_form_id": "12345",
+                "value": "100.00",
+                "another_field": "another_value"
+            }
+
             with override_settings(
                 WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
                 WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
@@ -168,7 +177,7 @@ class ConversionEventAPITest(TembaTest):
             ):
                 response = self.client.post(
                     self.endpoint_url,
-                    data=json.dumps(self.valid_payload),
+                    data=json.dumps(payload),
                     content_type="application/json",
                 )
 
@@ -191,8 +200,14 @@ class ConversionEventAPITest(TembaTest):
                 self.assertEqual(event_data["key"], "capi")
                 self.assertEqual(event_data["value"], "lead")
                 self.assertEqual(event_data["project"], str(self.org.proj_uuid))
+                
+                # Verify all payload data is in metadata
                 self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
                 self.assertEqual(event_data["metadata"]["ctwa_id"], "test_clid_123")
+                self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
+                self.assertEqual(event_data["metadata"]["order_form_id"], "12345")
+                self.assertEqual(event_data["metadata"]["value"], "100.00")
+                self.assertEqual(event_data["metadata"]["another_field"], "another_value")
                 self.assertNotIn("ctwa_id", event_data)  # Verify ctwa_id is not in main payload
 
     def test_successful_conversion_without_ctwa(self):
@@ -205,6 +220,11 @@ class ConversionEventAPITest(TembaTest):
             # Use a different contact URN that doesn't have CTWA data
             payload = self.valid_payload.copy()
             payload["contact_urn"] = "whatsapp:+5511888888888"
+            payload["payload"] = {
+                "custom_field": "custom_value",
+                "order_form_id": "12345",
+                "value": "100.00"
+            }
 
             response = self.client.post(
                 self.endpoint_url,
@@ -223,7 +243,12 @@ class ConversionEventAPITest(TembaTest):
             event_data = datalake_call[0][1]
             self.assertEqual(event_data["event_name"], "conversion_lead")
             self.assertEqual(event_data["project"], str(self.org.proj_uuid))
+            
+            # Verify all payload data is in metadata
             self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
+            self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
+            self.assertEqual(event_data["metadata"]["order_form_id"], "12345")
+            self.assertEqual(event_data["metadata"]["value"], "100.00")
             self.assertIsNone(event_data["metadata"]["ctwa_id"])  # Verify ctwa_id is None in metadata
             self.assertNotIn("ctwa_id", event_data)  # Verify ctwa_id is not in main payload
 
