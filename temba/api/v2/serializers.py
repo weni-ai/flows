@@ -285,6 +285,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     groups = fields.ContactGroupField(many=True, required=False)
     msg = serializers.DictField(required=True)
     channel = serializers.UUIDField(required=False)
+    queue = serializers.CharField(required=False)
 
     def validate_msg(self, value):
         if not (value.get("text") or value.get("attachments") or value.get("template") or value.get("action_type")):
@@ -314,6 +315,14 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             if not channel.template_translations.filter(template__uuid=template["uuid"]).exists():
                 raise serializers.ValidationError(f"Template {template['uuid']} not found in channel {channel.uuid}")
 
+        data["template_id"] = data["msg"].get("template_id")
+
+        if data.get("queue"):
+            if data.get("queue") not in ["wpp_broadcast_batch", "template_batch", "template_notification_batch"]:
+                raise serializers.ValidationError(
+                    "Queue must be either wpp_broadcast_batch, template_batch or template_notification_batch"
+                )
+
         return data
 
     def _validate_and_assign_template(self, data, template_data, channel_data):
@@ -323,11 +332,14 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         if not uuid and not name:
             raise serializers.ValidationError("Template UUID or Name are required.")
 
+        data["template_id"] = data["msg"].get("template_id")
+
         if name and not channel_data:
             raise serializers.ValidationError("Channel is required to use template name")
 
         try:
             template = self._get_template(uuid=uuid, name=name, org=self.context.get("org"))
+            template_id = template.id
 
             data["msg"]["template"] = {
                 "name": template.name,
@@ -335,8 +347,10 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 "variables": template_data.get("variables", []),
                 "locale": template_data.get("locale", None),
             }
+            data["msg"]["template_id"] = template_id
 
         except Template.DoesNotExist:
+            data["msg"]["template_id"] = None
             if uuid:
                 raise serializers.ValidationError(f"Template with UUID {uuid} not found.")
             raise serializers.ValidationError(f"Template with name {name} not found.")
@@ -363,6 +377,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             msg=self.validated_data.get("msg", {}),
             channel=self.validated_data.get("channel", None),
             broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
+            queue=self.validated_data.get("queue", None),
         )
         # send it
         on_transaction_commit(lambda: broadcast.send_async())

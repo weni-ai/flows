@@ -1400,18 +1400,18 @@ windows-terminal = ["colorama (>=0.4.6)"]
 
 [[package]]
 name = "pyjwt"
-version = "2.3.0"
+version = "2.10.1"
 description = "JSON Web Token implementation in Python"
 category = "main"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.9"
 
 [package.dependencies]
-cryptography = {version = ">=3.3.1", optional = true, markers = "extra == \"crypto\""}
+cryptography = {version = ">=3.4.0", optional = true, markers = "extra == \"crypto\""}
 
 [package.extras]
-crypto = ["cryptography (>=3.3.1)"]
-dev = ["coverage[toml] (==5.0.4)", "cryptography (>=3.3.1)", "mypy", "pre-commit", "pytest (>=6.0.0,<7.0.0)", "sphinx", "sphinx-rtd-theme", "zope.interface"]
+crypto = ["cryptography (>=3.4.0)"]
+dev = ["coverage[toml] (==5.0.4)", "cryptography (>=3.4.0)", "pre-commit", "pytest (>=6.0.0,<7.0.0)", "sphinx", "sphinx-rtd-theme", "zope.interface"]
 docs = ["sphinx", "sphinx-rtd-theme", "zope.interface"]
 tests = ["coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)"]
 
@@ -1898,7 +1898,7 @@ pytest = ">=8.4.0,<9.0.0"
 
 [[package]]
 name = "weni-rp-apps"
-version = "2.10.2"
+version = "2.10.3"
 description = "Weni apps for Rapidpro Platform"
 category = "main"
 optional = false
@@ -1984,7 +1984,7 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=4.6)", "pytest-black (
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "85d67a5839f7cca3435da7226722a8180207a1f6c1406643a95fe98333ac0651"
+content-hash = "ff7218658cfbc23383a27c70da69942c99b2283af843cfe7d62b3e7ae99ed017"
 
 [metadata.files]
 amqp = [
@@ -2801,8 +2801,8 @@ pygments = [
     {file = "pygments-2.19.1.tar.gz", hash = "sha256:61c16d2a8576dc0649d9f39e089b5f02bcd27fba10d8fb4dcc28173f7a45151f"},
 ]
 pyjwt = [
-    {file = "PyJWT-2.3.0-py3-none-any.whl", hash = "sha256:e0c4bb8d9f0af0c7f5b1ec4c5036309617d03d56932877f2f7a0beeb5318322f"},
-    {file = "PyJWT-2.3.0.tar.gz", hash = "sha256:b888b4d56f06f6dcd777210c334e69c737be74755d3e5e9ee3fe67dc18a0ee41"},
+    {file = "PyJWT-2.10.1-py3-none-any.whl", hash = "sha256:dcdd193e30abefd5debf142f9adfcdd2b58004e644f25406ffaebd50bd98dacb"},
+    {file = "pyjwt-2.10.1.tar.gz", hash = "sha256:3cc5772eb20009233caf06e9d8a0577824723b44e6648ee0a2aedb6cf9381953"},
 ]
 pyopenssl = [
     {file = "pyOpenSSL-21.0.0-py2.py3-none-any.whl", hash = "sha256:8935bd4920ab9abfebb07c41a4f58296407ed77f04bd1a92914044b848ba1ed6"},
@@ -3100,8 +3100,8 @@ weni-datalake-sdk = [
     {file = "weni_datalake_sdk-0.4.0.tar.gz", hash = "sha256:6dc19055ed1ae9b79e94026a99c6688338c00e957dfaa3215dbc869fe2b88fd9"},
 ]
 weni-rp-apps = [
-    {file = "weni_rp_apps-2.10.2-py3-none-any.whl", hash = "sha256:9b226fd707da05f16e9dda78acf8fc6e541f2505c7abb261d646487bf3d8355c"},
-    {file = "weni_rp_apps-2.10.2.tar.gz", hash = "sha256:b19cd80e89d7c84214d00b5bb5a495d36119a748a0d4b0fb4560533a8c5f821a"},
+    {file = "weni_rp_apps-2.10.3-py3-none-any.whl", hash = "sha256:8953e25d4921f9d4524e59b82e387fdec69a87abaf1b026f33bfedb2b39b236f"},
+    {file = "weni_rp_apps-2.10.3.tar.gz", hash = "sha256:ec6edae24c2b3052e28bd1bd777167a6ae2cbac1d59af03bd2520564df0a8c98"},
 ]
 werkzeug = [
     {file = "werkzeug-3.1.3-py3-none-any.whl", hash = "sha256:54b78bf3716d19a65be4fceccc0d1d7b89e608834989dfae50ea87564639213e"},

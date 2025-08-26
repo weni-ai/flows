@@ -3,18 +3,18 @@ from datetime import datetime
 
 import requests
 from rest_framework import viewsets
-from weni.internal.views import InternalGenericViewSet
 
 from django.conf import settings
 from django.http import JsonResponse
 
+from .jwt_auth import JWTModuleAuthMixin
 from .models import CTWA
 from .serializers import ConversionEventSerializer
 
 logger = logging.getLogger(__name__)
 
 
-class ConversionEventView(viewsets.ModelViewSet, InternalGenericViewSet):
+class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
     """
     API endpoint to receive conversion events (lead/purchase)
     and send immediately to Meta Conversion API
@@ -116,11 +116,11 @@ class ConversionEventView(viewsets.ModelViewSet, InternalGenericViewSet):
         event_time = int(datetime.now().timestamp())
 
         # Map event types for Meta
-        event_name_map = {"lead": "Lead", "purchase": "Purchase"}
+        event_name_map = {"lead": "LeadSubmitted", "purchase": "Purchase"}
 
         # Payload following the specified format for Meta
         meta_event = {
-            "event_name": event_name_map.get(event_type, "Lead"),
+            "event_name": event_name_map.get(event_type, "LeadSubmitted"),
             "event_time": event_time,
             "action_source": "business_messaging",
             "messaging_channel": "whatsapp",
