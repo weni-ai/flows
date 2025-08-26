@@ -249,7 +249,6 @@ class ConversionEventAPITest(TembaTest):
             self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
             self.assertEqual(event_data["metadata"]["order_form_id"], "12345")
             self.assertEqual(event_data["metadata"]["value"], "100.00")
-            self.assertIsNone(event_data["metadata"]["ctwa_id"])  # Verify ctwa_id is None in metadata
             self.assertNotIn("ctwa_id", event_data)  # Verify ctwa_id is not in main payload
 
     def test_datalake_error_handling(self):
@@ -258,11 +257,15 @@ class ConversionEventAPITest(TembaTest):
         self.org.save(update_fields=["proj_uuid"])
 
         with patch("temba.conversion_events.views.send_event_data") as mock_send_event:
-            mock_send_event.side_effect = Exception("Datalake API error")
+            mock_send_event.side_effect = Exception("API error")
+
+            # Use a different contact URN that doesn't have CTWA data
+            payload = self.valid_payload.copy()
+            payload["contact_urn"] = "whatsapp:+5511888888888"  # Non-existent contact
 
             response = self.client.post(
                 self.endpoint_url,
-                data=json.dumps(self.valid_payload),
+                data=json.dumps(payload),
                 content_type="application/json",
             )
 
@@ -270,6 +273,7 @@ class ConversionEventAPITest(TembaTest):
             response_data = response.json()
             self.assertEqual(response_data["error"], "API Error")
             self.assertIn("Error sending to Datalake", response_data["detail"])
+            self.assertIn("API error", response_data["detail"])
 
     def test_successful_purchase_conversion(self):
         payload = self.valid_payload.copy()
@@ -438,27 +442,57 @@ class ConversionEventAPITest(TembaTest):
 
     @patch("temba.conversion_events.models.CTWA.objects.filter")
     def test_database_exception_in_ctwa_lookup(self, mock_filter):
+        """Test that event is still sent to Datalake when CTWA lookup fails"""
         mock_filter.side_effect = Exception("Database error")
-        response = self.client.post(
-            self.endpoint_url,
-            data=json.dumps(self.valid_payload),
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, 404)
-        response_data = response.json()
-        self.assertEqual(response_data["error"], "CTWA Data Not Found")
+
+        with patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+            # Set proj_uuid for the org
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
+            response = self.client.post(
+                self.endpoint_url,
+                data=json.dumps(self.valid_payload),
+                content_type="application/json",
+            )
+
+            # Should still succeed since we can send to Datalake
+            self.assertEqual(response.status_code, 200)
+            response_data = response.json()
+            self.assertEqual(response_data["status"], "success")
+            self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
+
+            # Verify Datalake call
+            mock_send_event.assert_called_once()
+            datalake_call = mock_send_event.call_args
+            event_data = datalake_call[0][1]
+            self.assertEqual(event_data["event_name"], "conversion_lead")
+            self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
 
     @patch("temba.channels.models.Channel.objects.filter")
     def test_database_exception_in_channel_lookup(self, mock_filter):
+        """Test that event fails when channel lookup fails"""
         mock_filter.side_effect = Exception("Database error")
-        response = self.client.post(
-            self.endpoint_url,
-            data=json.dumps(self.valid_payload),
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, 404)
-        response_data = response.json()
-        self.assertEqual(response_data["error"], "Dataset ID Not Found")
+
+        with patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+            # Set proj_uuid for the org
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
+            response = self.client.post(
+                self.endpoint_url,
+                data=json.dumps(self.valid_payload),
+                content_type="application/json",
+            )
+
+            # Should fail since we need the channel to send to Datalake
+            self.assertEqual(response.status_code, 500)
+            response_data = response.json()
+            self.assertEqual(response_data["error"], "API Error")
+            self.assertIn("Channel not found", response_data["detail"])
+
+            # Verify Datalake was not called
+            mock_send_event.assert_not_called()
 
 
 class CTWAModelTest(TembaTest):
