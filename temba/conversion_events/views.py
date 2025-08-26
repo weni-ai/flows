@@ -59,7 +59,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                     meta_success, meta_error = self._send_to_meta(meta_payload, dataset_id)
 
             # Always send to Datalake regardless of CTWA status
-            datalake_success = self._send_to_datalake(
+            datalake_success, datalake_error = self._send_to_datalake(
                 event_type=event_type,
                 channel_uuid=channel_uuid,
                 contact_urn=contact_urn,
@@ -68,22 +68,29 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             )
 
             # Prepare response based on results
-            if ctwa_data and meta_success:
+            if ctwa_data and dataset_id and meta_success:  # Check for dataset_id here
                 logger.info(
                     f"Conversion event {event_type} sent successfully to Meta and Datalake for channel {channel_uuid}"
                 )
                 return JsonResponse(
                     {"status": "success", "message": "Event sent to Meta and Datalake successfully"}, status=200
                 )
-            elif not ctwa_data and datalake_success:
+            elif datalake_success:  # If Datalake succeeds, it's a success
                 logger.info(f"Conversion event {event_type} sent successfully to Datalake for channel {channel_uuid}")
                 return JsonResponse(
                     {"status": "success", "message": "Event sent to Datalake successfully"}, status=200
                 )
             else:
-                error_msg = meta_error if meta_error else "Failed to send event to destination(s)"
+                # If we tried to send to Meta (have CTWA and dataset_id) and it failed, it's a Meta error
+                if ctwa_data and dataset_id:
+                    error_type = "Meta API Error"
+                    error_msg = meta_error
+                else:
+                    error_type = "API Error"
+                    error_msg = datalake_error
+
                 logger.error(f"Failed to send conversion event: {error_msg}")
-                return JsonResponse({"error": "API Error", "detail": error_msg}, status=500)
+                return JsonResponse({"error": error_type, "detail": error_msg}, status=500)
 
         except Exception as e:
             error_msg = str(e)
@@ -181,24 +188,29 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             from temba.channels.models import Channel
             from temba.orgs.models import Org
 
-            channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only("org_id").first()
-            if not channel:
-                logger.error(f"Channel {channel_uuid} not found")
-                return False
+            try:
+                channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only("org_id").first()
+                if not channel:
+                    return False, "Channel not found"
+            except Exception as e:
+                return False, "Channel not found"
 
-            org = Org.objects.filter(id=channel.org_id).only("proj_uuid").first()
-            if not org or not org.proj_uuid:
-                logger.error(f"Org or proj_uuid not found for channel {channel_uuid}")
-                return False
+            try:
+                org = Org.objects.filter(id=channel.org_id).only("proj_uuid").first()
+                if not org or not org.proj_uuid:
+                    return False, "Organization not found"
+            except Exception as e:
+                return False, "Organization not found"
 
             # Start with all payload data in metadata
             metadata = payload.copy() if payload else {}
             
             # Add required fields to metadata
-            metadata.update({
-                "channel": channel_uuid,
-                "ctwa_id": ctwa_data.ctwa_clid if ctwa_data else None,
-            })
+            metadata["channel"] = str(channel_uuid)
+            
+            # Add CTWA ID only if available
+            if ctwa_data:
+                metadata["ctwa_id"] = ctwa_data.ctwa_clid
 
             data = {
                 "event_name": f"conversion_{event_type}",
@@ -212,8 +224,9 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             }
 
             send_event_data(EventPath, data)
-            return True
+            return True, None
 
         except Exception as e:
-            logger.error(f"Error sending to Datalake: {str(e)}")
-            return False
+            error_msg = f"Error sending to Datalake: {str(e)}"
+            logger.error(error_msg)
+            return False, error_msg
