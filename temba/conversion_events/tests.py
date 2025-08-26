@@ -149,8 +149,9 @@ class ConversionEventAPITest(TembaTest):
         }
 
     def test_successful_lead_conversion(self):
-        with patch("temba.conversion_events.views.requests.post") as mock_post, \
-             patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"success": True}
@@ -175,7 +176,7 @@ class ConversionEventAPITest(TembaTest):
                 response_data = response.json()
                 self.assertEqual(response_data["status"], "success")
                 self.assertEqual(response_data["message"], "Event sent to Meta and Datalake successfully")
-                
+
                 # Verify Meta API call
                 mock_post.assert_called_once()
                 call_args = mock_post.call_args
@@ -246,8 +247,9 @@ class ConversionEventAPITest(TembaTest):
     def test_successful_purchase_conversion(self):
         payload = self.valid_payload.copy()
         payload["event_type"] = "purchase"
-        with patch("temba.conversion_events.views.requests.post") as mock_post, \
-             patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"success": True}
@@ -288,7 +290,7 @@ class ConversionEventAPITest(TembaTest):
             payload = self.valid_payload.copy()
             payload["contact_urn"] = "whatsapp:+5511888888888"  # Non-existent contact
             response = self.client.post(self.endpoint_url, data=json.dumps(payload), content_type="application/json")
-            
+
             self.assertEqual(response.status_code, 200)
             response_data = response.json()
             self.assertEqual(response_data["status"], "success")
@@ -317,9 +319,9 @@ class ConversionEventAPITest(TembaTest):
             payload = self.valid_payload.copy()
             payload["channel_uuid"] = str(channel_without_dataset.uuid)
             payload["contact_urn"] = "whatsapp:+5511888888888"
-            
+
             response = self.client.post(self.endpoint_url, data=json.dumps(payload), content_type="application/json")
-            
+
             self.assertEqual(response.status_code, 200)
             response_data = response.json()
             self.assertEqual(response_data["status"], "success")

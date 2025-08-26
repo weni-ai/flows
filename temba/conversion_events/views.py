@@ -3,12 +3,11 @@ from datetime import datetime
 
 import requests
 from rest_framework import viewsets
+from weni_datalake_sdk.clients.client import send_event_data
+from weni_datalake_sdk.paths.events_path import EventPath
 
 from django.conf import settings
 from django.http import JsonResponse
-
-from weni_datalake_sdk.clients.client import send_event_data
-from weni_datalake_sdk.paths.events_path import EventPath
 
 from .jwt_auth import JWTModuleAuthMixin
 from .models import CTWA
@@ -53,7 +52,9 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                 dataset_id = self._get_channel_dataset_id(channel_uuid)
                 if dataset_id:
                     # Build payload for Meta Conversion API
-                    meta_payload = self._build_meta_payload(event_type, ctwa_data, None) # payload is not used for Meta
+                    meta_payload = self._build_meta_payload(
+                        event_type, ctwa_data, None
+                    )  # payload is not used for Meta
                     # Send to Meta
                     meta_success, meta_error = self._send_to_meta(meta_payload, dataset_id)
 
@@ -63,16 +64,22 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                 channel_uuid=channel_uuid,
                 contact_urn=contact_urn,
                 ctwa_data=ctwa_data,
-                payload=payload
+                payload=payload,
             )
 
             # Prepare response based on results
             if ctwa_data and meta_success:
-                logger.info(f"Conversion event {event_type} sent successfully to Meta and Datalake for channel {channel_uuid}")
-                return JsonResponse({"status": "success", "message": "Event sent to Meta and Datalake successfully"}, status=200)
+                logger.info(
+                    f"Conversion event {event_type} sent successfully to Meta and Datalake for channel {channel_uuid}"
+                )
+                return JsonResponse(
+                    {"status": "success", "message": "Event sent to Meta and Datalake successfully"}, status=200
+                )
             elif not ctwa_data and datalake_success:
                 logger.info(f"Conversion event {event_type} sent successfully to Datalake for channel {channel_uuid}")
-                return JsonResponse({"status": "success", "message": "Event sent to Datalake successfully"}, status=200)
+                return JsonResponse(
+                    {"status": "success", "message": "Event sent to Datalake successfully"}, status=200
+                )
             else:
                 error_msg = meta_error if meta_error else "Failed to send event to destination(s)"
                 logger.error(f"Failed to send conversion event: {error_msg}")
@@ -173,13 +180,13 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             # Get channel and org data
             from temba.channels.models import Channel
             from temba.orgs.models import Org
-            
-            channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only('org_id').first()
+
+            channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only("org_id").first()
             if not channel:
                 logger.error(f"Channel {channel_uuid} not found")
                 return False
-                
-            org = Org.objects.filter(id=channel.org_id).only('proj_uuid').first()
+
+            org = Org.objects.filter(id=channel.org_id).only("proj_uuid").first()
             if not org or not org.proj_uuid:
                 logger.error(f"Org or proj_uuid not found for channel {channel_uuid}")
                 return False
@@ -187,9 +194,9 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             metadata = {
                 "channel": channel_uuid,
                 "order_form_id": payload.get("order_form_id"),
-                "value": payload.get("value")
+                "value": payload.get("value"),
             }
-            
+
             # Add CTWA ID if available
             if ctwa_data:
                 metadata["ctwa_id"] = ctwa_data.ctwa_clid
@@ -202,7 +209,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                 "date": datetime.now().strftime("%Y-%m-%d"),
                 "project": str(org.proj_uuid),  # Using org proj_uuid as project identifier
                 "contact_urn": contact_urn,
-                "metadata": metadata
+                "metadata": metadata,
             }
 
             send_event_data(EventPath, data)
