@@ -192,14 +192,14 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                 channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only("org_id").first()
                 if not channel:
                     return False, "Channel not found"
-            except Exception as e:
+            except Exception:
                 return False, "Channel not found"
 
             try:
                 org = Org.objects.filter(id=channel.org_id).only("proj_uuid").first()
                 if not org or not org.proj_uuid:
                     return False, "Organization not found"
-            except Exception as e:
+            except Exception:
                 return False, "Organization not found"
 
             # Start with all payload data in metadata
