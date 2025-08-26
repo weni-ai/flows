@@ -1,4 +1,5 @@
 import datetime as dt
+from typing import Optional
 
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
@@ -15,6 +16,8 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import exceptions as django_exceptions
 from django.db import models
+from django.db.models import Sum, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
@@ -141,6 +144,30 @@ class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class ContactGroupsService:
+    @staticmethod
+    def list_groups(org, name_filter: Optional[str], order_by: Optional[str]):
+        queryset = ContactGroup.user_groups.filter(org=org, is_active=True)
+
+        if name_filter:
+            queryset = queryset.filter(name__icontains=name_filter)
+
+        # Pre-compute member_count for ordering and response
+        queryset = queryset.annotate(member_count=Coalesce(Sum("counts__count"), Value(0)))
+
+        ordering_map = {
+            "name": "name",
+            "-name": "-name",
+            "member_count": "member_count",
+            "-member_count": "-member_count",
+            "created_on": "created_on",
+            "-created_on": "-created_on",
+        }
+        # default to most recent first
+        default_order = "-created_on"
+        return queryset.order_by(ordering_map.get(order_by or default_order, default_order))
+
+
 class InternalContactGroupsView(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
     permission_classes = [IsAuthenticated, IsUserInOrg]
@@ -158,7 +185,9 @@ class InternalContactGroupsView(APIViewMixin, APIView):
         except (Org.DoesNotExist, django_exceptions.ValidationError):
             return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        groups = ContactGroup.user_groups.filter(org=org, is_active=True)
+        name_filter = request.query_params.get("name")
+        order_by = request.query_params.get("order_by") or request.query_params.get("order")
+        groups = ContactGroupsService.list_groups(org, name_filter, order_by)
         paginator = DefaultLimitOffsetPagination()
         page = paginator.paginate_queryset(groups, request, view=self)
         results = []
