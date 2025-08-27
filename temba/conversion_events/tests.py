@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 from uuid import uuid4
 
 import jwt
+import requests
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.test import APIRequestFactory
 
@@ -14,8 +15,6 @@ from temba.conversion_events.jwt_auth import JWTModuleAuthentication, JWTModuleA
 from temba.conversion_events.models import CTWA
 from temba.conversion_events.serializers import ConversionEventSerializer
 from temba.tests import TembaTest
-
-import requests
 
 
 class ConversionEventSerializerTest(TembaTest):
