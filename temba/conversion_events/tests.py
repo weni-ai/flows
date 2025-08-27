@@ -581,14 +581,6 @@ class ConversionEventAPITest(TembaTest):
             # Configure mocks
             mock_send_event.return_value = None  # Successful Datalake send
 
-            # Create a channel without dataset_id
-            channel = self.create_channel(
-                "WAC",
-                "No Dataset Channel",
-                "+12065551213",
-                config={},  # Empty config means no dataset_id
-            )
-
             # Test the _send_to_meta method directly
             from temba.conversion_events.views import ConversionEventView
 
