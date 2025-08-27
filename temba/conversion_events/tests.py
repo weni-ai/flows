@@ -511,8 +511,9 @@ class ConversionEventAPITest(TembaTest):
 
     def test_meta_missing_dataset_id(self):
         """Test handling when Meta dataset_id is not configured but we try to send to Meta"""
-        with patch("temba.conversion_events.views.requests.post") as mock_post, \
-             patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
             # Set proj_uuid for the org
             self.org.proj_uuid = uuid4()
             self.org.save(update_fields=["proj_uuid"])
@@ -524,7 +525,7 @@ class ConversionEventAPITest(TembaTest):
                 "+12065551213",
                 config={},  # Empty config means no dataset_id
             )
-            
+
             # Create CTWA data for this channel
             ctwa = CTWA.objects.create(
                 ctwa_clid="test_clid_456",
@@ -556,7 +557,7 @@ class ConversionEventAPITest(TembaTest):
 
                 # Verify Meta API was not called
                 mock_post.assert_not_called()
-                
+
                 # Verify Datalake was called
                 mock_send_event.assert_called_once()
 
@@ -564,16 +565,18 @@ class ConversionEventAPITest(TembaTest):
         """Test _get_channel_dataset_id when channel is not found"""
         # Create a view instance to test the method directly
         from temba.conversion_events.views import ConversionEventView
+
         view = ConversionEventView()
-        
+
         # Test with non-existent channel UUID
         result = view._get_channel_dataset_id("non-existent-uuid")
         self.assertIsNone(result)
 
     def test_meta_dataset_id_not_configured(self):
         """Test handling when Meta dataset_id is not configured"""
-        with patch("temba.conversion_events.views.requests.post") as mock_post, \
-             patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
 
             # Configure mocks
             mock_send_event.return_value = None  # Successful Datalake send
@@ -586,19 +589,12 @@ class ConversionEventAPITest(TembaTest):
                 config={},  # Empty config means no dataset_id
             )
 
-            # Create CTWA data
-            ctwa = CTWA.objects.create(
-                ctwa_clid="test_clid_456",
-                channel_uuid=channel.uuid,
-                waba="test_waba_456",
-                contact_urn="whatsapp:+5511888888888",
-            )
-
             # Test the _send_to_meta method directly
             from temba.conversion_events.views import ConversionEventView
+
             view = ConversionEventView()
             success, error = view._send_to_meta({}, None)  # dataset_id is None
-            
+
             self.assertFalse(success)
             self.assertEqual(error, "Meta dataset ID not configured")
             mock_post.assert_not_called()
@@ -611,11 +607,12 @@ class ConversionEventAPITest(TembaTest):
 
             # Test the _send_to_meta method directly
             from temba.conversion_events.views import ConversionEventView
+
             view = ConversionEventView()
-            
+
             with override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token"):
                 success, error = view._send_to_meta({}, "test_dataset")
-                
+
                 self.assertFalse(success)
                 self.assertEqual(error, "Network error sending to Meta: Network timeout")
 
@@ -623,16 +620,11 @@ class ConversionEventAPITest(TembaTest):
         """Test _send_to_datalake when channel and org are not found"""
         # Test the _send_to_datalake method directly
         from temba.conversion_events.views import ConversionEventView
+
         view = ConversionEventView()
-        
+
         # Test with non-existent channel
-        success, error = view._send_to_datalake(
-            "lead",
-            "non-existent-uuid",
-            "whatsapp:+1234567890",
-            None,
-            {}
-        )
+        success, error = view._send_to_datalake("lead", "non-existent-uuid", "whatsapp:+1234567890", None, {})
         self.assertFalse(success)
         self.assertEqual(error, "Channel not found")
 
@@ -642,38 +634,28 @@ class ConversionEventAPITest(TembaTest):
             mock_channel.org_id = 999999  # Non-existent org ID
             mock_channel_filter.return_value.only.return_value.first.return_value = mock_channel
 
-            success, error = view._send_to_datalake(
-                "lead",
-                "some-uuid",
-                "whatsapp:+1234567890",
-                None,
-                {}
-            )
+            success, error = view._send_to_datalake("lead", "some-uuid", "whatsapp:+1234567890", None, {})
             self.assertFalse(success)
             self.assertEqual(error, "Organization not found")
 
     def test_org_lookup_exception_direct(self):
         """Test _send_to_datalake when org lookup raises an exception"""
         from temba.conversion_events.views import ConversionEventView
+
         view = ConversionEventView()
 
-        with patch("temba.channels.models.Channel.objects.filter") as mock_channel_filter, \
-             patch("temba.orgs.models.Org.objects.filter") as mock_org_filter:
+        with patch("temba.channels.models.Channel.objects.filter") as mock_channel_filter, patch(
+            "temba.orgs.models.Org.objects.filter"
+        ) as mock_org_filter:
             # Setup channel mock to return a valid channel
             mock_channel = Mock()
             mock_channel.org_id = 123
             mock_channel_filter.return_value.only.return_value.first.return_value = mock_channel
-            
+
             # Setup org filter to raise an exception
             mock_org_filter.side_effect = Exception("Database error during org lookup")
 
-            success, error = view._send_to_datalake(
-                "lead",
-                "some-uuid",
-                "whatsapp:+1234567890",
-                None,
-                {}
-            )
+            success, error = view._send_to_datalake("lead", "some-uuid", "whatsapp:+1234567890", None, {})
             self.assertFalse(success)
             self.assertEqual(error, "Organization not found")
 
