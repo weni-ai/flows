@@ -3,6 +3,8 @@ from datetime import datetime
 
 import requests
 from rest_framework import viewsets
+from weni_datalake_sdk.clients.client import send_event_data
+from weni_datalake_sdk.paths.events_path import EventPath
 
 from django.conf import settings
 from django.http import JsonResponse
@@ -17,12 +19,12 @@ logger = logging.getLogger(__name__)
 class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
     """
     API endpoint to receive conversion events (lead/purchase)
-    and send immediately to Meta Conversion API
+    and send to Meta Conversion API and/or Weni Datalake
     """
 
     def create(self, request):
         """
-        Receive conversion event and send immediately to Meta
+        Receive conversion event and send to appropriate destinations
         """
         try:
             # Validate JSON first
@@ -42,37 +44,53 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
 
             # Get CTWA data for Meta sending
             ctwa_data = self._get_ctwa_data(channel_uuid, contact_urn)
-            if not ctwa_data:
-                return JsonResponse(
-                    {
-                        "error": "CTWA Data Not Found",
-                        "detail": f"No CTWA data found for channel {channel_uuid} and contact {contact_urn}",
-                    },
-                    status=404,
+            meta_success = None
+            meta_error = None
+
+            # If we have CTWA data, try to send to Meta
+            if ctwa_data:
+                dataset_id = self._get_channel_dataset_id(channel_uuid)
+                if dataset_id:
+                    # Build payload for Meta Conversion API
+                    meta_payload = self._build_meta_payload(
+                        event_type, ctwa_data, None
+                    )  # payload is not used for Meta
+                    # Send to Meta
+                    meta_success, meta_error = self._send_to_meta(meta_payload, dataset_id)
+
+            # Always send to Datalake regardless of CTWA status
+            datalake_success, datalake_error = self._send_to_datalake(
+                event_type=event_type,
+                channel_uuid=channel_uuid,
+                contact_urn=contact_urn,
+                ctwa_data=ctwa_data,
+                payload=payload,
+            )
+
+            # Prepare response based on results
+            if ctwa_data and dataset_id and meta_success:  # Check for dataset_id here
+                logger.info(
+                    f"Conversion event {event_type} sent successfully to Meta and Datalake for channel {channel_uuid}"
                 )
-
-            dataset_id = self._get_channel_dataset_id(channel_uuid)
-            if not dataset_id:
                 return JsonResponse(
-                    {
-                        "error": "Dataset ID Not Found",
-                        "detail": f"No dataset_id configured for channel {channel_uuid}",
-                    },
-                    status=404,
+                    {"status": "success", "message": "Event sent to Meta and Datalake successfully"}, status=200
                 )
-
-            # Build payload for Meta Conversion API
-            meta_payload = self._build_meta_payload(event_type, ctwa_data, payload)
-
-            # Send to Meta immediately
-            success, error_msg = self._send_to_meta(meta_payload, dataset_id)
-
-            if success:
-                logger.info(f"Conversion event {event_type} sent successfully to Meta for channel {channel_uuid}")
-                return JsonResponse({"status": "success", "message": "Event sent to Meta successfully"}, status=200)
+            elif datalake_success:  # If Datalake succeeds, it's a success
+                logger.info(f"Conversion event {event_type} sent successfully to Datalake for channel {channel_uuid}")
+                return JsonResponse(
+                    {"status": "success", "message": "Event sent to Datalake successfully"}, status=200
+                )
             else:
-                logger.error(f"Failed to send conversion event to Meta: {error_msg}")
-                return JsonResponse({"error": "Meta API Error", "detail": error_msg}, status=500)
+                # If we tried to send to Meta (have CTWA and dataset_id) and it failed, it's a Meta error
+                if ctwa_data and dataset_id:
+                    error_type = "Meta API Error"
+                    error_msg = meta_error
+                else:
+                    error_type = "API Error"
+                    error_msg = datalake_error
+
+                logger.error(f"Failed to send conversion event: {error_msg}")
+                return JsonResponse({"error": error_type, "detail": error_msg}, status=500)
 
         except Exception as e:
             error_msg = str(e)
@@ -162,3 +180,53 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             return False, f"Network error sending to Meta: {str(e)}"
         except Exception as e:
             return False, f"Error sending to Meta: {str(e)}"
+
+    def _send_to_datalake(self, event_type, channel_uuid, contact_urn, ctwa_data, payload):
+        """Send event to Weni Datalake"""
+        try:
+            # Get channel and org data
+            from temba.channels.models import Channel
+            from temba.orgs.models import Org
+
+            try:
+                channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only("org_id").first()
+                if not channel:
+                    return False, "Channel not found"
+            except Exception:
+                return False, "Channel not found"
+
+            try:
+                org = Org.objects.filter(id=channel.org_id).only("proj_uuid").first()
+                if not org or not org.proj_uuid:
+                    return False, "Organization not found"
+            except Exception:
+                return False, "Organization not found"
+
+            # Start with all payload data in metadata
+            metadata = payload.copy() if payload else {}
+
+            # Add required fields to metadata
+            metadata["channel"] = str(channel_uuid)
+
+            # Add CTWA ID only if available
+            if ctwa_data:
+                metadata["ctwa_id"] = ctwa_data.ctwa_clid
+
+            data = {
+                "event_name": f"conversion_{event_type}",
+                "key": "capi",
+                "value": event_type,  # "lead" or "purchase"
+                "value_type": "string",
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "project": str(org.proj_uuid),  # Using org proj_uuid as project identifier
+                "contact_urn": contact_urn,
+                "metadata": metadata,
+            }
+
+            send_event_data(EventPath, data)
+            return True, None
+
+        except Exception as e:
+            error_msg = f"Error sending to Datalake: {str(e)}"
+            logger.error(error_msg)
+            return False, error_msg
