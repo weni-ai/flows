@@ -584,11 +584,13 @@ class ConversionEventAPITest(TembaTest):
             from temba.conversion_events.views import ConversionEventView
 
             view = ConversionEventView()
-            success, error = view._send_to_meta({}, None)  # dataset_id is None
 
-            self.assertFalse(success)
-            self.assertEqual(error, "Meta dataset ID not configured")
-            mock_post.assert_not_called()
+            with override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token"):
+                success, error = view._send_to_meta({}, None)  # dataset_id is None
+
+                self.assertFalse(success)
+                self.assertEqual(error, "Meta dataset ID not configured")
+                mock_post.assert_not_called()
 
     def test_meta_network_error_direct(self):
         """Test _send_to_meta when network error occurs"""
