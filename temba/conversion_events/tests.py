@@ -15,6 +15,8 @@ from temba.conversion_events.models import CTWA
 from temba.conversion_events.serializers import ConversionEventSerializer
 from temba.tests import TembaTest
 
+import requests
+
 
 class ConversionEventSerializerTest(TembaTest):
     """Test the ConversionEventSerializer validation"""
@@ -149,8 +151,9 @@ class ConversionEventAPITest(TembaTest):
         }
 
     def test_successful_lead_conversion(self):
-        with patch("temba.conversion_events.views.requests.post") as mock_post, \
-             patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"success": True}
@@ -160,6 +163,15 @@ class ConversionEventAPITest(TembaTest):
             self.org.proj_uuid = uuid4()
             self.org.save(update_fields=["proj_uuid"])
 
+            # Add custom data to payload
+            payload = self.valid_payload.copy()
+            payload["payload"] = {
+                "custom_field": "custom_value",
+                "order_form_id": "12345",
+                "value": "100.00",
+                "another_field": "another_value",
+            }
+
             with override_settings(
                 WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
                 WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
@@ -167,7 +179,7 @@ class ConversionEventAPITest(TembaTest):
             ):
                 response = self.client.post(
                     self.endpoint_url,
-                    data=json.dumps(self.valid_payload),
+                    data=json.dumps(payload),
                     content_type="application/json",
                 )
 
@@ -175,7 +187,7 @@ class ConversionEventAPITest(TembaTest):
                 response_data = response.json()
                 self.assertEqual(response_data["status"], "success")
                 self.assertEqual(response_data["message"], "Event sent to Meta and Datalake successfully")
-                
+
                 # Verify Meta API call
                 mock_post.assert_called_once()
                 call_args = mock_post.call_args
@@ -190,8 +202,14 @@ class ConversionEventAPITest(TembaTest):
                 self.assertEqual(event_data["key"], "capi")
                 self.assertEqual(event_data["value"], "lead")
                 self.assertEqual(event_data["project"], str(self.org.proj_uuid))
+                # Verify all payload data is in metadata
                 self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
                 self.assertEqual(event_data["metadata"]["ctwa_id"], "test_clid_123")
+                self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
+                self.assertEqual(event_data["metadata"]["order_form_id"], "12345")
+                self.assertEqual(event_data["metadata"]["value"], "100.00")
+                self.assertEqual(event_data["metadata"]["another_field"], "another_value")
+                self.assertNotIn("ctwa_id", event_data)  # Verify ctwa_id is not in main payload
 
     def test_successful_conversion_without_ctwa(self):
         """Test successful conversion event without CTWA data - should only send to Datalake"""
@@ -203,6 +221,7 @@ class ConversionEventAPITest(TembaTest):
             # Use a different contact URN that doesn't have CTWA data
             payload = self.valid_payload.copy()
             payload["contact_urn"] = "whatsapp:+5511888888888"
+            payload["payload"] = {"custom_field": "custom_value", "order_form_id": "12345", "value": "100.00"}
 
             response = self.client.post(
                 self.endpoint_url,
@@ -221,8 +240,12 @@ class ConversionEventAPITest(TembaTest):
             event_data = datalake_call[0][1]
             self.assertEqual(event_data["event_name"], "conversion_lead")
             self.assertEqual(event_data["project"], str(self.org.proj_uuid))
+            # Verify all payload data is in metadata
             self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
-            self.assertNotIn("ctwa_id", event_data["metadata"])
+            self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
+            self.assertEqual(event_data["metadata"]["order_form_id"], "12345")
+            self.assertEqual(event_data["metadata"]["value"], "100.00")
+            self.assertNotIn("ctwa_id", event_data)  # Verify ctwa_id is not in main payload
 
     def test_datalake_error_handling(self):
         """Test handling of Datalake API errors"""
@@ -230,11 +253,15 @@ class ConversionEventAPITest(TembaTest):
         self.org.save(update_fields=["proj_uuid"])
 
         with patch("temba.conversion_events.views.send_event_data") as mock_send_event:
-            mock_send_event.side_effect = Exception("Datalake API error")
+            mock_send_event.side_effect = Exception("API error")
+
+            # Use a different contact URN that doesn't have CTWA data
+            payload = self.valid_payload.copy()
+            payload["contact_urn"] = "whatsapp:+5511888888888"  # Non-existent contact
 
             response = self.client.post(
                 self.endpoint_url,
-                data=json.dumps(self.valid_payload),
+                data=json.dumps(payload),
                 content_type="application/json",
             )
 
@@ -242,12 +269,14 @@ class ConversionEventAPITest(TembaTest):
             response_data = response.json()
             self.assertEqual(response_data["error"], "API Error")
             self.assertIn("Error sending to Datalake", response_data["detail"])
+            self.assertIn("API error", response_data["detail"])
 
     def test_successful_purchase_conversion(self):
         payload = self.valid_payload.copy()
         payload["event_type"] = "purchase"
-        with patch("temba.conversion_events.views.requests.post") as mock_post, \
-             patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"success": True}
@@ -288,7 +317,7 @@ class ConversionEventAPITest(TembaTest):
             payload = self.valid_payload.copy()
             payload["contact_urn"] = "whatsapp:+5511888888888"  # Non-existent contact
             response = self.client.post(self.endpoint_url, data=json.dumps(payload), content_type="application/json")
-            
+
             self.assertEqual(response.status_code, 200)
             response_data = response.json()
             self.assertEqual(response_data["status"], "success")
@@ -317,9 +346,9 @@ class ConversionEventAPITest(TembaTest):
             payload = self.valid_payload.copy()
             payload["channel_uuid"] = str(channel_without_dataset.uuid)
             payload["contact_urn"] = "whatsapp:+5511888888888"
-            
+
             response = self.client.post(self.endpoint_url, data=json.dumps(payload), content_type="application/json")
-            
+
             self.assertEqual(response.status_code, 200)
             response_data = response.json()
             self.assertEqual(response_data["status"], "success")
@@ -409,27 +438,242 @@ class ConversionEventAPITest(TembaTest):
 
     @patch("temba.conversion_events.models.CTWA.objects.filter")
     def test_database_exception_in_ctwa_lookup(self, mock_filter):
+        """Test that event is still sent to Datalake when CTWA lookup fails"""
         mock_filter.side_effect = Exception("Database error")
-        response = self.client.post(
-            self.endpoint_url,
-            data=json.dumps(self.valid_payload),
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, 404)
-        response_data = response.json()
-        self.assertEqual(response_data["error"], "CTWA Data Not Found")
+
+        with patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+            # Set proj_uuid for the org
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
+            response = self.client.post(
+                self.endpoint_url,
+                data=json.dumps(self.valid_payload),
+                content_type="application/json",
+            )
+
+            # Should still succeed since we can send to Datalake
+            self.assertEqual(response.status_code, 200)
+            response_data = response.json()
+            self.assertEqual(response_data["status"], "success")
+            self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
+
+            # Verify Datalake call
+            mock_send_event.assert_called_once()
+            datalake_call = mock_send_event.call_args
+            event_data = datalake_call[0][1]
+            self.assertEqual(event_data["event_name"], "conversion_lead")
+            self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
 
     @patch("temba.channels.models.Channel.objects.filter")
     def test_database_exception_in_channel_lookup(self, mock_filter):
+        """Test that event fails when channel lookup fails"""
         mock_filter.side_effect = Exception("Database error")
-        response = self.client.post(
-            self.endpoint_url,
-            data=json.dumps(self.valid_payload),
-            content_type="application/json",
+
+        with patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+            # Set proj_uuid for the org
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
+            response = self.client.post(
+                self.endpoint_url,
+                data=json.dumps(self.valid_payload),
+                content_type="application/json",
+            )
+
+            # Should fail since we need the channel to send to Datalake
+            self.assertEqual(response.status_code, 500)
+            response_data = response.json()
+            self.assertEqual(response_data["error"], "API Error")
+            self.assertIn("Channel not found", response_data["detail"])
+
+            # Verify Datalake was not called
+            mock_send_event.assert_not_called()
+
+    def test_unexpected_error(self):
+        """Test handling of unexpected errors in the main try-except block"""
+        with patch("temba.conversion_events.views.ConversionEventSerializer") as mock_serializer:
+            # Simulate an unexpected error that's not JSON related
+            mock_serializer.side_effect = Exception("Unexpected internal error")
+
+            response = self.client.post(
+                self.endpoint_url,
+                data=json.dumps(self.valid_payload),
+                content_type="application/json",
+            )
+
+            self.assertEqual(response.status_code, 500)
+            response_data = response.json()
+            self.assertEqual(response_data["error"], "Internal Server Error")
+            self.assertEqual(response_data["detail"], "An unexpected error occurred")
+
+    def test_meta_missing_dataset_id(self):
+        """Test handling when Meta dataset_id is not configured but we try to send to Meta"""
+        with patch("temba.conversion_events.views.requests.post") as mock_post, \
+             patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+            # Set proj_uuid for the org
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
+            # Create a channel without dataset_id but with CTWA data
+            channel_without_dataset = self.create_channel(
+                "WAC",
+                "No Dataset Channel",
+                "+12065551213",
+                config={},  # Empty config means no dataset_id
+            )
+            
+            # Create CTWA data for this channel
+            ctwa = CTWA.objects.create(
+                ctwa_clid="test_clid_456",
+                channel_uuid=channel_without_dataset.uuid,
+                waba="test_waba_456",
+                contact_urn="whatsapp:+5511888888888",
+            )
+
+            # Use the channel without dataset_id
+            payload = self.valid_payload.copy()
+            payload["channel_uuid"] = str(channel_without_dataset.uuid)
+            payload["contact_urn"] = ctwa.contact_urn
+
+            # Configure mock for successful Datalake send
+            mock_send_event.return_value = None  # Successful send returns None
+
+            with override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token"):
+                response = self.client.post(
+                    self.endpoint_url,
+                    data=json.dumps(payload),
+                    content_type="application/json",
+                )
+
+                # Since we have CTWA data but no dataset_id, it should succeed with Datalake only
+                self.assertEqual(response.status_code, 200)
+                response_data = response.json()
+                self.assertEqual(response_data["status"], "success")
+                self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
+
+                # Verify Meta API was not called
+                mock_post.assert_not_called()
+                
+                # Verify Datalake was called
+                mock_send_event.assert_called_once()
+
+    def test_get_channel_dataset_id_no_channel(self):
+        """Test _get_channel_dataset_id when channel is not found"""
+        # Create a view instance to test the method directly
+        from temba.conversion_events.views import ConversionEventView
+        view = ConversionEventView()
+        
+        # Test with non-existent channel UUID
+        result = view._get_channel_dataset_id("non-existent-uuid")
+        self.assertIsNone(result)
+
+    def test_meta_dataset_id_not_configured(self):
+        """Test handling when Meta dataset_id is not configured"""
+        with patch("temba.conversion_events.views.requests.post") as mock_post, \
+             patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+
+            # Configure mocks
+            mock_send_event.return_value = None  # Successful Datalake send
+
+            # Create a channel without dataset_id
+            channel = self.create_channel(
+                "WAC",
+                "No Dataset Channel",
+                "+12065551213",
+                config={},  # Empty config means no dataset_id
+            )
+
+            # Create CTWA data
+            ctwa = CTWA.objects.create(
+                ctwa_clid="test_clid_456",
+                channel_uuid=channel.uuid,
+                waba="test_waba_456",
+                contact_urn="whatsapp:+5511888888888",
+            )
+
+            # Test the _send_to_meta method directly
+            from temba.conversion_events.views import ConversionEventView
+            view = ConversionEventView()
+            success, error = view._send_to_meta({}, None)  # dataset_id is None
+            
+            self.assertFalse(success)
+            self.assertEqual(error, "Meta dataset ID not configured")
+            mock_post.assert_not_called()
+
+    def test_meta_network_error_direct(self):
+        """Test _send_to_meta when network error occurs"""
+        with patch("temba.conversion_events.views.requests.post") as mock_post:
+            # Simulate a network error
+            mock_post.side_effect = requests.RequestException("Network timeout")
+
+            # Test the _send_to_meta method directly
+            from temba.conversion_events.views import ConversionEventView
+            view = ConversionEventView()
+            
+            with override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token"):
+                success, error = view._send_to_meta({}, "test_dataset")
+                
+                self.assertFalse(success)
+                self.assertEqual(error, "Network error sending to Meta: Network timeout")
+
+    def test_channel_and_org_not_found_direct(self):
+        """Test _send_to_datalake when channel and org are not found"""
+        # Test the _send_to_datalake method directly
+        from temba.conversion_events.views import ConversionEventView
+        view = ConversionEventView()
+        
+        # Test with non-existent channel
+        success, error = view._send_to_datalake(
+            "lead",
+            "non-existent-uuid",
+            "whatsapp:+1234567890",
+            None,
+            {}
         )
-        self.assertEqual(response.status_code, 404)
-        response_data = response.json()
-        self.assertEqual(response_data["error"], "Dataset ID Not Found")
+        self.assertFalse(success)
+        self.assertEqual(error, "Channel not found")
+
+        # Test with non-existent org
+        with patch("temba.channels.models.Channel.objects.filter") as mock_channel_filter:
+            mock_channel = Mock()
+            mock_channel.org_id = 999999  # Non-existent org ID
+            mock_channel_filter.return_value.only.return_value.first.return_value = mock_channel
+
+            success, error = view._send_to_datalake(
+                "lead",
+                "some-uuid",
+                "whatsapp:+1234567890",
+                None,
+                {}
+            )
+            self.assertFalse(success)
+            self.assertEqual(error, "Organization not found")
+
+    def test_org_lookup_exception_direct(self):
+        """Test _send_to_datalake when org lookup raises an exception"""
+        from temba.conversion_events.views import ConversionEventView
+        view = ConversionEventView()
+
+        with patch("temba.channels.models.Channel.objects.filter") as mock_channel_filter, \
+             patch("temba.orgs.models.Org.objects.filter") as mock_org_filter:
+            # Setup channel mock to return a valid channel
+            mock_channel = Mock()
+            mock_channel.org_id = 123
+            mock_channel_filter.return_value.only.return_value.first.return_value = mock_channel
+            
+            # Setup org filter to raise an exception
+            mock_org_filter.side_effect = Exception("Database error during org lookup")
+
+            success, error = view._send_to_datalake(
+                "lead",
+                "some-uuid",
+                "whatsapp:+1234567890",
+                None,
+                {}
+            )
+            self.assertFalse(success)
+            self.assertEqual(error, "Organization not found")
 
 
 class CTWAModelTest(TembaTest):
