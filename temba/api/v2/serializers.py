@@ -325,6 +325,10 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             if data.get("queue") == "template_batch":
                 if not data.get("name"):
                     raise serializers.ValidationError("Name is required for template_batch queue")
+                if not data.get("groups"):
+                    raise serializers.ValidationError("Groups are required for template_batch queue")
+                if data.get("contacts"):
+                    raise serializers.ValidationError("Contacts are not allowed for template_batch queue")
 
         return data
 
