@@ -2,6 +2,8 @@ import uuid
 from functools import wraps
 from unittest.mock import patch
 
+from rest_framework.authentication import BasicAuthentication
+
 from django.urls import reverse
 
 from temba.tests import TembaTest
@@ -37,6 +39,7 @@ class GetProjectViewTest(TembaTest):
 
         self.url = reverse("api.v2.projects")
 
+    @patch(f"{GET_PROJECT_VIEW_PATH}.authentication_classes", [BasicAuthentication])
     def test_requires_authentication(self):
         # Without authentication headers, endpoint should deny access
         resp = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}")
