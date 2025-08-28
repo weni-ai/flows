@@ -130,6 +130,12 @@ class TemplateTranslation(models.Model):
     # the content of this template
     content = models.TextField(null=False)
 
+    # the body text of this template (WhatsApp BODY component)
+    body = models.CharField(max_length=2048, null=True)
+
+    # the footer text of this template (WhatsApp FOOTER component)
+    footer = models.CharField(max_length=60, null=True)
+
     # how many variables this template contains
     variable_count = models.IntegerField()
 
@@ -165,7 +171,19 @@ class TemplateTranslation(models.Model):
 
     @classmethod
     def get_or_create(
-        cls, channel, name, language, country, content, variable_count, status, external_id, namespace, category
+        cls,
+        channel,
+        name,
+        language,
+        country,
+        content,
+        variable_count,
+        status,
+        external_id,
+        namespace,
+        category,
+        body=None,
+        footer=None,
     ):
         existing = TemplateTranslation.objects.filter(channel=channel, external_id=external_id).first()
 
@@ -184,6 +202,9 @@ class TemplateTranslation(models.Model):
                 template.category = category
                 template.save(update_fields=["modified_on", "category"])
 
+            body_value = body[:2048] if body is not None else None
+            footer_value = footer[:60] if footer is not None else None
+
             existing = TemplateTranslation.objects.create(
                 template=template,
                 channel=channel,
@@ -194,14 +215,21 @@ class TemplateTranslation(models.Model):
                 country=country,
                 external_id=external_id,
                 namespace=namespace,
+                body=body_value,
+                footer=footer_value,
             )
 
         else:
+            body_value = body[:2048] if body is not None else None
+            footer_value = footer[:60] if footer is not None else None
+
             if (
                 existing.status != status
                 or existing.content != content
                 or existing.country != country
                 or existing.language != language
+                or (body is not None and existing.body != body_value)
+                or (footer is not None and existing.footer != footer_value)
             ):
                 existing.status = status
                 existing.content = content
@@ -210,17 +238,25 @@ class TemplateTranslation(models.Model):
                 existing.language = language
                 existing.country = country
                 existing.namespace = namespace
-                existing.save(
-                    update_fields=[
-                        "status",
-                        "language",
-                        "content",
-                        "country",
-                        "is_active",
-                        "variable_count",
-                        "namespace",
-                    ]
-                )
+                update_fields = [
+                    "status",
+                    "language",
+                    "content",
+                    "country",
+                    "is_active",
+                    "variable_count",
+                    "namespace",
+                ]
+
+                if body is not None and existing.body != body_value:
+                    existing.body = body_value
+                    update_fields.append("body")
+
+                if footer is not None and existing.footer != footer_value:
+                    existing.footer = footer_value
+                    update_fields.append("footer")
+
+                existing.save(update_fields=[*update_fields])
 
                 existing.template.modified_on = timezone.now()
                 existing.template.save(update_fields=["modified_on"])
@@ -236,6 +272,7 @@ class TemplateButton(models.Model):
         ("QUICK_REPLY", "quick_reply"),
         ("PHONE_NUMBER", "phone_number"),
         ("URL", "url"),
+        ("COPY_CODE", "copy_code"),
     )
 
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
