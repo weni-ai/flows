@@ -235,6 +235,10 @@ class Trigger(SmartModel):
         if trigger_type == Trigger.TYPE_SCHEDULE:  # schedule triggers never conflict
             return cls.objects.none()
 
+        # Allow overlapping/identical catch-all triggers (uncaught messages) to coexist
+        if trigger_type == Trigger.TYPE_CATCH_ALL:
+            return cls.objects.none()
+
         conflicts = org.triggers.filter(is_active=True, trigger_type=trigger_type)
         if not include_archived:
             conflicts = conflicts.filter(is_archived=False)
