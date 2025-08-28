@@ -217,7 +217,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                 "key": "capi",
                 "value": event_type,  # "lead" or "purchase"
                 "value_type": "string",
-                "date": datetime.now().strftime("%Y-%m-%d"),
+                "date": datetime.now().timestamp(),
                 "project": str(org.proj_uuid),  # Using org proj_uuid as project identifier
                 "contact_urn": contact_urn,
                 "metadata": metadata,
