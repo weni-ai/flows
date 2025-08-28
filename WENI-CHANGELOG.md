@@ -1,3 +1,8 @@
+3.38.0
+----------
+* Update weni-rp-apps version to 2.10.4
+* Enhance conversion event handling to send data to Weni Datalake
+
 3.37.2
 ----------
 * Add isOrgUser permission
