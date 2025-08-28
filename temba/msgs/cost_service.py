@@ -33,6 +33,15 @@ class BillingInternalClient(BaseInternalClient):
         return response.json()
 
 
+def get_billing_pricing(project: str = None):
+    """
+    Lightweight service to fetch pricing data directly from Billing.
+    Acts as a thin proxy with no additional transformation to avoid duplication.
+    """
+    client = BillingInternalClient()
+    return client.get_pricing(project=project)
+
+
 def get_template_price_and_currency_from_api(template_id=None):
     """
     Search for the template price and currency in the external pricing API.

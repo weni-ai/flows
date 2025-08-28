@@ -7,6 +7,7 @@ from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
 from temba.api.v2.templates.views import TemplatesTranslationsEndpoint
 from temba.api.v2.projects.views import GetProjectView
 
+from .billing.views import BillingPricingEndpoint
 from .flows.urls import urlpatterns as flows_urlpatterns
 from .internals.urls import urlpatterns as internals_urlpatterns
 from .views import (
@@ -110,6 +111,7 @@ urlpatterns = [
     url(r"^topics$", TopicsEndpoint.as_view(), name="api.v2.topics"),
     url(r"^users$", UsersEndpoint.as_view(), name="api.v2.users"),
     url(r"^workspace$", WorkspaceEndpoint.as_view(), name="api.v2.workspace"),
+    url(r"^billing_pricing$", BillingPricingEndpoint.as_view(), name="api.v2.billing_pricing"),
     url(r"^intelligences$", IntelligencesEndpoint.as_view(), name="api.v2.intelligences"),
     url(r"^brain_info$", BrainInfoEndpoint.as_view(), name="api.v2.brain_info"),
     url(r"^whatsapp_flows$", WhatsappFlowsEndpoint.as_view(), name="api.v2.whatsapp_flows"),
