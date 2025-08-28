@@ -189,7 +189,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             from temba.orgs.models import Org
 
             try:
-                channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only("org_id").first()
+                channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only("org_id", "config").first()
                 if not channel:
                     return False, "Channel not found"
             except Exception:
@@ -208,6 +208,10 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             # Add required fields to metadata
             metadata["channel"] = str(channel_uuid)
 
+            # Add waba_id from channel config if available
+            if channel.config and "waba_id" in channel.config:
+                metadata["waba_id"] = channel.config["waba_id"]
+
             # Add CTWA ID only if available
             if ctwa_data:
                 metadata["ctwa_id"] = ctwa_data.ctwa_clid
@@ -217,7 +221,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                 "key": "capi",
                 "value": event_type,  # "lead" or "purchase"
                 "value_type": "string",
-                "date": datetime.now().strftime("%Y-%m-%d"),
+                "date": datetime.now().timestamp(),
                 "project": str(org.proj_uuid),  # Using org proj_uuid as project identifier
                 "contact_urn": contact_urn,
                 "metadata": metadata,
