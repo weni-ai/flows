@@ -8,7 +8,6 @@ from django.core.files.storage import DefaultStorage
 from django.conf import settings
 
 from temba.utils import json
-from . import presigned
 
 
 class PrivateFileStorage(DefaultStorage):
