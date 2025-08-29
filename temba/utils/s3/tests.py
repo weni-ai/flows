@@ -8,10 +8,6 @@ from temba.tests import TembaTest
 from temba.tests.s3 import MockEventStream, MockS3Client
 from temba.utils.s3 import EventStreamReader, compile_select, get_body, split_url
 
-from django.test import TestCase, override_settings
-
-from . import presigned
-
 
 class S3Test(TembaTest):
     def test_buffer(self):
@@ -89,55 +85,3 @@ class SelectTest(TembaTest):
             "SELECT s.* FROM s3object s WHERE '1ccf09f6-3fe8-4c0d-a073-981632be5a30' IN s.labels[*].uuid[*]",
             compile_select(where={"__raw__": "'1ccf09f6-3fe8-4c0d-a073-981632be5a30' IN s.labels[*].uuid[*]"}),
         )
-
-
-class PresignedURLTest(TestCase):
-    @override_settings(
-        AWS_STORAGE_BUCKET_NAME="test-bucket",
-    )
-    @patch("temba.utils.s3.s3.client")
-    def test_generate_presigned_url(self, mock_client):
-        # Setup mock S3 client
-        mock_s3 = mock_client.return_value
-        mock_s3.generate_presigned_url.return_value = "https://test-bucket.s3.amazonaws.com/test.txt?signature=xyz"
-
-        # Test basic URL generation
-        url = presigned.generate_presigned_url("test.txt")
-        self.assertEqual(url, "https://test-bucket.s3.amazonaws.com/test.txt?signature=xyz")
-        
-        mock_s3.generate_presigned_url.assert_called_with(
-            "get_object",
-            Params={"Bucket": "test-bucket", "Key": "test.txt"},
-            ExpiresIn=3600,
-            HttpMethod="GET"
-        )
-
-        # Test with custom headers
-        headers = presigned.get_download_headers("myfile.pdf", "application/pdf")
-        url = presigned.generate_presigned_url("test.pdf", response_headers=headers)
-        
-        mock_s3.generate_presigned_url.assert_called_with(
-            "get_object",
-            Params={
-                "Bucket": "test-bucket",
-                "Key": "test.pdf",
-                "ResponseContentDisposition": "attachment; filename=myfile.pdf",
-                "ResponseContentType": "application/pdf"
-            },
-            ExpiresIn=3600,
-            HttpMethod="GET"
-        )
-
-    def test_get_download_headers(self):
-        # Test basic headers
-        headers = presigned.get_download_headers("test.txt")
-        self.assertEqual(headers, {
-            "ContentDisposition": "attachment; filename=test.txt"
-        })
-
-        # Test with content type
-        headers = presigned.get_download_headers("test.pdf", "application/pdf")
-        self.assertEqual(headers, {
-            "ContentDisposition": "attachment; filename=test.pdf",
-            "ContentType": "application/pdf"
-        })

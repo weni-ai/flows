@@ -29,21 +29,23 @@ def client():  # pragma: no cover
         # Configure session with explicit credentials if provided, otherwise use pod IAM role
         session_kwargs = {}
         if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
-            session_kwargs.update({
-                "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
-                "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY
-            })
-        
+            session_kwargs.update(
+                {
+                    "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+                    "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+                }
+            )
+
         session = boto3.Session(**session_kwargs)
-        
+
         # Configure the client with retries and endpoint if specified
         client_config = Config(retries={"max_attempts": 3})
         client_kwargs = {"config": client_config}
-        
+
         # Add custom endpoint if configured (useful for testing or non-AWS S3)
         if getattr(settings, "AWS_S3_ENDPOINT_URL", None):
             client_kwargs["endpoint_url"] = settings.AWS_S3_ENDPOINT_URL
-            
+
         _s3_client = session.client("s3", **client_kwargs)
 
     return _s3_client

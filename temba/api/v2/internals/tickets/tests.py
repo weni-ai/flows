@@ -373,15 +373,9 @@ class OpenTicketTest(TembaTest):
     def test_open_ticket_returning_error(self, mock_ticket_open, mock_protected_resource):
         mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
 
-        error_response = {
-            "error": "{\"detail\":\"The contact already have an open room in the project\"}"
-        }
-        
-        mock_ticket_open.side_effect = MailroomException(
-            "ticket/open", 
-            {"org_id": self.org.id}, 
-            error_response
-        )
+        error_response = {"error": '{"detail":"The contact already have an open room in the project"}'}
+
+        mock_ticket_open.side_effect = MailroomException("ticket/open", {"org_id": self.org.id}, error_response)
 
         url = "/api/v2/internals/open_ticket"
         body = {
@@ -397,7 +391,7 @@ class OpenTicketTest(TembaTest):
         mock_ticket_open.assert_called_once()
 
         self.assertEqual(response.status_code, 500)
-        
+
         self.assertEqual(response.data, error_response)
 
     @patch.object(LambdaURLValidator, "protected_resource")
