@@ -11,32 +11,11 @@ from temba.utils import json
 from . import presigned
 
 
-class PublicFileStorage(DefaultStorage):
-    default_acl = "private"  # Changed from public-read to private
-    
-    def url(self, name, parameters=None, http_method=None, expires_in=3600):
-        """
-        Generate a presigned URL for the file.
-        
-        Args:
-            name: Name of the file in storage
-            parameters: Optional dict of response parameters
-            http_method: HTTP method to allow (default: GET)
-            expires_in: Seconds until URL expires (default: 1 hour)
-            
-        Returns:
-            str: Presigned URL for the file
-        """
-        return presigned.generate_presigned_url(
-            path=name,
-            expires_in=expires_in,
-            response_headers=parameters,
-            http_method=http_method or "GET"
-        )
+class PrivateFileStorage(DefaultStorage):
+    default_acl = "private"
 
 
-public_file_storage = PublicFileStorage()
-public_file_storage.default_acl = "private"  # Changed from public-read to private
+private_file_storage = PrivateFileStorage()
 
 _s3_client = None
 
