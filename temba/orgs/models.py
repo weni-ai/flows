@@ -44,7 +44,7 @@ from temba.utils.cache import get_cacheable_result
 from temba.utils.dates import datetime_to_str
 from temba.utils.email import send_template_email
 from temba.utils.models import JSONAsTextField, JSONField, SquashableModel
-from temba.utils.s3 import public_file_storage
+from temba.utils.s3 import public_file_storage, private_file_storage
 from temba.utils.text import generate_token, random_string
 from temba.utils.timezones import timezone_to_country_code
 from temba.utils.uuid import uuid4
@@ -1904,6 +1904,14 @@ class Org(SmartModel):
 
     def __str__(self):
         return self.name
+
+    def save_export(self, task_type: str, file) -> str:
+        """
+        Saves an export file
+        """
+        path = f"exports/{self.id}/{task_type}/{uuid4()}/{file.name}"
+        location = private_file_storage.save(path, file)
+        return location
 
 
 # ===================== monkey patch User class with a few extra functions ========================
