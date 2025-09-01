@@ -24,6 +24,7 @@ from temba.api.v2.internals.contacts.serializers import (
     InternalContactSerializer,
 )
 from temba.api.v2.internals.views import APIViewMixin
+from temba.api.v2.permissions import IsUserInOrg
 from temba.api.v2.serializers import ContactFieldReadSerializer, ContactFieldWriteSerializer
 from temba.api.v2.validators import LambdaURLValidator
 from temba.contacts.models import Contact, ContactField, ContactURN
@@ -72,7 +73,7 @@ class InternalContactView(APIViewMixin, APIView):
 
 class InternalContactFieldsEndpoint(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    permission_classes = [IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)]
 
     def get(self, request, *args, **kwargs):
         query_params = request.query_params
