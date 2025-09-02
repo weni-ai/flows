@@ -1,6 +1,8 @@
 import datetime as dt
 import logging
+from pathlib import Path
 
+import pyexcel
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
 from rest_framework.pagination import CursorPagination
@@ -35,6 +37,7 @@ from temba.contacts.views import ContactImportCRUDL
 from temba.msgs.models import Msg
 from temba.orgs.models import Org
 from temba.tickets.models import Ticket
+from temba.utils.text import decode_stream
 
 logger = logging.getLogger(__name__)
 
@@ -178,8 +181,21 @@ class ContactsImportUploadView(APIViewMixin, APIView):
         except Exception as e:
             logger.exception("Error parsing import file")
             return Response({"error": f"Error parsing file: {str(e)}"}, status=400)
+        # Extract example values from the uploaded file before creating the import
+        examples = ContactImportPreviewService.extract_examples(file, file.name, mappings)
         # Create the ContactImport object like the CRUDL
-        # Use a system user if there is no request.user
+        # Use a system user if there is no authenticated request.user
+        created_by_user = request.user if getattr(request, "user", None) and request.user.is_authenticated else None
+        if not created_by_user:
+            internal_email = getattr(settings, "INTERNAL_USER_EMAIL", "")
+            if internal_email:
+                try:
+                    created_by_user = User.objects.get(email=internal_email)
+                except User.DoesNotExist:
+                    created_by_user = None
+        if not created_by_user:
+            created_by_user = getattr(org, "created_by", None) or getattr(org, "modified_by", None)
+
         contact_import = ContactImport.objects.create(
             org=org,
             file=file,
@@ -187,16 +203,16 @@ class ContactsImportUploadView(APIViewMixin, APIView):
             mappings=mappings,
             num_records=num_records,
             status=ContactImport.STATUS_PENDING,
-            created_by=request.user,
-            modified_by=request.user,
+            created_by=created_by_user,
+            modified_by=created_by_user,
         )
         # Create the fields/columns like the preview of the CRUDL
         org_fields = ContactField.user_fields.filter(org=org, is_active=True)
         fields = [{"key": f.key, "label": f.label, "type": f.value_type} for f in org_fields]
         columns = []
-        for item in mappings:
+        for idx, item in enumerate(mappings):
             mapping = item["mapping"]
-            col = {"header": item["header"]}
+            col = {"header": item["header"], "example": examples[idx]}
             if mapping["type"] == "field":
                 col["type"] = "field"
                 col["matched_field"] = mapping["key"]
@@ -228,6 +244,24 @@ class ContactsImportConfirmView(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
     permission_classes = [IsAuthenticated, IsUserInOrg]
     parser_classes = [JSONParser]
+
+    def get(self, request, import_id=None):
+        if not import_id:
+            return Response({"error": "import_id is required in URL."}, status=400)
+        try:
+            contact_import = ContactImport.objects.get(id=import_id)
+        except ContactImport.DoesNotExist:
+            return Response({"error": "Import not found."}, status=404)
+
+        # ensure the requester is the same user who confirmed the import
+        if not (getattr(request, "user", None) and request.user.is_authenticated):
+            return Response({"error": "Forbidden."}, status=403)
+        confirmer_id = contact_import.modified_by_id
+        if not confirmer_id or request.user.id != confirmer_id:
+            return Response({"error": "Forbidden."}, status=403)
+
+        info = contact_import.get_info()
+        return Response(info, status=200)
 
     def post(self, request, import_id=None):
         project_uuid = request.data.get("project_uuid")
@@ -268,6 +302,21 @@ class ContactsImportConfirmView(APIViewMixin, APIView):
                 obj.group = None
             elif group_mode == form.GROUP_MODE_EXISTING:
                 obj.group = form.cleaned_data["existing_group"]
+        # stamp the confirmer user
+        confirmer = request.user if getattr(request, "user", None) and request.user.is_authenticated else None
+        if not confirmer:
+            internal_email = getattr(settings, "INTERNAL_USER_EMAIL", "")
+            if internal_email:
+                try:
+                    confirmer = User.objects.get(email=internal_email)
+                except User.DoesNotExist:
+                    confirmer = None
+        if not confirmer:
+            confirmer = getattr(contact_import.org, "modified_by", None) or getattr(
+                contact_import.org, "created_by", None
+            )
+
+        obj.modified_by = confirmer
         obj.save()
         # Trigger the import task (asynchronous)
         obj.start_async()
@@ -334,12 +383,19 @@ class ContactsWithMessagesView(APIViewMixin, APIView):
         if timezone.is_naive(end_dt):
             end_dt = timezone.make_aware(end_dt, timezone.utc)
 
-        # Take all contacts created in the period
-        all_contacts_qs = ContactsWithMessagesService.get_contacts_with_messages(org, start_dt, end_dt).order_by(
-            "created_on"
+        # Take only contacts with messages in the period, then paginate
+        contacts_with_msgs_qs = (
+            ContactsWithMessagesService.get_contacts_with_messages(org, start_dt, end_dt)
+            .filter(
+                msgs__created_on__gte=start_dt,
+                msgs__created_on__lte=end_dt,
+                msgs__direction=Msg.DIRECTION_IN,
+            )
+            .distinct()
+            .order_by("created_on", "id")
         )
         paginator = ContactsWithMessagesCursorPagination()
-        page = paginator.paginate_queryset(all_contacts_qs, request, view=self)
+        page = paginator.paginate_queryset(contacts_with_msgs_qs, request, view=self)
         contact_results = []
         for contact in page:
             filtered_msgs = getattr(contact, "filtered_msgs", [])
@@ -355,3 +411,35 @@ class ContactsWithMessagesView(APIViewMixin, APIView):
                 )
         serializer = ContactWithMessagesListSerializer(contact_results, many=True)
         return paginator.get_paginated_response(serializer.data)
+
+
+# Service to extract example values for import preview
+class ContactImportPreviewService:
+    @staticmethod
+    def extract_examples(file, filename: str, mappings: list) -> list:
+        try:
+            file_type = Path(filename).suffix[1:].lower()
+        except Exception:
+            file_type = "csv"
+
+        stream = decode_stream(file) if file_type == "csv" else file
+        data = pyexcel.iget_array(file_stream=stream, file_type=file_type)
+
+        # skip headers
+        try:
+            next(data)
+        except StopIteration:
+            file.seek(0)
+            return [None] * len(mappings)
+
+        examples = [None] * len(mappings)
+        for raw_row in data:
+            row = ContactImport._parse_row(raw_row, len(mappings))
+            for i, value in enumerate(row):
+                if examples[i] is None and value and value != ContactImport.EXPLICIT_CLEAR:
+                    examples[i] = value
+            if all(v is not None for v in examples):
+                break
+
+        file.seek(0)
+        return examples
