@@ -78,7 +78,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
 
             # Prepare response based on results
             if meta_success and datalake_success:
-                logger.info(
+                logger.warning(
                     f"[SUCCESS] Both services: Meta and Datalake succeeded for event {event_type} on channel {channel_uuid}"
                 )
                 return JsonResponse(
@@ -94,7 +94,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                         f"[PARTIAL] Datalake succeeded but Meta failed for event {event_type} on channel {channel_uuid}. Meta error: {meta_error}"
                     )
                 else:  # Meta wasn't attempted (no CTWA or dataset_id)
-                    logger.info(
+                    logger.warning(
                         f"[SUCCESS] Datalake only: Meta not attempted for event {event_type} on channel {channel_uuid}"
                     )
                 return JsonResponse(
