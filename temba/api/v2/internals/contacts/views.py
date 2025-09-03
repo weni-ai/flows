@@ -20,6 +20,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import exceptions as django_exceptions
 from django.core.exceptions import ValidationError
+from django.core.files import File
 from django.db import models
 from django.db.models import Sum, Value
 from django.db.models.functions import Coalesce
@@ -39,13 +40,15 @@ from temba.api.v2.serializers import (
     ContactGroupWriteSerializer,
 )
 from temba.api.v2.validators import LambdaURLValidator
-from temba.contacts.models import Contact, ContactField, ContactGroup, ContactImport, ContactURN
+from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
+from temba.contacts.models import Contact, ContactField, ContactImport, ContactURN, ContactGroup
 from temba.contacts.views import ContactImportCRUDL
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
 from temba.msgs.models import Broadcast, Msg
 from temba.orgs.models import Org
 from temba.tickets.models import Ticket
 from temba.utils.text import decode_stream
+
 
 logger = logging.getLogger(__name__)
 
@@ -371,23 +374,35 @@ class ContactsImportUploadView(APIViewMixin, APIView):
 
     def post(self, request, *args, **kwargs):
         project_uuid = request.data.get("project_uuid")
-        file = request.FILES.get("file")
-        if not project_uuid or not file:
+        uploaded_file = request.FILES.get("file")
+        if not project_uuid or not uploaded_file:
             return Response({"error": "Project and file are required."}, status=400)
         try:
             org = Org.objects.get(proj_uuid=project_uuid)
         except Org.DoesNotExist:
             return Response({"error": "Project not found."}, status=404)
-        # Use the same parsing as the CRUDL
+        # Deduplicate uploaded file by UUID/URN and build duplicates XLSX if needed
         try:
-            mappings, num_records = ContactImport.try_to_parse(org, file, file.name)
+            (
+                mappings,
+                num_records,
+                dedup_tmp,
+                dedup_ext,
+                duplicates_url,
+                duplicates_count,
+                duplicates_error,
+            ) = ContactImportDeduplicationService.process(org, uploaded_file, uploaded_file.name)
         except ValidationError as e:
             return Response({"error": str(e)}, status=400)
         except Exception as e:
             logger.exception("Error parsing import file")
             return Response({"error": f"Error parsing file: {str(e)}"}, status=400)
-        # Extract example values from the uploaded file before creating the import
-        examples = ContactImportPreviewService.extract_examples(file, file.name, mappings)
+        # Extract example values from the deduplicated file before creating the import
+        try:
+            dedup_tmp.seek(0)
+            examples = ContactImportPreviewService.extract_examples(dedup_tmp, f"dedup.{dedup_ext}", mappings)
+        finally:
+            dedup_tmp.seek(0)
         # Create the ContactImport object like the CRUDL
         # Use a system user if there is no authenticated request.user
         created_by_user = request.user if getattr(request, "user", None) and request.user.is_authenticated else None
@@ -401,10 +416,13 @@ class ContactsImportUploadView(APIViewMixin, APIView):
         if not created_by_user:
             created_by_user = getattr(org, "created_by", None) or getattr(org, "modified_by", None)
 
+        # Save the deduplicated file as the import source
+        dedupulated_file = File(dedup_tmp, name=f"contacts_dedup.{dedup_ext}")
+
         contact_import = ContactImport.objects.create(
             org=org,
-            file=file,
-            original_filename=file.name,
+            file=dedupulated_file,
+            original_filename=uploaded_file.name,
             mappings=mappings,
             num_records=num_records,
             status=ContactImport.STATUS_PENDING,
@@ -433,12 +451,26 @@ class ContactsImportUploadView(APIViewMixin, APIView):
             else:
                 col["type"] = mapping["type"]
             columns.append(col)
+        # ensure duplicates_url is absolute when using non-S3 backends
+        if duplicates_url and not str(duplicates_url).lower().startswith("http"):
+            duplicates_url = request.build_absolute_uri(duplicates_url)
+
+        # duplicates object (null if none). Include error message if S3 upload failed
+        duplicates = None
+        if duplicates_count:
+            duplicates = {
+                "download_url": duplicates_url,
+                "count": duplicates_count,
+                "error": duplicates_error,
+            }
+
         return Response(
             {
                 "import_id": contact_import.id,
                 "num_records": num_records,
                 "fields": fields,
                 "columns": columns,
+                "duplicates": duplicates,
                 "errors": [],
             },
             status=200,
