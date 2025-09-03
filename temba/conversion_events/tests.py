@@ -690,38 +690,33 @@ class ConversionEventAPITest(TembaTest):
             self.org.proj_uuid = uuid4()
             self.org.save(update_fields=["proj_uuid"])
 
-            # Create CTWA data for this test
-            ctwa = CTWA.objects.create(
-                ctwa_clid="test_clid_456",
-                channel_uuid=self.channel.uuid,  # channel already has dataset_id from setUp
-                waba="test_waba_456",
-                contact_urn="whatsapp:+5511888888888",
-            )
+            # Use the valid payload that has CTWA data (from setUp)
+            with override_settings(
+                WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
+                WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
+                META_PARTNER_AGENT="Weni by VTEX",
+            ):
+                # Make the request
+                response = self.client.post(
+                    self.endpoint_url,
+                    data=json.dumps(self.valid_payload),
+                    content_type="application/json",
+                )
 
-            # Use payload with the CTWA contact URN
-            payload = self.valid_payload.copy()
-            payload["contact_urn"] = ctwa.contact_urn
+                # Should succeed overall since Datalake succeeded
+                self.assertEqual(response.status_code, 200)
+                response_data = response.json()
+                self.assertEqual(response_data["status"], "success")
+                self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
 
-            # Make the request
-            response = self.client.post(
-                self.endpoint_url,
-                data=json.dumps(payload),
-                content_type="application/json",
-            )
+                # Verify Meta API was called and failed
+                mock_post.assert_called_once()
+                call_args = mock_post.call_args
+                self.assertIn("test_dataset_123", call_args[0][0])
+                self.assertIn("access_token=test_token", call_args[0][0])
 
-            # Should succeed overall since Datalake succeeded
-            self.assertEqual(response.status_code, 200)
-            response_data = response.json()
-            self.assertEqual(response_data["status"], "success")
-            self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
-
-            # Verify Meta API was called and failed
-            mock_post.assert_called_once()
-            call_args = mock_post.call_args
-            self.assertIn("test_dataset_123", call_args[0][0])
-
-            # Verify Datalake was called and succeeded
-            mock_send_event.assert_called_once()
+                # Verify Datalake was called and succeeded
+                mock_send_event.assert_called_once()
 
 
 class CTWAModelTest(TembaTest):
