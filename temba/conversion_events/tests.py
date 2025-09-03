@@ -132,7 +132,7 @@ class ConversionEventAPITest(TembaTest):
             "Test WhatsApp Channel",
             "+12065551212",
             country="US",
-            config={"meta_dataset_id": "test_dataset_123"},
+            config={"meta_dataset_id": "test_dataset_123", "waba_id": "test_waba_123"},
         )
         # Create CTWA data for testing
         self.ctwa_data = CTWA.objects.create(
@@ -205,6 +205,7 @@ class ConversionEventAPITest(TembaTest):
                 # Verify all payload data is in metadata
                 self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
                 self.assertEqual(event_data["metadata"]["ctwa_id"], "test_clid_123")
+                self.assertEqual(event_data["metadata"]["waba_id"], "test_waba_123")
                 self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
                 self.assertEqual(event_data["metadata"]["order_form_id"], "12345")
                 self.assertEqual(event_data["metadata"]["value"], "100.00")
