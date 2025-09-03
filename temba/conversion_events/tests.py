@@ -690,10 +690,22 @@ class ConversionEventAPITest(TembaTest):
             self.org.proj_uuid = uuid4()
             self.org.save(update_fields=["proj_uuid"])
 
-            # Use the valid payload that has CTWA data
+            # Create CTWA data for this test
+            ctwa = CTWA.objects.create(
+                ctwa_clid="test_clid_456",
+                channel_uuid=self.channel.uuid,  # channel already has dataset_id from setUp
+                waba="test_waba_456",
+                contact_urn="whatsapp:+5511888888888",
+            )
+
+            # Use payload with the CTWA contact URN
+            payload = self.valid_payload.copy()
+            payload["contact_urn"] = ctwa.contact_urn
+
+            # Make the request
             response = self.client.post(
                 self.endpoint_url,
-                data=json.dumps(self.valid_payload),
+                data=json.dumps(payload),
                 content_type="application/json",
             )
 
