@@ -10,6 +10,7 @@ import pytz
 import stripe
 import stripe.error
 from bs4 import BeautifulSoup
+from django.core.files.uploadedfile import SimpleUploadedFile
 from smartmin.users.models import FailedLogin, RecoveryToken
 
 from django.conf import settings
@@ -65,6 +66,7 @@ from temba.tickets.models import Ticketer
 from temba.tickets.types.mailgun import MailgunType
 from temba.triggers.models import Trigger
 from temba.utils import json, languages
+from temba.utils.s3 import private_file_storage
 
 from .context_processors import GroupPermWrapper
 from .models import CreditAlert, Invitation, Org, OrgRole, TopUp
@@ -999,6 +1001,26 @@ class OrgTest(TembaTest):
         self.assertEqual(
             {self.admin, self.agent, self.editor}, set(self.org.get_users_with_perm("tickets.ticket_assignee"))
         )
+
+    def test_save_export(self):
+        """
+        Test that save_export correctly saves a file using private storage
+        """
+        test_file = SimpleUploadedFile("test.txt", b"test content", content_type="text/plain")
+        
+        # save the file
+        path = self.org.save_export("my_export", test_file)
+        
+        # check that path is correct format
+        self.assertTrue(path.startswith("exports/"))
+        self.assertTrue(path.endswith("/test.txt"))
+        
+        # check that file was saved with private storage
+        self.assertTrue(private_file_storage.exists(path))
+        
+        # check that file content is correct
+        with private_file_storage.open(path) as f:
+            self.assertEqual(f.read(), b"test content")
 
     def test_get_owner(self):
         # admins take priority
@@ -5102,3 +5124,115 @@ class UserCRUDLTestCase(TestCase):
 
         self.assertTrue(form.is_valid())
         self.assertEqual(form.cleaned_data["email"], self.user_email)
+
+    def test_save_media_with_private_storage(self):
+        """
+        Test that media files are saved with private storage
+        """
+        # create a simple file
+        test_file = SimpleUploadedFile("test.txt", b"test content", content_type="text/plain")
+
+        # save it using org's save_export method
+        path = self.org.save_export("test_task", test_file)
+
+        # check that path is correct
+        self.assertTrue(path.startswith("exports/"))
+        self.assertTrue(path.endswith("/test.txt"))
+
+        # check that file was saved with private storage
+        self.assertTrue(private_file_storage.exists(path))
+
+        # check that file content is correct
+        with private_file_storage.open(path) as f:
+            self.assertEqual(f.read(), b"test content")
+
+    def test_flow_media_upload(self):
+        """
+        Test that flow media uploads use private storage
+        """
+        self.login(self.admin)
+
+        flow = self.create_flow()
+
+        # create a test file
+        test_file = SimpleUploadedFile("test.txt", b"test content", content_type="text/plain")
+
+        # try to upload it
+        upload_url = reverse("flows.flow_upload_media_action", args=[flow.uuid])
+        response = self.client.post(upload_url, {"file": test_file})
+
+        # check response
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        
+        # should have a type and url
+        self.assertEqual(response_json["type"], "text/plain")
+        self.assertTrue("url" in response_json)
+
+        # url should be relative to STORAGE_URL
+        url = response_json["url"]
+        self.assertTrue(url.startswith(f"{settings.STORAGE_URL}/"))
+
+        # get the path part
+        path = url.replace(f"{settings.STORAGE_URL}/", "")
+
+        # check that file exists in private storage
+        self.assertTrue(private_file_storage.exists(path))
+
+        # check content
+        with private_file_storage.open(path) as f:
+            self.assertEqual(f.read(), b"test content")
+
+    def test_flow_recording_upload(self):
+        """
+        Test that flow recording uploads use private storage
+        """
+        self.login(self.admin)
+
+        flow = self.create_flow()
+
+        # create a test audio file
+        test_file = SimpleUploadedFile("test.wav", b"audio content", content_type="audio/wav")
+
+        # try to upload it
+        upload_url = reverse("flows.flow_upload_action_recording", args=[flow.uuid])
+        response = self.client.post(upload_url, {
+            "file": test_file,
+            "actionset": "action-uuid",
+            "action": "action-uuid",
+        })
+
+        # check response
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        
+        # should have a path
+        self.assertTrue("path" in response_json)
+        path = response_json["path"]
+
+        # check that file exists in private storage
+        self.assertTrue(private_file_storage.exists(path))
+
+        # check content
+        with private_file_storage.open(path) as f:
+            self.assertEqual(f.read(), b"audio content")
+
+    def test_save_export(self):
+        """
+        Test that save_export correctly saves a file using private storage
+        """
+        test_file = SimpleUploadedFile("test.txt", b"test content", content_type="text/plain")
+        
+        # save the file
+        path = self.org.save_export("my_export", test_file)
+        
+        # check that path is correct format
+        self.assertTrue(path.startswith("exports/"))
+        self.assertTrue(path.endswith("/test.txt"))
+        
+        # check that file was saved with private storage
+        self.assertTrue(private_file_storage.exists(path))
+        
+        # check that file content is correct
+        with private_file_storage.open(path) as f:
+            self.assertEqual(f.read(), b"test content")
