@@ -11,6 +11,8 @@ import iso8601
 import pytz
 from django_redis import get_redis_connection
 from openpyxl import load_workbook
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files.storage import default_storage, private_file_storage
 
 from django.conf import settings
 from django.contrib.auth.models import Group
@@ -1887,6 +1889,77 @@ class FlowTest(TembaTest):
 
         # run expiration should be last arrived_on + 12 hours
         self.assertEqual(datetime.datetime(2019, 1, 1, 12, 0, 0, 0, pytz.UTC), run.expires_on)
+
+    def test_media_upload_with_private_storage(self):
+        """
+        Test that media uploads use private storage
+        """
+        self.login(self.admin)
+
+        flow = self.create_flow()
+
+        # create a test file
+        test_file = SimpleUploadedFile("test.txt", b"test content", content_type="text/plain")
+
+        # try to upload it
+        upload_url = reverse("flows.flow_upload_media_action", args=[flow.uuid])
+        response = self.client.post(upload_url, {"file": test_file})
+
+        # check response
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        
+        # should have a type and url
+        self.assertEqual(response_json["type"], "text/plain")
+        self.assertTrue("url" in response_json)
+
+        # url should be relative to STORAGE_URL
+        url = response_json["url"]
+        self.assertTrue(url.startswith(f"{settings.STORAGE_URL}/"))
+
+        # get the path part
+        path = url.replace(f"{settings.STORAGE_URL}/", "")
+
+        # check that file exists in private storage
+        self.assertTrue(private_file_storage.exists(path))
+
+        # check content
+        with private_file_storage.open(path) as f:
+            self.assertEqual(f.read(), b"test content")
+
+    def test_recording_upload_with_private_storage(self):
+        """
+        Test that recording uploads use private storage
+        """
+        self.login(self.admin)
+
+        flow = self.create_flow()
+
+        # create a test audio file
+        test_file = SimpleUploadedFile("test.wav", b"audio content", content_type="audio/wav")
+
+        # try to upload it
+        upload_url = reverse("flows.flow_upload_action_recording", args=[flow.uuid])
+        response = self.client.post(upload_url, {
+            "file": test_file,
+            "actionset": "action-uuid",
+            "action": "action-uuid",
+        })
+
+        # check response
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        
+        # should have a path
+        self.assertTrue("path" in response_json)
+        path = response_json["path"]
+
+        # check that file exists in private storage
+        self.assertTrue(private_file_storage.exists(path))
+
+        # check content
+        with private_file_storage.open(path) as f:
+            self.assertEqual(f.read(), b"audio content")
 
 
 class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
