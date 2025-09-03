@@ -7,9 +7,9 @@ from django.db.models import F
 
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import IsUserInOrg
-from temba.api.v2.views_base import CreatedOnCursorPagination
+from temba.api.v2.views_base import DefaultLimitOffsetPagination
 from temba.orgs.models import Org
-from temba.templates.models import TemplateTranslation
+from temba.templates.models import Template, TemplateTranslation
 
 from .serializers import TemplateTranslationDetailsSerializer
 
@@ -25,28 +25,13 @@ class TemplatesTranslationsEndpoint(APIViewMixin, APIView):
       - category: optional template category filter (e.g. MARKETING, marketing)
       - order_by: optional ordering, one of: name, -name, created_on, -created_on (default -created_on)
       - limit: optional page size
-      - cursor: optional cursor for pagination
+      - offset: optional offset for pagination
     """
 
     authentication_classes = [InternalOIDCAuthentication]
     permission_classes = [IsAuthenticated, IsUserInOrg]
 
-    class Pagination(CreatedOnCursorPagination):
-        default_page_size = 20
-        page_size_query_param = "limit"
-        ordering = ("-sort_on", "-id")
-
-        def get_ordering(self, request, queryset, view=None):
-            order_by = request.query_params.get("order_by")
-            if order_by == "name":
-                return ("sort_on", "id")
-            elif order_by == "-name":
-                return ("-sort_on", "-id")
-            elif order_by == "created_on":
-                return ("sort_on", "id")
-            else:
-                # default and any other value -> -created_on
-                return ("-sort_on", "-id")
+    # Using limit/offset pagination with shared defaults
 
     def get(self, request, *args, **kwargs):
         project_uuid = request.query_params.get("project_uuid")
@@ -79,7 +64,7 @@ class TemplatesTranslationsEndpoint(APIViewMixin, APIView):
         if language:
             queryset = queryset.filter(language__iexact=language)
 
-        # determine sort field for cursor pagination
+        # determine sort field for ordering
         order_by = request.query_params.get("order_by")
         if order_by in ("name", "-name"):
             queryset = queryset.annotate(sort_on=F("template__name"))
@@ -87,7 +72,70 @@ class TemplatesTranslationsEndpoint(APIViewMixin, APIView):
             # default and any other value -> created_on
             queryset = queryset.annotate(sort_on=F("template__created_on"))
 
-        pagination = self.Pagination()
+        # apply explicit ordering for limit/offset pagination
+        if order_by == "name":
+            order_fields = ("sort_on", "id")
+        elif order_by == "-name":
+            order_fields = ("-sort_on", "-id")
+        elif order_by == "created_on":
+            order_fields = ("sort_on", "id")
+        else:
+            # default and any other value -> -created_on
+            order_fields = ("-sort_on", "-id")
+        queryset = queryset.order_by(*order_fields)
+
+        pagination = DefaultLimitOffsetPagination()
         page = pagination.paginate_queryset(queryset, request, self)
         serializer = TemplateTranslationDetailsSerializer(page, many=True)
         return pagination.get_paginated_response(serializer.data)
+
+
+class TemplateByIdEndpoint(APIViewMixin, APIView):
+    """
+    GET returns a single active template translation for a template, selected by project_uuid and path template_id.
+    Query:
+      - project_uuid: required (query param)
+      - language: optional (query param, case-insensitive)
+    Path:
+      - template_id: required (numeric id of Template)
+    """
+
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
+
+    def get(self, request, *args, **kwargs):
+        project_uuid = request.query_params.get("project_uuid")
+        if not project_uuid:
+            return Response({"error": "Project not provided"}, status=401)
+
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except Org.DoesNotExist:
+            return Response({"error": "Project not found"}, status=404)
+
+        template_id = kwargs.get("template_id")
+        try:
+            template_id = int(template_id)
+        except (TypeError, ValueError):
+            return Response({"error": "Template id must be an integer"}, status=400)
+
+        template = Template.objects.filter(id=template_id, org=org, is_active=True).first()
+        if not template:
+            return Response({"error": "Template not found"}, status=404)
+
+        language = request.query_params.get("language")
+        translations = TemplateTranslation.objects.filter(template=template, is_active=True)
+        if language:
+            translations = translations.filter(language__iexact=language)
+
+        translation = (
+            translations.select_related("template").prefetch_related("headers", "buttons").order_by("-id").first()
+        )
+
+        if not translation:
+            if language:
+                return Response({"error": "Translation not found for language"}, status=404)
+            return Response({"error": "No active translations for template"}, status=404)
+
+        data = TemplateTranslationDetailsSerializer(translation).data
+        return Response(data)
