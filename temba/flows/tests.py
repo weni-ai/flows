@@ -24,7 +24,6 @@ from django.utils.encoding import force_text
 from temba.api.models import Resthook
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
-
 from temba.classifiers.models import Classifier
 from temba.contacts.models import URN, Contact, ContactField, ContactGroup
 from temba.externals.models import ExternalService
