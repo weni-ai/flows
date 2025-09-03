@@ -4,7 +4,7 @@ from django.conf.urls import url
 from django.urls import include, path
 
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
-from temba.api.v2.templates.views import TemplatesTranslationsEndpoint
+from temba.api.v2.templates.views import TemplateByIdEndpoint, TemplatesTranslationsEndpoint
 
 from .flows.urls import urlpatterns as flows_urlpatterns
 from .internals.urls import urlpatterns as internals_urlpatterns
@@ -102,6 +102,11 @@ urlpatterns = [
     url(r"^runs$", RunsEndpoint.as_view(), name="api.v2.runs"),
     url(r"^templates$", TemplatesEndpoint.as_view(), name="api.v2.templates"),
     url(r"^templates/translations$", TemplatesTranslationsEndpoint.as_view(), name="api.v2.templates_translations"),
+    url(
+        r"^templates/translations/(?P<template_id>\d+)$",
+        TemplateByIdEndpoint.as_view(),
+        name="api.v2.templates_translation_by_id",
+    ),
     url(r"^ticketers$", TicketersEndpoint.as_view(), name="api.v2.ticketers"),
     url(r"^external_services$", ExternalServicesEndpoint.as_view(), name="api.v2.external_services"),
     url(r"^tickets$", TicketsEndpoint.as_view(), name="api.v2.tickets"),
