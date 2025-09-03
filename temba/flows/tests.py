@@ -11,11 +11,11 @@ import iso8601
 import pytz
 from django_redis import get_redis_connection
 from openpyxl import load_workbook
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.files.storage import default_storage, private_file_storage
 
 from django.conf import settings
 from django.contrib.auth.models import Group
+from django.core.files.storage import default_storage, private_file_storage
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models.functions import TruncDate
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -1908,7 +1908,7 @@ class FlowTest(TembaTest):
         # check response
         self.assertEqual(response.status_code, 200)
         response_json = response.json()
-        
+
         # should have a type and url
         self.assertEqual(response_json["type"], "text/plain")
         self.assertTrue("url" in response_json)
@@ -1940,16 +1940,19 @@ class FlowTest(TembaTest):
 
         # try to upload it
         upload_url = reverse("flows.flow_upload_action_recording", args=[flow.uuid])
-        response = self.client.post(upload_url, {
-            "file": test_file,
-            "actionset": "action-uuid",
-            "action": "action-uuid",
-        })
+        response = self.client.post(
+            upload_url,
+            {
+                "file": test_file,
+                "actionset": "action-uuid",
+                "action": "action-uuid",
+            },
+        )
 
         # check response
         self.assertEqual(response.status_code, 200)
         response_json = response.json()
-        
+
         # should have a path
         self.assertTrue("path" in response_json)
         path = response_json["path"]
