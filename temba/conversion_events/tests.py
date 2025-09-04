@@ -136,7 +136,7 @@ class ConversionEventAPITest(TembaTest):
             "Test WhatsApp Channel",
             "+12065551212",
             country="US",
-            config={"meta_dataset_id": "test_dataset_123", "waba_id": "test_waba_123"},
+            config={"meta_dataset_id": "test_dataset_123", "wa_waba_id": "test_waba_123"},
         )
         # Create CTWA data for testing
         self.ctwa_data = CTWA.objects.create(

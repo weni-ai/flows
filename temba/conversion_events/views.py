@@ -266,8 +266,8 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             metadata["channel"] = str(channel_uuid)
 
             # Add waba_id from channel config if available
-            if channel.config and "waba_id" in channel.config:
-                metadata["waba_id"] = channel.config["waba_id"]
+            if channel.config and "wa_waba_id" in channel.config:
+                metadata["waba_id"] = channel.config["wa_waba_id"]
 
             # Add CTWA ID only if available
             if ctwa_data:
