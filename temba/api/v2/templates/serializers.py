@@ -26,6 +26,8 @@ class TemplateTranslationDetailsSerializer(serializers.Serializer):
     body = serializers.DictField()
     footer = serializers.DictField(allow_null=True)
     buttons = TemplateButtonSerializer(many=True)
+    status = serializers.CharField(required=False)
+    channel = serializers.CharField(required=False)
 
     def to_representation(self, instance: TemplateTranslation):
         header_obj = None
@@ -54,6 +56,8 @@ class TemplateTranslationDetailsSerializer(serializers.Serializer):
             uuid=str(instance.template.uuid),
             category=instance.template.category,
             created_on=instance.template.created_on,
+            status=instance.status,
+            channel=str(instance.channel.uuid),
             language=instance.language,
             header=header_obj,
             body=body_obj,
