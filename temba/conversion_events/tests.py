@@ -306,43 +306,48 @@ class ConversionEventAPITest(TembaTest):
             self.org.proj_uuid = uuid4()
             self.org.save(update_fields=["proj_uuid"])
 
-            response = self.client.post(
-                self.endpoint_url,
-                data=json.dumps(payload),
-                content_type="application/json",
-            )
+            with override_settings(
+                WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
+                WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
+                META_PARTNER_AGENT="Weni by VTEX",
+            ):
+                response = self.client.post(
+                    self.endpoint_url,
+                    data=json.dumps(payload),
+                    content_type="application/json",
+                )
 
-            # Should succeed since we have both CTWA data and dataset_id
-            self.assertEqual(response.status_code, 200)
-            response_data = response.json()
-            self.assertEqual(response_data["status"], "success")
-            self.assertEqual(
-                response_data["message"],
-                "Event sent to Meta and Datalake successfully",
-            )
+                # Should succeed since we have both CTWA data and dataset_id
+                self.assertEqual(response.status_code, 200)
+                response_data = response.json()
+                self.assertEqual(response_data["status"], "success")
+                self.assertEqual(
+                    response_data["message"],
+                    "Event sent to Meta and Datalake successfully",
+                )
 
-            # Verify Meta API call
-            mock_post.assert_called_once()
-            meta_payload = mock_post.call_args[1]["json"]
-            meta_event = meta_payload["data"][0]
+                # Verify Meta API call
+                mock_post.assert_called_once()
+                meta_payload = mock_post.call_args[1]["json"]
+                meta_event = meta_payload["data"][0]
 
-            # Value should be float and currency should be string
-            self.assertEqual(meta_event["value"], 123.45)
-            self.assertEqual(meta_event["currency"], "USD")
-            self.assertEqual(meta_event["event_name"], "Purchase")
+                # Value should be float and currency should be string
+                self.assertEqual(meta_event["value"], 123.45)
+                self.assertEqual(meta_event["currency"], "USD")
+                self.assertEqual(meta_event["event_name"], "Purchase")
 
-            # Verify Datalake API call
-            mock_send_event.assert_called_once()
-            event_data = mock_send_event.call_args[0][1]
-            self.assertEqual(event_data["event_name"], "conversion_purchase")
-            self.assertEqual(event_data["key"], "capi")
-            self.assertEqual(event_data["value"], "purchase")
-            self.assertEqual(event_data["value_type"], "string")
-            self.assertEqual(event_data["project"], str(self.org.proj_uuid))
-            self.assertEqual(event_data["contact_urn"], self.valid_payload["contact_urn"])
-            self.assertEqual(event_data["metadata"]["value"], "123.45")
-            self.assertEqual(event_data["metadata"]["currency"], "USD")
-            self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
+                # Verify Datalake API call
+                mock_send_event.assert_called_once()
+                event_data = mock_send_event.call_args[0][1]
+                self.assertEqual(event_data["event_name"], "conversion_purchase")
+                self.assertEqual(event_data["key"], "capi")
+                self.assertEqual(event_data["value"], "purchase")
+                self.assertEqual(event_data["value_type"], "string")
+                self.assertEqual(event_data["project"], str(self.org.proj_uuid))
+                self.assertEqual(event_data["contact_urn"], self.valid_payload["contact_urn"])
+                self.assertEqual(event_data["metadata"]["value"], "123.45")
+                self.assertEqual(event_data["metadata"]["currency"], "USD")
+                self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
 
     def test_purchase_conversion_invalid_value(self):
         """Test purchase conversion with invalid value format"""
