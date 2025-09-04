@@ -6,6 +6,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
 
@@ -21,6 +22,8 @@ User = get_user_model()
 
 
 CONTACT_FIELDS_ENDPOINT_PATH = "temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint"
+CONTACTS_IMPORT_UPLOAD_PATH = "temba.api.v2.internals.contacts.views.ContactsImportUploadView"
+CONTACTS_IMPORT_CONFIRM_PATH = "temba.api.v2.internals.contacts.views.ContactsImportConfirmView"
 
 
 def skip_authentication(endpoint_path: str):
@@ -561,3 +564,109 @@ class ContactsWithMessagesViewTest(TembaTest):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()["results"] if "results" in resp.json() else resp.json()
         self.assertEqual(len(data), 0)
+
+
+class ContactsImportUploadViewTest(TembaTest):
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_UPLOAD_PATH)
+    def test_upload_returns_examples_for_each_column(self):
+        # Ensure a matching field exists so "Field:Team" maps to type "field"
+        ContactField.get_or_create(self.org, self.admin, key="team")
+
+        csv_content = (
+            "URN:whatsapp,Name,Field:Team,Field:NewThing\n"
+            "5561987654321,Alice,A-Team,Hello\n"
+            "556188888888,Bob,B-Team,World\n"
+        ).encode("utf-8")
+
+        upload = SimpleUploadedFile("import.csv", csv_content, content_type="text/csv")
+
+        url = "/api/v2/internals/contacts_import_upload"
+        resp = self.client.post(url, {"project_uuid": str(self.org.proj_uuid), "file": upload})
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("columns", data)
+        self.assertEqual(data.get("num_records"), 2)
+
+        cols = data["columns"]
+        # URN column
+        self.assertEqual(cols[0]["header"], "URN:whatsapp")
+        self.assertEqual(cols[0]["type"], "urn")
+        self.assertIsNone(cols[0]["matched_field"])
+        self.assertEqual(cols[0]["example"], "5561987654321")
+        # Name column
+        self.assertEqual(cols[1]["header"], "Name")
+        self.assertEqual(cols[1]["type"], "attribute")
+        self.assertEqual(cols[1]["matched_field"], "name")
+        self.assertEqual(cols[1]["example"], "Alice")
+        # Field:Team column (existing field)
+        self.assertEqual(cols[2]["header"], "Field:Team")
+        self.assertEqual(cols[2]["type"], "field")
+        self.assertEqual(cols[2]["matched_field"], "team")
+        self.assertEqual(cols[2]["example"], "A-Team")
+        # Field:NewThing column (new_field)
+        self.assertEqual(cols[3]["header"], "Field:NewThing")
+        self.assertEqual(cols[3]["type"], "new_field")
+        self.assertIn("suggested_type", cols[3])
+        self.assertEqual(cols[3]["example"], "Hello")
+
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_UPLOAD_PATH)
+    def test_examples_skip_blanks_and_explicit_clear(self):
+        ContactField.get_or_create(self.org, self.admin, key="team")
+
+        csv_content = ("URN:whatsapp,Field:Team,Field:EmptyTest\n" ",, -- \n" "12345,B, Y \n").encode("utf-8")
+
+        upload = SimpleUploadedFile("import.csv", csv_content, content_type="text/csv")
+
+        url = "/api/v2/internals/contacts_import_upload"
+        resp = self.client.post(url, {"project_uuid": str(self.org.proj_uuid), "file": upload})
+
+        self.assertEqual(resp.status_code, 200)
+        cols = resp.json()["columns"]
+
+        # First row blanks should be skipped, explicit clear (--) skipped too, so pick from second row
+        self.assertEqual(cols[0]["example"], "12345")
+        self.assertEqual(cols[1]["example"], "B")
+        self.assertEqual(cols[2]["example"], "Y")
+
+
+class ContactsImportConfirmViewTest(TembaTest):
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
+    def test_get_missing_params(self):
+        url = "/api/v2/internals/contacts_import_confirm/"
+        # no import_id in URL
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 404)  # no matching route without import_id
+
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
+    def test_get_import_not_found(self):
+        url = "/api/v2/internals/contacts_import_confirm/9999/"
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 404)
+        # Either route 404 or view 404, both acceptable. If view is hit, expect JSON error.
+
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
+    def test_get_project_mismatch(self):
+        # not applicable anymore since GET doesn't accept project_uuid; ensure it forbids non-confirmer
+        contact_import = self.create_contact_import("media/test_imports/simple.xlsx")
+        url = f"/api/v2/internals/contacts_import_confirm/{contact_import.id}/"
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 403)
+
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
+    def test_get_success_returns_info(self):
+        contact_import = self.create_contact_import("media/test_imports/simple.xlsx")
+        # simulate that the current user confirmed (modified_by)
+        contact_import.modified_by = self.user
+        contact_import.save(update_fields=["modified_by"])
+        # force request.user to be the confirmer
+        mock_user = MagicMock()
+        mock_user.is_authenticated = True
+        mock_user.id = self.user.id
+        with patch("rest_framework.request.Request.user", mock_user):
+            url = f"/api/v2/internals/contacts_import_confirm/{contact_import.id}/"
+            resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        for key in ("status", "num_created", "num_updated", "num_errored", "errors", "time_taken"):
+            self.assertIn(key, data)
