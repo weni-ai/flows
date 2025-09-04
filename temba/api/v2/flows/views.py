@@ -4,13 +4,19 @@ from mozilla_django_oidc.contrib.drf import OIDCAuthentication
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from weni.internal.authenticators import InternalOIDCAuthentication
 
 from django.conf import settings
 
 from temba import mailroom
+from temba.api.v2.internals.views import APIViewMixin
+from temba.api.v2.permissions import IsUserInOrg
+from temba.api.v2.views_base import CreatedOnCursorPagination
 from temba.flows.models import Flow
+from temba.orgs.models import Org
 from temba.utils import analytics
 
 
@@ -99,3 +105,30 @@ class SimulateAPIView(APIView):  # pragma: no cover
                 return Response(client.sim_resume(payload))
             except mailroom.MailroomException:
                 return Response(dict(status="error", description="mailroom error"), status=500)
+
+
+class InternalFlowsAPIView(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
+
+    class Pagination(CreatedOnCursorPagination):
+        page_size_query_param = "limit"
+
+    def get(self, request: Request):
+        params = request.query_params
+        project_uuid = params.get("project_uuid")
+
+        if project_uuid is None:
+            return Response(status=400, data={"error": "project_uuid is required"})
+
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except Org.DoesNotExist:
+            return Response(status=404, data={"error": "Project not found"})
+
+        queryset = Flow.objects.filter(org=org, is_active=True)
+
+        paginator = self.Pagination()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        results = [{"uuid": str(flow.uuid), "name": flow.name} for flow in page]
+        return paginator.get_paginated_response(results)
