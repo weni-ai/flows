@@ -1,3 +1,11 @@
+3.39.0
+----------
+* Send value and currency fields to Meta in purchase conversion events
+
+3.38.1
+----------
+* Send timestamp and waba id in event to data lake
+
 3.38.0
 ----------
 * Update weni-rp-apps version to 2.10.4

@@ -89,7 +89,11 @@ class ConversionEventSerializerTest(TembaTest):
 
     def test_serializer_uuid_validation_edge_case(self):
         """Test serializer UUID validation edge case - covers line 24 in serializers.py"""
-        data = {"event_type": "lead", "channel_uuid": "invalid-uuid-format", "contact_urn": "tel:+1234567890"}
+        data = {
+            "event_type": "lead",
+            "channel_uuid": "invalid-uuid-format",
+            "contact_urn": "tel:+1234567890",
+        }
         serializer = ConversionEventSerializer(data=data)
         self.assertFalse(serializer.is_valid())
         self.assertIn("channel_uuid", serializer.errors)
@@ -134,7 +138,7 @@ class ConversionEventAPITest(TembaTest):
             "Test WhatsApp Channel",
             "+12065551212",
             country="US",
-            config={"meta_dataset_id": "test_dataset_123"},
+            config={"meta_dataset_id": "test_dataset_123", "waba_id": "test_waba_123"},
         )
         # Create CTWA data for testing
         self.ctwa_data = CTWA.objects.create(
@@ -187,7 +191,10 @@ class ConversionEventAPITest(TembaTest):
                 self.assertEqual(response.status_code, 200)
                 response_data = response.json()
                 self.assertEqual(response_data["status"], "success")
-                self.assertEqual(response_data["message"], "Event sent to Meta and Datalake successfully")
+                self.assertEqual(
+                    response_data["message"],
+                    "Event sent to Meta and Datalake successfully",
+                )
 
                 # Verify Meta API call
                 mock_post.assert_called_once()
@@ -206,6 +213,7 @@ class ConversionEventAPITest(TembaTest):
                 # Verify all payload data is in metadata
                 self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
                 self.assertEqual(event_data["metadata"]["ctwa_id"], "test_clid_123")
+                self.assertEqual(event_data["metadata"]["waba_id"], "test_waba_123")
                 self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
                 self.assertEqual(event_data["metadata"]["order_form_id"], "12345")
                 self.assertEqual(event_data["metadata"]["value"], "100.00")
@@ -222,7 +230,11 @@ class ConversionEventAPITest(TembaTest):
             # Use a different contact URN that doesn't have CTWA data
             payload = self.valid_payload.copy()
             payload["contact_urn"] = "whatsapp:+5511888888888"
-            payload["payload"] = {"custom_field": "custom_value", "order_form_id": "12345", "value": "100.00"}
+            payload["payload"] = {
+                "custom_field": "custom_value",
+                "order_form_id": "12345",
+                "value": "100.00",
+            }
 
             response = self.client.post(
                 self.endpoint_url,
@@ -268,13 +280,84 @@ class ConversionEventAPITest(TembaTest):
 
             self.assertEqual(response.status_code, 500)
             response_data = response.json()
-            self.assertEqual(response_data["error"], "API Error")
+            self.assertEqual(response_data["error"], "Datalake Error")
             self.assertIn("Error sending to Datalake", response_data["detail"])
             self.assertIn("API error", response_data["detail"])
 
     def test_successful_purchase_conversion(self):
+        """Test successful purchase conversion with value and currency"""
         payload = self.valid_payload.copy()
         payload["event_type"] = "purchase"
+        payload["payload"] = {
+            "value": "123.45",
+            "currency": "USD",
+            "custom_field": "custom_value",
+        }
+
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"success": True}
+            mock_post.return_value = mock_response
+
+            # Set proj_uuid for the org
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
+            with override_settings(
+                WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
+                WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
+                META_PARTNER_AGENT="Weni by VTEX",
+            ):
+                response = self.client.post(
+                    self.endpoint_url,
+                    data=json.dumps(payload),
+                    content_type="application/json",
+                )
+
+                # Should succeed since we have both CTWA data and dataset_id
+                self.assertEqual(response.status_code, 200)
+                response_data = response.json()
+                self.assertEqual(response_data["status"], "success")
+                self.assertEqual(
+                    response_data["message"],
+                    "Event sent to Meta and Datalake successfully",
+                )
+
+                # Verify Meta API call
+                mock_post.assert_called_once()
+                meta_payload = mock_post.call_args[1]["json"]
+                meta_event = meta_payload["data"][0]
+
+                # Value should be float and currency should be string
+                self.assertEqual(meta_event["value"], 123.45)
+                self.assertEqual(meta_event["currency"], "USD")
+                self.assertEqual(meta_event["event_name"], "Purchase")
+
+                # Verify Datalake API call
+                mock_send_event.assert_called_once()
+                event_data = mock_send_event.call_args[0][1]
+                self.assertEqual(event_data["event_name"], "conversion_purchase")
+                self.assertEqual(event_data["key"], "capi")
+                self.assertEqual(event_data["value"], "purchase")
+                self.assertEqual(event_data["value_type"], "string")
+                self.assertEqual(event_data["project"], str(self.org.proj_uuid))
+                self.assertEqual(event_data["contact_urn"], self.valid_payload["contact_urn"])
+                self.assertEqual(event_data["metadata"]["value"], "123.45")
+                self.assertEqual(event_data["metadata"]["currency"], "USD")
+                self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
+
+    def test_purchase_conversion_invalid_value(self):
+        """Test purchase conversion with invalid value format"""
+        payload = self.valid_payload.copy()
+        payload["event_type"] = "purchase"
+        payload["payload"] = {
+            "value": "invalid",
+            "currency": "USD",
+        }
+
         with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
             "temba.conversion_events.views.send_event_data"
         ) as mock_send_event:
@@ -297,16 +380,26 @@ class ConversionEventAPITest(TembaTest):
                     content_type="application/json",
                 )
                 self.assertEqual(response.status_code, 200)
+
+                # Verify Meta API call
+                mock_post.assert_called_once()
                 call_kwargs = mock_post.call_args[1]
                 sent_payload = call_kwargs["json"]
-                self.assertEqual(sent_payload["data"][0]["event_name"], "Purchase")
+                meta_event = sent_payload["data"][0]
 
-                # Verify Datalake call
+                # Verify event name
+                self.assertEqual(meta_event["event_name"], "Purchase")
+
+                # Verify value and currency are not present due to invalid value
+                self.assertNotIn("value", meta_event)
+                self.assertNotIn("currency", meta_event)
+
+                # Verify Datalake call still includes the original payload
                 mock_send_event.assert_called_once()
                 datalake_call = mock_send_event.call_args
                 event_data = datalake_call[0][1]
-                self.assertEqual(event_data["event_name"], "conversion_purchase")
-                self.assertEqual(event_data["value"], "purchase")
+                self.assertEqual(event_data["metadata"]["value"], "invalid")
+                self.assertEqual(event_data["metadata"]["currency"], "USD")
 
     def test_ctwa_data_not_found(self):
         """Test that event is still sent to Datalake when CTWA data is not found"""
@@ -317,7 +410,11 @@ class ConversionEventAPITest(TembaTest):
 
             payload = self.valid_payload.copy()
             payload["contact_urn"] = "whatsapp:+5511888888888"  # Non-existent contact
-            response = self.client.post(self.endpoint_url, data=json.dumps(payload), content_type="application/json")
+            response = self.client.post(
+                self.endpoint_url,
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
 
             self.assertEqual(response.status_code, 200)
             response_data = response.json()
@@ -348,7 +445,11 @@ class ConversionEventAPITest(TembaTest):
             payload["channel_uuid"] = str(channel_without_dataset.uuid)
             payload["contact_urn"] = "whatsapp:+5511888888888"
 
-            response = self.client.post(self.endpoint_url, data=json.dumps(payload), content_type="application/json")
+            response = self.client.post(
+                self.endpoint_url,
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
 
             self.assertEqual(response.status_code, 200)
             response_data = response.json()
@@ -370,8 +471,8 @@ class ConversionEventAPITest(TembaTest):
             )
             self.assertEqual(response.status_code, 500)
             response_data = response.json()
-            self.assertEqual(response_data["error"], "Meta API Error")
-            self.assertIn("Meta access token not configured", response_data["detail"])
+            self.assertEqual(response_data["error"], "Meta and Datalake Error")
+            self.assertIn("Meta: Meta access token not configured", response_data["detail"])
 
     def test_meta_api_error_handling(self):
         with patch("temba.conversion_events.views.requests.post") as mock_post:
@@ -387,7 +488,9 @@ class ConversionEventAPITest(TembaTest):
                 )
                 self.assertEqual(response.status_code, 500)
                 response_data = response.json()
-                self.assertEqual(response_data["error"], "Meta API Error")
+                self.assertEqual(response_data["error"], "Meta and Datalake Error")
+                self.assertIn("Meta:", response_data["detail"])
+                self.assertIn("Datalake:", response_data["detail"])
 
     def test_network_error_handling(self):
         with patch("temba.conversion_events.views.requests.post") as mock_post:
@@ -400,7 +503,8 @@ class ConversionEventAPITest(TembaTest):
                 )
                 self.assertEqual(response.status_code, 500)
                 response_data = response.json()
-                self.assertEqual(response_data["error"], "Meta API Error")
+                self.assertEqual(response_data["error"], "Meta and Datalake Error")
+                self.assertIn("Meta: Error sending to Meta: Network error", response_data["detail"])
 
     def test_invalid_json_handling(self):
         response = self.client.post(
@@ -426,6 +530,7 @@ class ConversionEventAPITest(TembaTest):
 
     def test_request_with_no_data_attribute(self):
         from django.test import RequestFactory
+
         from temba.conversion_events.views import ConversionEventView
 
         factory = RequestFactory()
@@ -466,12 +571,11 @@ class ConversionEventAPITest(TembaTest):
             self.assertEqual(event_data["event_name"], "conversion_lead")
             self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
 
-    @patch("temba.channels.models.Channel.objects.filter")
-    def test_database_exception_in_channel_lookup(self, mock_filter):
+    def test_database_exception_in_channel_lookup(self):
         """Test that event fails when channel lookup fails"""
-        mock_filter.side_effect = Exception("Database error")
+        with patch("temba.channels.models.Channel.objects.filter") as mock_filter:
+            mock_filter.side_effect = Exception("Database error")
 
-        with patch("temba.conversion_events.views.send_event_data") as mock_send_event:
             # Set proj_uuid for the org
             self.org.proj_uuid = uuid4()
             self.org.save(update_fields=["proj_uuid"])
@@ -485,11 +589,8 @@ class ConversionEventAPITest(TembaTest):
             # Should fail since we need the channel to send to Datalake
             self.assertEqual(response.status_code, 500)
             response_data = response.json()
-            self.assertEqual(response_data["error"], "API Error")
+            self.assertEqual(response_data["error"], "Datalake Error")
             self.assertIn("Channel not found", response_data["detail"])
-
-            # Verify Datalake was not called
-            mock_send_event.assert_not_called()
 
     def test_unexpected_error(self):
         """Test handling of unexpected errors in the main try-except block"""
@@ -650,6 +751,52 @@ class ConversionEventAPITest(TembaTest):
             self.assertFalse(success)
             self.assertEqual(error, "Organization not found")
 
+    def test_meta_failure_datalake_success(self):
+        """Test when Meta fails but Datalake succeeds"""
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
+            # Configure Meta to fail
+            mock_response = Mock()
+            mock_response.status_code = 400
+            mock_response.json.return_value = {"error": "Invalid request"}
+            mock_post.return_value = mock_response
+
+            # Configure Datalake to succeed
+            mock_send_event.return_value = None
+
+            # Set proj_uuid for the org
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
+            # Use the valid payload that has CTWA data (from setUp)
+            with override_settings(
+                WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
+                WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
+                META_PARTNER_AGENT="Weni by VTEX",
+            ):
+                # Make the request
+                response = self.client.post(
+                    self.endpoint_url,
+                    data=json.dumps(self.valid_payload),
+                    content_type="application/json",
+                )
+
+                # Should succeed overall since Datalake succeeded
+                self.assertEqual(response.status_code, 200)
+                response_data = response.json()
+                self.assertEqual(response_data["status"], "success")
+                self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
+
+                # Verify Meta API was called and failed
+                mock_post.assert_called_once()
+                call_args = mock_post.call_args
+                self.assertIn("test_dataset_123", call_args[0][0])
+                self.assertIn("access_token=test_token", call_args[0][0])
+
+                # Verify Datalake was called and succeeded
+                mock_send_event.assert_called_once()
+
 
 class CTWAModelTest(TembaTest):
     """Test the CTWA model"""
@@ -690,10 +837,16 @@ class CTWAModelTest(TembaTest):
         """Test CTWA filtering capabilities"""
         # Create multiple CTWA records
         ctwa1 = CTWA.objects.create(
-            ctwa_clid="clid1", channel_uuid=self.channel.uuid, waba="waba1", contact_urn="whatsapp:+1111111111"
+            ctwa_clid="clid1",
+            channel_uuid=self.channel.uuid,
+            waba="waba1",
+            contact_urn="whatsapp:+1111111111",
         )
         ctwa2 = CTWA.objects.create(
-            ctwa_clid="clid2", channel_uuid=self.channel.uuid, waba="waba2", contact_urn="whatsapp:+2222222222"
+            ctwa_clid="clid2",
+            channel_uuid=self.channel.uuid,
+            waba="waba2",
+            contact_urn="whatsapp:+2222222222",
         )
 
         # Test filtering by channel_uuid
