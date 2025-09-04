@@ -59,6 +59,11 @@ class TemplatesTranslationsEndpoint(APIViewMixin, APIView):
         if name:
             queryset = queryset.filter(template__name__icontains=name)
 
+        # optional filter by channel
+        channel_uuid = request.query_params.get("channel")
+        if channel_uuid:
+            queryset = queryset.filter(channel__uuid=channel_uuid)
+
         # optional filter by language (case-insensitive exact)
         language = request.query_params.get("language")
         if language:
