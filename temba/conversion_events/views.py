@@ -62,7 +62,9 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                 if dataset_id:
                     # Build payload for Meta Conversion API
                     meta_payload = self._build_meta_payload(
-                        event_type, ctwa_data, None
+                        event_type,
+                        ctwa_data,
+                        payload,
                     )  # payload is not used for Meta
                     # Send to Meta
                     meta_success, meta_error = self._send_to_meta(meta_payload, dataset_id)
@@ -187,6 +189,19 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             },
         }
 
+        # Add value and currency only for purchase events
+        if event_type == "purchase":
+            value = original_payload.get("value")
+            currency = original_payload.get("currency", "BRL")  # Default to BRL if not provided
+            if value:
+                try:
+                    # Convert value to float and keep it as float
+                    value = float(value)
+                    meta_event["value"] = value
+                    meta_event["currency"] = currency
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid value format in purchase event: {value}")
+
         return {
             "data": [meta_event],
             "partner_agent": getattr(settings, "META_PARTNER_AGENT", "Weni by VTEX"),
@@ -251,8 +266,8 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             metadata["channel"] = str(channel_uuid)
 
             # Add waba_id from channel config if available
-            if channel.config and "waba_id" in channel.config:
-                metadata["waba_id"] = channel.config["waba_id"]
+            if channel.config and "wa_waba_id" in channel.config:
+                metadata["waba_id"] = channel.config["wa_waba_id"]
 
             # Add CTWA ID only if available
             if ctwa_data:
