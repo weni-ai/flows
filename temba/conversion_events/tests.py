@@ -285,8 +285,74 @@ class ConversionEventAPITest(TembaTest):
             self.assertIn("API error", response_data["detail"])
 
     def test_successful_purchase_conversion(self):
+        """Test successful purchase conversion with value and currency"""
         payload = self.valid_payload.copy()
         payload["event_type"] = "purchase"
+        payload["payload"] = {
+            "value": "123.45",
+            "currency": "USD",
+            "custom_field": "custom_value",
+        }
+
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"success": True}
+            mock_post.return_value = mock_response
+
+            # Set proj_uuid for the org
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
+            response = self.client.post(
+                self.endpoint_url,
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
+
+            # Should succeed since we have both CTWA data and dataset_id
+            self.assertEqual(response.status_code, 200)
+            response_data = response.json()
+            self.assertEqual(response_data["status"], "success")
+            self.assertEqual(
+                response_data["message"],
+                "Event sent to Meta and Datalake successfully",
+            )
+
+            # Verify Meta API call
+            mock_post.assert_called_once()
+            meta_payload = mock_post.call_args[1]["json"]
+            meta_event = meta_payload["data"][0]
+
+            # Value should be float and currency should be string
+            self.assertEqual(meta_event["value"], 123.45)
+            self.assertEqual(meta_event["currency"], "USD")
+            self.assertEqual(meta_event["event_name"], "Purchase")
+
+            # Verify Datalake API call
+            mock_send_event.assert_called_once()
+            event_data = mock_send_event.call_args[0][1]
+            self.assertEqual(event_data["event_name"], "conversion_purchase")
+            self.assertEqual(event_data["key"], "capi")
+            self.assertEqual(event_data["value"], "purchase")
+            self.assertEqual(event_data["value_type"], "string")
+            self.assertEqual(event_data["project"], str(self.org.proj_uuid))
+            self.assertEqual(event_data["contact_urn"], self.valid_payload["contact_urn"])
+            self.assertEqual(event_data["metadata"]["value"], "123.45")
+            self.assertEqual(event_data["metadata"]["currency"], "USD")
+            self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
+
+    def test_purchase_conversion_invalid_value(self):
+        """Test purchase conversion with invalid value format"""
+        payload = self.valid_payload.copy()
+        payload["event_type"] = "purchase"
+        payload["payload"] = {
+            "value": "invalid",
+            "currency": "USD",
+        }
+
         with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
             "temba.conversion_events.views.send_event_data"
         ) as mock_send_event:
@@ -309,16 +375,26 @@ class ConversionEventAPITest(TembaTest):
                     content_type="application/json",
                 )
                 self.assertEqual(response.status_code, 200)
+
+                # Verify Meta API call
+                mock_post.assert_called_once()
                 call_kwargs = mock_post.call_args[1]
                 sent_payload = call_kwargs["json"]
-                self.assertEqual(sent_payload["data"][0]["event_name"], "Purchase")
+                meta_event = sent_payload["data"][0]
 
-                # Verify Datalake call
+                # Verify event name
+                self.assertEqual(meta_event["event_name"], "Purchase")
+
+                # Verify value and currency are not present due to invalid value
+                self.assertNotIn("value", meta_event)
+                self.assertNotIn("currency", meta_event)
+
+                # Verify Datalake call still includes the original payload
                 mock_send_event.assert_called_once()
                 datalake_call = mock_send_event.call_args
                 event_data = datalake_call[0][1]
-                self.assertEqual(event_data["event_name"], "conversion_purchase")
-                self.assertEqual(event_data["value"], "purchase")
+                self.assertEqual(event_data["metadata"]["value"], "invalid")
+                self.assertEqual(event_data["metadata"]["currency"], "USD")
 
     def test_ctwa_data_not_found(self):
         """Test that event is still sent to Datalake when CTWA data is not found"""
