@@ -58,16 +58,23 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
 
             # If we have CTWA data, try to send to Meta
             if ctwa_data:
+                print("\n=== PROCESSANDO CTWA ===")
+                print(f"CTWA encontrado com waba: {ctwa_data.waba}")
+                print(f"CTWA encontrado com ctwa_clid: {ctwa_data.ctwa_clid}")
                 dataset_id = self._get_channel_dataset_id(channel_uuid)
                 if dataset_id:
-                    # Build payload for Meta Conversion API
-                    meta_payload = self._build_meta_payload(
-                        event_type,
-                        ctwa_data,
-                        payload,
-                    )  # payload is not used for Meta
-                    # Send to Meta
-                    meta_success, meta_error = self._send_to_meta(meta_payload, dataset_id)
+                    print(f"Dataset ID encontrado: {dataset_id}")
+                else:
+                    print("Dataset ID não encontrado!")
+                print("=====================\n")
+                # Build payload for Meta Conversion API
+                meta_payload = self._build_meta_payload(
+                    event_type,
+                    ctwa_data,
+                    payload,
+                )  # payload is not used for Meta
+                # Send to Meta
+                meta_success, meta_error = self._send_to_meta(meta_payload, dataset_id)
 
             # Always send to Datalake regardless of CTWA status
             datalake_success, datalake_error = self._send_to_datalake(
@@ -147,11 +154,26 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
     def _get_ctwa_data(self, channel_uuid, contact_urn):
         """Get CTWA data for lookup using both channel_uuid and contact_urn"""
         try:
-            return (
-                CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).order_by("-timestamp").first()
-            )
+            print("\n=== CTWA DEBUG ===")
+            print(f"Buscando CTWA com:")
+            print(f"channel_uuid: {channel_uuid}")
+            print(f"contact_urn: {contact_urn}")
+
+            ctwa = CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).order_by("-timestamp").first()
+
+            if ctwa:
+                print("\nCTWA ENCONTRADO:")
+                print(f"waba: {ctwa.waba}")
+                print(f"ctwa_clid: {ctwa.ctwa_clid}")
+            else:
+                print("\nCTWA NÃO ENCONTRADO!")
+                print("Query retornou None")
+
+            print("=================\n")
+            return ctwa
 
         except Exception as e:
+            print(f"\nERRO ao buscar CTWA: {str(e)}\n")
             logger.error(f"Error fetching CTWA data: {str(e)}")
             return None
 
