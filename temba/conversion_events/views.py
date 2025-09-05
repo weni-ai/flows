@@ -63,18 +63,14 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                 print(f"CTWA encontrado com ctwa_clid: {ctwa_data.ctwa_clid}")
                 dataset_id = self._get_channel_dataset_id(channel_uuid)
                 if dataset_id:
-                    print(f"Dataset ID encontrado: {dataset_id}")
-                else:
-                    print("Dataset ID não encontrado!")
-                print("=====================\n")
-                # Build payload for Meta Conversion API
-                meta_payload = self._build_meta_payload(
-                    event_type,
-                    ctwa_data,
-                    payload,
-                )  # payload is not used for Meta
-                # Send to Meta
-                meta_success, meta_error = self._send_to_meta(meta_payload, dataset_id)
+                    # Build payload for Meta Conversion API
+                    meta_payload = self._build_meta_payload(
+                        event_type,
+                        ctwa_data,
+                        payload,
+                    )
+                    # Send to Meta
+                    meta_success, meta_error = self._send_to_meta(meta_payload, dataset_id)
 
             # Always send to Datalake regardless of CTWA status
             datalake_success, datalake_error = self._send_to_datalake(
@@ -154,23 +150,45 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
     def _get_ctwa_data(self, channel_uuid, contact_urn):
         """Get CTWA data for lookup using both channel_uuid and contact_urn"""
         try:
-            print("\n=== CTWA DEBUG ===")
-            print(f"Buscando CTWA com:")
-            print(f"channel_uuid: {channel_uuid}")
-            print(f"contact_urn: {contact_urn}")
+            # If it's not a WhatsApp URN, just do a normal lookup
+            if not contact_urn.startswith("whatsapp:"):
+                return (
+                    CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn=contact_urn)
+                    .order_by("-timestamp")
+                    .first()
+                )
 
-            ctwa = CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).order_by("-timestamp").first()
+            # For WhatsApp URNs, try both with and without the extra 9 if it's a Brazilian number
+            # Split the URN into prefix and number
+            prefix, number = contact_urn.split(":", 1)
 
-            if ctwa:
-                print("\nCTWA ENCONTRADO:")
-                print(f"waba: {ctwa.waba}")
-                print(f"ctwa_clid: {ctwa.ctwa_clid}")
-            else:
-                print("\nCTWA NÃO ENCONTRADO!")
-                print("Query retornou None")
+            # Only handle the extra 9 for Brazilian numbers
+            if number.startswith("55"):
+                # Remove country code (55) and DDD (2 digits) to check remaining length
+                remaining_digits = number[4:]  # After 55 + DDD
 
-            print("=================\n")
-            return ctwa
+                # If we have more than 8 digits after DDD, it means we have the extra 9
+                if len(remaining_digits) > 8:  # Has the extra 9
+                    # Generate version without the extra 9
+                    other_number = number[:4] + remaining_digits[1:]  # Remove first digit after DDD (the 9)
+                    numbers = [number, other_number]
+                else:  # Doesn't have the extra 9
+                    # Generate version with the extra 9
+                    other_number = number[:4] + "9" + remaining_digits  # Add 9 after DDD
+                    numbers = [number, other_number]
+
+                # Create both URNs for lookup
+                urns = [f"{prefix}:{num}" for num in numbers]
+
+                # Try to find CTWA data for either URN
+                return (
+                    CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn__in=urns).order_by("-timestamp").first()
+                )
+
+            # For non-BR numbers or if we can't handle the number format, just do a normal lookup
+            return (
+                CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).order_by("-timestamp").first()
+            )
 
         except Exception as e:
             print(f"\nERRO ao buscar CTWA: {str(e)}\n")
@@ -288,8 +306,8 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             metadata["channel"] = str(channel_uuid)
 
             # Add waba_id from channel config if available
-            if channel.config and "waba_id" in channel.config:
-                metadata["waba_id"] = channel.config["waba_id"]
+            if channel.config and "wa_waba_id" in channel.config:
+                metadata["waba_id"] = channel.config["wa_waba_id"]
 
             # Add CTWA ID only if available
             if ctwa_data:

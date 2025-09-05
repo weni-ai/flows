@@ -1,3 +1,7 @@
+3.39.1
+----------
+* Handling the extra ninth digit in WhatsApp URNs for CTWA data fetching
+
 3.39.0
 ----------
 * Send value and currency fields to Meta in purchase conversion events
