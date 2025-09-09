@@ -22,6 +22,7 @@ class TemplateTranslationDetailsSerializer(serializers.Serializer):
     category = serializers.CharField(allow_null=True)
     created_on = serializers.DateTimeField(required=False)
     language = serializers.CharField()
+    variable_count = serializers.IntegerField(required=False)
     header = TemplateHeaderSerializer(allow_null=True)
     body = serializers.DictField()
     footer = serializers.DictField(allow_null=True)
@@ -59,6 +60,7 @@ class TemplateTranslationDetailsSerializer(serializers.Serializer):
             status=instance.status,
             channel=str(instance.channel.uuid),
             language=instance.language,
+            variable_count=instance.variable_count,
             header=header_obj,
             body=body_obj,
             footer=footer_obj,
