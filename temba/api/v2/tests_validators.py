@@ -29,16 +29,6 @@ class LambdaURLValidatorTest(unittest.TestCase):
                 self.validator.is_valid_url("https://malicious.com/?Action=GetCallerIdentity&Version=2011-06-15")
             )
 
-    def test_is_valid_url_with_string(self):
-        stub_settings = SimpleNamespace(LAMBDA_VALIDATION_URL="https://sts.amazonaws.com/?Action=GetCallerIdentity&")
-        with patch("temba.api.v2.validators.settings", stub_settings):
-            self.assertTrue(
-                self.validator.is_valid_url("https://sts.amazonaws.com/?Action=GetCallerIdentity&Version=2011-06-15")
-            )
-            self.assertFalse(
-                self.validator.is_valid_url("https://example.com/auth/sts?Action=GetCallerIdentity&Version=2011-06-15")
-            )
-
     def test_is_valid_url_rejects_dotdot(self):
         stub_settings = SimpleNamespace(LAMBDA_VALIDATION_URL=["https://sts.amazonaws.com/?Action=GetCallerIdentity&"])
         with patch("temba.api.v2.validators.settings", stub_settings):

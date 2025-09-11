@@ -32,8 +32,6 @@ class UniqueForOrgValidator(UniqueValidator):
 class LambdaURLValidator:  # pragma: no cover
     def is_valid_url(self, sts_url):
         allowed_prefixes = getattr(settings, "LAMBDA_VALIDATION_URL", [])
-        if isinstance(allowed_prefixes, str):
-            allowed_prefixes = [allowed_prefixes] if allowed_prefixes else []
 
         if ".." in sts_url:
             return False

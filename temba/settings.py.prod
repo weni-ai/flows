@@ -523,4 +523,4 @@ MUTABLE_EDITOR_DOMAINS = env.tuple("MUTABLE_EDITOR_DOMAINS", default=("@inspiria
 LAMBDA_ALLOWED_ROLES = env.list("LAMBDA_ALLOWED_ROLES", default=[])
 
 # Lambda permitted urls
-LAMBDA_VALIDATION_URL = os.environ.get("LAMBDA_VALIDATION_URL", default=["https://sts.amazonaws.com/?Action=GetCallerIdentity&"])
+LAMBDA_VALIDATION_URL = env.list("LAMBDA_VALIDATION_URL", default=["https://sts.amazonaws.com/?Action=GetCallerIdentity&"])
