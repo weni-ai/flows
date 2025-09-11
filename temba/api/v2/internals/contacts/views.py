@@ -501,9 +501,21 @@ class ContactsImportConfirmView(APIViewMixin, APIView):
             return Response({"error": "Forbidden."}, status=403)
 
         info = contact_import.get_info()
+        group = contact_import.group
+        if group:
+            group = {
+                "id": group.id,
+                "uuid": str(group.uuid),
+                "name": group.name,
+                "status": group.status,
+                "group_type": group.group_type,
+                "query": group.query,
+                "member_count": group.get_member_count(),
+            }
+
         result = {
             "info": info,
-            "group_id": contact_import.group_id,
+            "group": group,
         }
         return Response(result, status=200)
 
