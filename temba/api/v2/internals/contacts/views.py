@@ -32,6 +32,7 @@ from temba.api.v2.internals.contacts.serializers import (
     InternalContactFieldsValuesSerializer,
     InternalContactSerializer,
 )
+from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import IsUserInOrg
 from temba.api.v2.serializers import (
@@ -51,7 +52,6 @@ from temba.msgs.models import Broadcast, Msg
 from temba.orgs.models import Org
 from temba.tickets.models import Ticket
 from temba.utils.text import decode_stream
-
 
 logger = logging.getLogger(__name__)
 
@@ -501,7 +501,11 @@ class ContactsImportConfirmView(APIViewMixin, APIView):
             return Response({"error": "Forbidden."}, status=403)
 
         info = contact_import.get_info()
-        return Response(info, status=200)
+        result = {
+            "info": info,
+            "group_id": contact_import.group_id,
+        }
+        return Response(result, status=200)
 
     def post(self, request, import_id=None):
         project_uuid = request.data.get("project_uuid")
