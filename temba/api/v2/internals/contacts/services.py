@@ -1,15 +1,16 @@
 from pathlib import Path
 
 import pyexcel
-from django.core.exceptions import ValidationError
+from xlsxlite.writer import XLSXBook
+
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.files.temp import NamedTemporaryFile
 from django.utils.text import slugify
 
 from temba.contacts.models import ContactImport
 from temba.utils.text import decode_stream
 from temba.utils.uuid import uuid4
-from xlsxlite.writer import XLSXBook
 
 
 class ContactImportDeduplicationService:
