@@ -1261,6 +1261,7 @@ CHANNEL_TYPES = [
     "temba.channels.types.slack.SlackType",
     "temba.channels.types.teams.TeamsType",
     "temba.channels.types.email.EmailType",
+    "temba.channels.types.externalv2.ExternalV2Type",
 ]
 
 EXTERNALSERVICE_TYPES = [
