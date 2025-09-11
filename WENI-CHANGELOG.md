@@ -1,3 +1,8 @@
+3.39.2
+----------
+* Add limit and offset in get datalake events endpoint
+* Add environ variable in lambda validator url
+
 3.39.1
 ----------
 * Handling the extra ninth digit in WhatsApp URNs for CTWA data fetching
