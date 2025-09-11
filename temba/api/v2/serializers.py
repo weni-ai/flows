@@ -2092,3 +2092,5 @@ class EventFilterSerializer(serializers.Serializer):
     value = serializers.CharField(required=False)
     metadata = serializers.CharField(required=False)
     event_name = serializers.CharField(required=False)
+    limit = serializers.IntegerField(required=False)
+    offset = serializers.IntegerField(required=False)
