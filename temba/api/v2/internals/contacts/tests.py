@@ -613,8 +613,9 @@ class GroupsContactFieldsViewTest(TembaTest):
         self.assertIn("example", team5_item)
         self.assertIsNone(team5_item["example"])  # no contacts with value -> example null
 
+    @mock_mailroom
     @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
-    def test_static_group_fields_from_contacts(self):
+    def test_static_group_fields_from_contacts(self, mr_mocks):
         # create field and contact with that field value
         team3 = self.create_field("team3", "Team3")
         contact = self.create_contact("Alice", urns=["tel:+111"])
