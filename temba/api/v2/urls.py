@@ -4,6 +4,7 @@ from django.conf.urls import url
 from django.urls import include, path
 
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
+from temba.api.v2.flows.views import InternalFlowsAPIView
 from temba.api.v2.projects.views import GetProjectView
 
 from .flows.urls import urlpatterns as flows_urlpatterns
@@ -83,6 +84,7 @@ urlpatterns = [
     url(r"^events$", EventsEndpoint.as_view(), name="api.v2.events"),
     url(r"^filter_templates$", FilterTemplatesEndpoint.as_view(), name="api.v2.filter_templates"),
     url(r"^filter_templates_new$", FilterTemplatesEndpointNew.as_view(), name="api.v2.filter_templates_new"),
+    url(r"^internal_flows$", InternalFlowsAPIView.as_view(), name="api.v2.internal_flows"),
     url(r"^definitions$", DefinitionsEndpoint.as_view(), name="api.v2.definitions"),
     url(r"^fields$", FieldsEndpoint.as_view(), name="api.v2.fields"),
     url(r"^flow_starts$", FlowStartsEndpoint.as_view(), name="api.v2.flow_starts"),
