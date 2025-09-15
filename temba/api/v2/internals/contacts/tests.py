@@ -663,3 +663,65 @@ class GroupsContactFieldsViewTest(TembaTest):
         keys = {f["key"] for f in data}
         self.assertIn("team5", keys)
         self.assertIn("team3", keys)
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_group_ids_only_separators(self):
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": ",,,"},
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("comma-separated list of integers", resp.json().get("error", ""))
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_no_groups_found(self):
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": "999999,888888"},
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertIn("No groups found", resp.json().get("error", ""))
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_accepts_project_alias(self):
+        grp = self.create_group("AliasProjectGrp")
+        resp = self.client.get(
+            self.url,
+            {"project": str(self.org.proj_uuid), "group_ids": str(grp.id)},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("results", resp.json())
+
+    @mock_mailroom
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_loop_branches_break_and_continue(self, mr_mocks):
+        # two fields and three contacts; values found on first two contacts
+        # ensure inner-loop 'continue' and outer-loop 'break' are exercised
+        team3 = self.create_field("team3", "Team3")
+        team5 = self.create_field("team5", "Team5")
+
+        c1 = self.create_contact("C1", urns=["tel:+100"])
+        mods1 = c1.update_fields({team3: "V1"})
+        c1.modify(self.admin, mods1)
+
+        c2 = self.create_contact("C2", urns=["tel:+200"])
+        mods2 = c2.update_fields({team5: "V2"})
+        c2.modify(self.admin, mods2)
+
+        c3 = self.create_contact("C3", urns=["tel:+300"])  # no relevant fields
+
+        grp = self.create_group("LoopBranchesGrp", contacts=[c1, c2, c3])
+
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": str(grp.id)},
+        )
+        self.assertEqual(resp.status_code, 200)
+        results = resp.json()["results"]
+        keys = {i["key"] for i in results}
+        self.assertIn("team3", keys)
+        self.assertIn("team5", keys)
+        team3_item = next(i for i in results if i["key"] == "team3")
+        team5_item = next(i for i in results if i["key"] == "team5")
+        self.assertEqual(team3_item["example"], "V1")
+        self.assertEqual(team5_item["example"], "V2")
