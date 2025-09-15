@@ -4,8 +4,10 @@ from unittest.mock import patch
 
 from rest_framework.authentication import BasicAuthentication
 
-from django.urls import reverse
+from django.test import SimpleTestCase, override_settings
+from django.urls import resolve, reverse
 
+from temba.api.v2.projects.views import GetProjectView
 from temba.tests import TembaTest
 
 GET_PROJECT_VIEW_PATH = "temba.api.v2.projects.views.GetProjectView"
@@ -68,3 +70,12 @@ class GetProjectViewTest(TembaTest):
         self.assertEqual(data["name"], self.org.name)
         self.assertEqual(data["is_active"], self.org.is_active)
         self.assertEqual(data["brain_on"], self.org.brain_on)
+
+
+@override_settings(ROOT_URLCONF="temba.api.v2.projects.urls")
+class ProjectsUrlsTest(SimpleTestCase):
+    def test_projects_url_resolves_to_get_project_view(self):
+        url = reverse("projects")
+        self.assertEqual(url, "/projects")
+        match = resolve(url)
+        self.assertEqual(getattr(match.func, "view_class", None), GetProjectView)
