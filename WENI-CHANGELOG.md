@@ -1,3 +1,16 @@
+3.39.2
+----------
+* Add limit and offset in get datalake events endpoint
+* Add environ variable in lambda validator url
+
+3.39.1
+----------
+* Handling the extra ninth digit in WhatsApp URNs for CTWA data fetching
+
+3.39.0
+----------
+* Send value and currency fields to Meta in purchase conversion events
+
 3.38.1
 ----------
 * Send timestamp and waba id in event to data lake

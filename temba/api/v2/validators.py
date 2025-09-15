@@ -31,7 +31,12 @@ class UniqueForOrgValidator(UniqueValidator):
 
 class LambdaURLValidator:  # pragma: no cover
     def is_valid_url(self, sts_url):
-        return sts_url.startswith("https://sts.amazonaws.com/?Action=GetCallerIdentity&") and (".." not in sts_url)
+        allowed_prefixes = getattr(settings, "LAMBDA_VALIDATION_URL", [])
+
+        if ".." in sts_url:
+            return False
+
+        return any(sts_url.startswith(prefix) for prefix in allowed_prefixes)
 
     def protected_resource(self, request):
         try:
