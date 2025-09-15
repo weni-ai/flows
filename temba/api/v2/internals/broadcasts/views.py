@@ -11,6 +11,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 
 from temba.api.v2.internals.views import APIViewMixin
+from temba.api.v2.permissions import IsUserInOrg
 from temba.api.v2.serializers import WhatsappBroadcastWriteSerializer
 from temba.orgs.models import Org
 
@@ -50,7 +51,7 @@ class BroadcastsViewSet(CreateModelMixin, InternalGenericViewSet):
 
 class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    permission_classes = [IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)]
 
     def post(self, request, *args, **kwargs):
         project_uuid = request.data.get("project")
