@@ -285,6 +285,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     groups = fields.ContactGroupField(many=True, required=False)
     msg = serializers.DictField(required=True)
     channel = serializers.UUIDField(required=False)
+    queue = serializers.CharField(required=False)
 
     def validate_msg(self, value):
         if not (value.get("text") or value.get("attachments") or value.get("template") or value.get("action_type")):
@@ -313,6 +314,12 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             template = data["msg"]["template"]
             if not channel.template_translations.filter(template__uuid=template["uuid"]).exists():
                 raise serializers.ValidationError(f"Template {template['uuid']} not found in channel {channel.uuid}")
+
+        if data.get("queue"):
+            if data.get("queue") not in ["wpp_broadcast_batch", "template_batch", "template_notification_batch"]:
+                raise serializers.ValidationError(
+                    "Queue must be either wpp_broadcast_batch, template_batch or template_notification_batch"
+                )
 
         return data
 
@@ -363,6 +370,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             msg=self.validated_data.get("msg", {}),
             channel=self.validated_data.get("channel", None),
             broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
+            queue=self.validated_data.get("queue", None),
         )
         # send it
         on_transaction_commit(lambda: broadcast.send_async())
@@ -2025,3 +2033,5 @@ class EventFilterSerializer(serializers.Serializer):
     value = serializers.CharField(required=False)
     metadata = serializers.CharField(required=False)
     event_name = serializers.CharField(required=False)
+    limit = serializers.IntegerField(required=False)
+    offset = serializers.IntegerField(required=False)

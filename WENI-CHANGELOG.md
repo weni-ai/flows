@@ -1,3 +1,72 @@
+3.39.2
+----------
+* Add limit and offset in get datalake events endpoint
+* Add environ variable in lambda validator url
+
+3.39.1
+----------
+* Handling the extra ninth digit in WhatsApp URNs for CTWA data fetching
+
+3.39.0
+----------
+* Send value and currency fields to Meta in purchase conversion events
+
+3.38.1
+----------
+* Send timestamp and waba id in event to data lake
+
+3.38.0
+----------
+* Update weni-rp-apps version to 2.10.4
+* Enhance conversion event handling to send data to Weni Datalake
+
+3.37.2
+----------
+* Add isOrgUser permission
+* Remove API token logger
+* Internal endpoint to get channels
+
+3.37.1
+----------
+* Update weni-rp-apps version to 2.10.3
+* Remove filter to get only contacts with more than one message in get contacts message api
+
+3.37.0
+----------
+* Endpoint to get contacts with more than one message related
+
+3.36.0
+----------
+* Add queue field to WhatsappBroadcastWriteSerializer
+
+3.35.10
+----------
+* Fix: LeadSubmitted event name in Meta Conversion API
+
+3.35.9
+----------
+* Add logger to see API token and user
+
+3.35.8
+----------
+* Update floweditor to 3.6.2
+
+3.35.7
+----------
+* Add internal endpoint to check if contact has open ticket by URN as parameter
+
+3.35.6
+----------
+* Schedule task squash_flow_category_counts
+
+3.35.5
+----------
+* Change CAPI endpoint authentication to JWT
+
+3.35.4
+----------
+* Move squash FlowCategoryCount to a new task 
+
 3.35.3
 ----------
 * Update weni-datalake-sdk version to 0.4.0
