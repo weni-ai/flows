@@ -1350,7 +1350,7 @@ IP_ADDRESSES = ("172.16.10.10", "162.16.10.20")
 # -----------------------------------------------------------------------------------
 # Data model limits
 # -----------------------------------------------------------------------------------
-MSG_FIELD_SIZE = os.environ.get("MSG_FIELD_SIZE", 1500)  # used for broadcast text and message campaign events
+MSG_FIELD_SIZE = os.environ.get("MSG_FIELD_SIZE", 640)  # used for broadcast text and message campaign events
 FLOW_START_PARAMS_SIZE = 256  # used for params passed to flow start API endpoint
 GLOBAL_VALUE_SIZE = 10_000  # max length of global values
 
@@ -1412,6 +1412,8 @@ FLOWEDITOR_SENTRY_DSN = os.environ.get("FLOWEDITOR_SENTRY_DSN", default="")
 INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
 
 FLOW_PATH_RECENT_RUN_BATCH_SIZE = os.environ.get("FLOW_PATH_RECENT_RUN_BATCH_SIZE", default=50)
+
+LAMBDA_VALIDATION_URL = os.environ.get("LAMBDA_VALIDATION_URL", default="")
 
 # Datalake configuration
 DATALAKE_SERVER_ADDRESS = os.environ.get("DATALAKE_SERVER_ADDRESS", default="localhost:50051")
