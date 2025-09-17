@@ -1548,11 +1548,3 @@ class MessageExportAssetStore(BaseExportAssetStore):
     directory = "message_exports"
     permission = "msgs.msg_export"
     extensions = ("xlsx",)
-
-
-# Novo: referência ao service de cost (não acoplar lógica aqui)
-class CostService:
-    @staticmethod
-    def get_cost():
-        # Implementação real estará em temba/msgs/cost_service.py
-        pass
