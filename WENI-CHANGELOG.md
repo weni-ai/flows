@@ -1,3 +1,41 @@
+3.40.0
+----------
+* External v2
+* Add trigger to save msg status update in BroadcastStatistics table
+* BroadcastStatics new model and Broadcast update
+* Endpoint to get flows
+* Add possiblity to use IsUserOrg in internal whatsapp broadcast API
+* Endpoint to get project data
+* Add permission in internal ContactField endpoint
+
+3.39.2
+----------
+* Add limit and offset in get datalake events endpoint
+* Add environ variable in lambda validator url
+
+3.39.1
+----------
+* Handling the extra ninth digit in WhatsApp URNs for CTWA data fetching
+
+3.39.0
+----------
+* Send value and currency fields to Meta in purchase conversion events
+
+3.38.1
+----------
+* Send timestamp and waba id in event to data lake
+
+3.38.0
+----------
+* Update weni-rp-apps version to 2.10.4
+* Enhance conversion event handling to send data to Weni Datalake
+
+3.37.2
+----------
+* Add isOrgUser permission
+* Remove API token logger
+* Internal endpoint to get channels
+
 3.37.1
 ----------
 * Update weni-rp-apps version to 2.10.3

@@ -5,6 +5,7 @@ from .views import (
     ContactsImportConfirmView,
     ContactsImportUploadView,
     ContactsWithMessagesView,
+    GroupsContactFieldsView,
     InternalContactFieldsEndpoint,
     InternalContactView,
     UpdateContactFieldsView,
@@ -22,4 +23,5 @@ urlpatterns = [
         name="internal_contacts_import_confirm",
     ),
     path("contacts_with_messages", ContactsWithMessagesView.as_view(), name="contacts_with_messages"),
+    path("groups_contact_fields", GroupsContactFieldsView.as_view(), name="groups_contact_fields"),
 ]

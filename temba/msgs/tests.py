@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from decimal import Decimal
 from unittest.mock import PropertyMock, patch
 
 import pytz
@@ -11,11 +12,12 @@ from django.utils import timezone
 
 from temba.archives.models import Archive
 from temba.channels.models import ChannelCount, ChannelEvent, ChannelLog
-from temba.contacts.models import URN, ContactURN
+from temba.contacts.models import URN, ContactGroupCount, ContactURN
 from temba.contacts.search.omnibox import omnibox_serialize
 from temba.msgs.models import (
     Attachment,
     Broadcast,
+    BroadcastStatistics,
     ExportMessagesTask,
     Label,
     LabelCount,
@@ -2737,6 +2739,17 @@ class SystemLabelTest(TembaTest):
             },
         )
 
+    def test_last_30_days_stats_no_broadcasts(self):
+        # Remove all broadcast statistics and broadcasts to avoid ProtectedError
+        BroadcastStatistics.objects.filter(org=self.org).delete()
+        Broadcast.objects.filter(org=self.org).delete()
+        stats = BroadcastStatistics.last_30_days_stats(self.org)
+        self.assertEqual(stats["total_processed"], 0)
+        self.assertEqual(stats["total_sent"], 0)
+        self.assertEqual(stats["total_delivered"], 0)
+        self.assertEqual(stats["total_failed"], 0)
+        self.assertEqual(stats["total_contacts"], 0)
+
 
 class TagsTest(TembaTest):
     def setUp(self):
@@ -2803,3 +2816,118 @@ class TagsTest(TembaTest):
         # exception if tag not used correctly
         self.assertRaises(ValueError, self.render_template, "{% load sms %}{% render with bob %}{% endrender %}")
         self.assertRaises(ValueError, self.render_template, "{% load sms %}{% render as %}{% endrender %}")
+
+
+class BroadcastStatisticsTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.joe = self.create_contact("Joe Blow", phone="123")
+        self.broadcast = Broadcast.create(
+            self.org,
+            self.user,
+            "Test broadcast",
+            contacts=[self.joe],
+            is_bulk_send=True,
+        )
+        self.stats = BroadcastStatistics.objects.create(
+            broadcast=self.broadcast,
+            org=self.org,
+            processed=10,
+            sent=8,
+            delivered=6,
+            read=1,
+            failed=2,
+            contact_count=5,
+        )
+
+    def test_str(self):
+        expected = f"BroadcastStatistics[broadcast_id={self.broadcast.id}, org={self.org}, processed=10, sent=8, delivered=6, failed=2, read=1, cost=None, template_price=None, currency=None, contact_count=5]"
+        self.assertEqual(str(self.stats), expected)
+
+    def test_last_30_days_stats(self):
+        stats = BroadcastStatistics.last_30_days_stats(self.org)
+        self.assertEqual(stats["total_processed"], 10)
+        self.assertEqual(stats["total_sent"], 8)
+        self.assertEqual(stats["total_delivered"], 6)
+        self.assertEqual(stats["total_failed"], 2)
+        self.assertEqual(stats["total_contacts"], 5)
+        self.assertEqual(stats["total_read"], 1)
+
+    def test_last_30_days_stats_no_broadcasts(self):
+        # Remove all broadcast statistics and broadcasts to avoid ProtectedError
+        BroadcastStatistics.objects.filter(org=self.org).delete()
+        Broadcast.objects.filter(org=self.org).delete()
+        stats = BroadcastStatistics.last_30_days_stats(self.org)
+        self.assertEqual(stats["total_processed"], 0)
+        self.assertEqual(stats["total_sent"], 0)
+        self.assertEqual(stats["total_delivered"], 0)
+        self.assertEqual(stats["total_failed"], 0)
+        self.assertEqual(stats["total_contacts"], 0)
+        self.assertEqual(stats["total_read"], 0)
+
+    def test_success_rate_30_days(self):
+        rate = BroadcastStatistics.success_rate_30_days(self.org)
+        self.assertEqual(rate, 75.0)  # 6 delivered / 8 sent * 100
+
+    def test_success_rate_30_days_zero_sent(self):
+        self.stats.sent = 0
+        self.stats.delivered = 0
+        self.stats.save()
+        rate = BroadcastStatistics.success_rate_30_days(self.org)
+        self.assertEqual(rate, 0)
+
+
+class BroadcastCreateWithGroupsTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        # create contacts and two static groups
+        self.alice = self.create_contact("Alice", phone="111")
+        self.bob = self.create_contact("Bob", phone="222")
+        self.carlos = self.create_contact("Carlos", phone="333")
+
+        self.group_a = self.create_group("Group A", contacts=[self.alice, self.bob])
+        self.group_b = self.create_group("Group B", contacts=[self.carlos])
+
+        # ensure ContactGroupCount rows exist for deterministic totals
+        ContactGroupCount.populate_for_group(self.group_a)
+        ContactGroupCount.populate_for_group(self.group_b)
+
+    def _mock_pricing(self, price=0.1234, currency="USD"):
+        return patch("temba.msgs.models.get_template_price_and_currency_from_api", return_value=(price, currency))
+
+    def test_create_bulk_with_groups_creates_statistics_and_aggregates_counts(self):
+        # both groups should sum to 3 contacts
+        with self._mock_pricing(price=0.55, currency="BRL"):
+            broadcast = Broadcast.create(
+                self.org,
+                self.user,
+                "Hello group",
+                groups=[self.group_a, self.group_b],
+                is_bulk_send=True,
+                template_id=None,
+            )
+
+        stats = BroadcastStatistics.objects.filter(broadcast=broadcast, org=self.org).first()
+        self.assertIsNotNone(stats)
+        self.assertEqual(stats.contact_count, 3)
+        self.assertEqual(stats.template_price, Decimal("0.55"))
+        self.assertEqual(stats.currency, "BRL")
+        self.assertEqual(stats.cost, Decimal("0"))
+
+    def test_create_bulk_with_group_ids_list(self):
+        # pass group ids instead of instances
+        with self._mock_pricing(price=0.10, currency="USD"):
+            broadcast = Broadcast.create(
+                self.org,
+                self.user,
+                "Hello IDs",
+                groups=[self.group_a.id, self.group_b.id],
+                is_bulk_send=True,
+            )
+
+        stats = BroadcastStatistics.objects.filter(broadcast=broadcast, org=self.org).first()
+        self.assertIsNotNone(stats)
+        self.assertEqual(stats.contact_count, 3)
+        self.assertEqual(stats.template_price, Decimal("0.10"))
+        self.assertEqual(stats.currency, "USD")
+        self.assertEqual(stats.cost, Decimal("0"))
