@@ -988,11 +988,12 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
             success_status=200,
         )
 
-        # try a duplicate catch all with no groups
+        # allow duplicate catch-all with no groups
         self.assertCreateSubmit(
             create_url,
             {"flow": flow2.id},
-            form_errors={"__all__": "There already exists a trigger of this type with these options."},
+            new_obj_query=Trigger.objects.filter(trigger_type=Trigger.TYPE_CATCH_ALL, flow=flow2),
+            success_status=200,
         )
 
         # works if we specify a group
@@ -1003,11 +1004,14 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
             success_status=200,
         )
 
-        # groups between triggers can't overlap
+        # overlapping groups are allowed for catch-all triggers
         self.assertCreateSubmit(
             create_url,
             {"flow": flow2.id, "groups": [group1.id, group2.id]},
-            form_errors={"__all__": "There already exists a trigger of this type with these options."},
+            new_obj_query=Trigger.objects.filter(trigger_type=Trigger.TYPE_CATCH_ALL, flow=flow2)
+            .filter(groups=group1)
+            .filter(groups=group2),
+            success_status=200,
         )
 
     def test_create_closed_ticket(self):
