@@ -90,6 +90,10 @@ class InternalMessagesView(APIViewMixin, APIView):
             Prefetch("labels", queryset=Label.label_objects.only("uuid", "name").order_by("pk")),
         )
 
+        channel_uuid = params.get("channel_uuid")
+        if channel_uuid:
+            queryset = queryset.filter(channel__uuid=channel_uuid)
+
         # Filter by before/after
         before = params.get("before")
         after = params.get("after")
