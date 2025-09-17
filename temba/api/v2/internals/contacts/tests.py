@@ -21,6 +21,7 @@ User = get_user_model()
 
 
 CONTACT_FIELDS_ENDPOINT_PATH = "temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint"
+GROUPS_CONTACT_FIELDS_PATH = "temba.api.v2.internals.contacts.views.GroupsContactFieldsView"
 
 
 def skip_authentication(endpoint_path: str):
@@ -616,3 +617,166 @@ class ContactsWithMessagesViewTest(TembaTest):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()["results"] if "results" in resp.json() else resp.json()
         self.assertEqual(len(data), 0)
+
+
+class GroupsContactFieldsViewTest(TembaTest):
+    url = "/api/v2/internals/groups_contact_fields"
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_missing_params(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("error", resp.json())
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_missing_group_ids(self):
+        resp = self.client.get(self.url, {"project_uuid": str(self.org.proj_uuid)})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("group_ids not provided", resp.json().get("error", ""))
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_invalid_project(self):
+        resp = self.client.get(self.url, {"project_uuid": "00000000-0000-0000-0000-000000000000", "group_ids": "1"})
+        self.assertEqual(resp.status_code, 404)
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_group_ids_must_be_integers(self):
+        resp = self.client.get(self.url, {"project_uuid": str(self.org.proj_uuid), "group_ids": "abc,2"})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("must contain only integers", resp.json().get("error", ""))
+
+    @mock_mailroom
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_dynamic_group_fields_included_with_null_example(self, mr_mocks):
+        # create a user field and dynamic group referencing it
+        team5 = self.create_field("team5", "Team5")
+        query = 'team5 = "YES"'
+        mr_mocks.parse_query(query, fields=[team5])
+
+        dyn = self.create_group("DynTeam5", query=query)
+
+        # call endpoint
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": str(dyn.id)},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"]
+        keys = {f["key"] for f in data}
+        self.assertIn("team5", keys)
+        team5_item = next(i for i in data if i["key"] == "team5")
+        self.assertIn("example", team5_item)
+        self.assertIsNone(team5_item["example"])  # no contacts with value -> example null
+
+    @mock_mailroom
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_static_group_fields_from_contacts(self, mr_mocks):
+        # create field and contact with that field value
+        team3 = self.create_field("team3", "Team3")
+        contact = self.create_contact("Alice", urns=["tel:+111"])
+        mods = contact.update_fields({team3: "Opa"})
+        contact.modify(self.admin, mods)
+
+        # create static group with the contact
+        grp = self.create_group("StaticGrp", contacts=[contact])
+
+        # call endpoint
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": str(grp.id)},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"]
+        keys = {f["key"] for f in data}
+        self.assertIn("team3", keys)
+        team3_item = next(i for i in data if i["key"] == "team3")
+        self.assertEqual(team3_item["example"], "Opa")
+
+    @mock_mailroom
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_union_across_multiple_groups(self, mr_mocks):
+        # dynamic group with team5
+        team5 = self.create_field("team5", "Team5")
+        q = 'team5 = "YES"'
+        mr_mocks.parse_query(q, fields=[team5])
+        dyn = self.create_group("DynTeam5", query=q)
+
+        # static group with team3 value
+        team3 = self.create_field("team3", "Team3")
+        c = self.create_contact("Bob", urns=["tel:+222"])
+        mods = c.update_fields({team3: "Opa"})
+        c.modify(self.admin, mods)
+        stat = self.create_group("StatTeam3", contacts=[c])
+
+        gids = f"{dyn.id},{stat.id}"
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": gids},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"]
+        keys = {f["key"] for f in data}
+        self.assertIn("team5", keys)
+        self.assertIn("team3", keys)
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_group_ids_only_separators(self):
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": ",,,"},
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("comma-separated list of integers", resp.json().get("error", ""))
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_no_groups_found(self):
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": "999999,888888"},
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertIn("No groups found", resp.json().get("error", ""))
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_accepts_project_alias(self):
+        grp = self.create_group("AliasProjectGrp")
+        resp = self.client.get(
+            self.url,
+            {"project": str(self.org.proj_uuid), "group_ids": str(grp.id)},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("results", resp.json())
+
+    @mock_mailroom
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_loop_branches_break_and_continue(self, mr_mocks):
+        # two fields and three contacts; values found on first two contacts
+        # ensure inner-loop 'continue' and outer-loop 'break' are exercised
+        team3 = self.create_field("team3", "Team3")
+        team5 = self.create_field("team5", "Team5")
+
+        c1 = self.create_contact("C1", urns=["tel:+100"])
+        mods1 = c1.update_fields({team3: "V1"})
+        c1.modify(self.admin, mods1)
+
+        c2 = self.create_contact("C2", urns=["tel:+200"])
+        mods2 = c2.update_fields({team5: "V2"})
+        c2.modify(self.admin, mods2)
+
+        c3 = self.create_contact("C3", urns=["tel:+300"])  # no relevant fields
+
+        grp = self.create_group("LoopBranchesGrp", contacts=[c1, c2, c3])
+
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": str(grp.id)},
+        )
+        self.assertEqual(resp.status_code, 200)
+        results = resp.json()["results"]
+        keys = {i["key"] for i in results}
+        self.assertIn("team3", keys)
+        self.assertIn("team5", keys)
+        team3_item = next(i for i in results if i["key"] == "team3")
+        team5_item = next(i for i in results if i["key"] == "team5")
+        self.assertEqual(team3_item["example"], "V1")
+        self.assertEqual(team5_item["example"], "V2")

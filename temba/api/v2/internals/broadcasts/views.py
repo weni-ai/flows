@@ -53,7 +53,7 @@ class BroadcastsViewSet(CreateModelMixin, InternalGenericViewSet):
 
 class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    permission_classes = [IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)]
 
     def post(self, request, *args, **kwargs):
         project_uuid = request.data.get("project")
