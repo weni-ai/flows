@@ -1,13 +1,13 @@
 from django.conf import settings
 
 from temba.orgs.models import Org
-from temba.utils.s3 import public_file_storage
+from temba.utils.s3 import private_file_storage
 from temba.utils.uuid import uuid4
 
 
 def upload_broadcast_media(org: Org, file) -> dict:
     """
-    Saves the given file to public storage under a predictable attachments path and returns metadata.
+    Saves the given file to storage under a predictable attachments path and returns metadata.
     - Path: attachments/<org_id>/broadcasts/<random_uuid>/<original_filename>
     - Returns: {"type": <mime>, "url": <public_url>}
     """
@@ -19,6 +19,6 @@ def upload_broadcast_media(org: Org, file) -> dict:
         file.content_type = "audio/mp4"
 
     path = f"attachments/{org.pk}/broadcasts/{random_uuid_folder_name}/{file.name}"
-    saved_path = public_file_storage.save(path, file)
+    saved_path = private_file_storage.save(path, file)
 
     return {"type": file.content_type, "url": f"{settings.STORAGE_URL}/{saved_path}"}
