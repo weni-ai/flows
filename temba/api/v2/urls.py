@@ -4,9 +4,9 @@ from django.conf.urls import url
 from django.urls import include, path
 
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
-from temba.api.v2.templates.views import TemplateByIdEndpoint, TemplatesTranslationsEndpoint
 from temba.api.v2.flows.views import InternalFlowsAPIView
 from temba.api.v2.projects.views import GetProjectView
+from temba.api.v2.templates.views import TemplateByIdEndpoint, TemplatesTranslationsEndpoint
 
 from .flows.urls import urlpatterns as flows_urlpatterns
 from .internals.urls import urlpatterns as internals_urlpatterns
