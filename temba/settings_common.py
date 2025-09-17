@@ -1423,6 +1423,8 @@ DATALAKE_SERVER_ADDRESS = os.environ.get("DATALAKE_SERVER_ADDRESS", default="loc
 
 FLOW_PATH_RECENT_RUN_BATCH_SIZE = os.environ.get("FLOW_PATH_RECENT_RUN_BATCH_SIZE", default=50)
 
+LAMBDA_VALIDATION_URL = os.environ.get("LAMBDA_VALIDATION_URL", default="")
+
 # Datalake configuration
 DATALAKE_SERVER_ADDRESS = os.environ.get("DATALAKE_SERVER_ADDRESS", default="localhost:50051")
 EVENTS_METRIC_NAME = os.environ.get("EVENTS_METRIC_NAME", default="")

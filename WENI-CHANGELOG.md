@@ -1,3 +1,13 @@
+3.40.0
+----------
+* External v2
+* Add trigger to save msg status update in BroadcastStatistics table
+* BroadcastStatics new model and Broadcast update
+* Endpoint to get flows
+* Add possiblity to use IsUserOrg in internal whatsapp broadcast API
+* Endpoint to get project data
+* Add permission in internal ContactField endpoint
+
 3.39.2
 ----------
 * Add limit and offset in get datalake events endpoint

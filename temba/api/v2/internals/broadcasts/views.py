@@ -1,6 +1,7 @@
-from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
+from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated, ParseError
 from rest_framework.mixins import CreateModelMixin
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
@@ -18,6 +19,7 @@ from temba.msgs.models import Broadcast, BroadcastStatistics
 from temba.orgs.models import Org
 
 from .serializers import BroadcastSerializer, BroadcastWithStatisticsSerializer, UserAndProjectSerializer
+from .services import upload_broadcast_media
 
 User = get_user_model()
 
@@ -122,13 +124,37 @@ class InternalBroadcastStatisticMontlyEndpoint(APIViewMixin, APIView):
         project_uuid = request.query_params.get("project_uuid")
         if not project_uuid:
             return Response({"error": "Project UUID not provided"}, status=400)
-
+        
         try:
             org = Org.objects.get(proj_uuid=project_uuid)
         except Org.DoesNotExist:
             return Response({"error": "Project not found"}, status=404)
 
+
         result = {}
         result["last_30_days_stats"] = BroadcastStatistics.last_30_days_stats(org)
         result["success_rate_30_days"] = BroadcastStatistics.success_rate_30_days(org)
+
+        return Response(result)
+
+class InternalBroadcastsUploadMediaEndpoint(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)]
+
+    def post(self, request: Request):
+        project_uuid = request.data.get("project_uuid") or request.data.get("project")
+
+        if not project_uuid:
+            return Response({"error": "project_uuid is required"}, status=400)
+        
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except Org.DoesNotExist:
+            return Response({"error": "Project not found"}, status=404)
+
+        upload = request.FILES.get("file") or request.data.get("file")
+        if not upload:
+            raise ParseError(detail="file is required")
+
+        result = upload_broadcast_media(org, upload)
         return Response(result)
