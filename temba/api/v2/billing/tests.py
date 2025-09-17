@@ -52,3 +52,27 @@ class BillingPricingEndpointTest(TembaTest):
 
         self.assertEqual(response.status_code, 502)
         self.assertEqual(response.json(), {})
+
+    @patch("temba.api.v2.billing.views.BillingPricingEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.billing.views.BillingPricingEndpoint.permission_classes", [])
+    @patch("temba.api.v2.billing.views.get_billing_pricing")
+    def test_missing_project_param_returns_400(self, mock_get_pricing, *mocks):
+        url = reverse("api.v2.billing_pricing")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+        mock_get_pricing.assert_not_called()
+
+    @patch("temba.api.v2.billing.views.BillingPricingEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.billing.views.BillingPricingEndpoint.permission_classes", [])
+    @patch("temba.api.v2.billing.views.get_billing_pricing")
+    def test_unknown_project_returns_404(self, mock_get_pricing, *mocks):
+        unknown_proj = str(uuid4())
+
+        url = reverse("api.v2.billing_pricing")
+        response = self.client.get(url, {"project_uuid": unknown_proj})
+
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("error", response.json())
+        mock_get_pricing.assert_not_called()
