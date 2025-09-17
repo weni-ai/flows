@@ -1,3 +1,9 @@
+3.40.1
+----------
+* Add pagination to be used in v2 api
+* Add channel filter in internal get message
+* Endpoint to upload media
+
 3.40.0
 ----------
 * External v2
