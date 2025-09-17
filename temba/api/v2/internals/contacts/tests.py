@@ -669,8 +669,12 @@ class ContactsImportConfirmViewTest(TembaTest):
             resp = self.client.get(url)
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
+        # expect nested structure: data has 'info' dict and 'group' key
+        self.assertIn("info", data)
+        self.assertIn("group", data)
+        info = data["info"]
         for key in ("status", "num_created", "num_updated", "num_errored", "errors", "time_taken"):
-            self.assertIn(key, data)
+            self.assertIn(key, info)
 
 
 class GroupsContactFieldsViewTest(TembaTest):
