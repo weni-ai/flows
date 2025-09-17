@@ -57,10 +57,14 @@ def export_flow_results_task(export_id):
 def squash_flowcounts():
     FlowNodeCount.squash()
     FlowRunCount.squash()
-    FlowCategoryCount.squash()
     FlowPathRecentRun.prune()
     FlowStartCount.squash()
     FlowPathCount.squash()
+
+
+@nonoverlapping_task(track_started=True, name="squash_flow_category_counts", lock_timeout=7200)
+def squash_flow_category_counts():
+    FlowCategoryCount.squash()
 
 
 @nonoverlapping_task(track_started=True, name="trim_flow_revisions")

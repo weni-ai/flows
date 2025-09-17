@@ -60,6 +60,7 @@ from .models import (
 )
 from .tasks import (
     interrupt_flow_sessions,
+    squash_flow_category_counts,
     squash_flowcounts,
     trim_all_flow_starts,
     trim_flow_revisions,
@@ -978,6 +979,68 @@ class FlowTest(TembaTest):
         squash_flowcounts()
         self.assertEqual(max_id, FlowRunCount.objects.all().order_by("-id").first().id)
 
+    def test_squash_category_counts(self):
+        flow = self.get_flow("favorites")
+        flow2 = self.get_flow("pick_a_number")
+
+        FlowCategoryCount.objects.create(
+            flow=flow,
+            node_uuid="ce1cc75f-34c8-490e-98f3-fb72f78510b6",
+            result_key="color",
+            result_name="Color",
+            category_name="Blue",
+            count=2,
+        )
+        FlowCategoryCount.objects.create(
+            flow=flow,
+            node_uuid="ce1cc75f-34c8-490e-98f3-fb72f78510b6",
+            result_key="color",
+            result_name="Color",
+            category_name="Blue",
+            count=1,
+        )
+        FlowCategoryCount.objects.create(
+            flow=flow,
+            node_uuid="ce1cc75f-34c8-490e-98f3-fb72f78510b6",
+            result_key="color",
+            result_name="Color",
+            category_name="Red",
+            count=3,
+        )
+        FlowCategoryCount.objects.create(
+            flow=flow2,
+            node_uuid="6b754443-89b1-4476-98c6-aa5836e6f1d7",
+            result_key="number",
+            result_name="Number",
+            category_name="1",
+            count=10,
+        )
+        FlowCategoryCount.objects.create(
+            flow=flow2,
+            node_uuid="6b754443-89b1-4476-98c6-aa5836e6f1d7",
+            result_key="number",
+            result_name="Number",
+            category_name="1",
+            count=-1,
+        )
+
+        squash_flow_category_counts()
+        self.assertEqual(FlowCategoryCount.objects.all().count(), 3)
+
+        blue_count = FlowCategoryCount.objects.get(flow=flow, category_name="Blue")
+        red_count = FlowCategoryCount.objects.get(flow=flow, category_name="Red")
+        one_count = FlowCategoryCount.objects.get(flow=flow2, category_name="1")
+
+        self.assertEqual(blue_count.count, 3)
+        self.assertEqual(red_count.count, 3)
+        self.assertEqual(one_count.count, 9)
+
+        max_id = FlowCategoryCount.objects.all().order_by("-id").first().id
+
+        # no-op this time
+        squash_flow_category_counts()
+        self.assertEqual(max_id, FlowCategoryCount.objects.all().order_by("-id").first().id)
+
     def test_category_counts(self):
         def assertCount(counts, result_key, category_name, truth):
             found = False
@@ -1227,61 +1290,33 @@ class FlowTest(TembaTest):
         FlowStartCount.squash()
         self.assertEqual(FlowStartCount.get_count(start), 10)
 
-    # def test_prune_recentruns(self):
-    #     flow = self.get_flow("color_v13")
-    #     flow_nodes = flow.get_definition()["nodes"]
-    #     color_prompt = flow_nodes[0]
-    #     color_other = flow_nodes[3]
-    #     color_split = flow_nodes[4]
-    #     other_exit = color_split["exits"][2]
+    def test_prune_recent_runs(self):
+        """
+        Test that prune() correctly handles cases where records older than 30 days
+        """
+        now = timezone.now()
 
-    #     # send 12 invalid color responses from two contacts
-    #     session = None
-    #     bob = self.create_contact("Bob", phone="+260964151234")
-    #     for m in range(12):
-    #         contact = self.contact if m % 2 == 0 else bob
-    #         session = (
-    #             MockSessionWriter(contact, flow)
-    #             .visit(color_prompt)
-    #             .send_msg("What is your favorite color?", self.channel)
-    #             .visit(color_split)
-    #             .wait()
-    #             .resume(msg=self.create_incoming_msg(contact, text=str(m + 1)))
-    #             .visit(color_other)
-    #             .visit(color_split)
-    #             .wait()
-    #             .save()
-    #         )
+        FlowPathRecentRun.objects.create(
+            from_uuid=uuid4(),
+            from_step_uuid=uuid4(),
+            to_uuid=uuid4(),
+            to_step_uuid=uuid4(),
+            run_id=1,
+            visited_on=now - timedelta(days=31),
+        )
 
-    #     # all 12 messages are stored for the other segment
-    #     other_recent = FlowPathRecentRun.objects.filter(from_uuid=other_exit["uuid"], to_uuid=color_other["uuid"])
-    #     self.assertEqual(12, len(other_recent))
+        FlowPathRecentRun.objects.create(
+            from_uuid=uuid4(),
+            from_step_uuid=uuid4(),
+            to_uuid=uuid4(),
+            to_step_uuid=uuid4(),
+            run_id=2,
+            visited_on=now - timedelta(days=31),
+        )
 
-    #     # and these are returned with most-recent first
-    #     other_recent = FlowPathRecentRun.get_recent([other_exit["uuid"]], color_other["uuid"], limit=None)
-    #     self.assertEqual(
-    #         ["12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1"], [r["text"] for r in other_recent]
-    #     )
+        FlowPathRecentRun.prune()
 
-    #     # even when limit is applied
-    #     other_recent = FlowPathRecentRun.get_recent([other_exit["uuid"]], color_other["uuid"], limit=5)
-    #     self.assertEqual(["12", "11", "10", "9", "8"], [r["text"] for r in other_recent])
-
-    #     squash_flowcounts()
-
-    #     # now only 5 newest are stored
-    #     other_recent = FlowPathRecentRun.objects.filter(from_uuid=other_exit["uuid"], to_uuid=color_other["uuid"])
-    #     self.assertEqual(5, len(other_recent))
-
-    #     other_recent = FlowPathRecentRun.get_recent([other_exit["uuid"]], color_other["uuid"])
-    #     self.assertEqual(["12", "11", "10", "9", "8"], [r["text"] for r in other_recent])
-
-    #     # send another message and prune again
-    #     (session.resume(msg=self.create_incoming_msg(bob, "13")).visit(color_other).visit(color_split).wait().save())
-    #     squash_flowcounts()
-
-    #     other_recent = FlowPathRecentRun.get_recent([other_exit["uuid"]], color_other["uuid"])
-    #     self.assertEqual(["13", "12", "11", "10", "9"], [r["text"] for r in other_recent])
+        self.assertEqual(FlowPathRecentRun.objects.count(), 0)
 
     def test_flow_keyword_update(self):
         self.login(self.admin)

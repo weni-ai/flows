@@ -3,6 +3,7 @@ import socket
 import sys
 import urllib
 from datetime import timedelta
+from pathlib import Path
 
 import iptools
 import sentry_sdk
@@ -142,6 +143,8 @@ STATICFILES_FINDERS = (
 
 # Make this unique, and don't share it with anybody.
 SECRET_KEY = "your own secret key"
+
+WENI_REDIRECT_WHITELIST_PATHS = os.environ.get("WENI_REDIRECT_WHITELIST_PATHS", default=["/redirect", "/api"])
 
 # -----------------------------------------------------------------------------------
 # Directory Configuration
@@ -337,6 +340,7 @@ INSTALLED_APPS = (
     "temba.wpp_flows",
     "temba.projects",
     "temba.event_driven",
+    "temba.conversion_events",
 )
 
 # the last installed app that uses smartmin permissions
@@ -1095,6 +1099,7 @@ CELERY_BEAT_SCHEDULE = {
     "trim-webhook-event": {"task": "trim_webhook_event_task", "schedule": crontab(hour=3, minute=0)},
     "update-org-activity": {"task": "update_org_activity_task", "schedule": crontab(hour=3, minute=5)},
     "refresh-teams-tokens": {"task": "refresh_teams_tokens", "schedule": crontab(hour=8, minute=0)},
+    "squash-flow-category-counts": {"task": "squash_flow_category_counts", "schedule": timedelta(seconds=60)},
 }
 
 # -----------------------------------------------------------------------------------
@@ -1345,7 +1350,7 @@ IP_ADDRESSES = ("172.16.10.10", "162.16.10.20")
 # -----------------------------------------------------------------------------------
 # Data model limits
 # -----------------------------------------------------------------------------------
-MSG_FIELD_SIZE = os.environ.get("MSG_FIELD_SIZE", 640)  # used for broadcast text and message campaign events
+MSG_FIELD_SIZE = os.environ.get("MSG_FIELD_SIZE", 1500)  # used for broadcast text and message campaign events
 FLOW_START_PARAMS_SIZE = 256  # used for params passed to flow start API endpoint
 GLOBAL_VALUE_SIZE = 10_000  # max length of global values
 
@@ -1356,6 +1361,11 @@ ORG_LIMIT_DEFAULTS = {
     "labels": 250,
     "topics": 250,
 }
+
+# Default batch size for squashing model counts, can be overridden by model classes
+SQUASH_BATCH_SIZE = int(os.environ.get("SQUASH_BATCH_SIZE", 5000))
+
+FLOW_CATEGORY_COUNT_SQUASH_BATCH_SIZE = int(os.environ.get("FLOW_CATEGORY_COUNT_SQUASH_BATCH_SIZE", 100))
 
 # -----------------------------------------------------------------------------------
 # Data retention periods - tasks trim away data older than these settings
@@ -1397,10 +1407,31 @@ INTELLIGENCES_TOKEN = os.environ.get("INTELLIGENCES_TOKEN", default="")
 # Nexus url
 NEXUS_BASE_URL = os.environ.get("NEXUS_BASE_URL", default="https://nexus.dev.cloud.weni.ai")
 
+BILLING_BASE_URL = os.environ.get("BILLING_BASE_URL", default="https://billing.stg.cloud.weni.ai")
+
 FLOWEDITOR_SENTRY_DSN = os.environ.get("FLOWEDITOR_SENTRY_DSN", default="")
 
 INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
 
 FLOW_PATH_RECENT_RUN_BATCH_SIZE = os.environ.get("FLOW_PATH_RECENT_RUN_BATCH_SIZE", default=50)
 
+LAMBDA_VALIDATION_URL = os.environ.get("LAMBDA_VALIDATION_URL", default="")
+
+# Datalake configuration
 DATALAKE_SERVER_ADDRESS = os.environ.get("DATALAKE_SERVER_ADDRESS", default="localhost:50051")
+EVENTS_METRIC_NAME = os.environ.get("EVENTS_METRIC_NAME", default="")
+REDSHIFT_QUERY_BASE_URL = os.environ.get("REDSHIFT_QUERY_BASE_URL", default="")
+REDSHIFT_SECRET = os.environ.get("REDSHIFT_SECRET", default="")
+REDSHIFT_ROLE_ARN = os.environ.get("REDSHIFT_ROLE_ARN", default="")
+
+# Path to the JWT public key
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+JWT_PUBLIC_KEY_PATH = BASE_DIR / "temba" / "jwt_public_key.pem"
+
+# The public key is loaded a single time at application startup.
+try:
+    with open(JWT_PUBLIC_KEY_PATH, "rb") as f:
+        JWT_PUBLIC_KEY = f.read()
+except FileNotFoundError:
+    JWT_PUBLIC_KEY = None

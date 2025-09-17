@@ -1,4 +1,5 @@
 import itertools
+import json
 from enum import Enum
 
 from rest_framework import generics, status, views
@@ -8,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from smartmin.views import SmartFormView, SmartTemplateView
+from weni_datalake_sdk.clients.redshift.events import get_events
 
 from django import forms
 from django.contrib.auth import authenticate, login
@@ -75,6 +77,7 @@ from .serializers import (
     ContactTemplateSerializer,
     ContactTemplateSerializerNew,
     ContactWriteSerializer,
+    EventFilterSerializer,
     ExternalServicesReadSerializer,
     FilterTemplateSerializer,
     FilterTemplateSerializerNew,
@@ -335,6 +338,7 @@ class ExplorerView(SmartTemplateView):
             ExternalServicesEndpoint.get_read_explorer(),
             BrainInfoEndpoint.get_read_explorer(),
             WhatsappFlowsEndpoint.get_read_explorer(),
+            EventsEndpoint.get_read_explorer(),
         ]
         return context
 
@@ -5300,7 +5304,7 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
             "assets": {
                 "screens": [
                     "WELCOME", "MIDDLE"
-                },
+                ],
                 "variables": [
                     "question1Checkbox", "checkbox_source"
                 ]
@@ -5338,4 +5342,63 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
             "slug": "whatsapp_flows-list",
             "params": [],
             "example": {},
+        }
+
+
+class EventsEndpoint(BaseAPIView):
+    permission = "orgs.org_api"
+
+    def get(self, request, *args, **kwargs):
+        serializer = EventFilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            org = request.user.get_org()
+            validated_data = serializer.validated_data.copy()
+            validated_data["project"] = str(org.proj_uuid)
+
+            events = get_events(**validated_data)
+
+            processed_events = []
+            for event in events:
+                processed_event = {}
+                for key, value in event.items():
+                    if isinstance(value, str):
+                        try:
+                            processed_event[key] = json.loads(value)
+                        except (json.JSONDecodeError, TypeError):
+                            processed_event[key] = value
+                    else:
+                        processed_event[key] = value
+                processed_events.append(processed_event)
+
+            return Response(processed_events)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Datalake Events",
+            "url": reverse("api.v2.events"),
+            "slug": "events-list",
+            "params": [
+                {
+                    "name": "date_start",
+                    "required": True,
+                    "help": "The start date for the filter, ex: 2025-06-03T00:00:00Z",
+                },
+                {
+                    "name": "date_end",
+                    "required": True,
+                    "help": "The end date for the filter, ex: 2025-06-20T23:59:59Z",
+                },
+                {"name": "key", "required": False, "help": "A key to filter by"},
+                {"name": "contact_urn", "required": False, "help": "A contact URN to filter by"},
+                {"name": "value_type", "required": False, "help": "A value_type to filter by"},
+                {"name": "value", "required": False, "help": "A value to filter by"},
+                {"name": "metadata", "required": False, "help": "A metadata to filter by"},
+                {"name": "event_name", "required": False, "help": "An event_name to filter by"},
+            ],
         }

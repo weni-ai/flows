@@ -4,6 +4,8 @@ from django.conf.urls import url
 from django.urls import include, path
 
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
+from temba.api.v2.flows.views import InternalFlowsAPIView
+from temba.api.v2.projects.views import GetProjectView
 
 from .flows.urls import urlpatterns as flows_urlpatterns
 from .internals.urls import urlpatterns as internals_urlpatterns
@@ -23,6 +25,7 @@ from .views import (
     ContactsTemplatesEndpoint,
     ContactsTemplatesEndpointNew,
     DefinitionsEndpoint,
+    EventsEndpoint,
     ExplorerView,
     ExternalServicesEndpoint,
     FieldsEndpoint,
@@ -78,8 +81,10 @@ urlpatterns = [
     url(r"^contact_templates$", ContactsTemplatesEndpoint.as_view(), name="api.v2.contact_templates"),
     url(r"^contact_templates_new$", ContactsTemplatesEndpointNew.as_view(), name="api.v2.contact_templates_new"),
     url(r"^contacts_elastic$", ContactsElasticSearchEndpoint.as_view(), name="api.v2.contacts_elastic"),
+    url(r"^events$", EventsEndpoint.as_view(), name="api.v2.events"),
     url(r"^filter_templates$", FilterTemplatesEndpoint.as_view(), name="api.v2.filter_templates"),
     url(r"^filter_templates_new$", FilterTemplatesEndpointNew.as_view(), name="api.v2.filter_templates_new"),
+    url(r"^internal_flows$", InternalFlowsAPIView.as_view(), name="api.v2.internal_flows"),
     url(r"^definitions$", DefinitionsEndpoint.as_view(), name="api.v2.definitions"),
     url(r"^fields$", FieldsEndpoint.as_view(), name="api.v2.fields"),
     url(r"^flow_starts$", FlowStartsEndpoint.as_view(), name="api.v2.flow_starts"),
@@ -108,6 +113,7 @@ urlpatterns = [
     url(r"^intelligences$", IntelligencesEndpoint.as_view(), name="api.v2.intelligences"),
     url(r"^brain_info$", BrainInfoEndpoint.as_view(), name="api.v2.brain_info"),
     url(r"^whatsapp_flows$", WhatsappFlowsEndpoint.as_view(), name="api.v2.whatsapp_flows"),
+    url(r"^projects$", GetProjectView.as_view(), name="api.v2.projects"),
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns, allowed=["json", "api"])
