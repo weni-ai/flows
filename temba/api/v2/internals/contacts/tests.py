@@ -1,3 +1,4 @@
+import datetime as dt
 from functools import wraps
 from unittest.mock import MagicMock, patch
 
@@ -6,16 +7,21 @@ from rest_framework.response import Response
 
 from django.contrib.auth import get_user_model
 from django.test import override_settings
+from django.utils import timezone
 
 from temba.api.v2.validators import LambdaURLValidator
 from temba.contacts.models import ContactField
+from temba.msgs.models import Msg
 from temba.tests import TembaTest
 from temba.tests.mailroom import mock_mailroom
+from temba.tickets.models import Ticketer
+from temba.tickets.types.wenichats.type import WeniChatsType
 
 User = get_user_model()
 
 
 CONTACT_FIELDS_ENDPOINT_PATH = "temba.api.v2.internals.contacts.views.InternalContactFieldsEndpoint"
+GROUPS_CONTACT_FIELDS_PATH = "temba.api.v2.internals.contacts.views.GroupsContactFieldsView"
 
 
 def skip_authentication(endpoint_path: str):
@@ -335,3 +341,387 @@ class InternalContactFieldsEndpointTest(TembaTest):
 
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json(), {"label": "Nick Name", "value_type": "T"})
+
+
+class HasOpenTicketViewTest(TembaTest):
+    def test_missing_contact_urn_param(self):
+        """Test that the endpoint returns 400 when contact_urn parameter is missing"""
+        url = "/api/v2/internals/contact_has_open_ticket"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 400)
+
+    def test_contact_not_found(self):
+        """Test that the endpoint returns 404 when contact is not found"""
+        url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_contact_without_open_ticket(self):
+        """Test that the endpoint returns false when contact has no open tickets"""
+        self.create_contact("Bob", urns=["tel:+1234567890"])
+
+        url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"has_open_ticket": False})
+
+    def test_contact_with_open_ticket(self):
+        """Test that the endpoint returns true when contact has an open ticket"""
+        contact = self.create_contact("Bob", urns=["tel:+1234567890"])
+        ticketer = Ticketer.create(self.org, self.admin, WeniChatsType.slug, "bob@acme.com", {})
+        self.create_ticket(ticketer, contact, "Test ticket")
+
+        url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"has_open_ticket": True})
+
+    def test_contact_with_closed_ticket(self):
+        """Test that the endpoint returns false when contact has only closed tickets"""
+        contact = self.create_contact("Bob", urns=["tel:+1234567890"])
+        ticketer = Ticketer.create(self.org, self.admin, WeniChatsType.slug, "bob@acme.com", {})
+
+        ticket = self.create_ticket(ticketer, contact, "Test ticket")
+        ticket.status = "C"
+        ticket.save()
+
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, "C")
+
+        url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"has_open_ticket": False})
+
+
+class ContactsWithMessagesViewTest(TembaTest):
+    url = "/api/v2/internals/contacts_with_messages"
+
+    def setUp(self):
+        super().setUp()
+        self.start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc)
+        self.end = dt.datetime(2025, 1, 2, 23, 59, tzinfo=timezone.utc)
+        self.contact1 = super().create_contact("Alice", urns=["tel:+1111111111"])
+        self.contact1.created_on = self.start
+        self.contact1.save(update_fields=["created_on"])
+        self.contact2 = super().create_contact("Bob", urns=["tel:+2222222222"])
+        self.contact2.created_on = self.start
+        self.contact2.save(update_fields=["created_on"])
+        self.contact3 = super().create_contact("Carol", urns=["tel:+3333333333"])
+        self.contact3.created_on = self.start
+        self.contact3.save(update_fields=["created_on"])
+
+    def _create_contact_with_created_on(self, name, urns, created_on):
+        contact = super().create_contact(name, urns=urns)
+        contact.created_on = created_on
+        contact.save(update_fields=["created_on"])
+        return contact
+
+    def create_msg(self, contact, text, created_on):
+        return Msg.objects.create(org=self.org, contact=contact, text=text, created_on=created_on, direction="I")
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_missing_params(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("error", resp.json())
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_project_not_found(self):
+        resp = self.client.get(
+            self.url,
+            {"project": "00000000-0000-0000-0000-000000000000", "start_date": "2025-01-01", "end_date": "2025-01-02"},
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertIn("error", resp.json())
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_only_contacts_with_multiple_msgs(self):
+        # contact1: 2 msgs, contact2: 1 msg, contact3: 0 msgs
+        self.create_msg(self.contact1, "msg1", self.start)
+        self.create_msg(self.contact1, "msg2", self.end)
+        self.create_msg(self.contact2, "msg3", self.start)
+        resp = self.client.get(
+            self.url, {"project": str(self.org.proj_uuid), "start_date": "2025-01-01", "end_date": "2025-01-02"}
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"] if "results" in resp.json() else resp.json()
+
+        self.assertEqual(len(data), 2)
+        contact_ids = {c["contact_id"] for c in data}
+        self.assertIn(self.contact1.id, contact_ids)
+        self.assertIn(self.contact2.id, contact_ids)
+        self.assertNotIn(self.contact3.id, contact_ids)
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_returns_all_msgs_for_qualified_contacts(self):
+        self.create_msg(self.contact1, "msg1", self.start)
+        self.create_msg(self.contact1, "msg2", self.end)
+        self.create_msg(self.contact1, "msg3", self.end)
+        resp = self.client.get(
+            self.url, {"project": str(self.org.proj_uuid), "start_date": "2025-01-01", "end_date": "2025-01-02"}
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"] if "results" in resp.json() else resp.json()
+
+        self.assertEqual(len(data), 1)
+        contact_ids = {c["contact_id"] for c in data}
+        self.assertIn(self.contact1.id, contact_ids)
+        contact1_data = next(c for c in data if c["contact_id"] == self.contact1.id)
+        self.assertEqual(len(contact1_data["messages"]), 3)
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_pagination_limit(self):
+        # create 3 contacts with 2 msgs each, all with created_on dentro do período
+        cts = [self._create_contact_with_created_on(f"C{i}", [f"tel:+{i}"], self.start) for i in range(10, 13)]
+        for c in cts:
+            self.create_msg(c, "a", self.start)
+            self.create_msg(c, "b", self.end)
+        resp = self.client.get(
+            self.url,
+            {"project": str(self.org.proj_uuid), "start_date": "2025-01-01", "end_date": "2025-01-02", "limit": 2},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"] if "results" in resp.json() else resp.json()
+        self.assertEqual(len(data), 2)
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_accepts_datetime_and_date(self):
+        self.create_msg(self.contact1, "msg1", self.start)
+        self.create_msg(self.contact1, "msg2", self.end)
+        # date only
+        resp1 = self.client.get(
+            self.url, {"project": str(self.org.proj_uuid), "start_date": "2025-01-01", "end_date": "2025-01-02"}
+        )
+        # datetime
+        resp2 = self.client.get(
+            self.url,
+            {
+                "project": str(self.org.proj_uuid),
+                "start_date": "2025-01-01T00:00:00Z",
+                "end_date": "2025-01-02T23:59:59Z",
+            },
+        )
+        self.assertEqual(resp1.status_code, 200)
+        self.assertEqual(resp2.status_code, 200)
+        self.assertEqual(len(resp1.json()["results"] if "results" in resp1.json() else resp1.json()), 1)
+        self.assertEqual(len(resp2.json()["results"] if "results" in resp2.json() else resp2.json()), 1)
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_invalid_date_format(self):
+        resp = self.client.get(
+            self.url, {"project": str(self.org.proj_uuid), "start_date": "2025-01-01", "end_date": "not-a-date"}
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("error", resp.json())
+        self.assertIn("Invalid date format", resp.json()["error"])
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_missing_start_or_end_date(self):
+        # missing start_date
+        resp1 = self.client.get(self.url, {"project": str(self.org.proj_uuid), "end_date": "2025-01-02"})
+        self.assertEqual(resp1.status_code, 400)
+        self.assertIn("error", resp1.json())
+        self.assertIn("start_date and end_date are required", resp1.json()["error"])
+        # missing end_date
+        resp2 = self.client.get(self.url, {"project": str(self.org.proj_uuid), "start_date": "2025-01-01"})
+        self.assertEqual(resp2.status_code, 400)
+        self.assertIn("error", resp2.json())
+        self.assertIn("start_date and end_date are required", resp2.json()["error"])
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_accepts_naive_datetime(self):
+        self.create_msg(self.contact1, "msg1", self.start)
+        self.create_msg(self.contact1, "msg2", self.end)
+        # naive datetime (no timezone info)
+        resp = self.client.get(
+            self.url,
+            {
+                "project": str(self.org.proj_uuid),
+                "start_date": "2025-01-01T00:00:00",
+                "end_date": "2025-01-02T23:59:59",
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"] if "results" in resp.json() else resp.json()
+        self.assertEqual(len(data), 1)
+        contact_ids = {c["contact_id"] for c in data}
+        self.assertIn(self.contact1.id, contact_ids)
+        contact1_data = next(c for c in data if c["contact_id"] == self.contact1.id)
+        self.assertEqual(len(contact1_data["messages"]), 2)
+
+    @skip_authentication(endpoint_path="temba.api.v2.internals.contacts.views.ContactsWithMessagesView")
+    def test_no_contacts_with_msgs_in_period(self):
+        resp = self.client.get(
+            self.url,
+            {"project": str(self.org.proj_uuid), "start_date": "2025-01-01", "end_date": "2025-01-02"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"] if "results" in resp.json() else resp.json()
+        self.assertEqual(len(data), 0)
+
+
+class GroupsContactFieldsViewTest(TembaTest):
+    url = "/api/v2/internals/groups_contact_fields"
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_missing_params(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("error", resp.json())
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_missing_group_ids(self):
+        resp = self.client.get(self.url, {"project_uuid": str(self.org.proj_uuid)})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("group_ids not provided", resp.json().get("error", ""))
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_invalid_project(self):
+        resp = self.client.get(self.url, {"project_uuid": "00000000-0000-0000-0000-000000000000", "group_ids": "1"})
+        self.assertEqual(resp.status_code, 404)
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_group_ids_must_be_integers(self):
+        resp = self.client.get(self.url, {"project_uuid": str(self.org.proj_uuid), "group_ids": "abc,2"})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("must contain only integers", resp.json().get("error", ""))
+
+    @mock_mailroom
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_dynamic_group_fields_included_with_null_example(self, mr_mocks):
+        # create a user field and dynamic group referencing it
+        team5 = self.create_field("team5", "Team5")
+        query = 'team5 = "YES"'
+        mr_mocks.parse_query(query, fields=[team5])
+
+        dyn = self.create_group("DynTeam5", query=query)
+
+        # call endpoint
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": str(dyn.id)},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"]
+        keys = {f["key"] for f in data}
+        self.assertIn("team5", keys)
+        team5_item = next(i for i in data if i["key"] == "team5")
+        self.assertIn("example", team5_item)
+        self.assertIsNone(team5_item["example"])  # no contacts with value -> example null
+
+    @mock_mailroom
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_static_group_fields_from_contacts(self, mr_mocks):
+        # create field and contact with that field value
+        team3 = self.create_field("team3", "Team3")
+        contact = self.create_contact("Alice", urns=["tel:+111"])
+        mods = contact.update_fields({team3: "Opa"})
+        contact.modify(self.admin, mods)
+
+        # create static group with the contact
+        grp = self.create_group("StaticGrp", contacts=[contact])
+
+        # call endpoint
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": str(grp.id)},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"]
+        keys = {f["key"] for f in data}
+        self.assertIn("team3", keys)
+        team3_item = next(i for i in data if i["key"] == "team3")
+        self.assertEqual(team3_item["example"], "Opa")
+
+    @mock_mailroom
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_union_across_multiple_groups(self, mr_mocks):
+        # dynamic group with team5
+        team5 = self.create_field("team5", "Team5")
+        q = 'team5 = "YES"'
+        mr_mocks.parse_query(q, fields=[team5])
+        dyn = self.create_group("DynTeam5", query=q)
+
+        # static group with team3 value
+        team3 = self.create_field("team3", "Team3")
+        c = self.create_contact("Bob", urns=["tel:+222"])
+        mods = c.update_fields({team3: "Opa"})
+        c.modify(self.admin, mods)
+        stat = self.create_group("StatTeam3", contacts=[c])
+
+        gids = f"{dyn.id},{stat.id}"
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": gids},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"]
+        keys = {f["key"] for f in data}
+        self.assertIn("team5", keys)
+        self.assertIn("team3", keys)
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_group_ids_only_separators(self):
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": ",,,"},
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("comma-separated list of integers", resp.json().get("error", ""))
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_no_groups_found(self):
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": "999999,888888"},
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertIn("No groups found", resp.json().get("error", ""))
+
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_accepts_project_alias(self):
+        grp = self.create_group("AliasProjectGrp")
+        resp = self.client.get(
+            self.url,
+            {"project": str(self.org.proj_uuid), "group_ids": str(grp.id)},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("results", resp.json())
+
+    @mock_mailroom
+    @skip_authentication(endpoint_path=GROUPS_CONTACT_FIELDS_PATH)
+    def test_loop_branches_break_and_continue(self, mr_mocks):
+        # two fields and three contacts; values found on first two contacts
+        # ensure inner-loop 'continue' and outer-loop 'break' are exercised
+        team3 = self.create_field("team3", "Team3")
+        team5 = self.create_field("team5", "Team5")
+
+        c1 = self.create_contact("C1", urns=["tel:+100"])
+        mods1 = c1.update_fields({team3: "V1"})
+        c1.modify(self.admin, mods1)
+
+        c2 = self.create_contact("C2", urns=["tel:+200"])
+        mods2 = c2.update_fields({team5: "V2"})
+        c2.modify(self.admin, mods2)
+
+        c3 = self.create_contact("C3", urns=["tel:+300"])  # no relevant fields
+
+        grp = self.create_group("LoopBranchesGrp", contacts=[c1, c2, c3])
+
+        resp = self.client.get(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "group_ids": str(grp.id)},
+        )
+        self.assertEqual(resp.status_code, 200)
+        results = resp.json()["results"]
+        keys = {i["key"] for i in results}
+        self.assertIn("team3", keys)
+        self.assertIn("team5", keys)
+        team3_item = next(i for i in results if i["key"] == "team3")
+        team5_item = next(i for i in results if i["key"] == "team5")
+        self.assertEqual(team3_item["example"], "V1")
+        self.assertEqual(team5_item["example"], "V2")

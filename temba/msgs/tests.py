@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from decimal import Decimal
 from unittest.mock import PropertyMock, patch
 
 import pytz
@@ -11,7 +12,7 @@ from django.utils import timezone
 
 from temba.archives.models import Archive
 from temba.channels.models import ChannelCount, ChannelEvent, ChannelLog
-from temba.contacts.models import URN, ContactURN
+from temba.contacts.models import URN, ContactGroupCount, ContactURN
 from temba.contacts.search.omnibox import omnibox_serialize
 from temba.msgs.models import (
     Attachment,
@@ -2874,3 +2875,59 @@ class BroadcastStatisticsTest(TembaTest):
         self.stats.save()
         rate = BroadcastStatistics.success_rate_30_days(self.org)
         self.assertEqual(rate, 0)
+
+
+class BroadcastCreateWithGroupsTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        # create contacts and two static groups
+        self.alice = self.create_contact("Alice", phone="111")
+        self.bob = self.create_contact("Bob", phone="222")
+        self.carlos = self.create_contact("Carlos", phone="333")
+
+        self.group_a = self.create_group("Group A", contacts=[self.alice, self.bob])
+        self.group_b = self.create_group("Group B", contacts=[self.carlos])
+
+        # ensure ContactGroupCount rows exist for deterministic totals
+        ContactGroupCount.populate_for_group(self.group_a)
+        ContactGroupCount.populate_for_group(self.group_b)
+
+    def _mock_pricing(self, price=0.1234, currency="USD"):
+        return patch("temba.msgs.models.get_template_price_and_currency_from_api", return_value=(price, currency))
+
+    def test_create_bulk_with_groups_creates_statistics_and_aggregates_counts(self):
+        # both groups should sum to 3 contacts
+        with self._mock_pricing(price=0.55, currency="BRL"):
+            broadcast = Broadcast.create(
+                self.org,
+                self.user,
+                "Hello group",
+                groups=[self.group_a, self.group_b],
+                is_bulk_send=True,
+                template_id=None,
+            )
+
+        stats = BroadcastStatistics.objects.filter(broadcast=broadcast, org=self.org).first()
+        self.assertIsNotNone(stats)
+        self.assertEqual(stats.contact_count, 3)
+        self.assertEqual(stats.template_price, Decimal("0.55"))
+        self.assertEqual(stats.currency, "BRL")
+        self.assertEqual(stats.cost, Decimal("0"))
+
+    def test_create_bulk_with_group_ids_list(self):
+        # pass group ids instead of instances
+        with self._mock_pricing(price=0.10, currency="USD"):
+            broadcast = Broadcast.create(
+                self.org,
+                self.user,
+                "Hello IDs",
+                groups=[self.group_a.id, self.group_b.id],
+                is_bulk_send=True,
+            )
+
+        stats = BroadcastStatistics.objects.filter(broadcast=broadcast, org=self.org).first()
+        self.assertIsNotNone(stats)
+        self.assertEqual(stats.contact_count, 3)
+        self.assertEqual(stats.template_price, Decimal("0.10"))
+        self.assertEqual(stats.currency, "USD")
+        self.assertEqual(stats.cost, Decimal("0"))

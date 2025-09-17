@@ -3,6 +3,7 @@ import socket
 import sys
 import urllib
 from datetime import timedelta
+from pathlib import Path
 
 import iptools
 import sentry_sdk
@@ -1098,6 +1099,7 @@ CELERY_BEAT_SCHEDULE = {
     "trim-webhook-event": {"task": "trim_webhook_event_task", "schedule": crontab(hour=3, minute=0)},
     "update-org-activity": {"task": "update_org_activity_task", "schedule": crontab(hour=3, minute=5)},
     "refresh-teams-tokens": {"task": "refresh_teams_tokens", "schedule": crontab(hour=8, minute=0)},
+    "squash-flow-category-counts": {"task": "squash_flow_category_counts", "schedule": timedelta(seconds=60)},
 }
 
 # -----------------------------------------------------------------------------------
@@ -1413,9 +1415,23 @@ INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
 
 FLOW_PATH_RECENT_RUN_BATCH_SIZE = os.environ.get("FLOW_PATH_RECENT_RUN_BATCH_SIZE", default=50)
 
+LAMBDA_VALIDATION_URL = os.environ.get("LAMBDA_VALIDATION_URL", default="")
+
 # Datalake configuration
 DATALAKE_SERVER_ADDRESS = os.environ.get("DATALAKE_SERVER_ADDRESS", default="localhost:50051")
 EVENTS_METRIC_NAME = os.environ.get("EVENTS_METRIC_NAME", default="")
 REDSHIFT_QUERY_BASE_URL = os.environ.get("REDSHIFT_QUERY_BASE_URL", default="")
 REDSHIFT_SECRET = os.environ.get("REDSHIFT_SECRET", default="")
 REDSHIFT_ROLE_ARN = os.environ.get("REDSHIFT_ROLE_ARN", default="")
+
+# Path to the JWT public key
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+JWT_PUBLIC_KEY_PATH = BASE_DIR / "temba" / "jwt_public_key.pem"
+
+# The public key is loaded a single time at application startup.
+try:
+    with open(JWT_PUBLIC_KEY_PATH, "rb") as f:
+        JWT_PUBLIC_KEY = f.read()
+except FileNotFoundError:
+    JWT_PUBLIC_KEY = None
