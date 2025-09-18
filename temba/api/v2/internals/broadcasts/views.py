@@ -14,9 +14,11 @@ from django.contrib.auth import get_user_model
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import IsUserInOrg
 from temba.api.v2.serializers import WhatsappBroadcastWriteSerializer
+from temba.api.v2.views_base import DefaultLimitOffsetPagination
+from temba.msgs.models import Broadcast, BroadcastStatistics
 from temba.orgs.models import Org
 
-from .serializers import BroadcastSerializer, UserAndProjectSerializer
+from .serializers import BroadcastSerializer, BroadcastWithStatisticsSerializer, UserAndProjectSerializer
 from .services import upload_broadcast_media
 
 User = get_user_model()
@@ -78,6 +80,63 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
         return Response(serializer.errors, status=400)
 
 
+class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
+    serializer_class = BroadcastWithStatisticsSerializer
+
+    def get(self, request, *args, **kwargs):
+        project_uuid = request.query_params.get("project_uuid")
+        if not project_uuid:
+            return Response({"error": "Project UUID not provided"}, status=400)
+
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except Org.DoesNotExist:
+            return Response({"error": "Project not found"}, status=404)
+        qs = Broadcast.objects.filter(org=org, is_bulk_send=True)
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+        name = request.query_params.get("name")
+        broadcast_id = request.query_params.get("id")
+
+        if start_date:
+            qs = qs.filter(created_on__gte=start_date)
+        if end_date:
+            qs = qs.filter(created_on__lte=end_date)
+        if name:
+            qs = qs.filter(name__icontains=name)
+        if broadcast_id:
+            qs = qs.filter(id=broadcast_id)
+
+        qs = qs.order_by("-created_on")
+        paginator = DefaultLimitOffsetPagination()
+        page = paginator.paginate_queryset(qs, request, view=self)
+        serializer = BroadcastWithStatisticsSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+
+class InternalBroadcastStatisticMontlyEndpoint(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
+
+    def get(self, request, *args, **kwargs):
+        project_uuid = request.query_params.get("project_uuid")
+        if not project_uuid:
+            return Response({"error": "Project UUID not provided"}, status=400)
+
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except Org.DoesNotExist:
+            return Response({"error": "Project not found"}, status=404)
+
+        result = {}
+        result["last_30_days_stats"] = BroadcastStatistics.last_30_days_stats(org)
+        result["success_rate_30_days"] = BroadcastStatistics.success_rate_30_days(org)
+
+        return Response(result)
+
+
 class InternalBroadcastsUploadMediaEndpoint(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
     permission_classes = [IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)]
@@ -93,9 +152,14 @@ class InternalBroadcastsUploadMediaEndpoint(APIViewMixin, APIView):
         except Org.DoesNotExist:
             return Response({"error": "Project not found"}, status=404)
 
+        result = {}
+        result["last_30_days_stats"] = BroadcastStatistics.last_30_days_stats(org)
+        result["success_rate_30_days"] = BroadcastStatistics.success_rate_30_days(org)
+
         upload = request.FILES.get("file") or request.data.get("file")
         if not upload:
             raise ParseError(detail="file is required")
 
         result = upload_broadcast_media(org, upload)
+
         return Response(result)
