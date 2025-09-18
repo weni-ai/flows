@@ -351,8 +351,8 @@ class InternalContactGroupsViewTest(TembaTest):
         contact1 = self.create_contact("Alice")
         contact2 = self.create_contact("Bob")
         group1 = self.create_group("Group 1", contacts=[contact1, contact2])
-        group2 = self.create_group("Group 2")
         group3 = self.create_group("Group 3", contacts=[contact1])
+        self.create_group("Group 2")
 
         url = f"/api/v2/internals/contact_groups?project_uuid={self.org.proj_uuid}"
         response = self.client.get(url)
@@ -360,8 +360,8 @@ class InternalContactGroupsViewTest(TembaTest):
         data = response.json()
         self.assertIn("results", data)
         results = data["results"]
-        # Should return all created groups
-        group_uuids = {str(group1.uuid), str(group2.uuid), str(group3.uuid)}
+        # Should return only groups with members
+        group_uuids = {str(group1.uuid), str(group3.uuid)}
         self.assertEqual(set(r["uuid"] for r in results), group_uuids)
         # Check main fields
         for r in results:
@@ -376,8 +376,6 @@ class InternalContactGroupsViewTest(TembaTest):
         for r in results:
             if r["uuid"] == str(group1.uuid):
                 self.assertEqual(r["member_count"], 2)
-            elif r["uuid"] == str(group2.uuid):
-                self.assertEqual(r["member_count"], 0)
             elif r["uuid"] == str(group3.uuid):
                 self.assertEqual(r["member_count"], 1)
 
@@ -788,9 +786,13 @@ class InternalContactGroupsViewAdditionalTests(TembaTest):
     @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes", [])
     @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.permission_classes", [])
     def test_get_with_name_filter_and_order(self):
-        self.create_group("Alpha")
-        self.create_group("Beta")
-        self.create_group("Gamma")
+        # ensure groups have members; zero-member groups are excluded by the API
+        c1 = self.create_contact("A1")
+        c2 = self.create_contact("B1")
+        c3 = self.create_contact("G1")
+        self.create_group("Alpha", contacts=[c1])
+        self.create_group("Beta", contacts=[c2])
+        self.create_group("Gamma", contacts=[c3])
 
         resp = self.client.get(self.url, {"project_uuid": str(self.org.proj_uuid), "name": "a", "order_by": "name"})
         self.assertEqual(resp.status_code, 200)

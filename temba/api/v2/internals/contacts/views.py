@@ -155,6 +155,9 @@ class ContactGroupsService:
         # Pre-compute member_count for ordering and response
         queryset = queryset.annotate(member_count=Coalesce(Sum("counts__count"), Value(0)))
 
+        # Exclude groups with zero members
+        queryset = queryset.filter(member_count__gt=0)
+
         ordering_map = {
             "name": "name",
             "-name": "-name",
