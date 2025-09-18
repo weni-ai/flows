@@ -15,6 +15,7 @@ from temba.tests import CRUDLTestMixin, TembaTest
 
 from .models import Trigger
 from .types import KeywordTriggerType
+from .usecases import create_catchall_trigger
 
 
 class TriggerTest(TembaTest):
@@ -1358,3 +1359,18 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
             referral_url, allow_viewers=True, allow_editors=True, context_objects=[trigger3, trigger4]
         )
         self.assertListFetch(catchall_url, allow_viewers=True, allow_editors=True, context_objects=[trigger5])
+
+    def test_usecase_create_catchall_trigger(self):
+        flow = self.create_flow()
+        group1 = self.create_group("G1", contacts=[])
+        group2 = self.create_group("G2", contacts=[])
+
+        # without groups defaults to empty list
+        trig1 = create_catchall_trigger(org=self.org, user=self.admin, flow=flow)
+        self.assertEqual(trig1.trigger_type, Trigger.TYPE_CATCH_ALL)
+        self.assertEqual(trig1.flow, flow)
+        self.assertEqual(trig1.groups.count(), 0)
+
+        # with groups assigns groups
+        trig2 = create_catchall_trigger(org=self.org, user=self.admin, flow=flow, groups=[group1, group2])
+        self.assertEqual({group1, group2}, set(trig2.groups.all()))
