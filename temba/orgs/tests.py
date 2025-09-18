@@ -4407,7 +4407,7 @@ class BulkExportTest(TembaTest):
                 2, CampaignEvent.objects.filter(campaign__org=self.org, event_type="M", is_active=True).count()
             )
             self.assertEqual(2, Trigger.objects.filter(org=self.org, trigger_type="K", is_archived=False).count())
-            self.assertEqual(1, Trigger.objects.filter(org=self.org, trigger_type="C", is_archived=False).count())
+            self.assertEqual(2, Trigger.objects.filter(org=self.org, trigger_type="C", is_archived=False).count())
             self.assertEqual(1, Trigger.objects.filter(org=self.org, trigger_type="M", is_archived=False).count())
             self.assertEqual(3, ContactGroup.user_groups.filter(org=self.org).count())
             self.assertEqual(1, Label.label_objects.filter(org=self.org).count())
