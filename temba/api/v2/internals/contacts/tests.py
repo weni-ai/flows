@@ -613,6 +613,54 @@ class ContactsImportUploadViewTest(TembaTest):
         self.assertEqual(cols[3]["example"], "Hello")
 
     @skip_authentication(endpoint_path=CONTACTS_IMPORT_UPLOAD_PATH)
+    @override_settings(INTERNAL_USER_EMAIL="internal@system.local")
+    def test_upload_created_by_falls_back_to_internal_user(self):
+        # Ensure internal user exists
+        User.objects.create_user("internal@system.local", "internal@system.local")
+
+        csv_content = ("URN:whatsapp,Name\n" "5561987654321,Alice\n").encode("utf-8")
+        upload = SimpleUploadedFile("import.csv", csv_content, content_type="text/csv")
+
+        # Unauthenticated request to force fallback path
+        with patch("rest_framework.request.Request.user") as mock_req_user:
+            mock_req_user.is_authenticated = False
+            url = "/api/v2/internals/contacts_import_upload"
+            resp = self.client.post(url, {"project_uuid": str(self.org.proj_uuid), "file": upload})
+
+        self.assertEqual(resp.status_code, 200)
+        # Verify ContactImport was created with created_by set to internal user
+        from temba.contacts.models import ContactImport as ContactImportModel
+
+        contact_import = ContactImportModel.objects.order_by("-id").first()
+        self.assertIsNotNone(contact_import)
+        self.assertIsNotNone(contact_import.created_by)
+        self.assertEqual(contact_import.created_by.email, "internal@system.local")
+
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_UPLOAD_PATH)
+    @override_settings(INTERNAL_USER_EMAIL="internal-missing@system.local")
+    def test_upload_created_by_fallback_missing_internal_user(self):
+        # No user with INTERNAL_USER_EMAIL; ensure org.created_by is used as last resort
+        # Remove created_by/modified_by on org to ensure branch picks at least one available attr safely
+        # Many factories set both; here we just assert that created_by is set and not None after upload
+
+        csv_content = ("URN:whatsapp,Name\n" "5561987654321,Alice\n").encode("utf-8")
+        upload = SimpleUploadedFile("import.csv", csv_content, content_type="text/csv")
+
+        with patch("rest_framework.request.Request.user") as mock_req_user:
+            mock_req_user.is_authenticated = False
+            url = "/api/v2/internals/contacts_import_upload"
+            resp = self.client.post(url, {"project_uuid": str(self.org.proj_uuid), "file": upload})
+
+        self.assertEqual(resp.status_code, 200)
+
+        from temba.contacts.models import ContactImport as ContactImportModel
+
+        contact_import = ContactImportModel.objects.order_by("-id").first()
+        self.assertIsNotNone(contact_import)
+        # When internal user not found, view falls back to org.created_by or modified_by
+        self.assertIsNotNone(contact_import.created_by)
+
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_UPLOAD_PATH)
     def test_examples_skip_blanks_and_explicit_clear(self):
         ContactField.get_or_create(self.org, self.admin, key="team")
 
@@ -1105,7 +1153,7 @@ class ContactsImportConfirmViewPostTest(TembaTest):
         from temba.api.v2.internals.contacts.views import ContactImportCRUDL
 
         # ensure internal user exists
-        User.objects.create_user("internal@example.com")
+        User.objects.create_user("internal@example.com", "internal@example.com")
 
         contact_import = self.create_contact_import("media/test_imports/simple.xlsx")
         contact_import.mappings = [{"header": "Field:Nick Name", "mapping": {"type": "new_field", "key": "nickname"}}]
@@ -1133,6 +1181,44 @@ class ContactsImportConfirmViewPostTest(TembaTest):
             resp = self.client.post(url, {"project_uuid": str(self.org.proj_uuid)}, content_type="application/json")
 
         self.assertEqual(resp.status_code, 200)
+        # ensure modified_by picked the internal user when request.user unauthenticated
+        contact_import.refresh_from_db()
+        self.assertIsNotNone(contact_import.modified_by)
+        self.assertEqual(contact_import.modified_by.email, "internal@example.com")
+
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
+    @override_settings(INTERNAL_USER_EMAIL="missing-internal@example.com")
+    def test_post_confirmer_fallback_when_internal_user_missing(self):
+        from temba.api.v2.internals.contacts.views import ContactImportCRUDL
+
+        contact_import = self.create_contact_import("media/test_imports/simple.xlsx")
+        contact_import.mappings = [{"header": "Field:Nick Name", "mapping": {"type": "new_field", "key": "nickname"}}]
+        contact_import.save(update_fields=["mappings"])
+
+        class DummyForm:
+            GROUP_MODE_NEW = "new"
+
+            def __init__(self, data, org=None, instance=None):
+                self.instance = instance
+                self.cleaned_data = {"add_to_group": False}
+
+            def is_valid(self):
+                return True
+
+            def get_form_values(self):
+                return [{"include": True, "name": "Nick Name", "value_type": "T"}]
+
+        with patch.object(ContactImportCRUDL.Preview, "form_class", DummyForm), patch(
+            "rest_framework.request.Request.user"
+        ) as mock_req_user:
+            mock_req_user.is_authenticated = False
+            url = f"/api/v2/internals/contacts_import_confirm/{contact_import.id}/"
+            resp = self.client.post(url, {"project_uuid": str(self.org.proj_uuid)}, content_type="application/json")
+
+        self.assertEqual(resp.status_code, 200)
+        contact_import.refresh_from_db()
+        # When internal user not found, it should fall back to org.modified_by or org.created_by
+        self.assertIsNotNone(contact_import.modified_by)
 
 
 class ContactsImportConfirmViewTest(TembaTest):
