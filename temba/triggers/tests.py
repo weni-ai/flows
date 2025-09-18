@@ -1000,7 +1000,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"flow": flow2.id, "groups": group1.id},
-            new_obj_query=Trigger.objects.filter(trigger_type=Trigger.TYPE_CATCH_ALL, flow=flow2),
+            new_obj_query=Trigger.objects.filter(trigger_type=Trigger.TYPE_CATCH_ALL, flow=flow2, groups=group1),
             success_status=200,
         )
 
