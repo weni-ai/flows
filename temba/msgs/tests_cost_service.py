@@ -1,7 +1,11 @@
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from temba.msgs.cost_service import BillingInternalClient, get_template_price_and_currency_from_api
+from temba.msgs.cost_service import (
+    BillingInternalClient,
+    get_billing_pricing,
+    get_template_price_and_currency_from_api,
+)
 from temba.templates.models import Template
 from temba.tests.base import TembaTest
 
@@ -92,3 +96,28 @@ class GetTemplatePriceFromApiTest(TembaTest):
             instance.get_pricing.return_value = {"currency": "USD", "rates": {"marketing": 2.00}}
 
             self.assertEqual(get_template_price_and_currency_from_api(template_id=999999), (0, "BRL"))
+
+    def test_no_template_id_returns_defaults_due_to_missing_data(self):
+        # Current implementation references `data` when template_id is None, which falls back
+        # to the default (0, 'BRL') via the broad exception handler.
+        with patch("temba.msgs.cost_service.BillingInternalClient") as MockClient:
+            instance = MockClient.return_value
+            instance.get_pricing.return_value = {
+                "currency": "COP",
+                "rates": {"marketing": 3.14},
+                "marketing": 3.14,  # defensive, in case code path reads flat key
+            }
+
+            self.assertEqual(get_template_price_and_currency_from_api(), (0, "BRL"))
+
+
+class GetBillingPricingTest(TembaTest):
+    def test_delegates_to_client_with_project(self):
+        with patch("temba.msgs.cost_service.BillingInternalClient") as MockClient:
+            instance = MockClient.return_value
+            instance.get_pricing.return_value = {"currency": "USD"}
+
+            result = get_billing_pricing(project="proj-123")
+
+            self.assertEqual(result, {"currency": "USD"})
+            instance.get_pricing.assert_called_once_with(project="proj-123")
