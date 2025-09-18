@@ -973,6 +973,7 @@ class APITest(TembaTest):
         expected_metadata = {
             "template": {"name": template.name, "uuid": template.uuid, "variables": [], "locale": None},
             "text": "Send a message",
+            "template_id": Template.objects.get(uuid=template.uuid).id,
         }
 
         response = self.postJSON(
@@ -1154,7 +1155,8 @@ class APITest(TembaTest):
         )
 
         expected_metadata = {
-            "template": {"name": template.name, "uuid": template.uuid, "variables": ["1"], "locale": None}
+            "template": {"name": template.name, "uuid": template.uuid, "variables": ["1"], "locale": None},
+            "template_id": Template.objects.get(uuid=template.uuid).id,
         }
         broadcast = Broadcast.objects.get(id=response.json()["id"])
 
@@ -1197,7 +1199,8 @@ class APITest(TembaTest):
         )
 
         expected_metadata = {
-            "template": {"name": template.name, "uuid": template.uuid, "variables": ["1"], "locale": None}
+            "template": {"name": template.name, "uuid": template.uuid, "variables": ["1"], "locale": None},
+            "template_id": Template.objects.get(uuid=template.uuid).id,
         }
         broadcast = Broadcast.objects.get(id=response.json()["id"])
 

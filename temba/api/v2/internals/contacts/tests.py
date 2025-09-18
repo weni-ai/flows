@@ -347,6 +347,59 @@ class InternalContactFieldsEndpointTest(TembaTest):
             self.assertEqual(response.json(), {"label": "Nick Name", "value_type": "T"})
 
 
+class InternalContactGroupsViewTest(TembaTest):
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.permission_classes", [])
+    def test_get_groups_success(self):
+        # Cria grupos
+        contact1 = self.create_contact("Alice")
+        contact2 = self.create_contact("Bob")
+        group1 = self.create_group("Group 1", contacts=[contact1, contact2])
+        group3 = self.create_group("Group 3", contacts=[contact1])
+        self.create_group("Group 2")
+
+        url = f"/api/v2/internals/contact_groups?project_uuid={self.org.proj_uuid}"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("results", data)
+        results = data["results"]
+        # Should return only groups with members
+        group_uuids = {str(group1.uuid), str(group3.uuid)}
+        self.assertEqual(set(r["uuid"] for r in results), group_uuids)
+        # Check main fields
+        for r in results:
+            self.assertIn("id", r)
+            self.assertIn("uuid", r)
+            self.assertIn("name", r)
+            self.assertIn("status", r)
+            self.assertIn("group_type", r)
+            self.assertIn("query", r)
+            self.assertIn("member_count", r)
+        # Check member_count
+        for r in results:
+            if r["uuid"] == str(group1.uuid):
+                self.assertEqual(r["member_count"], 2)
+            elif r["uuid"] == str(group3.uuid):
+                self.assertEqual(r["member_count"], 1)
+
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.permission_classes", [])
+    def test_get_groups_no_project(self):
+        url = "/api/v2/internals/contact_groups"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"error": "Project not provided"})
+
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.permission_classes", [])
+    def test_get_groups_project_not_found(self):
+        url = "/api/v2/internals/contact_groups?project_uuid=00000000-0000-0000-0000-000000000000"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"error": "Project not found"})
+
+
 class HasOpenTicketViewTest(TembaTest):
     def test_missing_contact_urn_param(self):
         """Test that the endpoint returns 400 when contact_urn parameter is missing"""
@@ -1512,3 +1565,89 @@ class GroupsContactFieldsViewTest(TembaTest):
         team5_item = next(i for i in results if i["key"] == "team5")
         self.assertEqual(team3_item["example"], "V1")
         self.assertEqual(team5_item["example"], "V2")
+
+
+class InternalContactGroupsViewAdditionalTests(TembaTest):
+    url = "/api/v2/internals/contact_groups"
+
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.permission_classes", [])
+    def test_get_with_name_filter_and_order(self):
+        # ensure groups have members; zero-member groups are excluded by the API
+        c1 = self.create_contact("A1")
+        c2 = self.create_contact("B1")
+        c3 = self.create_contact("G1")
+        self.create_group("Alpha", contacts=[c1])
+        self.create_group("Beta", contacts=[c2])
+        self.create_group("Gamma", contacts=[c3])
+
+        resp = self.client.get(self.url, {"project_uuid": str(self.org.proj_uuid), "name": "a", "order_by": "name"})
+        self.assertEqual(resp.status_code, 200)
+        names = [g["name"] for g in resp.json()["results"]]
+        self.assertEqual(names, sorted(names))
+
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.permission_classes", [])
+    def test_post_validations_and_success(self):
+        # missing name
+        resp = self.client.post(self.url, {"broadcast_id": 1, "status": "S"})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "Name is required"})
+
+        # missing broadcast_id
+        resp = self.client.post(self.url, {"name": "MyGroup", "status": "S"})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "Broadcast ID is required"})
+
+        # invalid status
+        resp = self.client.post(self.url, {"name": "MyGroup", "broadcast_id": 1, "status": "X"})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "Invalid status"})
+
+        # valid success path
+        contact = self.create_contact("Alice", urns=["tel:+111"])
+        bcast = self.create_broadcast(self.admin, "hi", contacts=[contact])
+
+        with patch("temba.api.v2.internals.contacts.views.User.objects.get") as mock_get_user, patch(
+            "rest_framework.request.Request.user"
+        ) as mock_req_user:
+            mock_get_user.return_value = self.admin
+            mock_req_user.is_authenticated = True
+            mock_req_user.email = self.admin.email
+            resp = self.client.post(self.url, {"name": "SuccessGroup", "broadcast_id": bcast.id, "status": "S"})
+        self.assertEqual(resp.status_code, 201)
+        body = resp.json()
+        self.assertTrue(body["group_uuid"])
+        self.assertEqual(body["group_name"], "SuccessGroup")
+        self.assertGreaterEqual(body["count"], 1)
+
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.permission_classes", [])
+    def test_post_missing_status_returns_400(self):
+        contact = self.create_contact("Alice", urns=["tel:+111"])
+        bcast = self.create_broadcast(self.admin, "hi", contacts=[contact])
+        resp = self.client.post(self.url, {"name": "NoStatusGroup", "broadcast_id": bcast.id})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "Status is required"})
+
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.permission_classes", [])
+    def test_post_broadcast_not_found_returns_404(self):
+        resp = self.client.post(self.url, {"name": "MissingBroadcast", "broadcast_id": 999999, "status": "S"})
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {"error": "Project or Broadcast not found"})
+
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.permission_classes", [])
+    def test_post_user_not_found_returns_404(self):
+        contact = self.create_contact("Alice", urns=["tel:+111"])
+        bcast = self.create_broadcast(self.admin, "hi", contacts=[contact])
+        with patch("temba.api.v2.internals.contacts.views.User.objects.get") as mock_get_user, patch(
+            "rest_framework.request.Request.user"
+        ) as mock_req_user:
+            mock_req_user.is_authenticated = True
+            mock_req_user.email = "missing@example.com"
+            mock_get_user.side_effect = User.DoesNotExist
+            resp = self.client.post(self.url, {"name": "UserMissingGroup", "broadcast_id": bcast.id, "status": "S"})
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {"error": "User not found"})
