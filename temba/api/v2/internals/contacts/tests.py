@@ -354,7 +354,7 @@ class InternalContactGroupsViewTest(TembaTest):
         group2 = self.create_group("Group 2")
         group3 = self.create_group("Group 3", contacts=[contact1])
 
-        url = f"/api/v2/internals/contact_groups?project={self.org.proj_uuid}"
+        url = f"/api/v2/internals/contact_groups?project_uuid={self.org.proj_uuid}"
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -392,7 +392,7 @@ class InternalContactGroupsViewTest(TembaTest):
     @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes", [])
     @patch("temba.api.v2.internals.contacts.views.InternalContactGroupsView.permission_classes", [])
     def test_get_groups_project_not_found(self):
-        url = "/api/v2/internals/contact_groups?project=00000000-0000-0000-0000-000000000000"
+        url = "/api/v2/internals/contact_groups?project_uuid=00000000-0000-0000-0000-000000000000"
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json(), {"error": "Project not found"})
