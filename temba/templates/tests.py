@@ -62,6 +62,48 @@ class TemplateTest(TembaTest):
         # trim them
         TemplateTranslation.trim(self.channel, [tt1])
 
+    def test_get_or_create_updates_body_and_footer(self):
+        # create initial translation with body and footer
+        tt = TemplateTranslation.get_or_create(
+            self.channel,
+            "hello",
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "ext-1",
+            "",
+            "AUTHENTICATION",
+            body="Body v1",
+            footer="Foot v1",
+        )
+
+        self.assertEqual(tt.body, "Body v1")
+        self.assertEqual(tt.footer, "Foot v1")
+
+        # call again with updated body and footer to exercise update branches
+        tt_updated = TemplateTranslation.get_or_create(
+            self.channel,
+            "hello",
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "ext-1",
+            "",
+            "AUTHENTICATION",
+            body="Body v2",
+            footer="Foot v2",
+        )
+
+        self.assertEqual(tt.id, tt_updated.id)
+
+        refreshed = TemplateTranslation.objects.get(id=tt.id)
+        self.assertEqual(refreshed.body, "Body v2")
+        self.assertEqual(refreshed.footer, "Foot v2")
+
 
 class TemplateViewSetTests(TembaTest):
     view_class = TemplateViewSet
