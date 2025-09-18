@@ -65,6 +65,7 @@ class TestInternalMessages(TembaTest):
                 text="Test inbox",
                 msg_type="I",
                 status="H",
+                channel=self.channel,
             )
             self.create_outgoing_msg(
                 contact=contact,
@@ -95,6 +96,14 @@ class TestInternalMessages(TembaTest):
             self.assertEqual(response.status_code, 200)
             results = response.json()["results"]
             self.assertEqual(len(results), 0)  # Should return empty list due to pk=-1 filter
+
+            # Test get messages by channel_uuid
+            response = self.client.get(
+                f"{reverse('internal_messages')}?project_uuid={self.org.proj_uuid}&channel_uuid={self.channel.uuid}"
+            )
+            self.assertEqual(response.status_code, 200)
+            results = response.json()["results"]
+            self.assertEqual(len(results), 2)
 
     @patch("temba.api.v2.internals.msgs.views.InternalMessagesView.authentication_classes", [])
     @patch("temba.api.v2.internals.msgs.views.InternalMessagesView.permission_classes", [])
