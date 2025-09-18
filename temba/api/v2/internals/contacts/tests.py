@@ -737,6 +737,16 @@ class ContactImportDeduplicationServiceTest(TembaTest):
         with self.assertRaises(ValidationError):
             ContactImportDeduplicationService.process(self.org, upload, upload.name)
 
+    def test_process_header_only_no_records_raises(self):
+        from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
+
+        # headers present but no data rows should raise
+        csv = ("UUID,URN:whatsapp,Name\n").encode("utf-8")
+        upload = SimpleUploadedFile("import.csv", csv, content_type="text/csv")
+        with self.assertRaises(ValidationError) as ctx:
+            ContactImportDeduplicationService.process(self.org, upload, upload.name)
+        self.assertIn("doesn't contain any records", str(ctx.exception))
+
     @override_settings(AWS_STORAGE_BUCKET_NAME=None)
     def test_process_duplicates_and_bucket_not_configured(self):
         from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
@@ -817,6 +827,26 @@ class ContactImportDeduplicationServiceUUIDTest(TembaTest):
         self.assertEqual(num_unique, 2)
         self.assertEqual(dup_count, 0)
 
+    def test_process_marks_duplicate_uuid_as_duplicate(self):
+        from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
+
+        # same UUID on two rows -> second one should be treated as duplicate
+        csv = (
+            "UUID,Name\n" "11111111-1111-1111-1111-111111111111,Alice\n" "11111111-1111-1111-1111-111111111111,Bob\n"
+        ).encode("utf-8")
+        upload = SimpleUploadedFile("import.csv", csv, content_type="text/csv")
+        (
+            mappings,
+            num_unique,
+            dedup_tmp,
+            ext,
+            dup_url,
+            dup_count,
+            dup_error,
+        ) = ContactImportDeduplicationService.process(self.org, upload, upload.name)
+        self.assertEqual(num_unique, 1)
+        self.assertEqual(dup_count, 1)
+
 
 class ContactImportDeduplicationServiceMaxRecordsTest(TembaTest):
     def test_process_raises_when_exceed_max_records(self):
@@ -896,6 +926,23 @@ class ContactsImportConfirmViewGetMoreTest(TembaTest):
         self.assertIn("group", data)
         self.assertIn("member_count", data["group"])
 
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
+    def test_get_authenticated_but_not_confirmer_returns_403(self):
+        contact_import = self.create_contact_import("media/test_imports/simple.xlsx")
+        # set a different confirmer
+        other = self.create_user("confirmer@example.com")
+        contact_import.modified_by = other
+        contact_import.save(update_fields=["modified_by"])
+
+        # force an authenticated request.user with a different id
+        mock_user = MagicMock()
+        mock_user.is_authenticated = True
+        mock_user.id = 999999
+        with patch("rest_framework.request.Request.user", mock_user):
+            url = f"/api/v2/internals/contacts_import_confirm/{contact_import.id}/"
+            resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 403)
+
 
 class ContactImportPreviewServiceTest(TembaTest):
     def test_extract_examples_empty_file(self):
@@ -909,6 +956,17 @@ class ContactImportPreviewServiceTest(TembaTest):
         ]
         examples = ContactImportPreviewService.extract_examples(file, "empty.csv", mappings)
         self.assertEqual(examples, [None, None])
+
+    def test_extract_examples_path_exception_falls_back_to_csv(self):
+        from temba.api.v2.internals.contacts.views import ContactImportPreviewService
+
+        file = SimpleUploadedFile("noext", b"URN:whatsapp\n123\n", content_type="text/plain")
+        mappings = [
+            {"header": "URN:whatsapp", "mapping": {"type": "scheme", "scheme": "whatsapp"}},
+        ]
+        with patch("temba.api.v2.internals.contacts.views.Path", side_effect=Exception("bad path")):
+            examples = ContactImportPreviewService.extract_examples(file, "noext", mappings)
+        self.assertEqual(examples, ["123"])
 
 
 class ContactsImportConfirmViewPostTest(TembaTest):
@@ -1121,6 +1179,90 @@ class ContactsImportConfirmViewTest(TembaTest):
         info = data["info"]
         for key in ("status", "num_created", "num_updated", "num_errored", "errors", "time_taken"):
             self.assertIn(key, info)
+
+
+class ContactsImportConfirmViewEdgeCasesTest(TembaTest):
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
+    def test_get_without_import_id_returns_400_direct(self):
+        # call the view directly without URL kwargs to exercise the explicit 400 branch
+        from rest_framework.test import APIRequestFactory
+        from temba.api.v2.internals.contacts.views import ContactsImportConfirmView
+
+        factory = APIRequestFactory()
+        request = factory.get("/api/v2/internals/contacts_import_confirm/")
+        view = ContactsImportConfirmView.as_view()
+        resp = view(request)
+        self.assertEqual(resp.status_code, 400)
+
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
+    def test_post_missing_project_uuid_returns_400_direct(self):
+        from rest_framework.test import APIRequestFactory
+        from temba.api.v2.internals.contacts.views import ContactsImportConfirmView
+
+        # use a valid import id but omit project_uuid in body
+        contact_import = self.create_contact_import("media/test_imports/simple.xlsx")
+        factory = APIRequestFactory()
+        request = factory.post(
+            "/api/v2/internals/contacts_import_confirm/%d/" % contact_import.id,
+            {},
+            format="json",
+        )
+        view = ContactsImportConfirmView.as_view()
+        resp = view(request, import_id=contact_import.id)
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("Project is required", resp.data.get("error", ""))
+
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
+    def test_post_missing_import_id_returns_400_direct(self):
+        from rest_framework.test import APIRequestFactory
+        from temba.api.v2.internals.contacts.views import ContactsImportConfirmView
+
+        factory = APIRequestFactory()
+        request = factory.post(
+            "/api/v2/internals/contacts_import_confirm/",
+            {"project_uuid": str(self.org.proj_uuid)},
+            format="json",
+        )
+        view = ContactsImportConfirmView.as_view()
+        resp = view(request)
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("import_id is required", resp.data.get("error", ""))
+
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
+    def test_post_include_false_sets_mapping_ignore(self):
+        from temba.api.v2.internals.contacts.views import ContactImportCRUDL
+        from temba.contacts.models import ContactImport
+
+        contact_import = self.create_contact_import("media/test_imports/simple.xlsx")
+        # create a single mapping to be ignored
+        contact_import.mappings = [{"header": "Name", "mapping": {"type": "attribute", "name": "name"}}]
+        contact_import.save(update_fields=["mappings"])
+
+        class DummyForm:
+            GROUP_MODE_NEW = "new"
+            GROUP_MODE_EXISTING = "existing"
+
+            def __init__(self, data, org=None, instance=None):
+                self.instance = instance
+                self.cleaned_data = {"add_to_group": False}
+
+            def is_valid(self):
+                return True
+
+            def get_form_values(self):
+                # request to ignore the only column
+                return [{"include": False}]
+
+        with patch.object(ContactImportCRUDL.Preview, "form_class", DummyForm), patch.object(
+            ContactImport, "start_async"
+        ):
+            self.login(self.user)
+            url = f"/api/v2/internals/contacts_import_confirm/{contact_import.id}/"
+            resp = self.client.post(url, {"project_uuid": str(self.org.proj_uuid)}, content_type="application/json")
+
+        self.assertEqual(resp.status_code, 200)
+        contact_import.refresh_from_db()
+        self.assertEqual(contact_import.mappings[0]["mapping"], ContactImport.MAPPING_IGNORE)
 
 
 class GroupsContactFieldsViewTest(TembaTest):
