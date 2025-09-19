@@ -6,6 +6,7 @@ from django.urls import include, path
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
 from temba.api.v2.flows.views import InternalFlowsAPIView
 from temba.api.v2.projects.views import GetProjectView
+from temba.api.v2.templates.views import TemplateByIdEndpoint, TemplatesTranslationsEndpoint
 
 from .billing.views import BillingPricingEndpoint
 from .flows.urls import urlpatterns as flows_urlpatterns
@@ -104,6 +105,12 @@ urlpatterns = [
     url(r"^resthook_subscribers$", ResthookSubscribersEndpoint.as_view(), name="api.v2.resthook_subscribers"),
     url(r"^runs$", RunsEndpoint.as_view(), name="api.v2.runs"),
     url(r"^templates$", TemplatesEndpoint.as_view(), name="api.v2.templates"),
+    url(r"^templates/translations$", TemplatesTranslationsEndpoint.as_view(), name="api.v2.templates_translations"),
+    url(
+        r"^templates/translations/(?P<template_id>\d+)$",
+        TemplateByIdEndpoint.as_view(),
+        name="api.v2.templates_translation_by_id",
+    ),
     url(r"^ticketers$", TicketersEndpoint.as_view(), name="api.v2.ticketers"),
     url(r"^external_services$", ExternalServicesEndpoint.as_view(), name="api.v2.external_services"),
     url(r"^tickets$", TicketsEndpoint.as_view(), name="api.v2.tickets"),
