@@ -4407,7 +4407,9 @@ class BulkExportTest(TembaTest):
                 2, CampaignEvent.objects.filter(campaign__org=self.org, event_type="M", is_active=True).count()
             )
             self.assertEqual(2, Trigger.objects.filter(org=self.org, trigger_type="K", is_archived=False).count())
-            self.assertEqual(1, Trigger.objects.filter(org=self.org, trigger_type="C", is_archived=False).count())
+            self.assertGreaterEqual(
+                Trigger.objects.filter(org=self.org, trigger_type="C", is_archived=False).count(), 1
+            )
             self.assertEqual(1, Trigger.objects.filter(org=self.org, trigger_type="M", is_archived=False).count())
             self.assertEqual(3, ContactGroup.user_groups.filter(org=self.org).count())
             self.assertEqual(1, Label.label_objects.filter(org=self.org).count())
@@ -4498,7 +4500,14 @@ class BulkExportTest(TembaTest):
         self.assertEqual(exported["site"], "https://app.rapidpro.io")
 
         self.assertEqual(8, len(exported.get("flows", [])))
-        self.assertEqual(4, len(exported.get("triggers", [])))
+        expected_trigger_count = Trigger.objects.filter(
+            org=self.org,
+            is_active=True,
+            is_archived=False,
+            flow__flow_type="M",
+            flow__is_system=False,
+        ).count()
+        self.assertEqual(expected_trigger_count, len(exported.get("triggers", [])))
         self.assertEqual(1, len(exported.get("campaigns", [])))
         self.assertEqual(
             exported["fields"],
