@@ -1,9 +1,14 @@
+import datetime as dt
 import uuid
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
+from django.utils import timezone
 
 from temba.flows.models import Flow
+from temba.msgs.models import Broadcast, BroadcastStatistics
 from temba.tests.base import TembaTest
 
 User = get_user_model()
@@ -236,3 +241,340 @@ class TestInternalWhatsappBroadcast(TembaTest):
 
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json(), {"message": "Success"})
+
+
+class TestInternalBroadcastsUploadMedia(TembaTest):
+    def setUp(self):
+        super().setUp()
+        # Ensure org has a project UUID for lookups
+        if not self.org.proj_uuid:
+            self.org.proj_uuid = uuid.uuid4()
+            self.org.save(update_fields=("proj_uuid",))
+
+        self.url = "/api/v2/internals/broadcasts/upload_media"
+
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalBroadcastsUploadMediaEndpoint.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalBroadcastsUploadMediaEndpoint.permission_classes",
+        [],
+    )
+    @override_settings(STORAGE_URL="https://bucket.example.com")
+    def test_success_upload(self):
+        upload = SimpleUploadedFile("file.txt", b"hello world", content_type="text/plain")
+
+        with patch(
+            "temba.api.v2.internals.broadcasts.services.public_file_storage.save",
+        ) as mock_save:
+            mock_save.return_value = f"attachments/{self.org.id}/broadcasts/abcd/file.txt"
+
+            resp = self.client.post(
+                self.url,
+                data={"project_uuid": str(self.org.proj_uuid), "file": upload},
+            )
+
+            self.assertEqual(resp.status_code, 200)
+            data = resp.json()
+            self.assertEqual(data["type"], "text/plain")
+            self.assertEqual(
+                data["url"], f"https://bucket.example.com/attachments/{self.org.id}/broadcasts/abcd/file.txt"
+            )
+
+            # Ensure path written respects convention
+            called_path = mock_save.call_args[0][0]
+            self.assertTrue(called_path.startswith(f"attachments/{self.org.id}/broadcasts/"))
+
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalBroadcastsUploadMediaEndpoint.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalBroadcastsUploadMediaEndpoint.permission_classes",
+        [],
+    )
+    @override_settings(STORAGE_URL="https://bucket.example.com")
+    def test_success_upload_m4a_normalization(self):
+        upload = SimpleUploadedFile("audio.m4a", b"data", content_type="audio/m4a")
+
+        with patch(
+            "temba.api.v2.internals.broadcasts.services.public_file_storage.save",
+        ) as mock_save:
+            mock_save.return_value = f"attachments/{self.org.id}/broadcasts/abcd/audio.m4a"
+
+            resp = self.client.post(
+                self.url,
+                data={"project_uuid": str(self.org.proj_uuid), "file": upload},
+            )
+
+            self.assertEqual(resp.status_code, 200)
+            data = resp.json()
+            self.assertEqual(data["type"], "audio/mp4")
+
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalBroadcastsUploadMediaEndpoint.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalBroadcastsUploadMediaEndpoint.permission_classes",
+        [],
+    )
+    def test_missing_project_uuid_returns_400(self):
+        upload = SimpleUploadedFile("file.txt", b"hello", content_type="text/plain")
+        resp = self.client.post(self.url, data={"file": upload})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "project_uuid is required"})
+
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalBroadcastsUploadMediaEndpoint.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalBroadcastsUploadMediaEndpoint.permission_classes",
+        [],
+    )
+    def test_project_not_found_returns_404(self):
+        upload = SimpleUploadedFile("file.txt", b"hello", content_type="text/plain")
+        random_proj = uuid.uuid4()
+        resp = self.client.post(self.url, data={"project_uuid": str(random_proj), "file": upload})
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {"error": "Project not found"})
+
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalBroadcastsUploadMediaEndpoint.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalBroadcastsUploadMediaEndpoint.permission_classes",
+        [],
+    )
+    def test_missing_file_returns_400(self):
+        resp = self.client.post(self.url, data={"project_uuid": str(self.org.proj_uuid)})
+        self.assertEqual(resp.status_code, 400)
+        data = resp.json()
+        # DRF ParseError returns {"detail": "..."}
+        self.assertIn("detail", data)
+        self.assertEqual(data["detail"], "file is required")
+
+
+class TestUploadBroadcastMediaService(TembaTest):
+    @override_settings(STORAGE_URL="https://bucket.example.com")
+    def test_service_path_and_url_and_m4a(self):
+        from temba.api.v2.internals.broadcasts.services import upload_broadcast_media
+
+        # Ensure project UUID exists for completeness
+        if not self.org.proj_uuid:
+            self.org.proj_uuid = uuid.uuid4()
+            self.org.save(update_fields=("proj_uuid",))
+
+        upload = SimpleUploadedFile("clip.m4a", b"123", content_type="audio/m4a")
+
+        with patch("temba.api.v2.internals.broadcasts.services.uuid4", return_value="fixeduuid"), patch(
+            "temba.api.v2.internals.broadcasts.services.public_file_storage.save"
+        ) as mock_save:
+            mock_save.return_value = f"attachments/{self.org.id}/broadcasts/fixeduuid/clip.m4a"
+
+            result = upload_broadcast_media(self.org, upload)
+            self.assertEqual(result["type"], "audio/mp4")
+            self.assertEqual(
+                result["url"], f"https://bucket.example.com/attachments/{self.org.id}/broadcasts/fixeduuid/clip.m4a"
+            )
+
+            called_path = mock_save.call_args[0][0]
+            self.assertEqual(called_path, f"attachments/{self.org.id}/broadcasts/fixeduuid/clip.m4a")
+
+    @override_settings(STORAGE_URL="https://bucket.example.com")
+    def test_service_plain_text(self):
+        from temba.api.v2.internals.broadcasts.services import upload_broadcast_media
+
+        upload = SimpleUploadedFile("note.txt", b"abc", content_type="text/plain")
+
+        with patch("temba.api.v2.internals.broadcasts.services.uuid4", return_value="abc123"), patch(
+            "temba.api.v2.internals.broadcasts.services.public_file_storage.save"
+        ) as mock_save:
+            mock_save.return_value = f"attachments/{self.org.id}/broadcasts/abc123/note.txt"
+
+            result = upload_broadcast_media(self.org, upload)
+            self.assertEqual(result["type"], "text/plain")
+            self.assertEqual(
+                result["url"], f"https://bucket.example.com/attachments/{self.org.id}/broadcasts/abc123/note.txt"
+            )
+
+
+class TestBroadcastsViewSet(TembaTest):
+    url = "/api/v2/internals/broadcasts/"
+
+    def _fake_user_and_project_serializer(self, user, org):
+        class _Fake:
+            def __init__(self, *args, **kwargs):
+                self._validated = {"user": user, "project": type("P", (), {"org": org})}
+
+            def is_valid(self, raise_exception=False):
+                return True
+
+            @property
+            def validated_data(self):
+                return self._validated
+
+        return _Fake
+
+    def test_create_missing_token_returns_403(self):
+        data = {
+            "text": "hello",
+            "urns": ["tel:+12025550149"],
+            "user": self.user.email,
+            "project": str(self.org.proj_uuid),
+        }
+        with patch(
+            "temba.api.v2.internals.broadcasts.views.UserAndProjectSerializer",
+            new=self._fake_user_and_project_serializer(self.user, self.org),
+        ):
+            resp = self.client.post(self.url, data=data, content_type="application/json")
+        self.assertEqual(resp.status_code, 403)
+
+    @override_settings(ROUTER_FIXED_ACCESS_TOKEN="abc")
+    def test_create_invalid_token_returns_403(self):
+        data = {
+            "text": "hello",
+            "urns": ["tel:+12025550149"],
+            "user": self.user.email,
+            "project": str(self.org.proj_uuid),
+        }
+        with patch(
+            "temba.api.v2.internals.broadcasts.views.UserAndProjectSerializer",
+            new=self._fake_user_and_project_serializer(self.user, self.org),
+        ):
+            resp = self.client.post(f"{self.url}?token=wrong", data=data, content_type="application/json")
+        self.assertEqual(resp.status_code, 403)
+
+    @override_settings(ROUTER_FIXED_ACCESS_TOKEN="abc")
+    def test_create_success(self):
+        data = {
+            "text": "hello world",
+            "urns": ["tel:+12025550149"],
+            "user": self.user.email,
+            "project": str(self.org.proj_uuid),
+        }
+        with patch(
+            "temba.api.v2.internals.broadcasts.views.UserAndProjectSerializer",
+            new=self._fake_user_and_project_serializer(self.user, self.org),
+        ):
+            resp = self.client.post(f"{self.url}?token=abc", data=data, content_type="application/json")
+        self.assertIn(resp.status_code, (200, 201))
+
+
+class TestInternalBroadcastStatistics(TembaTest):
+    stats_url = "/api/v2/internals/broadcasts-statistics"
+    monthly_url = "/api/v2/internals/broadcasts-statistics-stats"
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalBroadcastStatisticsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalBroadcastStatisticsEndpoint.permission_classes", [])
+    def test_missing_and_invalid_project(self):
+        resp = self.client.get(self.stats_url)
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "Project UUID not provided"})
+
+        resp = self.client.get(self.stats_url, {"project_uuid": "00000000-0000-0000-0000-000000000000"})
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {"error": "Project not found"})
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalBroadcastStatisticsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalBroadcastStatisticsEndpoint.permission_classes", [])
+    def test_filters_and_serializer_fields(self):
+        c1 = self.create_contact("Alice", urns=["tel:+111"])
+        c2 = self.create_contact("Bob", urns=["tel:+222"])
+
+        from temba.templates.models import Template
+
+        t = Template.objects.create(org=self.org, name="Welcome")
+
+        b1 = Broadcast.create(self.org, self.admin, text="Hi", contacts=[c1], is_bulk_send=True)
+        b1.name = "Alpha"
+        b1.created_on = timezone.now() - dt.timedelta(days=10)
+        b1.template_id = t.id
+        b1.save(update_fields=("name", "created_on", "template_id"))
+        BroadcastStatistics.objects.create(
+            broadcast=b1,
+            org=self.org,
+            processed=5,
+            sent=4,
+            delivered=3,
+            failed=1,
+            read=2,
+            contact_count=2,
+            cost=1,
+            template_price=0.5,
+            currency="BRL",
+        )
+
+        b2 = Broadcast.create(self.org, self.admin, text="Hello", contacts=[c2], is_bulk_send=True)
+        b2.name = "Beta"
+        b2.created_on = timezone.now() - dt.timedelta(days=5)
+        b2.template_id = 999999
+        b2.save(update_fields=("name", "created_on", "template_id"))
+        BroadcastStatistics.objects.create(broadcast=b2, org=self.org, sent=1)
+
+        params = {
+            "project_uuid": str(self.org.proj_uuid),
+            "start_date": (timezone.now() - dt.timedelta(days=30)).isoformat(),
+            "end_date": timezone.now().isoformat(),
+            "name": "Beta",
+            "id": str(b2.id),
+            "limit": 1,
+        }
+
+        resp = self.client.get(self.stats_url, params)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["results"]
+        self.assertEqual(len(data), 1)
+        item = data[0]
+        self.assertEqual(item["created_by"], self.admin.email)
+        self.assertIn("statistics", item)
+        self.assertIn("template", item)
+
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalBroadcastStatisticMontlyEndpoint.authentication_classes", []
+    )
+    @patch("temba.api.v2.internals.broadcasts.views.InternalBroadcastStatisticMontlyEndpoint.permission_classes", [])
+    def test_monthly_endpoint(self):
+        resp = self.client.get(self.monthly_url)
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "Project UUID not provided"})
+
+        resp = self.client.get(self.monthly_url, {"project_uuid": "00000000-0000-0000-0000-000000000000"})
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {"error": "Project not found"})
+
+        resp = self.client.get(self.monthly_url, {"project_uuid": str(self.org.proj_uuid)})
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertIn("last_30_days_stats", body)
+        self.assertIn("success_rate_30_days", body)
+
+
+class BroadcastWithStatisticsSerializerTests(TembaTest):
+    def test_template_none_without_template_id(self):
+        # create a broadcast with recipients but no template_id
+        b = Broadcast.create(
+            self.org, self.admin, text="Hello", urns=["tel:+12025550149"]
+        )  # template_id defaults to None
+        from temba.api.v2.internals.broadcasts.serializers import BroadcastWithStatisticsSerializer
+
+        ser = BroadcastWithStatisticsSerializer(b)
+        data = ser.data
+        self.assertIn("template", data)
+        self.assertIsNone(data["template"])  # covers return at line 80
+
+    def test_template_present_when_template_exists(self):
+        from temba.templates.models import Template
+        from temba.api.v2.internals.broadcasts.serializers import BroadcastWithStatisticsSerializer
+
+        b = Broadcast.create(self.org, self.admin, text="Hi", urns=["tel:+12025550149"])  # have recipients
+        t = Template.objects.create(org=self.org, name="Welcome")
+        b.template_id = t.id
+        b.save(update_fields=("template_id",))
+
+        ser = BroadcastWithStatisticsSerializer(b)
+        data = ser.data
+        self.assertEqual(data["template"], {"id": t.id, "name": "Welcome"})  # covers return at line 84

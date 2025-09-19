@@ -1,3 +1,13 @@
+3.40.2
+----------
+* External v2 initialization and listed in settings_common CHANNEL_TYPES
+
+3.40.1
+----------
+* Add pagination to be used in v2 api
+* Add channel filter in internal get message
+* Endpoint to upload media
+
 3.40.0
 ----------
 * External v2
