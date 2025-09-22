@@ -1,3 +1,7 @@
+3.41.1
+----------
+* Fix success_rate calculation in BroadcastStatistic
+
 3.41.0
 ----------
 * Add endpoint to list broadcasts with statistics
