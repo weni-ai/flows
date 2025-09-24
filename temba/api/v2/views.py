@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from smartmin.views import SmartFormView, SmartTemplateView
-from weni_datalake_sdk.clients.redshift.events import get_events
+from weni_datalake_sdk.clients.redshift.events import get_events, get_events_count_by_group
 
 from django import forms
 from django.contrib.auth import authenticate, login
@@ -339,6 +339,7 @@ class ExplorerView(SmartTemplateView):
             BrainInfoEndpoint.get_read_explorer(),
             WhatsappFlowsEndpoint.get_read_explorer(),
             EventsEndpoint.get_read_explorer(),
+            EventsGroupByCountEndpoint.get_read_explorer(),
         ]
         return context
 
@@ -5400,5 +5401,65 @@ class EventsEndpoint(BaseAPIView):
                 {"name": "value", "required": False, "help": "A value to filter by"},
                 {"name": "metadata", "required": False, "help": "A metadata to filter by"},
                 {"name": "event_name", "required": False, "help": "An event_name to filter by"},
+            ],
+        }
+
+
+class EventsGroupByCountEndpoint(BaseAPIView):
+    permission = "orgs.org_api"
+
+    def get(self, request, *args, **kwargs):
+        serializer = EventFilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            org = request.user.get_org()
+            validated_data = serializer.validated_data.copy()
+            validated_data["project"] = str(org.proj_uuid)
+
+            events = get_events_count_by_group(**validated_data)
+
+            processed_events = []
+            for event in events:
+                processed_event = {}
+                for key, value in event.items():
+                    if isinstance(value, str):
+                        try:
+                            processed_event[key] = json.loads(value)
+                        except (json.JSONDecodeError, TypeError):
+                            processed_event[key] = value
+                    else:
+                        processed_event[key] = value
+                processed_events.append(processed_event)
+
+            return Response(processed_events)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Datalake Events",
+            "url": reverse("api.v2.events-group-by-count"),
+            "slug": "events-group-by-count-list",
+            "params": [
+                {
+                    "name": "date_start",
+                    "required": True,
+                    "help": "The start date for the filter, ex: 2025-06-03T00:00:00Z",
+                },
+                {
+                    "name": "date_end",
+                    "required": True,
+                    "help": "The end date for the filter, ex: 2025-06-20T23:59:59Z",
+                },
+                {"name": "key", "required": False, "help": "A key to filter by"},
+                {"name": "contact_urn", "required": False, "help": "A contact URN to filter by"},
+                {"name": "value_type", "required": False, "help": "A value_type to filter by"},
+                {"name": "value", "required": False, "help": "A value to filter by"},
+                {"name": "metadata", "required": False, "help": "A metadata to filter by"},
+                {"name": "event_name", "required": False, "help": "An event_name to filter by"},
+                {"name": "group_by", "required": False, "help": "A group_by to filter by, default is value"},
             ],
         }
