@@ -2867,7 +2867,7 @@ class BroadcastStatisticsTest(TembaTest):
 
     def test_success_rate_30_days(self):
         rate = BroadcastStatistics.success_rate_30_days(self.org)
-        self.assertEqual(rate, 75.0)  # 6 delivered / 8 sent * 100
+        self.assertEqual(rate, 80.0)  # 8 sent / 10 processed * 100
 
     def test_success_rate_30_days_zero_sent(self):
         self.stats.sent = 0

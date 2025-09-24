@@ -124,12 +124,10 @@ class InternalBroadcastStatisticMontlyEndpoint(APIViewMixin, APIView):
         project_uuid = request.query_params.get("project_uuid")
         if not project_uuid:
             return Response({"error": "Project UUID not provided"}, status=400)
-        
         try:
             org = Org.objects.get(proj_uuid=project_uuid)
         except Org.DoesNotExist:
             return Response({"error": "Project not found"}, status=404)
-
 
         result = {}
         result["last_30_days_stats"] = BroadcastStatistics.last_30_days_stats(org)
@@ -152,9 +150,14 @@ class InternalBroadcastsUploadMediaEndpoint(APIViewMixin, APIView):
         except Org.DoesNotExist:
             return Response({"error": "Project not found"}, status=404)
 
+        result = {}
+        result["last_30_days_stats"] = BroadcastStatistics.last_30_days_stats(org)
+        result["success_rate_30_days"] = BroadcastStatistics.success_rate_30_days(org)
+
         upload = request.FILES.get("file") or request.data.get("file")
         if not upload:
             raise ParseError(detail="file is required")
 
         result = upload_broadcast_media(org, upload)
+
         return Response(result)

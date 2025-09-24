@@ -1,7 +1,7 @@
 import datetime as dt
 import logging
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
 import pyexcel
 from rest_framework import status
@@ -41,14 +41,10 @@ from temba.api.v2.serializers import (
     ContactGroupWriteSerializer,
 )
 from temba.api.v2.validators import LambdaURLValidator
-from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
-from temba.contacts.models import Contact, ContactField, ContactImport, ContactURN, ContactGroup
-from temba.contacts.views import ContactImportCRUDL
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
+from temba.contacts.models import Contact, ContactField, ContactGroup, ContactImport, ContactURN
+from temba.contacts.views import ContactImportCRUDL
 from temba.msgs.models import Broadcast, Msg
-
-
-
 from temba.orgs.models import Org
 from temba.tickets.models import Ticket
 from temba.utils.text import decode_stream
@@ -170,6 +166,9 @@ class ContactGroupsService:
         # Pre-compute member_count for ordering and response
         queryset = queryset.annotate(member_count=Coalesce(Sum("counts__count"), Value(0)))
 
+        # Exclude groups with zero members
+        queryset = queryset.filter(member_count__gt=0)
+
         ordering_map = {
             "name": "name",
             "-name": "-name",
@@ -285,89 +284,6 @@ class ContactHasOpenTicketView(APIViewMixin, APIView):
 
         has_open_ticket = Ticket.objects.filter(contact_id=contactURN.contact_id, status=Ticket.STATUS_OPEN).exists()
         return Response({"has_open_ticket": has_open_ticket})
-
-
-# Service function for business logic
-class ContactsWithMessagesService:
-    @staticmethod
-    def get_contacts_with_messages(org, start_date, end_date):
-        contacts = org.contacts.filter(is_active=True, created_on__gte=start_date, created_on__lte=end_date)
-        return contacts.prefetch_related(
-            models.Prefetch(
-                "msgs",
-                queryset=Msg.objects.filter(
-                    created_on__gte=start_date, created_on__lte=end_date, direction=Msg.DIRECTION_IN
-                ).order_by("created_on"),
-                to_attr="filtered_msgs",
-            )
-        )
-
-
-class ContactsWithMessagesCursorPagination(CursorPagination):
-    ordering = "created_on"
-    page_size = 10
-    page_size_query_param = "limit"
-    max_page_size = 500
-
-
-class ContactsWithMessagesView(APIViewMixin, APIView):
-    authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
-
-    def get(self, request: Request):
-        project_uuid = request.query_params.get("project")
-        start_date = request.query_params.get("start_date")
-        end_date = request.query_params.get("end_date")
-
-        if project_uuid is None:
-            return Response({"error": "Project is required"}, status=400)
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except Org.DoesNotExist:
-            return Response({"error": "Project not found"}, status=404)
-        if not start_date or not end_date:
-            return Response({"error": "start_date and end_date are required"}, status=400)
-
-        # Accept date (YYYY-MM-DD) or datetime with timezone, minimal validation
-        start_dt = parse_datetime(start_date)
-        end_dt = parse_datetime(end_date)
-        if not start_dt:
-            d = parse_date(start_date)
-            if d:
-                start_dt = dt.datetime.combine(d, dt.time.min, tzinfo=timezone.utc)
-        if not end_dt:
-            d = parse_date(end_date)
-            if d:
-                end_dt = dt.datetime.combine(d, dt.time.max, tzinfo=timezone.utc)
-        if not start_dt or not end_dt:
-            return Response({"error": "Invalid date format. Use YYYY-MM-DD or ISO 8601 with timezone."}, status=400)
-        # If parsed datetimes are naive, make them UTC
-        if timezone.is_naive(start_dt):
-            start_dt = timezone.make_aware(start_dt, timezone.utc)
-        if timezone.is_naive(end_dt):
-            end_dt = timezone.make_aware(end_dt, timezone.utc)
-
-        # Take all contacts created in the period
-        all_contacts_qs = ContactsWithMessagesService.get_contacts_with_messages(org, start_dt, end_dt).order_by(
-            "created_on"
-        )
-        paginator = ContactsWithMessagesCursorPagination()
-        page = paginator.paginate_queryset(all_contacts_qs, request, view=self)
-        contact_results = []
-        for contact in page:
-            filtered_msgs = getattr(contact, "filtered_msgs", [])
-            if filtered_msgs:
-                contact_results.append(
-                    {
-                        "contact_id": contact.id,
-                        "messages": [
-                            {"contact_id": contact.id, "msg_text": msg.text, "msg_created_on": msg.created_on}
-                            for msg in sorted(filtered_msgs, key=lambda x: x.created_on, reverse=True)
-                        ],
-                    }
-                )
-        serializer = ContactWithMessagesListSerializer(contact_results, many=True)
-        return paginator.get_paginated_response(serializer.data)
 
 
 class ContactsImportUploadView(APIViewMixin, APIView):
@@ -595,6 +511,79 @@ class ContactsWithMessagesService:
         )
 
 
+class ContactsWithMessagesCursorPagination(CursorPagination):
+    ordering = "created_on"
+    page_size = 10
+    page_size_query_param = "limit"
+    max_page_size = 500
+
+
+class ContactsWithMessagesView(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+
+    def get(self, request: Request):
+        project_uuid = request.query_params.get("project")
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
+        if project_uuid is None:
+            return Response({"error": "Project is required"}, status=400)
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except Org.DoesNotExist:
+            return Response({"error": "Project not found"}, status=404)
+        if not start_date or not end_date:
+            return Response({"error": "start_date and end_date are required"}, status=400)
+
+        # Accept date (YYYY-MM-DD) or datetime with timezone, minimal validation
+        start_dt = parse_datetime(start_date)
+        end_dt = parse_datetime(end_date)
+        if not start_dt:
+            d = parse_date(start_date)
+            if d:
+                start_dt = dt.datetime.combine(d, dt.time.min, tzinfo=timezone.utc)
+        if not end_dt:
+            d = parse_date(end_date)
+            if d:
+                end_dt = dt.datetime.combine(d, dt.time.max, tzinfo=timezone.utc)
+        if not start_dt or not end_dt:
+            return Response({"error": "Invalid date format. Use YYYY-MM-DD or ISO 8601 with timezone."}, status=400)
+        # If parsed datetimes are naive, make them UTC
+        if timezone.is_naive(start_dt):
+            start_dt = timezone.make_aware(start_dt, timezone.utc)
+        if timezone.is_naive(end_dt):
+            end_dt = timezone.make_aware(end_dt, timezone.utc)
+
+        # Take only contacts with messages in the period, then paginate
+        contacts_with_msgs_qs = (
+            ContactsWithMessagesService.get_contacts_with_messages(org, start_dt, end_dt)
+            .filter(
+                msgs__created_on__gte=start_dt,
+                msgs__created_on__lte=end_dt,
+                msgs__direction=Msg.DIRECTION_IN,
+            )
+            .distinct()
+            .order_by("created_on", "id")
+        )
+        paginator = ContactsWithMessagesCursorPagination()
+        page = paginator.paginate_queryset(contacts_with_msgs_qs, request, view=self)
+        contact_results = []
+        for contact in page:
+            filtered_msgs = getattr(contact, "filtered_msgs", [])
+            if filtered_msgs:
+                contact_results.append(
+                    {
+                        "contact_id": contact.id,
+                        "messages": [
+                            {"contact_id": contact.id, "msg_text": msg.text, "msg_created_on": msg.created_on}
+                            for msg in sorted(filtered_msgs, key=lambda x: x.created_on, reverse=True)
+                        ],
+                    }
+                )
+        serializer = ContactWithMessagesListSerializer(contact_results, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
 
 # Service to extract example values for import preview
 class ContactImportPreviewService:
@@ -626,6 +615,8 @@ class ContactImportPreviewService:
 
         file.seek(0)
         return examples
+
+
 class GroupContactFieldsService:
     @staticmethod
     def _build_field_payload(field, example_value):

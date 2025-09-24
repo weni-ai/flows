@@ -391,7 +391,7 @@ class BroadcastStatistics(models.Model):
     def success_rate_30_days(cls, org):
         last_30_days_stats = cls.last_30_days_stats(org)
         return (
-            last_30_days_stats.get("total_delivered") / last_30_days_stats.get("total_sent") * 100
+            last_30_days_stats.get("total_sent") / last_30_days_stats.get("total_processed") * 100
             if last_30_days_stats.get("total_sent") > 0
             else 0
         )
