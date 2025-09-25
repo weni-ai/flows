@@ -1,5 +1,4 @@
 import itertools
-import json
 from enum import Enum
 
 from rest_framework import generics, status, views
@@ -9,7 +8,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from smartmin.views import SmartFormView, SmartTemplateView
-from weni_datalake_sdk.clients.redshift.events import get_events, get_events_count_by_group
 
 from django import forms
 from django.contrib.auth import authenticate, login
@@ -5355,24 +5353,9 @@ class EventsEndpoint(BaseAPIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            org = request.user.get_org()
-            validated_data = serializer.validated_data.copy()
-            validated_data["project"] = str(org.proj_uuid)
+            from temba.api.v2.services.events import fetch_events_for_org
 
-            events = get_events(**validated_data)
-
-            processed_events = []
-            for event in events:
-                processed_event = {}
-                for key, value in event.items():
-                    if isinstance(value, str):
-                        try:
-                            processed_event[key] = json.loads(value)
-                        except (json.JSONDecodeError, TypeError):
-                            processed_event[key] = value
-                    else:
-                        processed_event[key] = value
-                processed_events.append(processed_event)
+            processed_events = fetch_events_for_org(request.user, **serializer.validated_data)
 
             return Response(processed_events)
         except Exception as e:
@@ -5414,24 +5397,9 @@ class EventsGroupByCountEndpoint(BaseAPIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            org = request.user.get_org()
-            validated_data = serializer.validated_data.copy()
-            validated_data["project"] = str(org.proj_uuid)
+            from temba.api.v2.services.events import fetch_event_counts_for_org
 
-            events = get_events_count_by_group(**validated_data)
-
-            processed_events = []
-            for event in events:
-                processed_event = {}
-                for key, value in event.items():
-                    if isinstance(value, str):
-                        try:
-                            processed_event[key] = json.loads(value)
-                        except (json.JSONDecodeError, TypeError):
-                            processed_event[key] = value
-                    else:
-                        processed_event[key] = value
-                processed_events.append(processed_event)
+            processed_events = fetch_event_counts_for_org(request.user, **serializer.validated_data)
 
             return Response(processed_events)
         except Exception as e:
