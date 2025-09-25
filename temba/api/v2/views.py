@@ -5442,7 +5442,7 @@ class EventsGroupByCountEndpoint(BaseAPIView):
         return {
             "method": "GET",
             "title": "List Datalake Events",
-            "url": reverse("api.v2.events-group-by-count"),
+            "url": reverse("api.v2.events_group_by_count"),
             "slug": "events-group-by-count-list",
             "params": [
                 {

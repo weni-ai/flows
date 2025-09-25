@@ -6124,7 +6124,7 @@ class EventsEndpointTest(APITest):
 class EventsGroupByCountEndpointTest(APITest):
     @patch("temba.api.v2.views.get_events_count_by_group")
     def test_events_group_by_count_endpoint(self, mock_get_events_count_by_group):
-        url = reverse("api.v2.events_group_by_count")
+        url = reverse("api.v2.events_group_by")
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
@@ -6149,7 +6149,7 @@ class EventsGroupByCountEndpointTest(APITest):
 
     @patch("temba.api.v2.views.get_events_count_by_group")
     def test_json_payload_parsing_group_by_count(self, mock_get_events_count_by_group):
-        url = reverse("api.v2.events_group_by_count")
+        url = reverse("api.v2.events_group_by")
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
@@ -6167,7 +6167,7 @@ class EventsGroupByCountEndpointTest(APITest):
 
     @patch("temba.api.v2.views.get_events_count_by_group")
     def test_invalid_json_payload_group_by_count(self, mock_get_events_count_by_group):
-        url = reverse("api.v2.events_group_by_count")
+        url = reverse("api.v2.events_group_by")
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
@@ -6184,7 +6184,7 @@ class EventsGroupByCountEndpointTest(APITest):
 
     @patch("temba.api.v2.views.get_events_count_by_group")
     def test_get_events_group_by_count_exception(self, mock_get_events_count_by_group):
-        url = reverse("api.v2.events_group_by_count")
+        url = reverse("api.v2.events_group_by")
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
@@ -6208,7 +6208,7 @@ class EventsGroupByCountEndpointTest(APITest):
 
         mock_get_events_count_by_group.return_value = [{"key": "non-json-string"}]
 
-        url = reverse("api.v2.events_group_by_count")
+        url = reverse("api.v2.events_group_by")
         query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
 
         response = self.fetchJSON(url, query)
@@ -6224,7 +6224,7 @@ class EventsGroupByCountEndpointTest(APITest):
 
         mock_get_events_count_by_group.return_value = [{"key_int": 123, "key_bool": False, "key_none": None}]
 
-        url = reverse("api.v2.events_group_by_count")
+        url = reverse("api.v2.events_group_by")
         query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
 
         response = self.fetchJSON(url, query)
