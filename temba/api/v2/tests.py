@@ -6004,13 +6004,13 @@ class WhatsappFlowsEndpointViewSetTest(TembaTest):
 
 
 class EventsEndpointTest(APITest):
-    @patch("temba.api.v2.views.get_events")
-    def test_events_endpoint(self, mock_get_events):
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_endpoint(self, mock_fetch_events_for_org):
         url = reverse("api.v2.events")
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
-        mock_get_events.return_value = [{"event": "test"}]
+        mock_fetch_events_for_org.return_value = [{"event": "test"}]
 
         self.login(self.admin)
 
@@ -6023,19 +6023,20 @@ class EventsEndpointTest(APITest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [{"event": "test"}])
 
-        mock_get_events.assert_called_once()
-        call_args, call_kwargs = mock_get_events.call_args
-        self.assertEqual(call_kwargs["project"], str(self.org.proj_uuid))
+        mock_fetch_events_for_org.assert_called_once()
+        call_args, call_kwargs = mock_fetch_events_for_org.call_args
+        # first arg is user
+        self.assertEqual(call_args[0], self.admin)
         self.assertEqual(call_kwargs["date_start"], iso8601.parse_date(start_date))
         self.assertEqual(call_kwargs["date_end"], iso8601.parse_date(end_date))
 
-    @patch("temba.api.v2.views.get_events")
-    def test_json_payload_parsing(self, mock_get_events):
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_json_payload_parsing(self, mock_dl_get_events):
         url = reverse("api.v2.events")
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
-        mock_get_events.return_value = [{"payload": '{"key": "value"}'}]
+        mock_dl_get_events.return_value = [{"payload": '{"key": "value"}'}]
 
         self.login(self.admin)
 
@@ -6047,13 +6048,13 @@ class EventsEndpointTest(APITest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [{"payload": {"key": "value"}}])
 
-    @patch("temba.api.v2.views.get_events")
-    def test_invalid_json_payload(self, mock_get_events):
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_invalid_json_payload(self, mock_dl_get_events):
         url = reverse("api.v2.events")
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
-        mock_get_events.return_value = [{"payload": '{"key": "value"invalid}'}]
+        mock_dl_get_events.return_value = [{"payload": '{"key": "value"invalid}'}]
 
         self.login(self.admin)
         start_date = "2024-01-01T00:00:00Z"
@@ -6064,14 +6065,14 @@ class EventsEndpointTest(APITest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [{"payload": '{"key": "value"invalid}'}])
 
-    @patch("temba.api.v2.views.get_events")
-    def test_get_events_exception(self, mock_get_events):
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_get_events_exception(self, mock_fetch_events_for_org):
         url = reverse("api.v2.events")
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
         error_message = "Something went wrong"
-        mock_get_events.side_effect = Exception(error_message)
+        mock_fetch_events_for_org.side_effect = Exception(error_message)
 
         self.login(self.admin)
         start_date = "2024-01-01T00:00:00Z"
@@ -6082,13 +6083,13 @@ class EventsEndpointTest(APITest):
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.json(), {"error": error_message})
 
-    @patch("temba.api.v2.views.get_events")
-    def test_non_json_string_in_payload(self, mock_get_events):
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_non_json_string_in_payload(self, mock_dl_get_events):
         self.login(self.admin)
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
-        mock_get_events.return_value = [{"key": "non-json-string"}]
+        mock_dl_get_events.return_value = [{"key": "non-json-string"}]
 
         url = reverse("api.v2.events")
         query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
@@ -6098,13 +6099,13 @@ class EventsEndpointTest(APITest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [{"key": "non-json-string"}])
 
-    @patch("temba.api.v2.views.get_events")
-    def test_payload_with_other_types(self, mock_get_events):
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_payload_with_other_types(self, mock_dl_get_events):
         self.login(self.admin)
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
-        mock_get_events.return_value = [{"key_int": 123, "key_bool": False, "key_none": None}]
+        mock_dl_get_events.return_value = [{"key_int": 123, "key_bool": False, "key_none": None}]
 
         url = reverse("api.v2.events")
         query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
@@ -6116,13 +6117,13 @@ class EventsEndpointTest(APITest):
 
 
 class EventsGroupByCountEndpointTest(APITest):
-    @patch("temba.api.v2.views.get_events_count_by_group")
-    def test_events_group_by_count_endpoint(self, mock_get_events_count_by_group):
+    @patch("temba.api.v2.services.events.fetch_event_counts_for_org")
+    def test_events_group_by_count_endpoint(self, mock_fetch_event_counts_for_org):
         url = reverse("api.v2.events_group_by")
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
-        mock_get_events_count_by_group.return_value = [{"event": "test"}]
+        mock_fetch_event_counts_for_org.return_value = [{"event": "test"}]
 
         self.login(self.admin)
 
@@ -6135,19 +6136,19 @@ class EventsGroupByCountEndpointTest(APITest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [{"event": "test"}])
 
-        mock_get_events_count_by_group.assert_called_once()
-        call_args, call_kwargs = mock_get_events_count_by_group.call_args
-        self.assertEqual(call_kwargs["project"], str(self.org.proj_uuid))
+        mock_fetch_event_counts_for_org.assert_called_once()
+        call_args, call_kwargs = mock_fetch_event_counts_for_org.call_args
+        self.assertEqual(call_args[0], self.admin)
         self.assertEqual(call_kwargs["date_start"], iso8601.parse_date(start_date))
         self.assertEqual(call_kwargs["date_end"], iso8601.parse_date(end_date))
 
-    @patch("temba.api.v2.views.get_events_count_by_group")
-    def test_json_payload_parsing_group_by_count(self, mock_get_events_count_by_group):
+    @patch("temba.api.v2.services.events.dl_get_events_count_by_group")
+    def test_json_payload_parsing_group_by_count(self, mock_dl_get_events_count_by_group):
         url = reverse("api.v2.events_group_by")
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
-        mock_get_events_count_by_group.return_value = [{"payload": '{"key": "value"}'}]
+        mock_dl_get_events_count_by_group.return_value = [{"payload": '{"key": "value"}'}]
 
         self.login(self.admin)
 
@@ -6159,13 +6160,13 @@ class EventsGroupByCountEndpointTest(APITest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [{"payload": {"key": "value"}}])
 
-    @patch("temba.api.v2.views.get_events_count_by_group")
-    def test_invalid_json_payload_group_by_count(self, mock_get_events_count_by_group):
+    @patch("temba.api.v2.services.events.dl_get_events_count_by_group")
+    def test_invalid_json_payload_group_by_count(self, mock_dl_get_events_count_by_group):
         url = reverse("api.v2.events_group_by")
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
-        mock_get_events_count_by_group.return_value = [{"payload": '{"key": "value"invalid}'}]
+        mock_dl_get_events_count_by_group.return_value = [{"payload": '{"key": "value"invalid}'}]
 
         self.login(self.admin)
         start_date = "2024-01-01T00:00:00Z"
@@ -6176,14 +6177,14 @@ class EventsGroupByCountEndpointTest(APITest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [{"payload": '{"key": "value"invalid}'}])
 
-    @patch("temba.api.v2.views.get_events_count_by_group")
-    def test_get_events_group_by_count_exception(self, mock_get_events_count_by_group):
+    @patch("temba.api.v2.services.events.fetch_event_counts_for_org")
+    def test_get_events_group_by_count_exception(self, mock_fetch_event_counts_for_org):
         url = reverse("api.v2.events_group_by")
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
         error_message = "Something went wrong"
-        mock_get_events_count_by_group.side_effect = Exception(error_message)
+        mock_fetch_event_counts_for_org.side_effect = Exception(error_message)
 
         self.login(self.admin)
         start_date = "2024-01-01T00:00:00Z"
@@ -6194,13 +6195,13 @@ class EventsGroupByCountEndpointTest(APITest):
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.json(), {"error": error_message})
 
-    @patch("temba.api.v2.views.get_events_count_by_group")
-    def test_non_json_string_in_payload_group_by_count(self, mock_get_events_count_by_group):
+    @patch("temba.api.v2.services.events.dl_get_events_count_by_group")
+    def test_non_json_string_in_payload_group_by_count(self, mock_dl_get_events_count_by_group):
         self.login(self.admin)
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
-        mock_get_events_count_by_group.return_value = [{"key": "non-json-string"}]
+        mock_dl_get_events_count_by_group.return_value = [{"key": "non-json-string"}]
 
         url = reverse("api.v2.events_group_by")
         query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
@@ -6210,13 +6211,13 @@ class EventsGroupByCountEndpointTest(APITest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [{"key": "non-json-string"}])
 
-    @patch("temba.api.v2.views.get_events_count_by_group")
-    def test_payload_with_other_types_group_by_count(self, mock_get_events_count_by_group):
+    @patch("temba.api.v2.services.events.dl_get_events_count_by_group")
+    def test_payload_with_other_types_group_by_count(self, mock_dl_get_events_count_by_group):
         self.login(self.admin)
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
-        mock_get_events_count_by_group.return_value = [{"key_int": 123, "key_bool": False, "key_none": None}]
+        mock_dl_get_events_count_by_group.return_value = [{"key_int": 123, "key_bool": False, "key_none": None}]
 
         url = reverse("api.v2.events_group_by")
         query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
@@ -6225,3 +6226,84 @@ class EventsGroupByCountEndpointTest(APITest):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [{"key_int": 123, "key_bool": False, "key_none": None}])
+
+
+class EventsServiceTest(APITest):
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_fetch_events_for_org_parses_and_forwards(self, mock_dl_get_events):
+        # ensure org has proj_uuid
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        # mock datalake return with mixed values
+        mock_dl_get_events.return_value = [
+            {
+                "payload": '{"key": "value"}',
+                "key_int": 1,
+                "key_bool": False,
+                "key_none": None,
+                "raw": "plain",
+            },
+            {"bad_json": '{"x": "y"invalid}'},
+        ]
+
+        # call service
+        from temba.api.v2.services.events import fetch_events_for_org
+
+        start_date = iso8601.parse_date("2024-01-01T00:00:00Z")
+        end_date = iso8601.parse_date("2024-01-31T23:59:59Z")
+
+        results = fetch_events_for_org(self.admin, date_start=start_date, date_end=end_date)
+
+        # assert parsing behavior
+        self.assertEqual(
+            results,
+            [
+                {"payload": {"key": "value"}, "key_int": 1, "key_bool": False, "key_none": None, "raw": "plain"},
+                {"bad_json": '{"x": "y"invalid}'},
+            ],
+        )
+
+        # assert datalake call forwarded params incl. project
+        mock_dl_get_events.assert_called_once()
+        _, call_kwargs = mock_dl_get_events.call_args
+        self.assertEqual(call_kwargs["project"], str(self.org.proj_uuid))
+        self.assertEqual(call_kwargs["date_start"], start_date)
+        self.assertEqual(call_kwargs["date_end"], end_date)
+
+    @patch("temba.api.v2.services.events.dl_get_events_count_by_group")
+    def test_fetch_event_counts_for_org_parses_and_forwards(self, mock_dl_get_counts):
+        # ensure org has proj_uuid
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_dl_get_counts.return_value = [
+            {"group_value": '"group-a"', "count": 5},
+            {"metadata": '{"country": "BR"}', "count": 3},
+            {"payload": '{"x": "y"invalid}', "count": 1},
+        ]
+
+        from temba.api.v2.services.events import fetch_event_counts_for_org
+
+        start_date = iso8601.parse_date("2024-01-01T00:00:00Z")
+        end_date = iso8601.parse_date("2024-01-31T23:59:59Z")
+
+        results = fetch_event_counts_for_org(
+            self.admin, date_start=start_date, date_end=end_date, group_by="metadata.country"
+        )
+
+        self.assertEqual(
+            results,
+            [
+                {"group_value": "group-a", "count": 5},
+                {"metadata": {"country": "BR"}, "count": 3},
+                {"payload": '{"x": "y"invalid}', "count": 1},
+            ],
+        )
+
+        mock_dl_get_counts.assert_called_once()
+        _, call_kwargs = mock_dl_get_counts.call_args
+        self.assertEqual(call_kwargs["project"], str(self.org.proj_uuid))
+        self.assertEqual(call_kwargs["date_start"], start_date)
+        self.assertEqual(call_kwargs["date_end"], end_date)
+        self.assertEqual(call_kwargs["group_by"], "metadata.country")
