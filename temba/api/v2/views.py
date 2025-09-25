@@ -5419,7 +5419,20 @@ class EventsGroupByCountEndpoint(BaseAPIView):
 
             events = get_events_count_by_group(**validated_data)
 
-            return Response(events)
+            processed_events = []
+            for event in events:
+                processed_event = {}
+                for key, value in event.items():
+                    if isinstance(value, str):
+                        try:
+                            processed_event[key] = json.loads(value)
+                        except (json.JSONDecodeError, TypeError):
+                            processed_event[key] = value
+                    else:
+                        processed_event[key] = value
+                processed_events.append(processed_event)
+
+            return Response(processed_events)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
