@@ -1,3 +1,7 @@
+3.41.2
+----------
+* Add endpoint to get events aggregated
+
 3.41.1
 ----------
 * Fix success_rate calculation in BroadcastStatistic
