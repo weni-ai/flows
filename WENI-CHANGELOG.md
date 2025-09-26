@@ -1,3 +1,7 @@
+3.41.3
+----------
+* Fix error in create contact endpoint when verify ninth digit is enabled
+
 3.41.2
 ----------
 * Add endpoint to get events aggregated
