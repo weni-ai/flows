@@ -1996,18 +1996,16 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
             if not contact and org.config.get("verify_ninth_digit", False):
                 scheme, path, _, _ = URN.to_parts(urn)
                 if scheme == "whatsapp" and path.startswith("55"):
+                    lookup_values = self.lookup_values.copy()
                     if len(path) == 13 and path[4] == "9":
                         # Generate without digit 9
                         number = path[:4] + path[5:]
-                        self.lookup_values["urns__identity"] = scheme + ":" + number
-                        contact = self.get_queryset().filter(**self.lookup_values).first()
-
                     else:
                         # Generate with digit 9
                         number = path[:4] + "9" + path[4:]
 
-                        self.lookup_values["urns__identity"] = scheme + ":" + number
-                        contact = self.get_queryset().filter(**self.lookup_values).first()
+                    lookup_values["urns__identity"] = scheme + ":" + number
+                    contact = self.get_queryset().filter(**lookup_values).first()
 
             return contact
         else:
