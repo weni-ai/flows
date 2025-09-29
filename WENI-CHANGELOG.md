@@ -1,3 +1,7 @@
+3.41.4
+----------
+* Update floweditor to 3.6.3
+
 3.41.3
 ----------
 * Fix error in create contact endpoint when verify ninth digit is enabled
