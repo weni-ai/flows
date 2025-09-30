@@ -106,3 +106,19 @@ class ChannelAllowedDomainsView(APIViewMixin, APIView):
             response = allowedDomains
 
         return Response(response)
+
+
+# Return the channel's project's language
+class LanguageByChannelView(APIViewMixin, APIView):
+    def get(self, request: Request):
+        params = request.query_params
+        channel_uuid = params.get("channel")
+
+        if channel_uuid is None:
+            return Response(status=400)
+        try:
+            channel = Channel.objects.get(uuid=channel_uuid)
+        except Channel.DoesNotExist:
+            return Response(status=404)
+
+        return Response({"language": channel.org.language})
