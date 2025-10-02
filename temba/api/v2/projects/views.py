@@ -6,6 +6,7 @@ from weni.internal.authenticators import InternalOIDCAuthentication
 
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import IsUserInOrg
+from temba.channels.models import Channel
 from temba.orgs.models import Org
 
 
@@ -32,3 +33,26 @@ class GetProjectView(APIViewMixin, APIView):
             "brain_on": org.brain_on,
         }
         return Response(project_data)
+
+
+class ProjectLanguageView(APIViewMixin, APIView):
+    def get(self, request: Request):
+        params = request.query_params
+        project_uuid = params.get("project_uuid")
+        channel_uuid = params.get("channel_uuid")
+
+        if project_uuid is None and channel_uuid is None:
+            return Response(status=400, data={"error": "project_uuid or channel_uuid is required"})
+
+        try:
+            if project_uuid:
+                org = Org.objects.get(proj_uuid=project_uuid)
+            else:
+                channel = Channel.objects.get(uuid=channel_uuid)
+                org = channel.org
+        except (Org.DoesNotExist):
+            return Response(status=404, data={"error": "Project not found"})
+        except Channel.DoesNotExist:
+            return Response(status=404, data={"error": "Channel not found"})
+
+        return Response({"language": org.language})

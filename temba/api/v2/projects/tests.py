@@ -7,7 +7,7 @@ from rest_framework.authentication import BasicAuthentication
 from django.test import SimpleTestCase, override_settings
 from django.urls import resolve, reverse
 
-from temba.api.v2.projects.views import GetProjectView
+from temba.api.v2.projects.views import GetProjectView, ProjectLanguageView
 from temba.tests import TembaTest
 
 GET_PROJECT_VIEW_PATH = "temba.api.v2.projects.views.GetProjectView"
@@ -79,3 +79,43 @@ class ProjectsUrlsTest(SimpleTestCase):
         self.assertEqual(url, "/projects")
         match = resolve(url)
         self.assertEqual(getattr(match.func, "view_class", None), GetProjectView)
+
+    def test_project_language_url_resolves_to_project_language_view(self):
+        url = reverse("project_language")
+        self.assertEqual(url, "/projects/project_language")
+        match = resolve(url)
+        self.assertEqual(getattr(match.func, "view_class", None), ProjectLanguageView)
+
+
+class ProjectLanguageViewTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save(update_fields=("proj_uuid",))
+
+        self.url = reverse("api.v2.project_language")
+
+    def test_request_without_project_uuid_and_channel_uuid(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 400)
+
+    def test_request_with_channel_uuid(self):
+        channel = self.create_channel("TG", "Test Channel", "test", org=self.org)
+        response = self.client.get(f"{self.url}?channel_uuid={channel.uuid}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"language": self.org.language})
+
+    def test_request_with_channel_uuid_notfound(self):
+        url = f"{self.url}?channel_uuid=2337712f-dcbc-48f3-9ae7-7f832445f6c9"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_request_with_project_uuid(self):
+        response = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"language": self.org.language})
+
+    def test_request_with_project_uuid_notfound(self):
+        url = f"{self.url}?project_uuid=2337712f-dcbc-48f3-9ae7-7f832445f6c9"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
