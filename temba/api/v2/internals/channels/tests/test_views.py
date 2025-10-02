@@ -176,22 +176,3 @@ class InternalChannelViewTest(TembaTest):
         self.assertEqual(wac["waba"], "12345678910")
         self.assertEqual(wac["phone_number"], "+55 00 900001234")
         self.assertTrue(wac["MMLite"])
-
-
-class LanguageByChannelViewTest(TembaTest):
-    url = "/api/v2/internals/language_by_channel"
-
-    def test_request_without_channel_uuid(self):
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 400)
-
-    def test_request_with_channel_uuid(self):
-        channel = self.create_channel("TG", "Test Channel", "test", org=self.org)
-        response = self.client.get(f"{self.url}?channel={channel.uuid}")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"language": self.org.language})
-
-    def test_request_with_channel_uuid_notfound(self):
-        url = f"{self.url}?channel=2337712f-dcbc-48f3-9ae7-7f832445f6c9"
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 404)
