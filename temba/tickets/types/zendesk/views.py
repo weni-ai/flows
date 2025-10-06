@@ -18,7 +18,7 @@ from django.views.generic import View
 
 from temba.orgs.views import OrgPermsMixin
 from temba.utils import json
-from temba.utils.s3 import public_file_storage
+from temba.utils.s3 import private_file_storage
 from temba.utils.text import random_string
 from temba.utils.views import ComponentFormMixin
 
@@ -309,4 +309,4 @@ class FileCallbackView(View):
     def post(self, request, *args, **kwargs):
         path = "attachments/" + kwargs["path"]
         assert ".." not in kwargs["path"]
-        return FileResponse(public_file_storage.open(path))
+        return FileResponse(private_file_storage.open(path))
