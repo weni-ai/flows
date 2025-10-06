@@ -21,7 +21,8 @@ from django.utils.translation import ugettext_lazy as _
 from temba import mailroom
 from temba.assets.models import register_asset_store
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
-from temba.contacts.models import URN, Contact, ContactGroup, ContactURN
+from temba.contacts.models import URN, Contact, ContactGroup, ContactGroupCount, ContactURN
+from temba.msgs.cost_service import get_template_price_and_currency_from_api
 from temba.orgs.models import DependencyMixin, Org, TopUp
 from temba.schedules.models import Schedule
 from temba.utils import chunk_list, on_transaction_commit
@@ -72,7 +73,11 @@ class Broadcast(models.Model):
     TEMPLATE_STATE_LEGACY = "legacy"
     TEMPLATE_STATE_EVALUATED = "evaluated"
     TEMPLATE_STATE_UNEVALUATED = "unevaluated"
-    TEMPLATE_STATE_CHOICES = (TEMPLATE_STATE_LEGACY, TEMPLATE_STATE_EVALUATED, TEMPLATE_STATE_UNEVALUATED)
+    TEMPLATE_STATE_CHOICES = (
+        TEMPLATE_STATE_LEGACY,
+        TEMPLATE_STATE_EVALUATED,
+        TEMPLATE_STATE_UNEVALUATED,
+    )
 
     METADATA_QUICK_REPLIES = "quick_replies"
     METADATA_TEMPLATE_STATE = "template_state"
@@ -105,7 +110,12 @@ class Broadcast(models.Model):
 
     created_by = models.ForeignKey(User, null=True, on_delete=models.PROTECT, related_name="broadcast_creations")
     created_on = models.DateTimeField(default=timezone.now, db_index=True)  # TODO remove index
-    modified_by = models.ForeignKey(User, null=True, on_delete=models.PROTECT, related_name="broadcast_modifications")
+    modified_by = models.ForeignKey(
+        User,
+        null=True,
+        on_delete=models.PROTECT,
+        related_name="broadcast_modifications",
+    )
     modified_on = models.DateTimeField(default=timezone.now)
 
     # whether this broadcast should send to all URNs for each contact
@@ -113,6 +123,10 @@ class Broadcast(models.Model):
 
     metadata = JSONAsTextField(null=True, default=dict)
     broadcast_type = models.CharField(max_length=1, choices=BROADCAST_TYPES_CHOICES, default=BROADCAST_TYPE_DEFAULT)
+
+    name = models.CharField(max_length=255, null=True, blank=True)
+    is_bulk_send = models.BooleanField(default=False)
+    template_id = models.IntegerField(null=True, blank=True)
 
     @classmethod
     def create(
@@ -136,6 +150,9 @@ class Broadcast(models.Model):
         template_state: str = TEMPLATE_STATE_LEGACY,
         status: str = STATUS_INITIALIZING,
         queue: str = None,
+        name: str = None,
+        template_id: int = None,
+        is_bulk_send: bool = False,
         **kwargs,
     ):
         # for convenience broadcasts can still be created with single translation and no base_language
@@ -184,11 +201,40 @@ class Broadcast(models.Model):
             metadata=metadata,
             status=status,
             broadcast_type=broadcast_type,
+            name=name,
+            template_id=template_id,
+            is_bulk_send=is_bulk_send,
             **kwargs,
         )
 
         # set our recipients
         broadcast._set_recipients(groups=groups, contacts=contacts, urns=urns, contact_ids=contact_ids)
+
+        if broadcast.is_bulk_send:
+            # Populate contact_count when creating BroadcastStatistics if there are groups
+            contact_count = 0
+
+            # Search for values from the external API using the broadcast's template_id
+            template_price, currency = get_template_price_and_currency_from_api(
+                getattr(broadcast, "template_id", None)
+            )
+
+            if groups:
+                group_ids = [g.id if hasattr(g, "id") else g for g in groups]
+                contact_count = (
+                    ContactGroupCount.objects.filter(group_id__in=group_ids).aggregate(total=models.Sum("count"))[
+                        "total"
+                    ]
+                    or 0
+                )
+                BroadcastStatistics.objects.create(
+                    broadcast=broadcast,
+                    org=org,
+                    contact_count=contact_count,
+                    template_price=template_price,
+                    cost=0,
+                    currency=currency,
+                )
 
         return broadcast
 
@@ -276,8 +322,79 @@ class Broadcast(models.Model):
     class Meta:
         indexes = [
             # used by the broadcasts API endpoint
-            models.Index(name="msgs_broadcasts_org_created_id", fields=["org", "-created_on", "-id"]),
+            models.Index(
+                name="msgs_broadcasts_org_created_id",
+                fields=["org", "-created_on", "-id"],
+            ),
         ]
+
+
+class BroadcastStatistics(models.Model):
+    """
+    Statistics for a broadcast
+    """
+
+    broadcast = models.ForeignKey(Broadcast, on_delete=models.PROTECT, related_name="statistics")
+    org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="broadcast_statistics")
+    processed = models.IntegerField(default=0)
+    sent = models.IntegerField(default=0)
+    delivered = models.IntegerField(default=0)
+    failed = models.IntegerField(default=0)
+    read = models.IntegerField(default=0)
+    contact_count = models.IntegerField(default=0)
+    cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    template_price = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+    currency = models.CharField(max_length=20, null=True, blank=True)
+    created_on = models.DateTimeField(default=timezone.now, db_index=True)
+    modified_on = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return (
+            f"BroadcastStatistics[broadcast_id={self.broadcast.id}, "
+            f"org={self.org}, "
+            f"processed={self.processed}, "
+            f"sent={self.sent}, "
+            f"delivered={self.delivered}, "
+            f"failed={self.failed}, "
+            f"read={self.read}, "
+            f"cost={self.cost}, "
+            f"template_price={self.template_price}, "
+            f"currency={self.currency}, "
+            f"contact_count={self.contact_count}]"
+        )
+
+    @classmethod
+    def last_30_days_stats(cls, org):
+        """
+        Returns the statistics for the last 30 days
+        """
+        now = timezone.now()
+        start_date = (now - timedelta(days=30)).replace(hour=0, minute=0, second=0, microsecond=0)
+        broadcasts_ids = Broadcast.objects.filter(org=org, is_bulk_send=True, created_on__gte=start_date).values_list(
+            "id", flat=True
+        )
+        stats_qs = cls.objects.filter(broadcast__in=broadcasts_ids)
+
+        aggregated_broadcasts = stats_qs.aggregate(
+            total_processed=Sum("processed"),
+            total_sent=Sum("sent"),
+            total_delivered=Sum("delivered"),
+            total_failed=Sum("failed"),
+            total_read=Sum("read"),
+            total_contacts=Sum("contact_count"),
+            total_cost=Sum("cost"),
+        )
+
+        return {k: v or 0 for k, v in aggregated_broadcasts.items()}
+
+    @classmethod
+    def success_rate_30_days(cls, org):
+        last_30_days_stats = cls.last_30_days_stats(org)
+        return (
+            last_30_days_stats.get("total_sent") / last_30_days_stats.get("total_processed") * 100
+            if last_30_days_stats.get("total_sent") > 0
+            else 0
+        )
 
 
 class Attachment:
@@ -439,7 +556,10 @@ class Msg(models.Model):
     # TODO deprecated in favor of delete_from_counts
     DELETE_FOR_ARCHIVE = "A"
     DELETE_FOR_USER = "U"
-    DELETE_CHOICES = ((DELETE_FOR_ARCHIVE, "Archive delete"), (DELETE_FOR_USER, "User delete"))
+    DELETE_CHOICES = (
+        (DELETE_FOR_ARCHIVE, "Archive delete"),
+        (DELETE_FOR_USER, "User delete"),
+    )
     delete_reason = models.CharField(null=True, max_length=1, choices=DELETE_CHOICES)
 
     @classmethod
@@ -468,11 +588,17 @@ class Msg(models.Model):
         one_week_ago = timezone.now() - timedelta(days=7)
         statuses = (cls.STATUS_QUEUED, cls.STATUS_PENDING, cls.STATUS_ERRORED)
         failed_messages = Msg.objects.filter(
-            created_on__lte=one_week_ago, direction=Msg.DIRECTION_OUT, status__in=statuses
+            created_on__lte=one_week_ago,
+            direction=Msg.DIRECTION_OUT,
+            status__in=statuses,
         )
 
         # fail our messages
-        failed_messages.update(status=cls.STATUS_FAILED, failed_reason=Msg.FAILED_TOO_OLD, modified_on=timezone.now())
+        failed_messages.update(
+            status=cls.STATUS_FAILED,
+            failed_reason=Msg.FAILED_TOO_OLD,
+            modified_on=timezone.now(),
+        )
 
     def as_archive_json(self):
         """
@@ -661,7 +787,11 @@ class Msg(models.Model):
         """
         Archives all incoming messages for the given contacts
         """
-        msgs = Msg.objects.filter(direction=cls.DIRECTION_IN, visibility=cls.VISIBILITY_VISIBLE, contact__in=contacts)
+        msgs = Msg.objects.filter(
+            direction=cls.DIRECTION_IN,
+            visibility=cls.VISIBILITY_VISIBLE,
+            contact__in=contacts,
+        )
         msg_ids = list(msgs.values_list("pk", flat=True))
 
         # update modified on in small batches to avoid long table lock, and having too many non-unique values for
@@ -811,11 +941,15 @@ class SystemLabel:
         # TODO: (Indexing) Sent and Failed require full message history
         if label_type == cls.TYPE_INBOX:
             qs = Msg.objects.filter(
-                direction=Msg.DIRECTION_IN, visibility=Msg.VISIBILITY_VISIBLE, msg_type=Msg.TYPE_INBOX
+                direction=Msg.DIRECTION_IN,
+                visibility=Msg.VISIBILITY_VISIBLE,
+                msg_type=Msg.TYPE_INBOX,
             )
         elif label_type == cls.TYPE_FLOWS:
             qs = Msg.objects.filter(
-                direction=Msg.DIRECTION_IN, visibility=Msg.VISIBILITY_VISIBLE, msg_type=Msg.TYPE_FLOW
+                direction=Msg.DIRECTION_IN,
+                visibility=Msg.VISIBILITY_VISIBLE,
+                msg_type=Msg.TYPE_FLOW,
             )
         elif label_type == cls.TYPE_ARCHIVED:
             qs = Msg.objects.filter(direction=Msg.DIRECTION_IN, visibility=Msg.VISIBILITY_ARCHIVED)
@@ -833,7 +967,9 @@ class SystemLabel:
             )
         elif label_type == cls.TYPE_FAILED:
             qs = Msg.objects.filter(
-                direction=Msg.DIRECTION_OUT, visibility=Msg.VISIBILITY_VISIBLE, status=Msg.STATUS_FAILED
+                direction=Msg.DIRECTION_OUT,
+                visibility=Msg.VISIBILITY_VISIBLE,
+                status=Msg.STATUS_FAILED,
             )
         elif label_type == cls.TYPE_SCHEDULED:
             qs = Broadcast.objects.exclude(schedule=None).prefetch_related("groups", "contacts", "urns")
@@ -894,7 +1030,10 @@ class SystemLabelCount(SquashableModel):
             "table": cls._meta.db_table
         }
 
-        return sql, (distinct_set.org_id, distinct_set.label_type, distinct_set.is_archived) * 2
+        return (
+            sql,
+            (distinct_set.org_id, distinct_set.label_type, distinct_set.is_archived) * 2,
+        )
 
     @classmethod
     def get_totals(cls, org, is_archived=False):
@@ -973,7 +1112,11 @@ class Label(TembaModel, DependencyMixin):
             return folder
 
         return cls.folder_objects.create(
-            org=org, name=name, label_type=Label.TYPE_FOLDER, created_by=user, modified_by=user
+            org=org,
+            name=name,
+            label_type=Label.TYPE_FOLDER,
+            created_by=user,
+            modified_by=user,
         )
 
     @classmethod
@@ -1135,7 +1278,14 @@ class MsgIterator:
     Queryset wrapper to chunk queries and reduce in-memory footprint
     """
 
-    def __init__(self, ids, order_by=None, select_related=None, prefetch_related=None, max_obj_num=1000):
+    def __init__(
+        self,
+        ids,
+        order_by=None,
+        select_related=None,
+        prefetch_related=None,
+        max_obj_num=1000,
+    ):
         self._ids = ids
         self._order_by = order_by
         self._select_related = select_related
@@ -1189,7 +1339,16 @@ class ExportMessagesTask(BaseExportTask):
     end_date = models.DateField(null=True, blank=True, help_text=_("The date for the newest message to export"))
 
     @classmethod
-    def create(cls, org, user, system_label=None, label=None, groups=(), start_date=None, end_date=None):
+    def create(
+        cls,
+        org,
+        user,
+        system_label=None,
+        label=None,
+        groups=(),
+        start_date=None,
+        end_date=None,
+    ):
         if label and system_label:  # pragma: no cover
             raise ValueError("Can't specify both label and system label")
 
@@ -1281,7 +1440,12 @@ class ExportMessagesTask(BaseExportTask):
 
         where = {"visibility": "visible"}
         if system_label:
-            visibility, direction, msg_type, statuses = SystemLabel.get_archive_attributes(system_label)
+            (
+                visibility,
+                direction,
+                msg_type,
+                statuses,
+            ) = SystemLabel.get_archive_attributes(system_label)
             where["direction"] = direction
             if msg_type:
                 where["type"] = msg_type

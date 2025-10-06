@@ -1256,6 +1256,7 @@ CHANNEL_TYPES = [
     "temba.channels.types.slack.SlackType",
     "temba.channels.types.teams.TeamsType",
     "temba.channels.types.email.EmailType",
+    "temba.channels.types.externalv2.ExternalV2Type",
 ]
 
 EXTERNALSERVICE_TYPES = [
@@ -1407,11 +1408,15 @@ INTELLIGENCES_TOKEN = os.environ.get("INTELLIGENCES_TOKEN", default="")
 # Nexus url
 NEXUS_BASE_URL = os.environ.get("NEXUS_BASE_URL", default="https://nexus.dev.cloud.weni.ai")
 
+BILLING_BASE_URL = os.environ.get("BILLING_BASE_URL", default="https://billing.stg.cloud.weni.ai")
+
 FLOWEDITOR_SENTRY_DSN = os.environ.get("FLOWEDITOR_SENTRY_DSN", default="")
 
 INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
 
 FLOW_PATH_RECENT_RUN_BATCH_SIZE = os.environ.get("FLOW_PATH_RECENT_RUN_BATCH_SIZE", default=50)
+
+LAMBDA_VALIDATION_URL = os.environ.get("LAMBDA_VALIDATION_URL", default="")
 
 # Datalake configuration
 DATALAKE_SERVER_ADDRESS = os.environ.get("DATALAKE_SERVER_ADDRESS", default="localhost:50051")

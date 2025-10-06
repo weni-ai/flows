@@ -29,12 +29,21 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
         try:
             # Validate JSON first
             if not hasattr(request, "data") or request.data is None:
-                return JsonResponse({"error": "Invalid JSON", "detail": "Request body must be valid JSON"}, status=400)
+                return JsonResponse(
+                    {
+                        "error": "Invalid JSON",
+                        "detail": "Request body must be valid JSON",
+                    },
+                    status=400,
+                )
 
             # Validate required data
             serializer = ConversionEventSerializer(data=request.data)
             if not serializer.is_valid():
-                return JsonResponse({"error": "Validation Error", "detail": serializer.errors}, status=400)
+                return JsonResponse(
+                    {"error": "Validation Error", "detail": serializer.errors},
+                    status=400,
+                )
 
             validated_data = serializer.validated_data
             event_type = validated_data["event_type"]
@@ -53,8 +62,10 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                 if dataset_id:
                     # Build payload for Meta Conversion API
                     meta_payload = self._build_meta_payload(
-                        event_type, ctwa_data, None
-                    )  # payload is not used for Meta
+                        event_type,
+                        ctwa_data,
+                        payload,
+                    )
                     # Send to Meta
                     meta_success, meta_error = self._send_to_meta(meta_payload, dataset_id)
 
@@ -68,44 +79,110 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             )
 
             # Prepare response based on results
-            if ctwa_data and dataset_id and meta_success:  # Check for dataset_id here
-                logger.info(
-                    f"Conversion event {event_type} sent successfully to Meta and Datalake for channel {channel_uuid}"
+            if meta_success and datalake_success:
+                logger.warning(
+                    f"[SUCCESS] Both services: Meta and Datalake succeeded for event {event_type} on channel {channel_uuid}"
                 )
                 return JsonResponse(
-                    {"status": "success", "message": "Event sent to Meta and Datalake successfully"}, status=200
+                    {
+                        "status": "success",
+                        "message": "Event sent to Meta and Datalake successfully",
+                    },
+                    status=200,
                 )
-            elif datalake_success:  # If Datalake succeeds, it's a success
-                logger.info(f"Conversion event {event_type} sent successfully to Datalake for channel {channel_uuid}")
+            elif datalake_success:  # If Datalake succeeds but Meta failed or wasn't attempted
+                if ctwa_data and dataset_id:  # Meta was attempted but failed
+                    logger.warning(
+                        f"[PARTIAL] Datalake succeeded but Meta failed for event {event_type} on channel {channel_uuid}. Meta error: {meta_error}"
+                    )
+                else:  # Meta wasn't attempted (no CTWA or dataset_id)
+                    logger.warning(
+                        f"[SUCCESS] Datalake only: Meta not attempted for event {event_type} on channel {channel_uuid}"
+                    )
                 return JsonResponse(
-                    {"status": "success", "message": "Event sent to Datalake successfully"}, status=200
+                    {
+                        "status": "success",
+                        "message": "Event sent to Datalake successfully",
+                    },
+                    status=200,
                 )
-            else:
-                # If we tried to send to Meta (have CTWA and dataset_id) and it failed, it's a Meta error
-                if ctwa_data and dataset_id:
-                    error_type = "Meta API Error"
-                    error_msg = meta_error
-                else:
-                    error_type = "API Error"
+            else:  # Datalake failed
+                if ctwa_data and dataset_id:  # Both services failed
+                    logger.error(
+                        f"[FAILURE] Both services failed for event {event_type} on channel {channel_uuid}. "
+                        f"Meta error: {meta_error}, Datalake error: {datalake_error}"
+                    )
+                    error_type = "Meta and Datalake Error"
+                    error_msg = f"Meta: {meta_error}, Datalake: {datalake_error}"
+                else:  # Only Datalake failed (Meta wasn't attempted)
+                    logger.error(
+                        f"[FAILURE] Datalake failed for event {event_type} on channel {channel_uuid}. Error: {datalake_error}"
+                    )
+                    error_type = "Datalake Error"
                     error_msg = datalake_error
 
-                logger.error(f"Failed to send conversion event: {error_msg}")
                 return JsonResponse({"error": error_type, "detail": error_msg}, status=500)
 
         except Exception as e:
             error_msg = str(e)
             if any(keyword in error_msg.lower() for keyword in ["json", "parse", "expecting value"]):
                 logger.error(f"JSON parse error - {error_msg}")
-                return JsonResponse({"error": "Invalid JSON", "detail": "Request body must be valid JSON"}, status=400)
+                return JsonResponse(
+                    {
+                        "error": "Invalid JSON",
+                        "detail": "Request body must be valid JSON",
+                    },
+                    status=400,
+                )
             else:
                 logger.error(f"Unexpected error processing conversion event: {error_msg}")
                 return JsonResponse(
-                    {"error": "Internal Server Error", "detail": "An unexpected error occurred"}, status=500
+                    {
+                        "error": "Internal Server Error",
+                        "detail": "An unexpected error occurred",
+                    },
+                    status=500,
                 )
 
     def _get_ctwa_data(self, channel_uuid, contact_urn):
         """Get CTWA data for lookup using both channel_uuid and contact_urn"""
         try:
+            # If it's not a WhatsApp URN, just do a normal lookup
+            if not contact_urn.startswith("whatsapp:"):
+                return (
+                    CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn=contact_urn)
+                    .order_by("-timestamp")
+                    .first()
+                )
+
+            # For WhatsApp URNs, try both with and without the extra 9 if it's a Brazilian number
+            # Split the URN into prefix and number
+            prefix, number = contact_urn.split(":", 1)
+
+            # Only handle the extra 9 for Brazilian numbers
+            if number.startswith("55"):
+                # Remove country code (55) and DDD (2 digits) to check remaining length
+                remaining_digits = number[4:]  # After 55 + DDD
+
+                # If we have more than 8 digits after DDD, it means we have the extra 9
+                if len(remaining_digits) > 8:  # Has the extra 9
+                    # Generate version without the extra 9
+                    other_number = number[:4] + remaining_digits[1:]  # Remove first digit after DDD (the 9)
+                    numbers = [number, other_number]
+                else:  # Doesn't have the extra 9
+                    # Generate version with the extra 9
+                    other_number = number[:4] + "9" + remaining_digits  # Add 9 after DDD
+                    numbers = [number, other_number]
+
+                # Create both URNs for lookup
+                urns = [f"{prefix}:{num}" for num in numbers]
+
+                # Try to find CTWA data for either URN
+                return (
+                    CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn__in=urns).order_by("-timestamp").first()
+                )
+
+            # For non-BR numbers or if we can't handle the number format, just do a normal lookup
             return (
                 CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).order_by("-timestamp").first()
             )
@@ -148,7 +225,23 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             },
         }
 
-        return {"data": [meta_event], "partner_agent": getattr(settings, "META_PARTNER_AGENT", "Weni by VTEX")}
+        # Add value and currency only for purchase events
+        if event_type == "purchase":
+            value = original_payload.get("value")
+            currency = original_payload.get("currency", "BRL")  # Default to BRL if not provided
+            if value:
+                try:
+                    # Convert value to float and keep it as float
+                    value = float(value)
+                    meta_event["value"] = value
+                    meta_event["currency"] = currency
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid value format in purchase event: {value}")
+
+        return {
+            "data": [meta_event],
+            "partner_agent": getattr(settings, "META_PARTNER_AGENT", "Weni by VTEX"),
+        }
 
     def _send_to_meta(self, payload, dataset_id):
         """Send event to Meta Conversion API"""
@@ -189,7 +282,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             from temba.orgs.models import Org
 
             try:
-                channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only("org_id").first()
+                channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only("org_id", "config").first()
                 if not channel:
                     return False, "Channel not found"
             except Exception:
@@ -208,6 +301,10 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             # Add required fields to metadata
             metadata["channel"] = str(channel_uuid)
 
+            # Add waba_id from channel config if available
+            if channel.config and "wa_waba_id" in channel.config:
+                metadata["waba_id"] = channel.config["wa_waba_id"]
+
             # Add CTWA ID only if available
             if ctwa_data:
                 metadata["ctwa_id"] = ctwa_data.ctwa_clid
@@ -217,7 +314,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                 "key": "capi",
                 "value": event_type,  # "lead" or "purchase"
                 "value_type": "string",
-                "date": datetime.now().strftime("%Y-%m-%d"),
+                "date": datetime.now().timestamp(),
                 "project": str(org.proj_uuid),  # Using org proj_uuid as project identifier
                 "contact_urn": contact_urn,
                 "metadata": metadata,

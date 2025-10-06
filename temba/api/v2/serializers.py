@@ -29,6 +29,7 @@ from temba.msgs.models import Broadcast, Label, Msg
 from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
+from temba.triggers.usecases import create_catchall_trigger
 from temba.utils import extract_constants, json, on_transaction_commit
 from temba.wpp_flows.models import WhatsappFlow
 from temba.wpp_products.models import Product
@@ -286,6 +287,9 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     msg = serializers.DictField(required=True)
     channel = serializers.UUIDField(required=False)
     queue = serializers.CharField(required=False)
+    name = serializers.CharField(required=False)
+    template_id = serializers.IntegerField(required=False)
+    trigger_flow_uuid = serializers.UUIDField(required=False)
 
     def validate_msg(self, value):
         if not (value.get("text") or value.get("attachments") or value.get("template") or value.get("action_type")):
@@ -315,11 +319,41 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             if not channel.template_translations.filter(template__uuid=template["uuid"]).exists():
                 raise serializers.ValidationError(f"Template {template['uuid']} not found in channel {channel.uuid}")
 
+        data["template_id"] = data["msg"].get("template_id")
+
         if data.get("queue"):
+            # normalize queue for comparison
+            data["queue"] = data.get("queue").lower()
             if data.get("queue") not in ["wpp_broadcast_batch", "template_batch", "template_notification_batch"]:
                 raise serializers.ValidationError(
                     "Queue must be either wpp_broadcast_batch, template_batch or template_notification_batch"
                 )
+            if data.get("queue") == "template_batch":
+                if not data.get("name"):
+                    raise serializers.ValidationError("Name is required for template_batch queue")
+                if not data.get("groups"):
+                    raise serializers.ValidationError("Groups are required for template_batch queue")
+                if data.get("contacts"):
+                    raise serializers.ValidationError("Contacts are not allowed for template_batch queue")
+
+        # If a flow UUID is provided it is only valid for template_batch queue
+        trigger_flow_uuid = data.get("trigger_flow_uuid")
+        if trigger_flow_uuid and data.get("queue") != "template_batch":
+            raise serializers.ValidationError("trigger_flow_uuid is only allowed when queue is template_batch")
+
+        # Resolve and validate trigger flow if provided
+        if trigger_flow_uuid:
+            org = self.context.get("org")
+            try:
+                flow = Flow.objects.get(uuid=trigger_flow_uuid, org=org, is_active=True)
+            except Flow.DoesNotExist:
+                raise serializers.ValidationError("Trigger flow not found for this workspace")
+
+            # Catch-all triggers only allow message or voice flows
+            if flow.flow_type not in (Flow.TYPE_MESSAGE, Flow.TYPE_VOICE):
+                raise serializers.ValidationError("Trigger flow must be a messaging or voice flow")
+
+            data["trigger_flow"] = flow
 
         return data
 
@@ -330,11 +364,14 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         if not uuid and not name:
             raise serializers.ValidationError("Template UUID or Name are required.")
 
+        data["template_id"] = data["msg"].get("template_id")
+
         if name and not channel_data:
             raise serializers.ValidationError("Channel is required to use template name")
 
         try:
             template = self._get_template(uuid=uuid, name=name, org=self.context.get("org"))
+            template_id = template.id
 
             data["msg"]["template"] = {
                 "name": template.name,
@@ -342,8 +379,10 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 "variables": template_data.get("variables", []),
                 "locale": template_data.get("locale", None),
             }
+            data["msg"]["template_id"] = template_id
 
         except Template.DoesNotExist:
+            data["msg"]["template_id"] = None
             if uuid:
                 raise serializers.ValidationError(f"Template with UUID {uuid} not found.")
             raise serializers.ValidationError(f"Template with name {name} not found.")
@@ -371,7 +410,19 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             channel=self.validated_data.get("channel", None),
             broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
             queue=self.validated_data.get("queue", None),
+            name=self.validated_data.get("name", None),
+            template_id=self.validated_data.get("template_id", None),
+            is_bulk_send=True if self.validated_data.get("queue") == "template_batch" else False,
         )
+        # create optional catch-all trigger (uncaught message) for provided flow and groups
+        trigger_flow = self.validated_data.get("trigger_flow")
+        if trigger_flow and self.validated_data.get("queue") == "template_batch":
+            groups = self.validated_data.get("groups", [])
+            if groups:
+                create_catchall_trigger(
+                    org=self.context["org"], user=self.context["user"], flow=trigger_flow, groups=groups
+                )
+
         # send it
         on_transaction_commit(lambda: broadcast.send_async())
 
@@ -2033,3 +2084,8 @@ class EventFilterSerializer(serializers.Serializer):
     value = serializers.CharField(required=False)
     metadata = serializers.CharField(required=False)
     event_name = serializers.CharField(required=False)
+    limit = serializers.IntegerField(required=False)
+    offset = serializers.IntegerField(required=False)
+    metadata_key = serializers.CharField(required=False)
+    metadata_value = serializers.CharField(required=False)
+    group_by = serializers.CharField(required=False)

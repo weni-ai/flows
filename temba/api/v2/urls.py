@@ -4,7 +4,11 @@ from django.conf.urls import url
 from django.urls import include, path
 
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
+from temba.api.v2.flows.views import InternalFlowsAPIView
+from temba.api.v2.projects.views import GetProjectView
+from temba.api.v2.templates.views import TemplateByIdEndpoint, TemplatesTranslationsEndpoint
 
+from .billing.views import BillingPricingEndpoint
 from .flows.urls import urlpatterns as flows_urlpatterns
 from .internals.urls import urlpatterns as internals_urlpatterns
 from .views import (
@@ -24,6 +28,7 @@ from .views import (
     ContactsTemplatesEndpointNew,
     DefinitionsEndpoint,
     EventsEndpoint,
+    EventsGroupByCountEndpoint,
     ExplorerView,
     ExternalServicesEndpoint,
     FieldsEndpoint,
@@ -80,8 +85,10 @@ urlpatterns = [
     url(r"^contact_templates_new$", ContactsTemplatesEndpointNew.as_view(), name="api.v2.contact_templates_new"),
     url(r"^contacts_elastic$", ContactsElasticSearchEndpoint.as_view(), name="api.v2.contacts_elastic"),
     url(r"^events$", EventsEndpoint.as_view(), name="api.v2.events"),
+    url(r"^events_group_by$", EventsGroupByCountEndpoint.as_view(), name="api.v2.events_group_by"),
     url(r"^filter_templates$", FilterTemplatesEndpoint.as_view(), name="api.v2.filter_templates"),
     url(r"^filter_templates_new$", FilterTemplatesEndpointNew.as_view(), name="api.v2.filter_templates_new"),
+    url(r"^internal_flows$", InternalFlowsAPIView.as_view(), name="api.v2.internal_flows"),
     url(r"^definitions$", DefinitionsEndpoint.as_view(), name="api.v2.definitions"),
     url(r"^fields$", FieldsEndpoint.as_view(), name="api.v2.fields"),
     url(r"^flow_starts$", FlowStartsEndpoint.as_view(), name="api.v2.flow_starts"),
@@ -100,6 +107,12 @@ urlpatterns = [
     url(r"^resthook_subscribers$", ResthookSubscribersEndpoint.as_view(), name="api.v2.resthook_subscribers"),
     url(r"^runs$", RunsEndpoint.as_view(), name="api.v2.runs"),
     url(r"^templates$", TemplatesEndpoint.as_view(), name="api.v2.templates"),
+    url(r"^templates/translations$", TemplatesTranslationsEndpoint.as_view(), name="api.v2.templates_translations"),
+    url(
+        r"^templates/translations/(?P<template_id>\d+)$",
+        TemplateByIdEndpoint.as_view(),
+        name="api.v2.templates_translation_by_id",
+    ),
     url(r"^ticketers$", TicketersEndpoint.as_view(), name="api.v2.ticketers"),
     url(r"^external_services$", ExternalServicesEndpoint.as_view(), name="api.v2.external_services"),
     url(r"^tickets$", TicketsEndpoint.as_view(), name="api.v2.tickets"),
@@ -107,9 +120,11 @@ urlpatterns = [
     url(r"^topics$", TopicsEndpoint.as_view(), name="api.v2.topics"),
     url(r"^users$", UsersEndpoint.as_view(), name="api.v2.users"),
     url(r"^workspace$", WorkspaceEndpoint.as_view(), name="api.v2.workspace"),
+    url(r"^billing_pricing$", BillingPricingEndpoint.as_view(), name="api.v2.billing_pricing"),
     url(r"^intelligences$", IntelligencesEndpoint.as_view(), name="api.v2.intelligences"),
     url(r"^brain_info$", BrainInfoEndpoint.as_view(), name="api.v2.brain_info"),
     url(r"^whatsapp_flows$", WhatsappFlowsEndpoint.as_view(), name="api.v2.whatsapp_flows"),
+    url(r"^projects$", GetProjectView.as_view(), name="api.v2.projects"),
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns, allowed=["json", "api"])

@@ -3,7 +3,7 @@ from uuid import UUID
 
 import iso8601
 from rest_framework import generics, mixins, status
-from rest_framework.pagination import CursorPagination
+from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
 
 from django.db import transaction
@@ -300,3 +300,13 @@ class DateJoinedCursorPagination(CursorPagination):
 class NameCursorPagination(CursorPagination):
     ordering = ("name", "-id")
     offset_cutoff = 1000000
+
+
+class DefaultLimitOffsetPagination(LimitOffsetPagination):
+    """
+    Shared LimitOffset pagination with sensible defaults for internal endpoints.
+    Uses `limit` and `offset` query params with default limit of 10 and max of 100.
+    """
+
+    default_limit = 10
+    max_limit = 100

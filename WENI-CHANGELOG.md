@@ -1,3 +1,64 @@
+3.41.4
+----------
+* Update floweditor to 3.6.3
+
+3.41.3
+----------
+* Fix error in create contact endpoint when verify ninth digit is enabled
+
+3.41.2
+----------
+* Add endpoint to get events aggregated
+
+3.41.1
+----------
+* Fix success_rate calculation in BroadcastStatistic
+
+3.41.0
+----------
+* Add endpoint to list broadcasts with statistics
+* Feature/template models new fields
+* Add new model fields in whatsapp broadcast creation
+* Cost API
+* Endpoints to Import Contacts via REST API
+
+3.40.2
+----------
+* External v2 initialization and listed in settings_common CHANNEL_TYPES
+
+3.40.1
+----------
+* Add pagination to be used in v2 api
+* Add channel filter in internal get message
+* Endpoint to upload media
+
+3.40.0
+----------
+* External v2
+* Add trigger to save msg status update in BroadcastStatistics table
+* BroadcastStatics new model and Broadcast update
+* Endpoint to get flows
+* Add possiblity to use IsUserOrg in internal whatsapp broadcast API
+* Endpoint to get project data
+* Add permission in internal ContactField endpoint
+
+3.39.2
+----------
+* Add limit and offset in get datalake events endpoint
+* Add environ variable in lambda validator url
+
+3.39.1
+----------
+* Handling the extra ninth digit in WhatsApp URNs for CTWA data fetching
+
+3.39.0
+----------
+* Send value and currency fields to Meta in purchase conversion events
+
+3.38.1
+----------
+* Send timestamp and waba id in event to data lake
+
 3.38.0
 ----------
 * Update weni-rp-apps version to 2.10.4

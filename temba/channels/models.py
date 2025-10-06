@@ -122,6 +122,12 @@ class ChannelType(metaclass=ABCMeta):
         """
         return Engine.get_default().from_string(self.claim_blurb)
 
+    def has_claim_view(self):
+        """
+        Returns True if this channel type has a claim view configured.
+        """
+        return self.claim_view is not None
+
     def get_urls(self):
         """
         Returns all the URLs this channel exposes to Django, the URL should be relative.

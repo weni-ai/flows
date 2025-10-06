@@ -15,6 +15,7 @@ from temba.tests import CRUDLTestMixin, TembaTest
 
 from .models import Trigger
 from .types import KeywordTriggerType
+from .usecases import create_catchall_trigger
 
 
 class TriggerTest(TembaTest):
@@ -988,26 +989,30 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
             success_status=200,
         )
 
-        # try a duplicate catch all with no groups
+        # allow duplicate catch-all with no groups
         self.assertCreateSubmit(
             create_url,
             {"flow": flow2.id},
-            form_errors={"__all__": "There already exists a trigger of this type with these options."},
+            new_obj_query=Trigger.objects.filter(trigger_type=Trigger.TYPE_CATCH_ALL, flow=flow2),
+            success_status=200,
         )
 
         # works if we specify a group
         self.assertCreateSubmit(
             create_url,
             {"flow": flow2.id, "groups": group1.id},
-            new_obj_query=Trigger.objects.filter(trigger_type=Trigger.TYPE_CATCH_ALL, flow=flow2),
+            new_obj_query=Trigger.objects.filter(trigger_type=Trigger.TYPE_CATCH_ALL, flow=flow2, groups=group1),
             success_status=200,
         )
 
-        # groups between triggers can't overlap
+        # overlapping groups are allowed for catch-all triggers
         self.assertCreateSubmit(
             create_url,
             {"flow": flow2.id, "groups": [group1.id, group2.id]},
-            form_errors={"__all__": "There already exists a trigger of this type with these options."},
+            new_obj_query=Trigger.objects.filter(trigger_type=Trigger.TYPE_CATCH_ALL, flow=flow2)
+            .filter(groups=group1)
+            .filter(groups=group2),
+            success_status=200,
         )
 
     def test_create_closed_ticket(self):
@@ -1354,3 +1359,18 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
             referral_url, allow_viewers=True, allow_editors=True, context_objects=[trigger3, trigger4]
         )
         self.assertListFetch(catchall_url, allow_viewers=True, allow_editors=True, context_objects=[trigger5])
+
+    def test_usecase_create_catchall_trigger(self):
+        flow = self.create_flow()
+        group1 = self.create_group("G1", contacts=[])
+        group2 = self.create_group("G2", contacts=[])
+
+        # without groups defaults to empty list
+        trig1 = create_catchall_trigger(org=self.org, user=self.admin, flow=flow)
+        self.assertEqual(trig1.trigger_type, Trigger.TYPE_CATCH_ALL)
+        self.assertEqual(trig1.flow, flow)
+        self.assertEqual(trig1.groups.count(), 0)
+
+        # with groups assigns groups
+        trig2 = create_catchall_trigger(org=self.org, user=self.admin, flow=flow, groups=[group1, group2])
+        self.assertEqual({group1, group2}, set(trig2.groups.all()))
