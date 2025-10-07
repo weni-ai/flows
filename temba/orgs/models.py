@@ -1910,7 +1910,7 @@ class Org(SmartModel):
         Saves an export file
         """
         path = f"exports/{self.id}/{task_type}/{uuid4()}/{file.name}"
-        location = public_file_storage.save(path, file)
+        location = private_file_storage.save(path, file)
         return location
 
 
