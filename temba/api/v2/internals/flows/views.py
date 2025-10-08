@@ -6,6 +6,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
+from weni.internal.permissions import CanCommunicateInternally
 from weni.internal.views import InternalGenericViewSet
 
 from django.conf import settings
@@ -51,7 +52,7 @@ class FlowStartViewSet(CreateModelMixin, InternalGenericViewSet):
 
 class FlowImportView(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, IsUserInOrg]
+    permission_classes = [IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)]
 
     def post(self, request: Request):
         serializer = FlowImportSerializer(data=request.data)
