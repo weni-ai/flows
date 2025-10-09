@@ -1536,19 +1536,21 @@ class FlowCategoryCount(SquashableModel):
 
     @classmethod
     def get_squash_query(cls, distinct_set):
-        sql = """
-        WITH removed as (
-          DELETE FROM %(table)s WHERE "id" IN (
-            SELECT "id" FROM %(table)s
-              WHERE "flow_id" = %%s AND "node_uuid" = %%s AND "result_key" = %%s AND "result_name" = %%s AND "category_name" = %%s
-              LIMIT 10000
-          ) RETURNING "count"
+        delete_limit = int(getattr(settings, "FLOW_CATEGORY_COUNT_DELETE_BATCH_LIMIT", 10000))
+        sql = f"""
+        WITH removed AS (
+          DELETE FROM {cls._meta.db_table} t
+          USING (
+            SELECT id FROM {cls._meta.db_table}
+            WHERE is_squashed = false AND "flow_id" = %s AND "node_uuid" = %s AND "result_key" = %s AND "result_name" = %s AND "category_name" = %s
+            LIMIT {delete_limit}
+          ) s
+          WHERE t.id = s.id
+          RETURNING t.count
         )
-        INSERT INTO %(table)s("flow_id", "node_uuid", "result_key", "result_name", "category_name", "count", "is_squashed")
-        VALUES (%%s, %%s, %%s, %%s, %%s, GREATEST(0, (SELECT SUM("count") FROM removed)), TRUE);
-        """ % {
-            "table": cls._meta.db_table
-        }
+        INSERT INTO {cls._meta.db_table}("flow_id", "node_uuid", "result_key", "result_name", "category_name", "count", "is_squashed")
+        VALUES (%s, %s, %s, %s, %s, GREATEST(0, (SELECT COALESCE(SUM("count"), 0) FROM removed)), TRUE);
+        """
 
         params = (
             distinct_set.flow_id,
@@ -1558,6 +1560,47 @@ class FlowCategoryCount(SquashableModel):
             distinct_set.category_name,
         ) * 2
         return sql, params
+
+    @classmethod
+    def squash(cls):
+        # Avoid DISTINCT: take a window of unsquashed rows ordered by id and group in memory
+        from collections import OrderedDict
+        from django.db import connection
+
+        batch_size = cls.squash_batch_size or settings.SQUASH_BATCH_SIZE
+
+        # Pull a window of candidate rows (id-ordered) to find up to batch_size distinct key sets
+        rows = list(
+            cls.objects.filter(is_squashed=False)
+            .order_by("id")
+            .values_list("flow_id", "node_uuid", "result_key", "result_name", "category_name")[: batch_size * 10]
+        )
+
+        distinct_keys = OrderedDict()
+        for r in rows:
+            distinct_keys.setdefault(r, None)
+            if len(distinct_keys) >= batch_size:
+                break
+
+        if not distinct_keys:
+            return
+
+        with connection.cursor() as cursor:
+            cursor.execute("SET application_name = 'flows_nokill';")
+            for (flow_id, node_uuid, result_key, result_name, category_name) in distinct_keys.keys():
+                distinct_set = type(
+                    "_K",
+                    (),
+                    dict(
+                        flow_id=flow_id,
+                        node_uuid=node_uuid,
+                        result_key=result_key,
+                        result_name=result_name,
+                        category_name=category_name,
+                    ),
+                )
+                sql, params = cls.get_squash_query(distinct_set)
+                cursor.execute(sql, params)
 
     def __str__(self):
         return "%s: %s" % (self.category_name, self.count)
