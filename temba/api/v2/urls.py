@@ -5,7 +5,7 @@ from django.urls import include, path
 
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
 from temba.api.v2.flows.views import InternalFlowsAPIView
-from temba.api.v2.projects.views import GetProjectView
+from temba.api.v2.projects.views import GetProjectView, ProjectLanguageView
 from temba.api.v2.templates.views import TemplateByIdEndpoint, TemplatesTranslationsEndpoint
 
 from .billing.views import BillingPricingEndpoint
@@ -125,6 +125,7 @@ urlpatterns = [
     url(r"^brain_info$", BrainInfoEndpoint.as_view(), name="api.v2.brain_info"),
     url(r"^whatsapp_flows$", WhatsappFlowsEndpoint.as_view(), name="api.v2.whatsapp_flows"),
     url(r"^projects$", GetProjectView.as_view(), name="api.v2.projects"),
+    url(r"^projects/project_language", ProjectLanguageView.as_view(), name="api.v2.project_language"),
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns, allowed=["json", "api"])
