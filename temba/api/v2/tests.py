@@ -6130,14 +6130,14 @@ class EventsEndpointTest(APITest):
         response = self.fetchJSON(url, query)
 
         self.assertEqual(response.status_code, 200)
-        
+
         # Verify that dl_get_events was called with UTC-converted ISO strings
         mock_dl_get_events.assert_called_once()
         call_kwargs = mock_dl_get_events.call_args[1]
-        
+
         # date_start should be in UTC format
         self.assertEqual(call_kwargs["date_start"], "2025-10-08T00:00:00+00:00")
-        
+
         # date_end should be adjusted by -1 second and in UTC format
         self.assertEqual(call_kwargs["date_end"], "2025-10-08T23:59:58+00:00")
 
