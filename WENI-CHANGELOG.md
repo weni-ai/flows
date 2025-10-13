@@ -1,3 +1,12 @@
+3.41.5
+----------
+* Update weni-rp-apps version to 2.10.5
+* Fix date error in events endpoint
+* Improve Flow Category squash
+* Return only queues active
+* Endpoint to import flow internally
+* Add project_language endpoint
+
 3.41.4
 ----------
 * Update floweditor to 3.6.3
