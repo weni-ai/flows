@@ -6115,6 +6115,32 @@ class EventsEndpointTest(APITest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [{"key_int": 123, "key_bool": False, "key_none": None}])
 
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_datetime_conversion_to_utc(self, mock_dl_get_events):
+        """Test that datetime objects are converted to UTC and date_end is adjusted by -1 second"""
+        self.login(self.admin)
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_dl_get_events.return_value = []
+
+        url = reverse("api.v2.events")
+        query = "date_start=2025-10-08T00:00:00Z&date_end=2025-10-08T23:59:59Z"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify that dl_get_events was called with UTC-converted ISO strings
+        mock_dl_get_events.assert_called_once()
+        call_kwargs = mock_dl_get_events.call_args[1]
+        
+        # date_start should be in UTC format
+        self.assertEqual(call_kwargs["date_start"], "2025-10-08T00:00:00+00:00")
+        
+        # date_end should be adjusted by -1 second and in UTC format
+        self.assertEqual(call_kwargs["date_end"], "2025-10-08T23:59:58+00:00")
+
 
 class EventsGroupByCountEndpointTest(APITest):
     @patch("temba.api.v2.services.events.fetch_event_counts_for_org")
