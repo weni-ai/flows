@@ -1,8 +1,14 @@
 from rest_framework import routers
 
-from .views import FlowStartViewSet
+from django.urls import path
+
+from .views import FlowImportView, FlowStartViewSet
 
 router = routers.DefaultRouter()
 router.register(r"flow_starts", FlowStartViewSet, basename="flow_starts")
 
-urlpatterns = router.urls
+urlpatterns = [
+    path("flows/import", FlowImportView.as_view(), name="internal-flows-import"),
+]
+
+urlpatterns += router.urls
