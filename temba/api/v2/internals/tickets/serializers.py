@@ -81,7 +81,7 @@ class GetDepartmentsSerializer(serializers.ModelSerializer):
         return obj.ticketer_type
 
     def get_topics(self, obj):
-        queues = TicketerQueue.objects.filter(ticketer=obj)
+        queues = TicketerQueue.objects.filter(ticketer=obj, is_active=True)
         return GetTicketerQueueSerializer(queues, many=True).data
 
     class Meta:
