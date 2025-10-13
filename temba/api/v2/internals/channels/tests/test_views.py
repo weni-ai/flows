@@ -103,7 +103,7 @@ class ChannelAllowedDomainsViewTest(TembaTest):
         self.assertEqual(len(data), 0)
 
     def test_request_with_channel_uuid_notfound(self):
-        url = f"/api/v2/internals/channel_allowed_domains?channel=2337712f-dcbc-48f3-9ae7-7f832445f6c9"
+        url = "/api/v2/internals/channel_allowed_domains?channel=2337712f-dcbc-48f3-9ae7-7f832445f6c9"
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
 
