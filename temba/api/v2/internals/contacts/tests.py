@@ -272,9 +272,6 @@ class UpdateContactFieldsViewTest(TembaTest):
     @override_settings(INTERNAL_USER_EMAIL="super@user.com")
     @patch.object(LambdaURLValidator, "protected_resource")
     def test_update_contact_name(self, mr_mocks, mock_protected_resource):
-        """
-        Should update the default 'name' attribute of the contact.
-        """
         contact = self.create_contact("Old Name", urns=["twitterid:11111"])
 
         mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
@@ -299,9 +296,6 @@ class UpdateContactFieldsViewTest(TembaTest):
     @override_settings(INTERNAL_USER_EMAIL="super@user.com")
     @patch.object(LambdaURLValidator, "protected_resource")
     def test_update_contact_language(self, mr_mocks, mock_protected_resource):
-        """
-        Should update the default 'language' attribute of the contact.
-        """
         contact = self.create_contact("Rigbt", urns=["twitterid:22222"])
 
         mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
@@ -325,9 +319,6 @@ class UpdateContactFieldsViewTest(TembaTest):
     @override_settings(INTERNAL_USER_EMAIL="super@user.com")
     @patch.object(LambdaURLValidator, "protected_resource")
     def test_update_contact_name_and_custom_field(self, mr_mocks, mock_protected_resource):
-        """
-        Should update both the 'name' and a custom field at the same time.
-        """
         contact = self.create_contact("Old Name", urns=["twitterid:33333"])
         self.create_field("nickname", "Apelido")
 
