@@ -1,3 +1,7 @@
+3.41.6
+----------
+* Update Poetry version on Dockerfile to 1.8.5
+
 3.41.5
 ----------
 * Update weni-rp-apps version to 2.10.5
