@@ -47,7 +47,7 @@ ARG BRANDING_ENABLED
  
 ARG RAPIDPRO_APPS_GIT_URL
 ARG RAPIDPRO_APPS_GIT_BRANCH
-
+ARG VERSION
 LABEL app=${VERSION} \
   os="debian" \
   os.version="12" \
@@ -74,7 +74,7 @@ ARG NODE_VERSION
 
 COPY pyproject.toml poetry.lock .
 
-RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip pip install --cache-dir /pip_cache -U poetry=="${POETRY_VERSION}" \
+RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip pip install --cache-dir /pip_cache -U "setuptools<69" "packaging<21.0" poetry=="${POETRY_VERSION}" \
   && poetry cache clear -n --all pypi \
   && pip install --cache-dir /pip_cache requests=="${REQUESTS_VERSION}" \
   && poetry export --without-hashes --output requirements.txt
