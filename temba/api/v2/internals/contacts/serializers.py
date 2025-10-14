@@ -49,14 +49,24 @@ class InternalContactFieldsValuesSerializer(serializers.Serializer):
         urn = ContactURN.lookup(org, contact_urn)
         contact = urn.contact
 
+        mods = []
+
+        name = contact_fields.pop("name", None)
+        language = contact_fields.pop("language", None)
+        if name is not None or language is not None:
+            mods.extend(contact.update(name=name, language=language))
+
         fields_to_update = {}
         for key, value in contact_fields.items():
             contact_field = ContactField.all_fields.filter(key=key, org=org).first()
             if contact_field:
                 fields_to_update[contact_field] = value
 
-        mods = contact.update_fields(fields_to_update)
-        contact.modify(user, mods)
+        if fields_to_update:
+            mods.extend(contact.update_fields(fields_to_update))
+
+        if mods:
+            contact.modify(user, mods)
 
         return instance
 
