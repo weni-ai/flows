@@ -3824,6 +3824,12 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
         if broadcast_id:
             queryset = queryset.filter(broadcast_id=broadcast_id)
 
+        # filter by contact URN (optional)
+        urn = params.get("urn")
+        if urn:
+            normalized_urn = self.normalize_urn(urn)
+            queryset = queryset.filter(contact__urns__identity=normalized_urn)
+
         # filter by contact (optional)
         contact_uuid = params.get("contact")
         if contact_uuid:
@@ -3872,6 +3878,11 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
                     "name": "contact",
                     "required": False,
                     "help": "A contact UUID to filter by, ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                },
+                {
+                    "name": "urn",
+                    "required": False,
+                    "help": "A contact URN to filter by, ex: tel:+12065551212",
                 },
                 {
                     "name": "folder",
