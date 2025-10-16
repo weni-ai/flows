@@ -67,6 +67,7 @@ def setup_contact_import_test_data(test_instance):
 
 def create_dummy_form_class():
     """Helper to create dummy form class for testing"""
+
     class DummyForm:
         GROUP_MODE_NEW = "new"
 
@@ -79,12 +80,13 @@ def create_dummy_form_class():
 
         def get_form_values(self):
             return [{"include": True, "name": "Nick Name", "value_type": "T"}]
-    
+
     return DummyForm
 
 
 def create_fake_s3_classes():
     """Helper to create fake S3 classes for testing"""
+
     class FakeS3Client:
         def __init__(self, should_raise=False):
             self.should_raise = should_raise
@@ -100,13 +102,14 @@ def create_fake_s3_classes():
     class FakeBoto3:
         @staticmethod
         def client(*args, **kwargs):
-            return FakeS3Client(should_raise=kwargs.get('should_raise', False))
-    
+            return FakeS3Client(should_raise=kwargs.get("should_raise", False))
+
     return FakeS3Client, FakeBoto3
 
 
 def create_failing_fake_s3_classes():
     """Helper to create fake S3 classes that always fail for testing"""
+
     class FakeS3Client:
         def upload_fileobj(self, *args, **kwargs):
             raise RuntimeError("nope")
@@ -118,7 +121,7 @@ def create_failing_fake_s3_classes():
         @staticmethod
         def client(*args, **kwargs):
             return FakeS3Client()
-    
+
     return FakeS3Client, FakeBoto3
 
 
