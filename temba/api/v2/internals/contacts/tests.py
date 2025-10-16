@@ -46,6 +46,82 @@ def skip_authentication(endpoint_path: str):
     return decorator
 
 
+def create_simple_csv_upload_for_test():
+    """Helper to create simple CSV upload for testing"""
+    csv_content = ("URN:whatsapp,Name\n" "5561987654321,Alice\n").encode("utf-8")
+    return SimpleUploadedFile("import.csv", csv_content, content_type="text/csv")
+
+
+def setup_contact_import_test_data(test_instance):
+    """Helper to setup contact import test data"""
+    contact_import = test_instance.create_contact_import("media/test_imports/simple.xlsx")
+    contact_import.mappings = [
+        {
+            "header": "Field:Nick Name",
+            "mapping": {"type": "new_field", "key": "nickname"},
+        }
+    ]
+    contact_import.save(update_fields=["mappings"])
+    return contact_import
+
+
+def create_dummy_form_class():
+    """Helper to create dummy form class for testing"""
+    class DummyForm:
+        GROUP_MODE_NEW = "new"
+
+        def __init__(self, data, org=None, instance=None):
+            self.instance = instance
+            self.cleaned_data = {"add_to_group": False}
+
+        def is_valid(self):
+            return True
+
+        def get_form_values(self):
+            return [{"include": True, "name": "Nick Name", "value_type": "T"}]
+    
+    return DummyForm
+
+
+def create_fake_s3_classes():
+    """Helper to create fake S3 classes for testing"""
+    class FakeS3Client:
+        def __init__(self, should_raise=False):
+            self.should_raise = should_raise
+
+        def upload_fileobj(self, *args, **kwargs):
+            if self.should_raise:
+                raise RuntimeError("nope")
+            return None
+
+        def generate_presigned_url(self, *args, **kwargs):
+            return "/downloads/dups.xlsx"
+
+    class FakeBoto3:
+        @staticmethod
+        def client(*args, **kwargs):
+            return FakeS3Client(should_raise=kwargs.get('should_raise', False))
+    
+    return FakeS3Client, FakeBoto3
+
+
+def create_failing_fake_s3_classes():
+    """Helper to create fake S3 classes that always fail for testing"""
+    class FakeS3Client:
+        def upload_fileobj(self, *args, **kwargs):
+            raise RuntimeError("nope")
+
+        def generate_presigned_url(self, *args, **kwargs):
+            return "/downloads/dups.xlsx"
+
+    class FakeBoto3:
+        @staticmethod
+        def client(*args, **kwargs):
+            return FakeS3Client()
+    
+    return FakeS3Client, FakeBoto3
+
+
 class InternalContactViewTest(TembaTest):
     def test_request_without_token(self):
         url = "/api/v2/internals/contacts"
@@ -812,8 +888,7 @@ class ContactsImportUploadViewTest(TembaTest):
         # Ensure internal user exists
         User.objects.create_user("internal@system.local", "internal@system.local")
 
-        csv_content = ("URN:whatsapp,Name\n" "5561987654321,Alice\n").encode("utf-8")
-        upload = SimpleUploadedFile("import.csv", csv_content, content_type="text/csv")
+        upload = create_simple_csv_upload_for_test()
 
         # Unauthenticated request to force fallback path
         with patch("rest_framework.request.Request.user") as mock_req_user:
@@ -837,8 +912,7 @@ class ContactsImportUploadViewTest(TembaTest):
         # Remove created_by/modified_by on org to ensure branch picks at least one available attr safely
         # Many factories set both; here we just assert that created_by is set and not None after upload
 
-        csv_content = ("URN:whatsapp,Name\n" "5561987654321,Alice\n").encode("utf-8")
-        upload = SimpleUploadedFile("import.csv", csv_content, content_type="text/csv")
+        upload = create_simple_csv_upload_for_test()
 
         with patch("rest_framework.request.Request.user") as mock_req_user:
             mock_req_user.is_authenticated = False
@@ -910,18 +984,7 @@ class ContactsImportUploadViewTest(TembaTest):
         csv_content = ("URN:whatsapp,Name\n" "5561987654321,Alice\n" "5561987654321,Bob\n").encode("utf-8")
         upload = SimpleUploadedFile("import.csv", csv_content, content_type="text/csv")
 
-        class FakeS3Client:
-            def upload_fileobj(self, *args, **kwargs):
-                return None
-
-            def generate_presigned_url(self, *args, **kwargs):
-                # return a non-HTTP path to exercise absolute URL conversion
-                return "/downloads/dups.xlsx"
-
-        class FakeBoto3:
-            @staticmethod
-            def client(*args, **kwargs):
-                return FakeS3Client()
+        _, FakeBoto3 = create_fake_s3_classes()
 
         with patch.dict("sys.modules", {"boto3": FakeBoto3}):
             url = "/api/v2/internals/contacts_import_upload"
@@ -941,17 +1004,7 @@ class ContactsImportUploadViewTest(TembaTest):
         csv_content = ("URN:whatsapp,Name\n" "5561987654321,Alice\n" "5561987654321,Bob\n").encode("utf-8")
         upload = SimpleUploadedFile("import.csv", csv_content, content_type="text/csv")
 
-        class FakeS3Client:
-            def upload_fileobj(self, *args, **kwargs):
-                raise RuntimeError("nope")
-
-            def generate_presigned_url(self, *args, **kwargs):
-                return "/downloads/dups.xlsx"
-
-        class FakeBoto3:
-            @staticmethod
-            def client(*args, **kwargs):
-                return FakeS3Client()
+        _, FakeBoto3 = create_failing_fake_s3_classes()
 
         with patch.dict("sys.modules", {"boto3": FakeBoto3}):
             url = "/api/v2/internals/contacts_import_upload"
@@ -1408,27 +1461,8 @@ class ContactsImportConfirmViewPostTest(TembaTest):
         # ensure internal user exists
         User.objects.create_user("internal@example.com", "internal@example.com")
 
-        contact_import = self.create_contact_import("media/test_imports/simple.xlsx")
-        contact_import.mappings = [
-            {
-                "header": "Field:Nick Name",
-                "mapping": {"type": "new_field", "key": "nickname"},
-            }
-        ]
-        contact_import.save(update_fields=["mappings"])
-
-        class DummyForm:
-            GROUP_MODE_NEW = "new"
-
-            def __init__(self, data, org=None, instance=None):
-                self.instance = instance
-                self.cleaned_data = {"add_to_group": False}
-
-            def is_valid(self):
-                return True
-
-            def get_form_values(self):
-                return [{"include": True, "name": "Nick Name", "value_type": "T"}]
+        contact_import = setup_contact_import_test_data(self)
+        DummyForm = create_dummy_form_class()
 
         with patch.object(ContactImportCRUDL.Preview, "form_class", DummyForm), patch(
             "rest_framework.request.Request.user"
@@ -1453,27 +1487,8 @@ class ContactsImportConfirmViewPostTest(TembaTest):
     def test_post_confirmer_fallback_when_internal_user_missing(self):
         from temba.api.v2.internals.contacts.views import ContactImportCRUDL
 
-        contact_import = self.create_contact_import("media/test_imports/simple.xlsx")
-        contact_import.mappings = [
-            {
-                "header": "Field:Nick Name",
-                "mapping": {"type": "new_field", "key": "nickname"},
-            }
-        ]
-        contact_import.save(update_fields=["mappings"])
-
-        class DummyForm:
-            GROUP_MODE_NEW = "new"
-
-            def __init__(self, data, org=None, instance=None):
-                self.instance = instance
-                self.cleaned_data = {"add_to_group": False}
-
-            def is_valid(self):
-                return True
-
-            def get_form_values(self):
-                return [{"include": True, "name": "Nick Name", "value_type": "T"}]
+        contact_import = setup_contact_import_test_data(self)
+        DummyForm = create_dummy_form_class()
 
         with patch.object(ContactImportCRUDL.Preview, "form_class", DummyForm), patch(
             "rest_framework.request.Request.user"
