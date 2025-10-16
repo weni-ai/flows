@@ -3900,6 +3900,14 @@ class APITest(TembaTest):
         response = self.fetchJSON(url, "contact=%s" % self.joe.uuid)
         self.assertResultsById(response, [joe_msg4, joe_msg3, joe_msg2, joe_msg1])
 
+        # filter by contact URN (normalized)
+        response = self.fetchJSON(url, "urn=%s" % quote_plus("tel:0788-123-123"))
+        self.assertResultsById(response, [joe_msg4, joe_msg3, joe_msg2, joe_msg1])
+
+        # invalid URN returns error
+        response = self.fetchJSON(url, "urn=12345")
+        self.assertResponseError(response, None, "Invalid URN: 12345")
+
         # filter by invalid contact
         response = self.fetchJSON(url, "contact=invalid")
         self.assertResultsById(response, [])
