@@ -99,6 +99,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
                 node = target
                 for i, token in enumerate(tokens):
                     is_last = i == len(tokens) - 1
+                    next_token = tokens[i + 1] if not is_last else None
                     # numeric tokens indicate list indices
                     if token.isdigit():
                         index = int(token)
@@ -136,8 +137,9 @@ class ClaimView(ClaimViewMixin, SmartFormView):
                                 node.append(new_dict)
                                 node = new_dict
                             else:
+                                # if next token is a digit, initialize as list, otherwise dict
                                 if token not in node or not isinstance(node[token], (dict, list)):
-                                    node[token] = {}
+                                    node[token] = [] if (next_token and next_token.isdigit()) else {}
                                 node = node[token]
 
             for key in self.request.POST.keys():

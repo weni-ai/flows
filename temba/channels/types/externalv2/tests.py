@@ -103,3 +103,83 @@ class ExternalV2TypeTest(TembaTest):
         self.assertIsNotNone(channel)
         self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
         self.assertEqual(channel.config, explicit_config)
+
+    def test_claim_with_form_bracket_notation_and_lists(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        # Simulate fields like receive_template[messages][0][id], etc.
+        form_payload = {
+            "receive_template[messages][0][id]": "1515",
+            "receive_template[messages][0][text]": "hi",
+            "receive_template[messages][0][urn_path]": "123",
+            "send_template[chat_id]": "123",
+            "send_template[text]": "5665",
+            "send_template[parse_mode]": "Markdown",
+            "send_method": "POST",
+            "send_url": "https://example.com/send_msg",
+            "content_type": "application/json",
+            # multipart values (multi-select style)
+            "extra_list": ["a", "b", ""],
+        }
+
+        response = self.client.post(url, data=form_payload, follow=True)
+
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertIsNotNone(channel)
+        self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
+        # Validate nested reconstruction
+        expected_receive = {
+            "messages": [
+                {"id": "1515", "text": "hi", "urn_path": "123"},
+            ]
+        }
+        self.assertEqual(channel.config["receive_template"], expected_receive)
+        self.assertEqual(channel.config["send_template"], {"chat_id": "123", "text": "5665", "parse_mode": "Markdown"})
+        self.assertEqual(channel.config["extra_list"], ["a", "b"])  # empty value filtered out
+
+    def test_claim_invalid_config_json(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        # Invalid JSON in config should show form error
+        form_payload = {"config": "{invalid json]"}
+        response = self.client.post(url, data=form_payload)
+        self.assertContains(response, "Invalid JSON")
+
+    def test_claim_config_json_must_be_object(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        # Valid JSON but not an object (list)
+        form_payload = {"config": json.dumps([1, 2, 3])}
+        response = self.client.post(url, data=form_payload)
+        self.assertContains(response, "JSON must be an object")
+
+        # Valid JSON but not an object (string)
+        form_payload = {"config": json.dumps("hello")}
+        response = self.client.post(url, data=form_payload)
+        self.assertContains(response, "JSON must be an object")
+
+    def test_claim_form_encoded_data_literal_eval_fallback(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        # Send data with single quotes (invalid JSON) but valid Python literal
+        data_literal = "{'send_url': 'https://example.com/send', 'send_method': 'POST', 'nested': {'x': 1}}"
+        form_payload = {
+            "data": data_literal,
+            "schemes": "ext",
+            "address": "",
+            "name": "External API V2",
+        }
+
+        response = self.client.post(url, data=form_payload, follow=True)
+
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertIsNotNone(channel)
+        self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
+        self.assertEqual(
+            channel.config,
+            {"send_url": "https://example.com/send", "send_method": "POST", "nested": {"x": 1}},
+        )
