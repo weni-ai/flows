@@ -1,10 +1,11 @@
+import ast
+import json
+import re
+
 from smartmin.views import SmartFormView
 
 from django import forms
 from django.utils.translation import ugettext_lazy as _
-import json
-import ast
-import re
 
 from temba.contacts.models import URN
 
@@ -183,5 +184,3 @@ class ClaimView(ClaimViewMixin, SmartFormView):
         )
 
         return super().form_valid(form)
-
-
