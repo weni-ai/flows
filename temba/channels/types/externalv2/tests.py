@@ -24,6 +24,9 @@ class ExternalV2TypeTest(TembaTest):
         payload = {
             "user": self.admin.username,
             "org": str(self.org.uuid),
+            "name": "Custom E2 Name",
+            "schemes": ["ext"],
+            "address": "",
             "data": {
                 "mo_response_content_type": "application/json",
                 "mo_response": "",
@@ -58,6 +61,7 @@ class ExternalV2TypeTest(TembaTest):
         self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
         self.assertEqual(channel.config, payload["data"])
         self.assertEqual(channel.schemes, ["ext"])
+        self.assertEqual(channel.name, "Custom E2 Name")
 
     def test_claim_with_form_encoded_data_json(self):
         url = reverse("channels.types.externalv2.claim")
@@ -74,7 +78,7 @@ class ExternalV2TypeTest(TembaTest):
         form_payload = {
             "data": json.dumps(data_obj),
             "address": "",
-            "name": "External API V2",
+            "name": "E2 form name",
             "schemes": "ext",
         }
 
@@ -84,6 +88,7 @@ class ExternalV2TypeTest(TembaTest):
         self.assertIsNotNone(channel)
         self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
         self.assertEqual(channel.config, data_obj)
+        self.assertEqual(channel.name, "E2 form name")
 
     def test_claim_with_explicit_config_field_precedence(self):
         url = reverse("channels.types.externalv2.claim")
