@@ -1,3 +1,9 @@
+3.41.7
+----------
+* Update weni-rp-apps version to 2.10.6
+* Add URN filter in messages endpoint
+* Adjust internal endpoint to update name field correctly
+
 3.41.6
 ----------
 * Update Poetry version on Dockerfile to 1.8.5
