@@ -51,6 +51,9 @@ class ClaimView(ClaimViewMixin, SmartFormView):
         org = self.request.user.get_org()
         data = form.cleaned_data
 
+        body_obj = None
+        payload_obj = None
+
         config_text = data.get("config")
         if config_text:
             try:
@@ -72,9 +75,9 @@ class ClaimView(ClaimViewMixin, SmartFormView):
                     if body_text:
                         body_obj = json.loads(body_text)
                         if isinstance(body_obj, dict):
-                            payload = body_obj.get("data", body_obj)
-                            if isinstance(payload, dict):
-                                config.update(payload)
+                            payload_obj = body_obj.get("data", body_obj)
+                            if isinstance(payload_obj, dict):
+                                config.update(payload_obj)
             except Exception:
                 # ignore if body is not JSON
                 pass
@@ -164,14 +167,37 @@ class ClaimView(ClaimViewMixin, SmartFormView):
                     # flat key
                     config[key] = value_to_set
 
+        # Determine schemes from multiple sources: form field, body, or config (and remove from config)
+        schemes = None
         schemes_str = (data.get("schemes") or "").strip()
         if schemes_str:
             schemes = [s.strip() for s in schemes_str.split(",") if s.strip()]
-        else:
+        elif body_obj and isinstance(body_obj.get("schemes"), list):
+            schemes = [str(s) for s in body_obj.get("schemes")]
+        elif "schemes" in config:
+            schemes_val = config.pop("schemes")
+            if isinstance(schemes_val, list):
+                schemes = [str(s) for s in schemes_val]
+            elif isinstance(schemes_val, str) and schemes_val.strip():
+                schemes = [s.strip() for s in schemes_val.split(",") if s.strip()]
+        if not schemes:
             schemes = [URN.EXTERNAL_SCHEME]
 
+        # Determine address similarly; prefer explicit fields, then body, then config; remove from config if present
         address = (data.get("address") or "").strip()
-        name = (data.get("name") or "External API V2").strip() or "External API V2"
+        if not address and body_obj and isinstance(body_obj.get("address"), str):
+            address = body_obj.get("address").strip()
+        if not address and isinstance(config.get("address"), str):
+            address = config.pop("address").strip()
+
+        # Determine name similarly; remove from config if present
+        name = (data.get("name") or "").strip()
+        if not name and body_obj and isinstance(body_obj.get("name"), str):
+            name = body_obj.get("name").strip()
+        if not name and isinstance(config.get("name"), str):
+            name = config.pop("name").strip()
+        if not name:
+            name = "External API V2"
 
         self.object = Channel.add_config_external_channel(
             org=org,
