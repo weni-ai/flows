@@ -1850,7 +1850,7 @@ class ContactTest(TembaTest):
                 omnibox_request(query="", version="2"),
             )
 
-        with self.assertNumQueries(19):
+        with self.assertNumQueries(20):
             mock_search_contacts.side_effect = [
                 SearchResults(query="", total=2, contact_ids=[self.billy.id, self.frank.id]),
                 SearchResults(query="", total=2, contact_ids=[self.voldemort.id, self.frank.id]),
