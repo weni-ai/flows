@@ -1,6 +1,7 @@
 from django.utils.translation import ugettext_lazy as _
 
 from ...models import ChannelType
+from .views import ClaimView
 
 
 class ExternalV2Type(ChannelType):
@@ -17,7 +18,8 @@ class ExternalV2Type(ChannelType):
     icon = "icon-power-cord"
 
     claim_blurb = _("Use our pluggable API to connect an external service you already have.")
-    claim_view = None
+    # Wire a dedicated claim view for External V2
+    claim_view = ClaimView
 
     update_form = None
 
