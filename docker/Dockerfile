@@ -9,10 +9,9 @@ ARG BUILD_DEPS="\
   gcc bzip2 git curl libpq-dev gettext \
   libgdal-dev python3-cffi python3-gdal \
   python3-dev default-libmysqlclient-dev build-essential \
-  build-essential \
-  git cmake \
-  autoconf pkg-config autoconf libtool automake \
-  libmariadb-dev npm"
+  cmake \
+  autoconf pkg-config libtool automake \
+  libmariadb-dev ccache"
 # default-libmysqlclient-dev
 ARG RUNTIME_DEPS="\
   git \
@@ -66,31 +65,21 @@ WORKDIR "${PROJECT_PATH}"
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
-FROM base as build-poetry
-
-ARG POETRY_VERSION
-ARG REQUESTS_VERSION
-ARG NODE_VERSION
-
-COPY pyproject.toml poetry.lock .
-
-RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip pip install --cache-dir /pip_cache -U poetry=="${POETRY_VERSION}" \
-  && poetry cache clear -n --all pypi \
-  && pip install --cache-dir /pip_cache requests=="${REQUESTS_VERSION}" \
-  && poetry export --without-hashes --output requirements.txt
-#  && poetry add -n --lock $(cat pip-requires.txt) \
-
 FROM base as build
 
 ARG BUILD_DEPS
+
+ENV CC="ccache gcc" CXX="ccache g++"
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
   apt-get update \
   && apt-get install --no-install-recommends --no-install-suggests -y ${BUILD_DEPS}
  
-COPY --from=build-poetry /app/requirements.txt /tmp/dep/
-RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip pip install --cache-dir /pip_cache --prefix=/install -r /tmp/dep/requirements.txt
+COPY requirements.txt /tmp/dep/
+RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip \
+  pip install --cache-dir /pip_cache -U pip setuptools wheel \
+  && pip install --cache-dir /pip_cache --prefer-binary --prefix=/install -r /tmp/dep/requirements.txt
 
 FROM base
 
@@ -100,8 +89,6 @@ ARG RUNTIME_DEPS
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
   apt-get update \
-  && SUDO_FORCE_REMOVE=yes apt-get remove --purge -y ${BUILD_DEPS} \
-  && apt-get autoremove -y \
   && apt-get install -y --no-install-recommends ${RUNTIME_DEPS} \
   && rm -rf /usr/share/man /usr/share/doc
 
@@ -112,7 +99,7 @@ RUN --mount=type=cache,id=npm,target=/npm_cache \
   coffeescript \
   less \
   yarn \
-  && npm install --ignore-scripts --cache /npm_cache
+  && npm ci --ignore-scripts --cache /npm_cache
 
 COPY --from=build /install /usr/local
 COPY --chown=${PROJECT_USER}:${PROJECT_GROUP} . ${PROJECT_PATH}
