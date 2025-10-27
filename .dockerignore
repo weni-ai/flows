@@ -29,5 +29,3 @@ pip_cache
 npm_cache
 docker/*.txt
 docker/*.log
-temba/**/tests/**
-test-data/**
