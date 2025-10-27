@@ -65,6 +65,20 @@ WORKDIR "${PROJECT_PATH}"
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
+FROM base as build-poetry
+
+ARG POETRY_VERSION
+ARG REQUESTS_VERSION
+ARG NODE_VERSION
+
+COPY pyproject.toml poetry.lock .
+
+RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip pip install --cache-dir /pip_cache -U poetry=="${POETRY_VERSION}" \
+  && poetry cache clear -n --all pypi \
+  && pip install --cache-dir /pip_cache requests=="${REQUESTS_VERSION}" \
+  && poetry export --without-hashes --output requirements.txt
+#  && poetry add -n --lock $(cat pip-requires.txt) \
+
 FROM base AS build
 
 ARG BUILD_DEPS
@@ -75,8 +89,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
   apt-get update \
   && apt-get install --no-install-recommends --no-install-suggests -y ${BUILD_DEPS}
- 
-COPY requirements.txt /tmp/dep/
+
+COPY --from=build-poetry /app/requirements.txt /tmp/dep/
+RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip pip install --cache-dir /pip_cache --prefix=/install -r /tmp/dep/requirements.txt
+
 RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip \
   --mount=type=cache,mode=0755,target=/root/.cache/ccache,id=ccache \
   pip install --cache-dir /pip_cache -U pip setuptools wheel \
