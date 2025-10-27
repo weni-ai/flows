@@ -1,3 +1,8 @@
+3.42.0
+----------
+* Increase per-type search limit to 50 and enhance group query matching logic in omnibox search
+* Rename project parameter to project_uuid in get_pricing method
+
 3.41.7
 ----------
 * Update weni-rp-apps version to 2.10.6
