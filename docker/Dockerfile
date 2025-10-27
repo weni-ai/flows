@@ -47,7 +47,7 @@ ARG BRANDING_ENABLED
 ARG RAPIDPRO_APPS_GIT_URL
 ARG RAPIDPRO_APPS_GIT_BRANCH
 
-LABEL app=${VERSION} \
+LABEL app="flows" \
   os="debian" \
   os.version="12" \
   name="Flows" \
@@ -69,7 +69,7 @@ FROM base as build
 
 ARG BUILD_DEPS
 
-ENV CC="ccache gcc" CXX="ccache g++"
+ENV CC="ccache gcc" CXX="ccache g++" PATH="/usr/lib/ccache:${PATH}"
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -78,6 +78,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
  
 COPY requirements.txt /tmp/dep/
 RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip \
+  --mount=type=cache,mode=0755,target=/root/.cache/ccache,id=ccache \
   pip install --cache-dir /pip_cache -U pip setuptools wheel \
   && pip install --cache-dir /pip_cache --prefer-binary --prefix=/install -r /tmp/dep/requirements.txt
 
@@ -95,11 +96,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 COPY --chown=${PROJECT_USER}:${PROJECT_GROUP} package.json package-lock.json ${PROJECT_PATH}
 
 RUN --mount=type=cache,id=npm,target=/npm_cache \
-  npm install --global --ignore-scripts --cache /npm_cache \
+  npm install --global --ignore-scripts --prefer-offline --cache /npm_cache \
   coffeescript \
   less \
   yarn \
-  && npm ci --ignore-scripts --cache /npm_cache
+  && npm ci --ignore-scripts --prefer-offline --cache /npm_cache
 
 COPY --from=build /install /usr/local
 COPY --chown=${PROJECT_USER}:${PROJECT_GROUP} . ${PROJECT_PATH}
