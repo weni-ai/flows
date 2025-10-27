@@ -33,6 +33,7 @@ jobs:
       - setup
     with:
       deploy_type: 'kubernetes'
+      dockerfile: 'docker/Dockerfile'
       target_application: "${{ needs.setup.outputs.repository_name }}"
       image_repository: "${{ needs.setup.outputs.repository_name }}"
     secrets: inherit
