@@ -24,7 +24,7 @@ ARG RUNTIME_DEPS="\
   npm"
 #libmariadb3 \
 
-FROM python:${PYTHON_VERSION}-slim-${DEBIAN_VERSION} as base
+FROM python:${PYTHON_VERSION}-slim-${DEBIAN_VERSION} AS base
 
 ARG POETRY_VERSION
 ARG REQUESTS_VERSION
@@ -65,7 +65,7 @@ WORKDIR "${PROJECT_PATH}"
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
-FROM base as build
+FROM base AS build
 
 ARG BUILD_DEPS
 
