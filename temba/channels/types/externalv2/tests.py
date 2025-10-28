@@ -90,6 +90,90 @@ class ExternalV2TypeTest(TembaTest):
         self.assertEqual(channel.config, data_obj)
         self.assertEqual(channel.name, "E2 form name")
 
+    def test_claim_schemes_from_config_string_and_list(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        # Case 1: schemes inside data as comma-separated string
+        data_obj = {
+            "send_url": "https://example.com/send_msg",
+            "send_method": "POST",
+            "content_type": "application/json",
+            "schemes": "ext, whatsapp",
+        }
+        response = self.client.post(url, data={"data": json.dumps(data_obj)}, follow=True)
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertIsNotNone(channel)
+        self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
+        self.assertEqual(channel.schemes, ["ext", "whatsapp"])
+        self.assertNotIn("schemes", channel.config)
+
+        # Case 2: schemes inside data as list
+        Channel.objects.filter(pk=channel.pk).delete()
+        data_obj = {
+            "send_url": "https://example.com/send_msg",
+            "send_method": "POST",
+            "content_type": "application/json",
+            "schemes": ["ext", "whatsapp"],
+        }
+        response = self.client.post(url, data={"data": json.dumps(data_obj)}, follow=True)
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertEqual(channel.schemes, ["ext", "whatsapp"])
+        self.assertNotIn("schemes", channel.config)
+
+    def test_claim_name_address_from_config_removed_from_config(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        data_obj = {
+            "name": "Name In Config",
+            "address": "addr_in_config",
+            "send_url": "https://example.com/send_msg",
+        }
+        response = self.client.post(url, data={"data": json.dumps(data_obj)}, follow=True)
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertIsNotNone(channel)
+        self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
+        self.assertEqual(channel.name, "Name In Config")
+        self.assertEqual(channel.address, "addr_in_config")
+        self.assertNotIn("name", channel.config)
+        self.assertNotIn("address", channel.config)
+
+    def test_claim_schemes_normalize_external(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        payload = {"schemes": "external", "data": json.dumps({"send_url": "https://example.com"})}
+        response = self.client.post(url, data=payload, follow=True)
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertIsNotNone(channel)
+        self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
+        self.assertEqual(channel.schemes, ["ext"])  # normalized
+
+    def test_claim_metadata_precedence_top_over_config(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        data_obj = {
+            "name": "ConfigName",
+            "address": "config_addr",
+            "schemes": ["whatsapp"],
+            "send_url": "https://example.com",
+        }
+        form_payload = {
+            "name": "TopName",
+            "address": "top_addr",
+            "schemes": "ext",
+            "data": json.dumps(data_obj),
+        }
+        response = self.client.post(url, data=form_payload, follow=True)
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertIsNotNone(channel)
+        self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
+        self.assertEqual(channel.name, "TopName")
+        self.assertEqual(channel.address, "top_addr")
+        self.assertEqual(channel.schemes, ["ext"])  # top-level takes precedence
+
     def test_claim_with_explicit_config_field_precedence(self):
         url = reverse("channels.types.externalv2.claim")
         self.login(self.admin)
