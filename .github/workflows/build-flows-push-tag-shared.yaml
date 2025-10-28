@@ -36,7 +36,8 @@ jobs:
       dockerfile: 'docker/Dockerfile'
       target_application: "${{ needs.setup.outputs.repository_name }}"
       image_repository: 'push-backend'
-      target_repository: 'kubernetes-manifests-platform'
+      target_repository: 'weni-ai/kubernetes-manifests-platform'
+      target_application_directory_prefix: 'weni-flows/flows/'
     secrets: inherit
 
 # vim: nu ts=2 fdm=indent et ft=yaml shiftwidth=2 softtabstop=2:
