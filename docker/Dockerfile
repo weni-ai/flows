@@ -65,7 +65,7 @@ WORKDIR "${PROJECT_PATH}"
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
-FROM base as build-poetry
+FROM base AS build-poetry
 
 ARG POETRY_VERSION
 ARG REQUESTS_VERSION
