@@ -182,6 +182,9 @@ class ClaimView(ClaimViewMixin, SmartFormView):
                 schemes = [s.strip() for s in schemes_val.split(",") if s.strip()]
         if not schemes:
             schemes = [URN.EXTERNAL_SCHEME]
+        else:
+            # normalize common alias
+            schemes = ["ext" if isinstance(s, str) and s.lower() == "external" else s for s in schemes]
 
         # Determine address similarly; prefer explicit fields, then body, then config; remove from config if present
         address = (data.get("address") or "").strip()
