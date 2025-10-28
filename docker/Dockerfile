@@ -73,11 +73,11 @@ ARG NODE_VERSION
 
 COPY pyproject.toml poetry.lock .
 
-RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip pip install --cache-dir /pip_cache -U poetry=="${POETRY_VERSION}" \
+RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip \
+  pip install --cache-dir /pip_cache -U poetry=="${POETRY_VERSION}" \
   && poetry cache clear -n --all pypi \
   && pip install --cache-dir /pip_cache requests=="${REQUESTS_VERSION}" \
   && poetry export --without-hashes --output requirements.txt
-#  && poetry add -n --lock $(cat pip-requires.txt) \
 
 FROM base AS build
 
@@ -89,7 +89,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
   apt-get update \
   && apt-get install --no-install-recommends --no-install-suggests -y ${BUILD_DEPS}
-
+ 
 COPY --from=build-poetry /app/requirements.txt /tmp/dep/
 
 RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip \
