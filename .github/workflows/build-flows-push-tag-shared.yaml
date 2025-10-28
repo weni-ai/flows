@@ -12,12 +12,28 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       repository_name: ${{ steps.setup.outputs.repository_name }}
+      build_args: ${{ steps.setup.outputs.build_args }}
     steps:
       - name: Setup outputs
         id: setup
         run: |
           {
             echo "repository_name=${GITHUB_REPOSITORY#$GITHUB_REPOSITORY_OWNER/}"
+
+            echo 'BUILD_ARGS<<EOFenv'
+            FLOWEDITOR_VERSION=$(
+              jq -r '.dependencies["@nyaruka/flow-editor"]' < package.json
+            )
+            echo "FLOWEDITOR_VERSION=${FLOWEDITOR_VERSION}"
+            echo "FLOWEDITOR_REPO=https://github.com/ilhasoft/floweditor"
+            FLOWEDITOR_BRANCH=$(
+              jq -r '.weni["floweditor-branch"]' < package.json
+            )
+            if [[ null == "${FLOWEDITOR_BRANCH}" ]]; then
+              FLOWEDITOR_BRANCH="main"
+            fi
+            echo "FLOWEDITOR_BRANCH=${FLOWEDITOR_BRANCH}"
+            echo 'EOFenv'
           } | tee -a "${GITHUB_OUTPUT}"
 
           {
@@ -25,6 +41,7 @@ jobs:
             echo "| Variable        | Value           |"
             echo "| --------------- | --------------- |"
             echo "| repository_name | Repository name |"
+            echo "| build_args      | Build arguments for image |"
           } | tee -a "${GITHUB_STEP_SUMMARY}"
 
   call-workflow:
@@ -39,6 +56,8 @@ jobs:
       target_repository: 'weni-ai/kubernetes-manifests-platform'
       target_application_directory_prefix: 'weni-flows/'
       target_patch_file: 'deployment-flows-image.json'
+      build_args: |
+        ${{ needs.setup.outputs.build_args }}
     secrets: inherit
 
 # vim: nu ts=2 fdm=indent et ft=yaml shiftwidth=2 softtabstop=2:
