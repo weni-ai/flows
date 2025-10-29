@@ -6038,6 +6038,47 @@ class EventsEndpointTest(APITest):
         self.assertEqual(call_kwargs["date_start"], iso8601.parse_date(start_date))
         self.assertEqual(call_kwargs["date_end"], iso8601.parse_date(end_date))
 
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_endpoint_requires_table_when_silver_true(self, mock_fetch_events_for_org):
+        url = reverse("api.v2.events")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        # missing table while silver=true
+        query = f"date_start={start_date}&date_end={end_date}&silver=true"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 400)
+        # ensure service not called
+        mock_fetch_events_for_org.assert_not_called()
+
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_endpoint_passes_silver_and_table(self, mock_fetch_events_for_org):
+        url = reverse("api.v2.events")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_fetch_events_for_org.return_value = []
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}&silver=true&table=my_table"
+
+        response = self.fetchJSON(url, query)
+        self.assertEqual(response.status_code, 200)
+
+        mock_fetch_events_for_org.assert_called_once()
+        _, call_kwargs = mock_fetch_events_for_org.call_args
+        self.assertTrue(call_kwargs["silver"])  # boolean
+        self.assertEqual(call_kwargs["table"], "my_table")
+
     @patch("temba.api.v2.services.events.dl_get_events")
     def test_json_payload_parsing(self, mock_dl_get_events):
         url = reverse("api.v2.events")
@@ -6175,6 +6216,22 @@ class EventsGroupByCountEndpointTest(APITest):
         self.assertEqual(call_args[0], self.admin)
         self.assertEqual(call_kwargs["date_start"], iso8601.parse_date(start_date))
         self.assertEqual(call_kwargs["date_end"], iso8601.parse_date(end_date))
+
+    @patch("temba.api.v2.services.events.fetch_event_counts_for_org")
+    def test_events_group_by_requires_table_when_silver_true(self, mock_fetch_event_counts_for_org):
+        url = reverse("api.v2.events_group_by")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}&silver=true"
+
+        response = self.fetchJSON(url, query)
+        self.assertEqual(response.status_code, 400)
+        mock_fetch_event_counts_for_org.assert_not_called()
 
     @patch("temba.api.v2.services.events.dl_get_events_count_by_group")
     def test_json_payload_parsing_group_by_count(self, mock_dl_get_events_count_by_group):
@@ -6343,3 +6400,56 @@ class EventsServiceTest(APITest):
         self.assertEqual(call_kwargs["date_start"], "2024-01-01T00:00:00+00:00")
         self.assertEqual(call_kwargs["date_end"], "2024-01-31T23:59:58+00:00")
         self.assertEqual(call_kwargs["group_by"], "metadata.country")
+
+    @patch("temba.api.v2.services.events.dl_get_events_silver")
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_fetch_events_for_org_with_silver_switches_source(self, mock_dl_get_events, mock_dl_get_events_silver):
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_dl_get_events.return_value = [{"payload": "{\"k\": \"v\"}"}]
+        mock_dl_get_events_silver.return_value = [{"raw": "x"}]
+
+        from temba.api.v2.services.events import fetch_events_for_org
+
+        start_date = iso8601.parse_date("2024-01-01T00:00:00Z")
+        end_date = iso8601.parse_date("2024-01-31T23:59:59Z")
+
+        results = fetch_events_for_org(self.admin, date_start=start_date, date_end=end_date, silver=True, table="t1")
+
+        # Only silver data should be used
+        self.assertEqual(results, [{"raw": "x"}])
+
+        # ensure standard not called when silver=true
+        mock_dl_get_events.assert_not_called()
+        # ensure table only sent to silver
+        _, kwargs_silver = mock_dl_get_events_silver.call_args
+        self.assertEqual(kwargs_silver.get("table"), "t1")
+
+    @patch("temba.api.v2.services.events.dl_get_events_count_by_group_silver")
+    @patch("temba.api.v2.services.events.dl_get_events_count_by_group")
+    def test_fetch_event_counts_for_org_with_silver_switches_source(self, mock_dl_counts, mock_dl_counts_silver):
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_dl_counts.return_value = [
+            {"group_value": '"foo"', "count": 2},
+            {"group_value": '"bar"', "count": 3},
+        ]
+        mock_dl_counts_silver.return_value = [
+            {"group_value": '"foo"', "count": 5},
+        ]
+
+        from temba.api.v2.services.events import fetch_event_counts_for_org
+
+        start_date = iso8601.parse_date("2024-01-01T00:00:00Z")
+        end_date = iso8601.parse_date("2024-01-31T23:59:59Z")
+
+        results = fetch_event_counts_for_org(
+            self.admin, date_start=start_date, date_end=end_date, group_by="event_name", silver=True, table="t1"
+        )
+
+        # Only silver data should be used, parsed (unquoted foo)
+        self.assertEqual(results, [{"group_value": "foo", "count": 5}])
+        # ensure standard not called when silver=true
+        mock_dl_counts.assert_not_called()
