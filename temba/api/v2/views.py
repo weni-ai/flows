@@ -5394,6 +5394,8 @@ class EventsEndpoint(BaseAPIView):
                 {"name": "value", "required": False, "help": "A value to filter by"},
                 {"name": "metadata", "required": False, "help": "A metadata to filter by"},
                 {"name": "event_name", "required": False, "help": "An event_name to filter by"},
+                {"name": "silver", "required": False, "help": "If true, also include data from silver"},
+                {"name": "table", "required": False, "help": "Required when silver=true; silver table name"},
             ],
         }
 
@@ -5439,5 +5441,7 @@ class EventsGroupByCountEndpoint(BaseAPIView):
                 {"name": "metadata", "required": False, "help": "A metadata to filter by"},
                 {"name": "event_name", "required": False, "help": "An event_name to filter by"},
                 {"name": "group_by", "required": False, "help": "A group_by to filter by, default is value"},
+                {"name": "silver", "required": False, "help": "If true, also include data from silver"},
+                {"name": "table", "required": False, "help": "Required when silver=true; silver table name"},
             ],
         }
