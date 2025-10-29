@@ -2931,3 +2931,39 @@ class BroadcastCreateWithGroupsTest(TembaTest):
         self.assertEqual(stats.template_price, Decimal("0.10"))
         self.assertEqual(stats.currency, "USD")
         self.assertEqual(stats.cost, Decimal("0"))
+
+
+class MsgTasksTest(TembaTest):
+    def test_fail_channel_outgoing_messages_task(self):
+        contact = self.create_contact("Bob", phone="+250700000001")
+
+        # messages on default channel
+        m_q = self.create_outgoing_msg(contact, "Q", channel=self.channel, status=Msg.STATUS_QUEUED)
+        m_p = self.create_outgoing_msg(contact, "P", channel=self.channel, status=Msg.STATUS_PENDING)
+        m_e = self.create_outgoing_msg(contact, "E", channel=self.channel, status=Msg.STATUS_ERRORED)
+        m_s = self.create_outgoing_msg(contact, "S", channel=self.channel, status=Msg.STATUS_SENT)
+        m_in = self.create_incoming_msg(contact, "in", channel=self.channel)
+
+        # message on other channel should remain unchanged
+        from temba.channels.models import Channel
+
+        other = Channel.create(
+            self.org,
+            self.user,
+            "RW",
+            "A",
+            name="Other",
+            address="+250111111111",
+            config={Channel.CONFIG_FCM_ID: "999"},
+        )
+        m_other = self.create_outgoing_msg(contact, "Other", channel=other, status=Msg.STATUS_PENDING)
+
+        from temba.msgs.tasks import fail_channel_outgoing_messages
+
+        fail_channel_outgoing_messages(self.channel.id)
+
+        for mid in (m_q.id, m_p.id, m_e.id):
+            self.assertEqual(Msg.objects.get(id=mid).status, Msg.STATUS_FAILED)
+        self.assertEqual(Msg.objects.get(id=m_s.id).status, Msg.STATUS_SENT)
+        self.assertEqual(Msg.objects.get(id=m_in.id).status, Msg.STATUS_HANDLED)
+        self.assertEqual(Msg.objects.get(id=m_other.id).status, Msg.STATUS_PENDING)

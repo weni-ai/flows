@@ -923,12 +923,10 @@ class Channel(TembaModel, DependencyMixin):
         self.is_active = False
         self.save(update_fields=("is_active", "config", "modified_by", "modified_on"))
 
-        # mark any messages in sending mode as failed for this channel
-        from temba.msgs.models import Msg
+        # mark any messages in sending mode as failed for this channel asynchronously
+        from temba.msgs.tasks import fail_channel_outgoing_messages
 
-        self.msgs.filter(
-            direction=Msg.DIRECTION_OUT, status__in=[Msg.STATUS_QUEUED, Msg.STATUS_PENDING, Msg.STATUS_ERRORED]
-        ).update(status=Msg.STATUS_FAILED)
+        on_transaction_commit(lambda: fail_channel_outgoing_messages.delay(self.id))
 
         # trigger the orphaned channel
         if trigger_sync and self.is_android() and registration_id:
