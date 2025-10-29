@@ -396,6 +396,27 @@ class ChannelTest(TembaTest):
         # bulk sender was also released
         self.assertFalse(vonage.is_active)
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    @patch("temba.msgs.tasks.fail_channel_outgoing_messages")
+    def test_release_enqueues_async_fail(self, mock_task):
+        # create a temporary channel and a pending message
+        temp_channel = Channel.create(
+            self.org,
+            self.user,
+            "RW",
+            "A",
+            name="Temp",
+            address="+250788000999",
+            config={Channel.CONFIG_FCM_ID: "x"},
+        )
+
+        contact = self.create_contact("Foo", phone="+250788000999")
+        self.create_outgoing_msg(contact, "hi", channel=temp_channel, status=Msg.STATUS_PENDING)
+
+        temp_channel.release(self.admin)
+
+        mock_task.delay.assert_called_once_with(temp_channel.id)
+
     def test_list(self):
         # de-activate existing channels
         Channel.objects.all().update(is_active=False)
