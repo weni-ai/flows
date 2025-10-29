@@ -6,7 +6,7 @@ from weni_datalake_sdk.clients.redshift.events import (
     get_events as dl_get_events,
     get_events_silver as dl_get_events_silver,
     get_events_count_by_group as dl_get_events_count_by_group,
-    get_events_count_by_group_silver as dl_get_events_count_by_group_silver,
+    get_events_silver_count_by_group as dl_get_events_count_by_group_silver,
 )
 
 
@@ -23,6 +23,25 @@ def _parse_event_values(events: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]
                         processed_event[key] = value
                 else:
                     processed_event[key] = value
+            # Normalize numeric timestamps to ISO-8601 Z for "date" field
+            if "date" in processed_event:
+                date_val = processed_event["date"]
+                # Try to coerce ints (epoch millis) and numeric-looking strings
+                if isinstance(date_val, (int, float)):
+                    from datetime import datetime, timezone as _tz
+
+                    dt = datetime.fromtimestamp(float(date_val) / 1000.0, tz=_tz.utc)
+                    iso = dt.isoformat()
+                    processed_event["date"] = iso.replace("+00:00", "Z")
+                elif isinstance(date_val, str):
+                    # If string is digits only, treat as epoch millis
+                    stripped = date_val.strip()
+                    if stripped.isdigit():
+                        from datetime import datetime, timezone as _tz
+
+                        dt = datetime.fromtimestamp(float(stripped) / 1000.0, tz=_tz.utc)
+                        iso = dt.isoformat()
+                        processed_event["date"] = iso.replace("+00:00", "Z")
             processed.append(processed_event)
         except Exception as e:
             # Log but don't skip the event - add it as-is
@@ -41,13 +60,19 @@ def _normalize_datetime_params(params: Dict[str, Any]) -> None:
         dt_start = params["date_start"]
         if dt_start.tzinfo is not None:
             dt_start = dt_start.astimezone(timezone.utc)
-        params["date_start"] = dt_start.isoformat()
+        start_str = dt_start.isoformat()
+        if start_str.endswith("+00:00"):
+            start_str = start_str.replace("+00:00", "Z")
+        params["date_start"] = start_str
 
     if "date_end" in params and hasattr(params["date_end"], "isoformat"):
         dt_end = params["date_end"]
         if dt_end.tzinfo is not None:
             dt_end = dt_end.astimezone(timezone.utc)
-        params["date_end"] = dt_end.isoformat()
+        end_str = dt_end.isoformat()
+        if end_str.endswith("+00:00"):
+            end_str = end_str.replace("+00:00", "Z")
+        params["date_end"] = end_str
 
 
 def _prepare_datalake_params(user, filters: Dict[str, Any]) -> Tuple[Dict[str, Any], bool, Optional[str]]:
