@@ -130,4 +130,3 @@ class JWTAuthMixinOptional:
     @property
     def jwt_payload(self):
         return getattr(self.request, "jwt_payload", None)
-

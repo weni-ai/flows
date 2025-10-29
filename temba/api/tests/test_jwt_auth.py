@@ -1,8 +1,9 @@
 from unittest.mock import patch
 
-from django.test import TestCase
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.test import APIRequestFactory
+
+from django.test import TestCase
 
 from temba.api.auth.jwt import OptionalJWTAuthentication, RequiredJWTAuthentication
 from temba.api.v2.permissions import HasValidJWT
@@ -94,5 +95,3 @@ class HasValidJWTTests(TestCase):
     def test_permission_denied_when_no_jwt(self):
         request = APIRequestFactory().get("/")
         self.assertFalse(HasValidJWT().has_permission(request, view=None))
-
-

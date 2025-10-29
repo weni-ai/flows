@@ -1,6 +1,8 @@
 import jwt as jwt
+
 from django.conf import settings as settings
-from temba.api.auth.jwt import RequiredJWTAuthentication, JWTAuthMixinRequired
+
+from temba.api.auth.jwt import JWTAuthMixinRequired, RequiredJWTAuthentication
 from temba.api.v2.permissions import HasValidJWT
 
 

@@ -11,13 +11,13 @@ from weni.internal.views import InternalGenericViewSet
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
+from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.api.v2.serializers import WhatsappBroadcastWriteSerializer
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
 from temba.msgs.models import Broadcast, BroadcastStatistics
 from temba.orgs.models import Org
-from temba.api.auth.jwt import OptionalJWTAuthentication
 
 from .serializers import BroadcastSerializer, BroadcastWithStatisticsSerializer, UserAndProjectSerializer
 from .services import upload_broadcast_media
