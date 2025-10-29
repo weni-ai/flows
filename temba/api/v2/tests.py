@@ -6186,15 +6186,15 @@ class EventsEndpointTest(APITest):
 
         self.assertEqual(response.status_code, 200)
 
-        # Verify that dl_get_events was called with UTC-converted ISO strings
+        # Verify that dl_get_events was called with UTC-converted ISO strings (Z suffix)
         mock_dl_get_events.assert_called_once()
         call_kwargs = mock_dl_get_events.call_args[1]
 
-        # date_start should be in UTC format
-        self.assertEqual(call_kwargs["date_start"], "2025-10-08T00:00:00+00:00")
+        # date_start should be in UTC format with Z
+        self.assertEqual(call_kwargs["date_start"], "2025-10-08T00:00:00Z")
 
-        # date_end should be adjusted by -1 second and in UTC format
-        self.assertEqual(call_kwargs["date_end"], "2025-10-08T23:59:58+00:00")
+        # date_end should be in UTC format with Z
+        self.assertEqual(call_kwargs["date_end"], "2025-10-08T23:59:59Z")
 
 
 class EventsGroupByCountEndpointTest(APITest):
@@ -6367,7 +6367,7 @@ class EventsServiceTest(APITest):
         self.assertEqual(call_kwargs["project"], str(self.org.proj_uuid))
         # dates are now converted to UTC ISO strings with date_end adjusted by -1 second
         self.assertEqual(call_kwargs["date_start"], "2024-01-01T00:00:00+00:00")
-        self.assertEqual(call_kwargs["date_end"], "2024-01-31T23:59:58+00:00")
+        self.assertEqual(call_kwargs["date_end"], "2024-01-31T23:59:59Z")
 
     @patch("temba.api.v2.services.events.dl_get_events_count_by_group")
     def test_fetch_event_counts_for_org_parses_and_forwards(self, mock_dl_get_counts):
@@ -6404,7 +6404,7 @@ class EventsServiceTest(APITest):
         self.assertEqual(call_kwargs["project"], str(self.org.proj_uuid))
         # dates are now converted to UTC ISO strings with date_end adjusted by -1 second
         self.assertEqual(call_kwargs["date_start"], "2024-01-01T00:00:00+00:00")
-        self.assertEqual(call_kwargs["date_end"], "2024-01-31T23:59:58+00:00")
+        self.assertEqual(call_kwargs["date_end"], "2024-01-31T23:59:59Z")
         self.assertEqual(call_kwargs["group_by"], "metadata.country")
 
     @patch("temba.api.v2.services.events.dl_get_events_silver")
