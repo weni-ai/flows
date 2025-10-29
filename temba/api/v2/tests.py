@@ -6407,7 +6407,7 @@ class EventsServiceTest(APITest):
         self.org.proj_uuid = uuid.uuid4()
         self.org.save()
 
-        mock_dl_get_events.return_value = [{"payload": "{\"k\": \"v\"}"}]
+        mock_dl_get_events.return_value = [{"payload": '{"k": "v"}'}]
         mock_dl_get_events_silver.return_value = [{"raw": "x"}]
 
         from temba.api.v2.services.events import fetch_events_for_org

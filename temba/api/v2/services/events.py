@@ -4,8 +4,8 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from weni_datalake_sdk.clients.redshift.events import (
     get_events as dl_get_events,
-    get_events_silver as dl_get_events_silver,
     get_events_count_by_group as dl_get_events_count_by_group,
+    get_events_silver as dl_get_events_silver,
     get_events_silver_count_by_group as dl_get_events_count_by_group_silver,
 )
 
