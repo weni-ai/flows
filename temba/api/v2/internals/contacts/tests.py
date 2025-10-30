@@ -168,6 +168,68 @@ class InternalContactViewTest(TembaTest):
             self.assertContains(response, str(contact1.uuid))
 
 
+class ContactsExportByStatusViewTest(TembaTest):
+    def test_export_contacts_by_status_enqueues_and_responds(self):
+        c1 = self.create_contact("C1", urns=["tel:+112"])
+        c2 = self.create_contact("C2", urns=["tel:+113"])
+        main = self.create_contact("A", urns=["tel:+111"])
+        broadcast = self.create_broadcast(self.admin, "hi", contacts=[main, c1, c2])
+        # mark only c1 and c2 as delivered for this broadcast
+        broadcast.msgs.filter(contact_id__in=[c1.id, c2.id]).update(status=Msg.STATUS_DELIVERED)
+
+        url = "/api/v2/internals/contacts_export_by_status"
+        with patch(
+            "temba.api.v2.internals.contacts.views.InternalOIDCAuthentication.authenticate",
+            return_value=(self.admin, None),
+        ), patch("temba.api.v2.internals.contacts.views.IsUserInOrg.has_permission", return_value=True), patch(
+            "temba.api.v2.internals.contacts.views.on_transaction_commit", side_effect=lambda fn: fn()
+        ), patch(
+            "temba.api.v2.internals.contacts.views.export_contacts_by_status_task.delay"
+        ) as mock_delay:
+            resp = self.client.post(
+                url,
+                data={
+                    "project_uuid": str(self.org.proj_uuid),
+                    "broadcast_id": broadcast.id,
+                    "status": Msg.STATUS_DELIVERED,
+                },
+            )
+        self.assertEqual(resp.status_code, 201)
+        data = resp.json()
+        self.assertIn("export_id", data)
+        self.assertIn("message", data)
+        self.assertIn("count", data)
+        self.assertEqual(data["count"], 2)
+        mock_delay.assert_called_once()
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    def test_export_contacts_by_status_builds_file_eager(self):
+        c1 = self.create_contact("X1", urns=["tel:+115"])
+        c2 = self.create_contact("X2", urns=["tel:+116"])
+        main = self.create_contact("B", urns=["tel:+114"])
+        broadcast = self.create_broadcast(self.admin, "hi", contacts=[main, c1, c2])
+        broadcast.msgs.filter(contact_id__in=[c1.id, c2.id]).update(status=Msg.STATUS_DELIVERED)
+
+        url = "/api/v2/internals/contacts_export_by_status"
+        with patch(
+            "temba.api.v2.internals.contacts.views.InternalOIDCAuthentication.authenticate",
+            return_value=(self.admin, None),
+        ), patch("temba.api.v2.internals.contacts.views.IsUserInOrg.has_permission", return_value=True):
+            resp = self.client.post(
+                url,
+                data={
+                    "project_uuid": str(self.org.proj_uuid),
+                    "broadcast_id": broadcast.id,
+                    "status": Msg.STATUS_DELIVERED,
+                },
+            )
+        self.assertEqual(resp.status_code, 201)
+        data = resp.json()
+        self.assertIsNotNone(data.get("export_id"))
+        # In eager mode the view fills download_url immediately
+        self.assertTrue("download_url" in data)
+
+
 class ListContactFieldsEndpointTest(TembaTest):
     @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
     def test_get_contact_fields_without_project_returns_400(self):

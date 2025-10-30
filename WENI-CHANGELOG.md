@@ -1,3 +1,10 @@
+3.42.1
+----------
+* Add task to update msgs async on channel release
+* Add silver in events API
+* Add ClaimView to E2 channel
+* Improve build
+
 3.42.0
 ----------
 * Increase per-type search limit to 50 and enhance group query matching logic in omnibox search

@@ -24,6 +24,7 @@ from django.core.files import File
 from django.db import models
 from django.db.models import Sum, Value
 from django.db.models.functions import Coalesce
+from django.db.transaction import on_commit as on_transaction_commit
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
@@ -42,7 +43,8 @@ from temba.api.v2.serializers import (
 )
 from temba.api.v2.validators import LambdaURLValidator
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
-from temba.contacts.models import Contact, ContactField, ContactGroup, ContactImport, ContactURN
+from temba.contacts.models import Contact, ContactField, ContactGroup, ContactImport, ContactURN, ExportContactsTask
+from temba.contacts.tasks import export_contacts_by_status_task
 from temba.contacts.views import ContactImportCRUDL
 from temba.msgs.models import Broadcast, Msg
 from temba.orgs.models import Org
@@ -267,6 +269,64 @@ class InternalContactGroupsView(APIViewMixin, APIView):
                 "group_name": group.name,
                 "added_contacts": [str(c.uuid) for c in contacts],
                 "count": contacts.count(),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ContactsExportByStatusView(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
+
+    def post(self, request, *args, **kwargs):
+        project_uuid = request.data.get("project_uuid") or request.data.get("project")
+        broadcast_id = request.data.get("broadcast_id")
+        msg_status = request.data.get("status")
+        if not project_uuid:
+            return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # validate broadcast belongs to org
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+            broadcast = Broadcast.objects.get(id=broadcast_id)
+            if broadcast.org_id != org.id:
+                return Response({"error": "Broadcast not found for project"}, status=status.HTTP_404_NOT_FOUND)
+        except (Org.DoesNotExist, Broadcast.DoesNotExist, django_exceptions.ValidationError):
+            return Response({"error": "Project or Broadcast not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Optionally precompute count for response
+        if msg_status:
+            valid_statuses = [s[0] for s in Msg.STATUS_CHOICES]
+            if msg_status not in valid_statuses:
+                return Response({"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "Status is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        msgs = Msg.objects.filter(broadcast_id=broadcast_id, status=msg_status)
+        contact_count = msgs.values("contact_id").distinct().count()
+
+        # create export record (we'll attach file in the async task)
+        user = User.objects.get(email=request.user.email)
+        export = ExportContactsTask.create(org=org, user=user, group=None, search=None, group_memberships=())
+
+        # schedule background export building and notification
+        on_transaction_commit(lambda: export_contacts_by_status_task.delay(export.pk, broadcast_id, msg_status))
+
+        if not getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+            message = f"We are preparing your export. We will e-mail you at {request.user.email} when it is ready."
+            download_url = None
+        else:
+            # in eager mode, export may be ready immediately
+            export.refresh_from_db()
+            download_url = export.get_download_url()
+            message = f"Export complete, you can find it here: {download_url}"
+
+        return Response(
+            {
+                "export_id": export.id,
+                "download_url": download_url,
+                "count": contact_count,
+                "message": message,
             },
             status=status.HTTP_201_CREATED,
         )

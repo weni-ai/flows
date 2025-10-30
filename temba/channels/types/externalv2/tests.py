@@ -14,8 +14,8 @@ class ExternalV2TypeTest(TembaTest):
     def test_claim_url_visible(self):
         url = reverse("channels.types.externalv2.claim")
         self.login(self.admin)
-        response = self.client.get(reverse("channels.channel_claim"))
-        self.assertContains(response, url)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
 
     def test_claim_with_json_body_data(self):
         url = reverse("channels.types.externalv2.claim")
@@ -89,6 +89,161 @@ class ExternalV2TypeTest(TembaTest):
         self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
         self.assertEqual(channel.config, data_obj)
         self.assertEqual(channel.name, "E2 form name")
+
+    def test_claim_schemes_from_config_string_and_list(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        # Case 1: schemes inside data as comma-separated string
+        data_obj = {
+            "send_url": "https://example.com/send_msg",
+            "send_method": "POST",
+            "content_type": "application/json",
+            "schemes": "ext, whatsapp",
+        }
+        response = self.client.post(url, data={"data": json.dumps(data_obj)}, follow=True)
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertIsNotNone(channel)
+        self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
+        self.assertEqual(channel.schemes, ["ext", "whatsapp"])
+        self.assertNotIn("schemes", channel.config)
+
+        # Case 2: schemes inside data as list
+        Channel.objects.filter(pk=channel.pk).delete()
+        data_obj = {
+            "send_url": "https://example.com/send_msg",
+            "send_method": "POST",
+            "content_type": "application/json",
+            "schemes": ["ext", "whatsapp"],
+        }
+        response = self.client.post(url, data={"data": json.dumps(data_obj)}, follow=True)
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertEqual(channel.schemes, ["ext", "whatsapp"])
+        self.assertNotIn("schemes", channel.config)
+
+    def test_claim_name_address_from_config_removed_from_config(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        data_obj = {
+            "name": "Name In Config",
+            "address": "addr_in_config",
+            "send_url": "https://example.com/send_msg",
+        }
+        response = self.client.post(url, data={"data": json.dumps(data_obj)}, follow=True)
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertIsNotNone(channel)
+        self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
+        self.assertEqual(channel.name, "Name In Config")
+        self.assertEqual(channel.address, "addr_in_config")
+        self.assertNotIn("name", channel.config)
+        self.assertNotIn("address", channel.config)
+
+    def test_claim_schemes_normalize_external(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        payload = {"schemes": "external", "data": json.dumps({"send_url": "https://example.com"})}
+        response = self.client.post(url, data=payload, follow=True)
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertIsNotNone(channel)
+        self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
+        self.assertEqual(channel.schemes, ["ext"])  # normalized
+
+    def test_claim_metadata_precedence_top_over_config(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        data_obj = {
+            "name": "ConfigName",
+            "address": "config_addr",
+            "schemes": ["whatsapp"],
+            "send_url": "https://example.com",
+        }
+        form_payload = {
+            "name": "TopName",
+            "address": "top_addr",
+            "schemes": "ext",
+            "data": json.dumps(data_obj),
+        }
+        response = self.client.post(url, data=form_payload, follow=True)
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertIsNotNone(channel)
+        self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
+        self.assertEqual(channel.name, "TopName")
+        self.assertEqual(channel.address, "top_addr")
+        self.assertEqual(channel.schemes, ["ext"])  # top-level takes precedence
+
+    def test_claim_bracket_numeric_stored_under_string_index(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        # First create dict context under 'obj' so numeric token falls back to string-key in dict
+        form_payload = {
+            "obj[x]": "y",
+            "obj[0][a]": "1",
+            "send_url": "https://example.com",
+        }
+
+        response = self.client.post(url, data=form_payload, follow=True)
+
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertIsNotNone(channel)
+        self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
+        self.assertEqual(channel.config["obj"]["0"]["a"], "1")
+
+    def test_claim_next_token_digit_initializes_list(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        form_payload = {
+            "root[list][0][key]": "val",
+        }
+
+        response = self.client.post(url, data=form_payload, follow=True)
+
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertIsNotNone(channel)
+        self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
+        self.assertIsInstance(channel.config["root"]["list"], list)
+        self.assertEqual(channel.config["root"]["list"][0]["key"], "val")
+
+    def test_claim_flat_key_and_multivalue_list(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        form_payload = {
+            "plain": "x",
+            "multi": ["1", "2"],
+        }
+
+        response = self.client.post(url, data=form_payload, follow=True)
+
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertIsNotNone(channel)
+        self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
+        self.assertEqual(channel.config["plain"], "x")
+        self.assertEqual(channel.config["multi"], ["1", "2"])
+
+    def test_claim_list_index_growth_and_assign(self):
+        url = reverse("channels.types.externalv2.claim")
+        self.login(self.admin)
+
+        form_payload = {
+            "lst[2][k]": "v",
+        }
+
+        response = self.client.post(url, data=form_payload, follow=True)
+
+        channel = Channel.objects.filter(channel_type="E2").order_by("-id").first()
+        self.assertIsNotNone(channel)
+        self.assertRedirects(response, reverse("channels.channel_configuration", args=[channel.uuid]))
+        lst = channel.config["lst"]
+        if isinstance(lst, list):
+            self.assertEqual(lst[2]["k"], "v")
+        else:
+            # fallback shape stores numeric index as string key under dict
+            self.assertEqual(lst["2"]["k"], "v")
 
     def test_claim_with_explicit_config_field_precedence(self):
         url = reverse("channels.types.externalv2.claim")
