@@ -3,6 +3,7 @@
 * Add task to update msgs async on channel release
 * Add silver in events API
 * Add ClaimView to E2 channel
+* Improve build
 
 3.42.0
 ----------
