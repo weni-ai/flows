@@ -1187,6 +1187,7 @@ TICKETER_TYPES = [
     "temba.tickets.types.rocketchat.RocketChatType",
     "temba.tickets.types.twilioflex.TwilioFlexType",
     "temba.tickets.types.wenichats.WeniChatsType",
+    "temba.tickets.types.twilioflex2.TwilioFlex2Type",
 ]
 
 CHANNEL_TYPES = [
