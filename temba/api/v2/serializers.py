@@ -2089,3 +2089,11 @@ class EventFilterSerializer(serializers.Serializer):
     metadata_key = serializers.CharField(required=False)
     metadata_value = serializers.CharField(required=False)
     group_by = serializers.CharField(required=False)
+    silver = serializers.BooleanField(required=False, default=False)
+    table = serializers.CharField(required=False)
+
+    def validate(self, attrs):
+        # If silver is true, table is mandatory
+        if attrs.get("silver") and not attrs.get("table"):
+            raise serializers.ValidationError({"table": ["This field is required when silver=true."]})
+        return attrs
