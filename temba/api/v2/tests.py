@@ -6359,8 +6359,8 @@ class EventsServiceTest(APITest):
         mock_dl_get_events.assert_called_once()
         _, call_kwargs = mock_dl_get_events.call_args
         self.assertEqual(call_kwargs["project"], str(self.org.proj_uuid))
-        # dates are now converted to UTC ISO strings with date_end adjusted by -1 second
-        self.assertEqual(call_kwargs["date_start"], "2024-01-01T00:00:00+00:00")
+        # dates are converted to UTC ISO strings with Z suffix
+        self.assertEqual(call_kwargs["date_start"], "2024-01-01T00:00:00Z")
         self.assertEqual(call_kwargs["date_end"], "2024-01-31T23:59:59Z")
 
     @patch("temba.api.v2.services.events.dl_get_events_count_by_group")
@@ -6396,8 +6396,8 @@ class EventsServiceTest(APITest):
         mock_dl_get_counts.assert_called_once()
         _, call_kwargs = mock_dl_get_counts.call_args
         self.assertEqual(call_kwargs["project"], str(self.org.proj_uuid))
-        # dates are now converted to UTC ISO strings with date_end adjusted by -1 second
-        self.assertEqual(call_kwargs["date_start"], "2024-01-01T00:00:00+00:00")
+        # dates are converted to UTC ISO strings with Z suffix
+        self.assertEqual(call_kwargs["date_start"], "2024-01-01T00:00:00Z")
         self.assertEqual(call_kwargs["date_end"], "2024-01-31T23:59:59Z")
         self.assertEqual(call_kwargs["group_by"], "metadata.country")
 
