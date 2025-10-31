@@ -72,5 +72,3 @@ class Twilioflex2ViewTest(Twilioflex2Mixin):
                 "Unable to validate Twilio configuration. Please check your credentials and SIDs then try again."
             )
             self.assertIn(expected_error_message, str(cm.exception))
-
-

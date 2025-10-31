@@ -28,13 +28,16 @@ class ConnectView(BaseConnectView):
             help_text=_("SID of the Flex 2.x instance (e.g. FXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)."),
         )
         flex_workspace_sid = forms.CharField(
-            label=_("Workspace SID"), help_text=_("SID of a TaskRouter Workspace (e.g. WSxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx).")
+            label=_("Workspace SID"),
+            help_text=_("SID of a TaskRouter Workspace (e.g. WSxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)."),
         )
         flex_workflow_sid = forms.CharField(
-            label=_("Workflow SID"), help_text=_("SID of a TaskRouter Workflow (e.g. WWxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx).")
+            label=_("Workflow SID"),
+            help_text=_("SID of a TaskRouter Workflow (e.g. WWxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)."),
         )
         conversation_service_sid = forms.CharField(
-            label=_("Conversation Service SID"), help_text=_("SID of a Conversation Service (e.g. ISxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx).")
+            label=_("Conversation Service SID"),
+            help_text=_("SID of a Conversation Service (e.g. ISxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)."),
         )
 
         def _validate_taskrouter(self, account_sid: str, auth_token: str, workspace_sid: str, workflow_sid: str):
@@ -53,16 +56,13 @@ class ConnectView(BaseConnectView):
             wf_resp.raise_for_status()
 
         def _validate_flex_instance(self, account_sid: str, auth_token: str, flex_instance_sid: str):
-            try:
-                resp = requests.get(
-                    f"https://flex-api.twilio.com/v2/FlexInstances/{flex_instance_sid}",
-                    auth=(account_sid, auth_token),
-                    timeout=10,
-                )
-                if resp.status_code not in (200, 204, 403):
-                    resp.raise_for_status()
-            except Exception:
-                pass
+        
+            resp = requests.get(
+                f"https://flex-api.twilio.com/v2/FlexInstances/{flex_instance_sid}",
+                auth=(account_sid, auth_token),
+                timeout=10,
+            )
+            resp.raise_for_status()
 
         def clean(self):
             account_sid = self.cleaned_data["account_sid"]
@@ -70,7 +70,6 @@ class ConnectView(BaseConnectView):
             flex_instance_sid = self.cleaned_data["flex_instance_sid"]
             flex_workspace_sid = self.cleaned_data["flex_workspace_sid"]
             flex_workflow_sid = self.cleaned_data["flex_workflow_sid"]
-            conversation_service_sid = self.cleaned_data["conversation_service_sid"]
 
             try:
                 self._validate_taskrouter(
