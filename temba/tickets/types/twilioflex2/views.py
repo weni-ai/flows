@@ -33,6 +33,9 @@ class ConnectView(BaseConnectView):
         flex_workflow_sid = forms.CharField(
             label=_("Workflow SID"), help_text=_("SID of a TaskRouter Workflow (e.g. WWxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx).")
         )
+        conversation_service_sid = forms.CharField(
+            label=_("Conversation Service SID"), help_text=_("SID of a Conversation Service (e.g. ISxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx).")
+        )
 
         def _validate_taskrouter(self, account_sid: str, auth_token: str, workspace_sid: str, workflow_sid: str):
             ws_resp = requests.get(
@@ -67,6 +70,7 @@ class ConnectView(BaseConnectView):
             flex_instance_sid = self.cleaned_data["flex_instance_sid"]
             flex_workspace_sid = self.cleaned_data["flex_workspace_sid"]
             flex_workflow_sid = self.cleaned_data["flex_workflow_sid"]
+            conversation_service_sid = self.cleaned_data["conversation_service_sid"]
 
             try:
                 self._validate_taskrouter(
@@ -97,6 +101,7 @@ class ConnectView(BaseConnectView):
         flex_instance_sid = form.cleaned_data["flex_instance_sid"]
         flex_workspace_sid = form.cleaned_data["flex_workspace_sid"]
         flex_workflow_sid = form.cleaned_data["flex_workflow_sid"]
+        conversation_service_sid = form.cleaned_data["conversation_service_sid"]
 
         config = {
             TwilioFlex2Type.CONFIG_ACCOUNT_SID: account_sid,
@@ -104,6 +109,7 @@ class ConnectView(BaseConnectView):
             TwilioFlex2Type.CONFIG_FLEX_INSTANCE_SID: flex_instance_sid,
             TwilioFlex2Type.CONFIG_FLEX_WORKSPACE_SID: flex_workspace_sid,
             TwilioFlex2Type.CONFIG_FLEX_WORKFLOW_SID: flex_workflow_sid,
+            TwilioFlex2Type.CONFIG_CONVERSATION_SERVICE_SID: conversation_service_sid,
         }
 
         self.object = Ticketer(
