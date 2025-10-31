@@ -56,7 +56,7 @@ class ConnectView(BaseConnectView):
             wf_resp.raise_for_status()
 
         def _validate_flex_instance(self, account_sid: str, auth_token: str, flex_instance_sid: str):
-        
+
             resp = requests.get(
                 f"https://flex-api.twilio.com/v2/FlexInstances/{flex_instance_sid}",
                 auth=(account_sid, auth_token),
