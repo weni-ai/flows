@@ -18,6 +18,8 @@ class TwilioFlex2Type(TicketerType):
     CONFIG_FLEX_INSTANCE_SID = "flex_instance_sid"
     CONFIG_FLEX_WORKSPACE_SID = "flex_workspace_sid"
     CONFIG_FLEX_WORKFLOW_SID = "flex_workflow_sid"
+    CONFIG_CONVERSATION_SERVICE_SID = "conversation_service_sid"
+
     
     connect_view = ConnectView
     connect_blurb = _(
