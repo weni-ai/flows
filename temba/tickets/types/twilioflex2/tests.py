@@ -1,13 +1,10 @@
 from unittest.mock import patch
 
-from django.core.exceptions import ValidationError
-from django.http import HttpRequest
 from django.urls import reverse
 
 from temba.tests import MockResponse
 from temba.tests.base import TembaTest
 from temba.tickets.models import Ticketer
-from temba.tickets.types.twilioflex2.views import ConnectView
 
 from .type import TwilioFlex2Type
 
