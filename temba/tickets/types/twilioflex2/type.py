@@ -1,8 +1,8 @@
 from django.utils.translation import ugettext_lazy as _
 
 from temba.tickets.models import TicketerType
-
 from temba.tickets.types.twilioflex2.views import ConnectView
+
 
 class TwilioFlex2Type(TicketerType):
     """
@@ -12,7 +12,7 @@ class TwilioFlex2Type(TicketerType):
     name = "Twilio Flex 2.x"
     slug = "twilioflex2"
     icon = "icon-twilio_original"
-    
+
     CONFIG_ACCOUNT_SID = "account_sid"
     CONFIG_AUTH_TOKEN = "auth_token"
     CONFIG_FLEX_INSTANCE_SID = "flex_instance_sid"
@@ -20,7 +20,6 @@ class TwilioFlex2Type(TicketerType):
     CONFIG_FLEX_WORKFLOW_SID = "flex_workflow_sid"
     CONFIG_CONVERSATION_SERVICE_SID = "conversation_service_sid"
 
-    
     connect_view = ConnectView
     connect_blurb = _(
         "%(link)s  is a solution for cloud communication which can be connected as ticket service "

@@ -1,3 +1,7 @@
+3.43.0
+----------
+* Add twilioflex2 ticketer type and respective claim view
+
 3.42.1
 ----------
 * Add task to update msgs async on channel release
