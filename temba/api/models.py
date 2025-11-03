@@ -33,7 +33,7 @@ class APIPermission(BasePermission):
 
             org = request.user.get_org()
 
-            if request.auth:
+            if request.auth and hasattr(request.auth, "role"):
                 role_group = request.auth.role
                 allowed_roles = APIToken.get_allowed_roles(org, request.user)
 
@@ -44,6 +44,9 @@ class APIPermission(BasePermission):
                 # user may not have used token authentication
                 role_group = org.get_user_org_group(request.user)
             else:
+                return False
+
+            if not role_group:
                 return False
 
             codename = view.permission.split(".")[-1]
