@@ -1,3 +1,7 @@
+3.43.1
+----------
+* Remove unnecessary validation on twilio flex 2 claim
+
 3.43.0
 ----------
 * Add twilioflex2 ticketer type and respective claim view
