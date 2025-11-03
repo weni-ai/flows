@@ -1,7 +1,4 @@
-import requests
-
 from django import forms
-from django.forms import ValidationError
 from django.utils.translation import ugettext_lazy as _
 
 from temba.tickets.models import Ticketer
@@ -25,7 +22,7 @@ class ConnectView(BaseConnectView):
         )
         flex_instance_sid = forms.CharField(
             label=_("Flex Instance SID"),
-            help_text=_("SID of the Flex 2.x instance (e.g. FXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)."),
+            help_text=_("SID of the Flex 2.x instance (e.g. GOxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)."),
         )
         flex_workspace_sid = forms.CharField(
             label=_("Workspace SID"),
@@ -40,55 +37,7 @@ class ConnectView(BaseConnectView):
             help_text=_("SID of a Conversation Service (e.g. ISxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)."),
         )
 
-        def _validate_taskrouter(self, account_sid: str, auth_token: str, workspace_sid: str, workflow_sid: str):
-            ws_resp = requests.get(
-                f"https://taskrouter.twilio.com/v1/Workspaces/{workspace_sid}",
-                auth=(account_sid, auth_token),
-                timeout=10,
-            )
-            ws_resp.raise_for_status()
-
-            wf_resp = requests.get(
-                f"https://taskrouter.twilio.com/v1/Workspaces/{workspace_sid}/Workflows/{workflow_sid}",
-                auth=(account_sid, auth_token),
-                timeout=10,
-            )
-            wf_resp.raise_for_status()
-
-        def _validate_flex_instance(self, account_sid: str, auth_token: str, flex_instance_sid: str):
-
-            resp = requests.get(
-                f"https://flex-api.twilio.com/v2/FlexInstances/{flex_instance_sid}",
-                auth=(account_sid, auth_token),
-                timeout=10,
-            )
-            resp.raise_for_status()
-
         def clean(self):
-            account_sid = self.cleaned_data["account_sid"]
-            auth_token = self.cleaned_data["auth_token"]
-            flex_instance_sid = self.cleaned_data["flex_instance_sid"]
-            flex_workspace_sid = self.cleaned_data["flex_workspace_sid"]
-            flex_workflow_sid = self.cleaned_data["flex_workflow_sid"]
-
-            try:
-                self._validate_taskrouter(
-                    account_sid=account_sid,
-                    auth_token=auth_token,
-                    workspace_sid=flex_workspace_sid,
-                    workflow_sid=flex_workflow_sid,
-                )
-                self._validate_flex_instance(
-                    account_sid=account_sid,
-                    auth_token=auth_token,
-                    flex_instance_sid=flex_instance_sid,
-                )
-            except Exception:
-                raise ValidationError(
-                    _(
-                        "Unable to validate Twilio configuration. Please check your credentials and SIDs then try again."
-                    )
-                )
             return self.cleaned_data
 
     def form_valid(self, form):
