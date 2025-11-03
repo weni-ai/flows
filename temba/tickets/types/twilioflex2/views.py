@@ -1,7 +1,4 @@
-import requests
-
 from django import forms
-from django.forms import ValidationError
 from django.utils.translation import ugettext_lazy as _
 
 from temba.tickets.models import Ticketer
