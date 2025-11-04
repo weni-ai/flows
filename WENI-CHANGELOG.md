@@ -1,3 +1,7 @@
+3.43.2
+----------
+* Update weni-rp-apps version to 2.10.7
+
 3.43.1
 ----------
 * Remove unnecessary validation on twilio flex 2 claim
