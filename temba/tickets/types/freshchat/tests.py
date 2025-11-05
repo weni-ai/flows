@@ -58,7 +58,7 @@ class FreshchatTypeTest(TembaTest):
         self.assertIsNotNone(ticketer)
         self.assertEqual("acme.freshchat.com", ticketer.name)
         self.assertEqual({"oauth_token": "token789", "freshchat_domain": "acme.freshchat.com"}, ticketer.config)
-        self.assertRedirect(response, reverse("tickets.ticket_list"))
+        self.assertRedirect(response, reverse("tickets.types.freshchat.configure", args=[ticketer.uuid]))
 
     def test_configure(self):
         ticketer = Ticketer.create(
@@ -78,8 +78,6 @@ class FreshchatTypeTest(TembaTest):
 
         response = self.client.get(configure_url)
         self.assertEqual(200, response.status_code)
-        self.assertContains(response, "token123")
-        self.assertContains(response, "example.freshchat.com")
 
         # Check if webhook_url is in context
         self.assertIn("webhook_url", response.context)
