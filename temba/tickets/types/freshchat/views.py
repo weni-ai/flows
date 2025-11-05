@@ -31,24 +31,41 @@ class ConnectView(BaseConnectView):
             if errors:
                 raise forms.ValidationError(errors)
 
-            existing = Ticketer.objects.filter(
+            current_org = self.request.user.get_org()
+
+            # Check if ticketer exists in this workspace
+            existing_same_org = Ticketer.objects.filter(
                 is_active=True,
                 ticketer_type=FreshchatType.slug,
-                org=self.request.user.get_org(),
-                config__contains=freshchat_domain,
+                org=current_org,
+                config__freshchat_domain=freshchat_domain,
             ).first()
 
-            if existing:
+            if existing_same_org:
                 raise forms.ValidationError(
                     _("A Freshchat ticketer for this domain already exists in this workspace.")
                 )
 
-            if existing.org_id != self.request.user.get_org().id:
+            # Check if ticketer exists in another workspace
+            existing_other_org = (
+                Ticketer.objects.filter(
+                    is_active=True,
+                    ticketer_type=FreshchatType.slug,
+                    config__freshchat_domain=freshchat_domain,
+                )
+                .exclude(org=current_org)
+                .first()
+            )
+
+            if existing_other_org:
                 raise forms.ValidationError(
                     _("A Freshchat ticketer for this domain already exists in another workspace.")
                 )
 
             return self.cleaned_data
+
+    def get_success_url(self):
+        return reverse("tickets.types.freshchat.configure", args=[self.object.uuid])
 
     def form_valid(self, form):
         from .type import FreshchatType
