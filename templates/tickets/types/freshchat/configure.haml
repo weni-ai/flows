@@ -1,0 +1,26 @@
+-extends "smartmin/read.html"
+-load smartmin i18n
+
+-block title
+  .medium-help.float-left(class='{{ object.type.icon }}')
+
+  %h2.font_normalize.header-margin.title
+    {{ ticketer.type.name }}
+    -trans "Ticketing Service"
+    .ticketer-name
+      {{ ticketer.name }}
+
+-block content
+  -blocktrans trimmed
+    To complete the connection between your account and Freshchat, follow these steps:
+
+  %ol.steps.card
+    %li
+      -blocktrans trimmed
+        Go to Admin Settings in your Freshchat account > .
+    %li
+      -blocktrans trimmed with brand=brand.name
+        Navigate to Conversation Webhooks and create a new webhook to receive your events.
+    %li
+      -blocktrans trimmed with webhook_url=webhook_url
+        Enter this URL as the webhook endpoint: <code>{{ webhook_url }}</code>  
