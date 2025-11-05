@@ -19,19 +19,24 @@ class ConnectView(BaseConnectView):
         def clean(self):
             from .type import FreshchatType
 
+            errors = []
             oauth_token = self.cleaned_data.get("oauth_token")
             if not oauth_token:
-                raise forms.ValidationError(_("OAuth Token is required"))
+                errors.append(_("OAuth Token is required"))
 
             freshchat_domain = self.cleaned_data.get("freshchat_domain")
             if not freshchat_domain:
-                raise forms.ValidationError(_("Freshchat Domain is required"))
+                errors.append(_("Freshchat Domain is required"))
+
+            if errors:
+                raise forms.ValidationError(errors)
 
             existing = Ticketer.objects.filter(
                 is_active=True,
                 ticketer_type=FreshchatType.slug,
+                org=self.request.user.get_org(),
                 config__contains=freshchat_domain,
-            )
+            ).first()
 
             if existing:
                 raise forms.ValidationError(
@@ -91,17 +96,10 @@ class ConfigureView(ComponentFormMixin, OrgPermsMixin, SmartReadView):
         return links
 
     def get_context_data(self, **kwargs):
-        from .type import FreshchatType
-
-        oauth_token = self.object.config[FreshchatType.CONFIG_OAUTH_TOKEN]
-        freshchat_domain = self.object.config[FreshchatType.CONFIG_FRESHCHAT_DOMAIN]
-
         # Build webhook URL
         domain = self.object.org.get_brand_domain()
         webhook_url = f"https://{domain}/mr/tickets/types/freshchat/webhook/{self.object.uuid}"
 
         context = super().get_context_data(**kwargs)
-        context["oauth_token"] = oauth_token
-        context["freshchat_domain"] = freshchat_domain
         context["webhook_url"] = webhook_url
         return context
