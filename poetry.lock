@@ -1884,7 +1884,7 @@ pytest = ">=8.4.0,<9.0.0"
 
 [[package]]
 name = "weni-rp-apps"
-version = "2.10.7a0"
+version = "2.10.7"
 description = "Weni apps for Rapidpro Platform"
 category = "main"
 optional = false
@@ -1970,7 +1970,7 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=4.6)", "pytest-black (
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "7487d75c9b700ccfdfac1d8128624309622f9d232bb1ca08b613b28ef67aace4"
+content-hash = "c15b40b926e15a5aa450668ada94c54333a69baa7ba39417377c74e0d2515a89"
 
 [metadata.files]
 amqp = [
@@ -3082,8 +3082,8 @@ weni-datalake-sdk = [
     {file = "weni_datalake_sdk-0.6.1.tar.gz", hash = "sha256:d19a6bff608d30ef2dbc544434a13b7640571a0afe443ae1c17f24b057ab47d6"},
 ]
 weni-rp-apps = [
-    {file = "weni_rp_apps-2.10.7a0-py3-none-any.whl", hash = "sha256:268aafa4a53fb18d9a59b585a8a23a02be687789fbcce46b6fba85f5ff29fb66"},
-    {file = "weni_rp_apps-2.10.7a0.tar.gz", hash = "sha256:37bae40056e5e589ec47cb4d6da929738e8d320cc4273324a9fe9b0937ef00e3"},
+    {file = "weni_rp_apps-2.10.7-py3-none-any.whl", hash = "sha256:7a528e6cf414261023a3ef39f97fd31b3b4fb11cdebb1b2e92520d4730d9f74e"},
+    {file = "weni_rp_apps-2.10.7.tar.gz", hash = "sha256:a0e20e5499b3df43ae972d6abd419348dbc0b08e2394cfeb0028cf0271895ff4"},
 ]
 werkzeug = [
     {file = "werkzeug-3.1.3-py3-none-any.whl", hash = "sha256:54b78bf3716d19a65be4fceccc0d1d7b89e608834989dfae50ea87564639213e"},
