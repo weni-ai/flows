@@ -25,15 +25,16 @@ BEGIN
         delivered = delivered + CASE WHEN NEW.status = 'D' THEN 1 ELSE 0 END,
         failed = failed + CASE WHEN NEW.status = 'F' THEN 1 ELSE 0 END,
         read = read + CASE WHEN NEW.status = 'V' THEN 1 ELSE 0 END,
+        -- processed should increment exactly once when leaving Q, or if inserted already processed
         processed = processed + CASE
-            WHEN NEW.status = 'W' THEN 1
-            WHEN TG_OP = 'UPDATE' AND NEW.status = 'F' AND OLD.status = 'Q' THEN 1
+            WHEN TG_OP = 'UPDATE' AND OLD.status = 'Q' AND NEW.status IN ('W','S','D','F','V') THEN 1
+            WHEN TG_OP = 'INSERT' AND NEW.status IN ('W','S','D','F','V') THEN 1
             ELSE 0
         END,
         cost = COALESCE(cost, 0) + CASE WHEN NEW.status = 'S' THEN COALESCE(template_price, 0) ELSE 0 END,
         modified_on = CASE
-            WHEN NEW.status = 'W' THEN NOW()
-            WHEN TG_OP = 'UPDATE' AND NEW.status = 'F' AND OLD.status = 'Q' THEN NOW()
+            WHEN TG_OP = 'UPDATE' AND OLD.status = 'Q' AND NEW.status IN ('W','S','D','F','V') THEN NOW()
+            WHEN TG_OP = 'INSERT' AND NEW.status IN ('W','S','D','F','V') THEN NOW()
             ELSE modified_on
         END
     WHERE s.broadcast_id = NEW.broadcast_id;
