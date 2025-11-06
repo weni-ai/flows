@@ -20,9 +20,14 @@ BEGIN
         sent = sent + CASE
             WHEN NEW.status = 'S' THEN 1
             WHEN TG_OP = 'UPDATE' AND NEW.status = 'D' AND OLD.status = 'W' THEN 1
+            WHEN TG_OP = 'INSERT' AND NEW.status = 'V' THEN 1
             ELSE 0
         END,
-        delivered = delivered + CASE WHEN NEW.status = 'D' THEN 1 ELSE 0 END,
+        delivered = delivered + CASE
+            WHEN NEW.status = 'D' THEN 1
+            WHEN TG_OP = 'INSERT' AND NEW.status = 'V' THEN 1
+            ELSE 0
+        END,
         failed = failed + CASE WHEN NEW.status = 'F' THEN 1 ELSE 0 END,
         read = read + CASE WHEN NEW.status = 'V' THEN 1 ELSE 0 END,
         -- processed should increment exactly once when leaving Q, or if inserted already processed
