@@ -20,11 +20,13 @@ BEGIN
         sent = sent + CASE
             WHEN NEW.status = 'S' THEN 1
             WHEN TG_OP = 'UPDATE' AND NEW.status = 'D' AND OLD.status = 'W' THEN 1
+            WHEN TG_OP = 'UPDATE' AND NEW.status = 'V' AND OLD.status IN ('Q','W') THEN 1
             WHEN TG_OP = 'INSERT' AND NEW.status = 'V' THEN 1
             ELSE 0
         END,
         delivered = delivered + CASE
             WHEN NEW.status = 'D' THEN 1
+            WHEN TG_OP = 'UPDATE' AND NEW.status = 'V' AND OLD.status IN ('Q','W') THEN 1
             WHEN TG_OP = 'INSERT' AND NEW.status = 'V' THEN 1
             ELSE 0
         END,
