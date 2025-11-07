@@ -19,19 +19,23 @@ class FreshchatTypeTest(TembaTest):
         self.login(self.admin)
 
         response = self.client.get(connect_url)
-        self.assertEqual(["oauth_token", "freshchat_domain", "loc"], list(response.context["form"].fields.keys()))
+        self.assertEqual(
+            ["name", "oauth_token", "freshchat_domain", "loc"], list(response.context["form"].fields.keys())
+        )
 
         # will fail as we don't have anything filled out
         response = self.client.post(connect_url, {})
-        self.assertFormError(response, "form", None, ["OAuth Token is required", "Freshchat Domain is required"])
+        self.assertFormError(
+            response, "form", None, ["Name is required", "OAuth Token is required", "Freshchat Domain is required"]
+        )
 
         # try with only oauth_token
         response = self.client.post(connect_url, {"oauth_token": "token123"})
-        self.assertFormError(response, "form", None, ["Freshchat Domain is required"])
+        self.assertFormError(response, "form", None, ["Name is required", "Freshchat Domain is required"])
 
         # try with only freshchat_domain
         response = self.client.post(connect_url, {"freshchat_domain": "example.freshchat.com"})
-        self.assertFormError(response, "form", None, ["OAuth Token is required"])
+        self.assertFormError(response, "form", None, ["Name is required", "OAuth Token is required"])
 
         # try with freshchat_domain already taken by this org
         Ticketer.create(
@@ -42,7 +46,8 @@ class FreshchatTypeTest(TembaTest):
             config={"oauth_token": "token123", "freshchat_domain": "example.freshchat.com"},
         )
         response = self.client.post(
-            connect_url, {"oauth_token": "token456", "freshchat_domain": "example.freshchat.com"}
+            connect_url,
+            {"name": "Test Ticketer", "oauth_token": "token456", "freshchat_domain": "example.freshchat.com"},
         )
         self.assertFormError(
             response,
@@ -52,11 +57,13 @@ class FreshchatTypeTest(TembaTest):
         )
 
         # submitting with valid data should create ticketer and redirect
-        response = self.client.post(connect_url, {"oauth_token": "token789", "freshchat_domain": "acme.freshchat.com"})
+        response = self.client.post(
+            connect_url, {"name": "My Freshchat", "oauth_token": "token789", "freshchat_domain": "acme.freshchat.com"}
+        )
 
         ticketer = Ticketer.objects.filter(ticketer_type="freshchat", is_active=True).order_by("id").last()
         self.assertIsNotNone(ticketer)
-        self.assertEqual("acme.freshchat.com", ticketer.name)
+        self.assertEqual("My Freshchat", ticketer.name)
         self.assertEqual({"oauth_token": "token789", "freshchat_domain": "acme.freshchat.com"}, ticketer.config)
         self.assertRedirect(response, reverse("tickets.types.freshchat.configure", args=[ticketer.uuid]))
 
