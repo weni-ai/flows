@@ -13,6 +13,7 @@ from temba.utils.views import ComponentFormMixin
 
 class ConnectView(BaseConnectView):
     class Form(BaseConnectView.Form):
+        name = forms.CharField(label=_("Name"), help_text=_("Name for this ticketer"))
         oauth_token = forms.CharField(label=_("OAuth Token"), help_text=_("OAuth Token"))
         freshchat_domain = forms.CharField(label=_("Freshchat Domain"), help_text=_("Freshchat Domain"))
 
@@ -20,6 +21,10 @@ class ConnectView(BaseConnectView):
             from .type import FreshchatType
 
             errors = []
+            name = self.cleaned_data.get("name")
+            if not name:
+                errors.append(_("Name is required"))
+
             oauth_token = self.cleaned_data.get("oauth_token")
             if not oauth_token:
                 errors.append(_("OAuth Token is required"))
@@ -70,6 +75,7 @@ class ConnectView(BaseConnectView):
     def form_valid(self, form):
         from .type import FreshchatType
 
+        name = form.cleaned_data["name"]
         oauth_token = form.cleaned_data["oauth_token"]
         freshchat_domain = form.cleaned_data["freshchat_domain"]
 
@@ -83,7 +89,7 @@ class ConnectView(BaseConnectView):
             org=self.org,
             ticketer_type=FreshchatType.slug,
             config=config,
-            name=freshchat_domain,
+            name=name,
             created_by=self.request.user,
             modified_by=self.request.user,
         )
