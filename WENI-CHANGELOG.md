@@ -1,3 +1,7 @@
+3.43.3
+----------
+* Add migration to optimize broadcast statistics trigger
+
 3.43.2
 ----------
 * Update weni-rp-apps version to 2.10.7
