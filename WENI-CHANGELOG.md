@@ -1,3 +1,19 @@
+3.43.3
+----------
+* Add migration to optimize broadcast statistics trigger
+
+3.43.2
+----------
+* Update weni-rp-apps version to 2.10.7
+
+3.43.1
+----------
+* Remove unnecessary validation on twilio flex 2 claim
+
+3.43.0
+----------
+* Add twilioflex2 ticketer type and respective claim view
+
 3.42.1
 ----------
 * Add task to update msgs async on channel release
