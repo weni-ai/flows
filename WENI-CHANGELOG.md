@@ -1,3 +1,7 @@
+3.44.0
+----------
+* Add Freshchat ticketer integration
+
 3.43.3
 ----------
 * Add migration to optimize broadcast statistics trigger
