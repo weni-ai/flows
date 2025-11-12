@@ -89,7 +89,7 @@ class OrgUserRateThrottle(ScopedRateThrottle):
 
     def allow_request(self, request, view):
         # any request not using a token (e.g. editor, explorer) isn't subject to throttling
-        if request.user.is_authenticated and not request.user.using_token:
+        if request.user.is_authenticated and not getattr(request.user, "using_token", False):
             return True
 
         return super().allow_request(request, view)
