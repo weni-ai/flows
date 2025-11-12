@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import timedelta
 
 import iso8601
@@ -6,6 +7,7 @@ import pytz
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.files import File
 from django.utils import timezone
 
 from celery import shared_task
@@ -102,10 +104,14 @@ def export_contacts_by_status_task(export_id: int, broadcast_id: int, msg_status
 
         temp_file, extension = exporter.save_file()
 
-        get_asset_store(model=ExportContactsTask).save(export.id, temp_file, extension)
+        # save to asset store (wrap temp file with Django File like BaseExportTask.perform does)
+        get_asset_store(model=ExportContactsTask).save(export.id, File(temp_file), extension)
 
         if hasattr(temp_file, "delete"):
-            temp_file.delete()
+            if temp_file.delete is False:  # pragma: no cover
+                os.unlink(temp_file.name)
+        else:  # pragma: no cover
+            os.unlink(temp_file.name)
 
         export.status = BaseExportTask.STATUS_COMPLETE
         export.save(update_fields=("status", "modified_on"))

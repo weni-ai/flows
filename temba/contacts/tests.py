@@ -6122,3 +6122,68 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
         read_url = reverse("contacts.contactimport_read", args=[imp.id])
 
         self.assertReadFetch(read_url, allow_viewers=True, allow_editors=True, context_object=imp)
+
+
+class ExportContactsByStatusTaskTest(TembaTest):
+    def _make_broadcast_with_contacts(self):
+        main = self.create_contact("Main", urns=["tel:+12025550000"])
+        c1 = self.create_contact("Alice", urns=["tel:+12025550001"])
+        c2 = self.create_contact("Bob", urns=["tel:+12025550002"])
+        bcast = self.create_broadcast(self.admin, "hi", contacts=[main, c1, c2])
+        # mark only c1 and c2 as delivered to match status filter
+        bcast.msgs.filter(contact_id__in=[c1.id, c2.id]).update(status=Msg.STATUS_DELIVERED)
+        return bcast, [c1, c2]
+
+    def test_task_success_creates_asset_and_notifies(self):
+        from temba.contacts.models import ExportContactsTask
+        from temba.contacts.tasks import export_contacts_by_status_task
+        from temba.notifications.models import Notification
+        from unittest.mock import Mock
+
+        bcast, delivered = self._make_broadcast_with_contacts()
+
+        # include group memberships to cover that branch in writer
+        group = self.create_group("Members", contacts=[delivered[0]])
+        export = ExportContactsTask.create(self.org, self.admin, group=None, search=None, group_memberships=(group,))
+
+        with patch("temba.contacts.tasks.get_asset_store") as mock_get_store, patch.object(
+            Notification, "export_finished"
+        ) as mock_notify:
+            mock_store = Mock()
+            mock_store.save.return_value = None
+            mock_get_store.return_value = mock_store
+
+            export_contacts_by_status_task(export.id, bcast.id, Msg.STATUS_DELIVERED)
+
+        export.refresh_from_db()
+        self.assertEqual(ExportContactsTask.STATUS_COMPLETE, export.status)
+        mock_notify.assert_called_once_with(export)
+
+        # download URL should resolve from asset store
+        url = export.get_download_url()
+        self.assertTrue(url and isinstance(url, str))
+
+    def test_task_handles_missing_export(self):
+        from temba.contacts.tasks import export_contacts_by_status_task
+
+        # should no-op without raising
+        export_contacts_by_status_task(999999, 1, Msg.STATUS_DELIVERED)
+
+    def test_task_failure_sets_failed_status(self):
+        from temba.contacts.models import ExportContactsTask
+        from temba.contacts.tasks import export_contacts_by_status_task
+        from unittest.mock import Mock
+
+        bcast, _ = self._make_broadcast_with_contacts()
+        export = ExportContactsTask.create(self.org, self.admin, group=None, search=None, group_memberships=())
+
+        # force failure on asset save
+        with patch("temba.contacts.tasks.get_asset_store") as mock_get_store:
+            mock_store = Mock()
+            mock_store.save.side_effect = RuntimeError("boom")
+            mock_get_store.return_value = mock_store
+
+            export_contacts_by_status_task(export.id, bcast.id, Msg.STATUS_DELIVERED)
+
+        export.refresh_from_db()
+        self.assertEqual(ExportContactsTask.STATUS_FAILED, export.status)

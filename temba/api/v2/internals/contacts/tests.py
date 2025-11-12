@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.test import APIClient
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -166,7 +167,12 @@ class InternalContactViewTest(TembaTest):
 
 
 class ContactsExportByStatusViewTest(TembaTest):
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
     def test_export_contacts_by_status_enqueues_and_responds(self):
+        # use DRF APIClient to force authenticate a real user without OIDC
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
         c1 = self.create_contact("C1", urns=["tel:+112"])
         c2 = self.create_contact("C2", urns=["tel:+113"])
         main = self.create_contact("A", urns=["tel:+111"])
@@ -175,21 +181,17 @@ class ContactsExportByStatusViewTest(TembaTest):
         broadcast.msgs.filter(contact_id__in=[c1.id, c2.id]).update(status=Msg.STATUS_DELIVERED)
 
         url = "/api/v2/internals/contacts_export_by_status"
-        with patch(
-            "temba.api.v2.internals.contacts.views.InternalOIDCAuthentication.authenticate",
-            return_value=(self.admin, None),
-        ), patch("temba.api.v2.internals.contacts.views.IsUserInOrg.has_permission", return_value=True), patch(
-            "temba.api.v2.internals.contacts.views.on_transaction_commit", side_effect=lambda fn: fn()
-        ), patch(
+        with patch("temba.api.v2.internals.contacts.views.on_transaction_commit", side_effect=lambda fn: fn()), patch(
             "temba.api.v2.internals.contacts.views.export_contacts_by_status_task.delay"
         ) as mock_delay:
-            resp = self.client.post(
+            resp = client.post(
                 url,
                 data={
                     "project_uuid": str(self.org.proj_uuid),
                     "broadcast_id": broadcast.id,
                     "status": Msg.STATUS_DELIVERED,
                 },
+                format="json",
             )
         self.assertEqual(resp.status_code, 201)
         data = resp.json()
@@ -200,7 +202,11 @@ class ContactsExportByStatusViewTest(TembaTest):
         mock_delay.assert_called_once()
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
     def test_export_contacts_by_status_builds_file_eager(self):
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
         c1 = self.create_contact("X1", urns=["tel:+115"])
         c2 = self.create_contact("X2", urns=["tel:+116"])
         main = self.create_contact("B", urns=["tel:+114"])
@@ -208,18 +214,15 @@ class ContactsExportByStatusViewTest(TembaTest):
         broadcast.msgs.filter(contact_id__in=[c1.id, c2.id]).update(status=Msg.STATUS_DELIVERED)
 
         url = "/api/v2/internals/contacts_export_by_status"
-        with patch(
-            "temba.api.v2.internals.contacts.views.InternalOIDCAuthentication.authenticate",
-            return_value=(self.admin, None),
-        ), patch("temba.api.v2.internals.contacts.views.IsUserInOrg.has_permission", return_value=True):
-            resp = self.client.post(
-                url,
-                data={
-                    "project_uuid": str(self.org.proj_uuid),
-                    "broadcast_id": broadcast.id,
-                    "status": Msg.STATUS_DELIVERED,
-                },
-            )
+        resp = client.post(
+            url,
+            data={
+                "project_uuid": str(self.org.proj_uuid),
+                "broadcast_id": broadcast.id,
+                "status": Msg.STATUS_DELIVERED,
+            },
+            format="json",
+        )
         self.assertEqual(resp.status_code, 201)
         data = resp.json()
         self.assertIsNotNone(data.get("export_id"))
