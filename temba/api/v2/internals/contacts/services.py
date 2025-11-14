@@ -201,7 +201,7 @@ class ContactDownloadByStatusService:
             batch_contacts = (
                 Contact.objects.filter(id__in=batch_ids)
                 .select_related("org")
-                .only("id", "uuid", "name", "language", "created_on", "last_seen_on")
+                .only("id", "uuid", "name", "language", "created_on", "last_seen_on", "org")
                 .using("readonly")
             )
 
