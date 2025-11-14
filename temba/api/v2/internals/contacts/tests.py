@@ -251,7 +251,9 @@ class ContactsExportByStatusViewTest(TembaTest):
     @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
     def test_broadcast_not_found_for_project_returns_404(self):
         # create broadcast on a different org
-        other_bcast = self.create_broadcast(self.admin2, "hi other", contacts=[self.create_contact("O1", urns=["tel:+991"])])
+        other_bcast = self.create_broadcast(
+            self.admin2, "hi other", contacts=[self.create_contact("O1", urns=["tel:+991"])]
+        )
         client = APIClient()
         client.force_authenticate(user=self.admin)
         url = "/api/v2/internals/contacts_export_by_status"
