@@ -229,6 +229,85 @@ class ContactsExportByStatusViewTest(TembaTest):
         # In eager mode the view fills download_url immediately
         self.assertTrue("download_url" in data)
 
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
+    def test_missing_project_returns_400(self):
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        url = "/api/v2/internals/contacts_export_by_status"
+        resp = client.post(
+            url,
+            data={
+                # no project_uuid
+                "broadcast_id": 123456,
+                "status": Msg.STATUS_DELIVERED,
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json().get("error"), "Project not provided")
+
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
+    def test_broadcast_not_found_for_project_returns_404(self):
+        # create broadcast on a different org
+        other_bcast = self.create_broadcast(self.admin2, "hi other", contacts=[self.create_contact("O1", urns=["tel:+991"])])
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        url = "/api/v2/internals/contacts_export_by_status"
+        resp = client.post(
+            url,
+            data={
+                "project_uuid": str(self.org.proj_uuid),  # current org
+                "broadcast_id": other_bcast.id,  # broadcast from different org (self.org2)
+                "status": Msg.STATUS_DELIVERED,
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json().get("error"), "Broadcast not found for project")
+
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
+    def test_invalid_status_returns_400(self):
+        # create a valid broadcast for current org
+        main = self.create_contact("A", urns=["tel:+110"])
+        bcast = self.create_broadcast(self.admin, "hi", contacts=[main])
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        url = "/api/v2/internals/contacts_export_by_status"
+        resp = client.post(
+            url,
+            data={
+                "project_uuid": str(self.org.proj_uuid),
+                "broadcast_id": bcast.id,
+                "status": "INVALID",
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json().get("error"), "Invalid status")
+
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
+    def test_status_required_returns_400(self):
+        main = self.create_contact("A", urns=["tel:+1110"])
+        bcast = self.create_broadcast(self.admin, "hello", contacts=[main])
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        url = "/api/v2/internals/contacts_export_by_status"
+        resp = client.post(
+            url,
+            data={
+                "project_uuid": str(self.org.proj_uuid),
+                "broadcast_id": bcast.id,
+                # missing status
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json().get("error"), "Status is required")
+
 
 class ListContactFieldsEndpointTest(TembaTest):
     @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
