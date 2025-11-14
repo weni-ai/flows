@@ -7,6 +7,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
 
+from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.flows.models import Flow
 from temba.msgs.models import Broadcast, BroadcastStatistics
 from temba.tests.base import TembaTest
@@ -551,6 +552,85 @@ class TestInternalBroadcastStatistics(TembaTest):
         body = resp.json()
         self.assertIn("last_30_days_stats", body)
         self.assertIn("success_rate_30_days", body)
+
+
+class TestInternalWhatsappBroadcastJWT(TembaTest):
+    url = "/api/v2/internals/whatsapp_broadcasts"
+
+    @patch("temba.api.auth.jwt.settings")
+    @patch("temba.api.auth.jwt.jwt.decode")
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes",
+        [OptionalJWTAuthentication],
+    )
+    def test_jwt_missing_project_returns_401(self, mock_decode, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = "dummy"
+        mock_decode.return_value = {}  # no project in payload
+        resp = self.client.post(
+            self.url,
+            data={"msg": {"text": "Hi"}, "urns": ["tel:+111"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer token",
+        )
+        self.assertEqual(resp.status_code, 401)
+        self.assertIn("Project not provided", resp.json().get("error", ""))
+
+    @patch("temba.api.auth.jwt.settings")
+    @patch("temba.api.auth.jwt.jwt.decode")
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes",
+        [OptionalJWTAuthentication],
+    )
+    def test_jwt_org_not_found_returns_404(self, mock_decode, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = "dummy"
+        mock_decode.return_value = {"project_uuid": "00000000-0000-0000-0000-000000000000"}
+        resp = self.client.post(
+            self.url,
+            data={"msg": {"text": "Hi"}, "urns": ["tel:+12025550149"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer token",
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertIn("Project not found", resp.json().get("error", ""))
+
+    @patch("temba.api.auth.jwt.settings")
+    @patch("temba.api.auth.jwt.jwt.decode")
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes",
+        [OptionalJWTAuthentication],
+    )
+    def test_jwt_missing_email_returns_401(self, mock_decode, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = "dummy"
+        mock_decode.return_value = {"project_uuid": str(self.org.proj_uuid)}
+        resp = self.client.post(
+            self.url,
+            data={"project": str(self.org.proj_uuid), "msg": {"text": "Hi"}, "urns": ["tel:+12025550149"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer token",
+        )
+        self.assertEqual(resp.status_code, 401)
+        self.assertIn("User email not provided", resp.json().get("error", ""))
+
+    @patch("temba.api.v2.serializers.Broadcast.create")
+    @patch("temba.api.auth.jwt.settings")
+    @patch("temba.api.auth.jwt.jwt.decode")
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes",
+        [OptionalJWTAuthentication],
+    )
+    def test_jwt_success_returns_200(self, mock_decode, mock_settings, mock_broadcast_create):
+        mock_settings.JWT_PUBLIC_KEY = "dummy"
+        mock_decode.return_value = {"project_uuid": str(self.org.proj_uuid), "email": "user@example.com"}
+        mock_broadcast_create.return_value = MagicMock()
+
+        resp = self.client.post(
+            self.url,
+            data={"project": str(self.org.proj_uuid), "msg": {"text": "Hi"}, "urns": ["tel:+12025550149"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer token",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("Success", resp.json().get("message", ""))
 
 
 class BroadcastWithStatisticsSerializerTests(TembaTest):

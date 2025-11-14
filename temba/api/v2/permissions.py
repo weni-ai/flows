@@ -30,3 +30,13 @@ class IsUserInOrg(BasePermission):
         except User.DoesNotExist:
             return False
         return org.has_user(user)
+
+
+class HasValidJWT(BasePermission):
+    """
+    Grants permission if request was successfully authenticated via JWT.
+    Relies on JWTModuleAuthentication setting `request.jwt_payload`.
+    """
+
+    def has_permission(self, request, view):
+        return getattr(request, "jwt_payload", None) is not None
