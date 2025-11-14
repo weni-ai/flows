@@ -16,4 +16,4 @@ class JWTModuleAuthentication(RequiredJWTAuthentication):
 
 class JWTModuleAuthMixin(JWTAuthMixinRequired):
     authentication_classes = [JWTModuleAuthentication]
-    permission_classes = [HasValidJWT]
+    permission_classes = []
