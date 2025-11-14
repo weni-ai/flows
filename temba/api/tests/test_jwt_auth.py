@@ -1,11 +1,17 @@
 from unittest.mock import patch
 
+import jwt
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.test import APIRequestFactory
 
 from django.test import TestCase
 
-from temba.api.auth.jwt import OptionalJWTAuthentication, RequiredJWTAuthentication
+from temba.api.auth.jwt import (
+    JWTAuthMixinOptional,
+    JWTAuthMixinRequired,
+    OptionalJWTAuthentication,
+    RequiredJWTAuthentication,
+)
 from temba.api.v2.permissions import HasValidJWT
 
 
@@ -43,6 +49,34 @@ class OptionalJWTAuthenticationTests(TestCase):
         self.assertIsInstance(user, AnonymousUser)
         self.assertEqual(getattr(request, "project_uuid", None), "proj-123")
         self.assertEqual(getattr(request, "jwt_payload", None), payload)
+
+    @patch("temba.api.auth.jwt.jwt.decode")
+    @patch("temba.api.auth.jwt.settings")
+    def test_success_sets_project_from_project_key(self, mock_settings, mock_jwt_decode):
+        mock_settings.JWT_PUBLIC_KEY = "dummy-public-key"
+        mock_jwt_decode.return_value = {"project": "proj-abc"}
+
+        request = self.factory.get("/")
+        request.headers = {"Authorization": "Bearer valid-token"}
+
+        self.auth.authenticate(request)
+        self.assertEqual(getattr(request, "project_uuid", None), "proj-abc")
+
+    @patch("temba.api.auth.jwt.settings")
+    def test_invalid_token_returns_none(self, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = "dummy-public-key"
+        request = self.factory.get("/")
+        request.headers = {"Authorization": "Bearer invalid-token"}
+        with patch("temba.api.auth.jwt.jwt.decode", side_effect=jwt.InvalidTokenError("bad")):
+            self.assertIsNone(self.auth.authenticate(request))
+
+    @patch("temba.api.auth.jwt.settings")
+    def test_expired_token_returns_none(self, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = "dummy-public-key"
+        request = self.factory.get("/")
+        request.headers = {"Authorization": "Bearer expired-token"}
+        with patch("temba.api.auth.jwt.jwt.decode", side_effect=jwt.ExpiredSignatureError("expired")):
+            self.assertIsNone(self.auth.authenticate(request))
 
 
 class RequiredJWTAuthenticationTests(TestCase):
@@ -85,6 +119,26 @@ class RequiredJWTAuthenticationTests(TestCase):
         self.assertEqual(getattr(request, "project_uuid", None), "proj-456")
         self.assertEqual(getattr(request, "jwt_payload", None), payload)
 
+    @patch("temba.api.auth.jwt.settings")
+    def test_required_expired_token_raises(self, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = "dummy-public-key"
+        request = self.factory.get("/")
+        request.headers = {"Authorization": "Bearer expired-token"}
+        with patch("temba.api.auth.jwt.jwt.decode", side_effect=jwt.ExpiredSignatureError("expired")):
+            with self.assertRaises(AuthenticationFailed) as ctx:
+                self.auth.authenticate(request)
+            self.assertIn("Token expired", str(ctx.exception))
+
+    @patch("temba.api.auth.jwt.settings")
+    def test_required_invalid_token_raises(self, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = "dummy-public-key"
+        request = self.factory.get("/")
+        request.headers = {"Authorization": "Bearer invalid-token"}
+        with patch("temba.api.auth.jwt.jwt.decode", side_effect=jwt.InvalidTokenError("bad")):
+            with self.assertRaises(AuthenticationFailed) as ctx:
+                self.auth.authenticate(request)
+            self.assertIn("Invalid token", str(ctx.exception))
+
 
 class HasValidJWTTests(TestCase):
     def test_permission_granted_when_jwt_payload_present(self):
@@ -95,3 +149,29 @@ class HasValidJWTTests(TestCase):
     def test_permission_denied_when_no_jwt(self):
         request = APIRequestFactory().get("/")
         self.assertFalse(HasValidJWT().has_permission(request, view=None))
+
+
+class JWTAuthMixinsTests(TestCase):
+    def test_required_mixin_properties(self):
+        class Dummy(JWTAuthMixinRequired):
+            request = None
+
+        d = Dummy()
+        req = APIRequestFactory().get("/")
+        req.project_uuid = "proj-required"
+        req.jwt_payload = {"a": 1}
+        d.request = req
+        self.assertEqual(d.project_uuid, "proj-required")
+        self.assertEqual(d.jwt_payload, {"a": 1})
+
+    def test_optional_mixin_properties(self):
+        class Dummy(JWTAuthMixinOptional):
+            request = None
+
+        d = Dummy()
+        req = APIRequestFactory().get("/")
+        req.project_uuid = "proj-optional"
+        req.jwt_payload = {"b": 2}
+        d.request = req
+        self.assertEqual(d.project_uuid, "proj-optional")
+        self.assertEqual(d.jwt_payload, {"b": 2})
