@@ -1,3 +1,8 @@
+3.44.1
+----------
+* Add jwt auth in internal whatsapp broadcast endpoint
+* Endpoint to download contacts according msgs status
+
 3.44.0
 ----------
 * Add Freshchat ticketer integration
