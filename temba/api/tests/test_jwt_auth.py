@@ -30,6 +30,18 @@ class OptionalJWTAuthenticationTests(TestCase):
         result = self.auth.authenticate(request)
         self.assertIsNone(result)
 
+    def test_invalid_header_type_returns_none(self):
+        request = self.factory.get("/")
+        request.headers = {"Authorization": 123}  # non-string
+        result = self.auth.authenticate(request)
+        self.assertIsNone(result)
+
+    def test_invalid_header_prefix_returns_none(self):
+        request = self.factory.get("/")
+        request.headers = {"Authorization": "Token abc"}  # not Bearer
+        result = self.auth.authenticate(request)
+        self.assertIsNone(result)
+
     @patch("temba.api.auth.jwt.settings")
     def test_missing_public_key_returns_none_when_bearer(self, mock_settings):
         mock_settings.JWT_PUBLIC_KEY = None
@@ -94,9 +106,27 @@ class RequiredJWTAuthenticationTests(TestCase):
         self.assertIs(self.auth.get_jwt(), jwt)
 
     @patch("temba.api.auth.jwt.settings")
+    def test_missing_public_key_raises(self, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = None
+        request = self.factory.get("/")
+        request.headers = {"Authorization": "Bearer any"}
+        with self.assertRaises(AuthenticationFailed) as ctx:
+            self.auth.authenticate(request)
+        self.assertIn("JWT_PUBLIC_KEY not configured", str(ctx.exception))
+
+    @patch("temba.api.auth.jwt.settings")
     def test_missing_authorization_header_raises(self, mock_settings):
         mock_settings.JWT_PUBLIC_KEY = "dummy-public-key"
         request = self.factory.get("/")
+        with self.assertRaises(AuthenticationFailed) as ctx:
+            self.auth.authenticate(request)
+        self.assertIn("Missing or invalid Authorization header", str(ctx.exception))
+
+    @patch("temba.api.auth.jwt.settings")
+    def test_invalid_authorization_prefix_raises(self, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = "dummy-public-key"
+        request = self.factory.get("/")
+        request.headers = {"Authorization": "Token abc"}
         with self.assertRaises(AuthenticationFailed) as ctx:
             self.auth.authenticate(request)
         self.assertIn("Missing or invalid Authorization header", str(ctx.exception))
