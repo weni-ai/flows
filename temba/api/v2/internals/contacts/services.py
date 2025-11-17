@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 
 import pyexcel
@@ -6,6 +7,7 @@ from xlsxlite.writer import XLSXBook
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.temp import NamedTemporaryFile
+from django.utils import timezone as dj_timezone
 from django.utils.text import slugify
 
 from temba.contacts.models import Contact, ContactImport
@@ -191,6 +193,18 @@ class ContactDownloadByStatusService:
         columns = ["Contact UUID", "Name", "URNs", "Language", "Created On", "Last Seen On"]
         exporter = TableExporter(task=None, sheet_name="Contacts", columns=columns)
 
+        def _prep(val):
+            if val is None:
+                return ""
+            if isinstance(val, str):
+                return "'" + val if val.startswith("=") else val
+            if isinstance(val, datetime):
+                v = val
+                if dj_timezone.is_aware(v):
+                    v = v.astimezone(org.timezone)
+                return v.replace(microsecond=0, tzinfo=None)
+            return str(val)
+
         # write out contacts in batches to limit memory usage
         def chunk_list(items, size):
             for i in range(0, len(items), size):
@@ -220,12 +234,12 @@ class ContactDownloadByStatusService:
 
                 exporter.write_row(
                     [
-                        str(contact.uuid),
-                        contact.name or "",
-                        urns_str,
-                        contact.language or "",
-                        contact.created_on,
-                        contact.last_seen_on,
+                        _prep(contact.uuid),
+                        _prep(contact.name or ""),
+                        _prep(urns_str),
+                        _prep(contact.language or ""),
+                        _prep(contact.created_on),
+                        _prep(contact.last_seen_on),
                     ]
                 )
 

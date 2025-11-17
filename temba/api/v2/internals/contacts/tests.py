@@ -316,9 +316,57 @@ class ContactsExportByStatusViewTest(TembaTest):
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.json().get("error"), "Status is required")
 
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
+    def test_project_or_broadcast_not_found_returns_404(self):
+        # project UUID does not exist -> triggers Org.DoesNotExist branch (lines 294-295)
+        main = self.create_contact("A", urns=["tel:+1112"])
+        bcast = self.create_broadcast(self.admin, "x", contacts=[main])
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        url = "/api/v2/internals/contacts_export_by_status"
+        from uuid import uuid4
+
+        resp = client.post(
+            url,
+            data={"project_uuid": str(uuid4()), "broadcast_id": bcast.id, "status": Msg.STATUS_DELIVERED},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json().get("error"), "Project or Broadcast not found")
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
+    def test_non_eager_sets_message_and_no_download_url(self):
+        # cover lines 316-317 path when CELERY_TASK_ALWAYS_EAGER is False
+        main = self.create_contact("A", urns=["tel:+1113"])
+        bcast = self.create_broadcast(self.admin, "x", contacts=[main])
+        bcast.msgs.update(status=Msg.STATUS_DELIVERED)
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        url = "/api/v2/internals/contacts_export_by_status"
+        with patch("temba.api.v2.internals.contacts.views.on_transaction_commit", side_effect=lambda fn: fn()), patch(
+            "temba.api.v2.internals.contacts.views.export_contacts_by_status_task.delay"
+        ) as mock_delay:
+            resp = client.post(
+                url,
+                data={
+                    "project_uuid": str(self.org.proj_uuid),
+                    "broadcast_id": bcast.id,
+                    "status": Msg.STATUS_DELIVERED,
+                },
+                format="json",
+            )
+        self.assertEqual(resp.status_code, 201)
+        data = resp.json()
+        self.assertIsNone(data.get("download_url"))
+        self.assertIn(self.admin.email, data.get("message", ""))
+        mock_delay.assert_called_once()
+
     def test_generate_xlsx_for_contacts_basic(self):
         # two contacts, one with URN and one without
-        c1 = self.create_contact("Alice", urns=["tel:+55110001"])
+        c1 = self.create_contact("=Alice", urns=["tel:+55110001"])
         c2 = self.create_contact("Bob")  # no urns
         with self.mockReadOnly():
             tmp, ext = ContactDownloadByStatusService._generate_xlsx_for_contacts(self.org, [c1.id, c2.id])
@@ -332,11 +380,32 @@ class ContactsExportByStatusViewTest(TembaTest):
             # row for c1
             row2 = [cell.value for cell in list(ws.rows)[1]]
             self.assertIn(str(c1.uuid), row2)
-            self.assertIn("tel:+55110001", row2[2])
+            expected_identity = c1.get_urns()[0].identity  # normalized by model (may drop '+')
+            self.assertIn(expected_identity, row2[2])
+            # name starting with '=' should be escaped with a leading apostrophe
+            self.assertTrue(str(row2[1]).startswith("'="))
             # row for c2 (URNs empty)
             row3 = [cell.value for cell in list(ws.rows)[2]]
             self.assertIn(str(c2.uuid), row3)
             self.assertEqual(row3[2], "")
+        finally:
+            if hasattr(tmp, "delete"):
+                try:
+                    tmp.delete()
+                except Exception:
+                    pass
+
+    def test_generate_xlsx_skips_missing_contact(self):
+        c1 = self.create_contact("Alice", urns=["tel:+5511222"])
+        missing_id = 99999999
+        with self.mockReadOnly():
+            tmp, ext = ContactDownloadByStatusService._generate_xlsx_for_contacts(self.org, [c1.id, missing_id])
+        try:
+            wb = load_workbook(tmp.name)
+            ws = wb.active
+            rows = list(ws.rows)
+            # header + 1 contact row
+            self.assertEqual(len(rows), 2)
         finally:
             if hasattr(tmp, "delete"):
                 try:

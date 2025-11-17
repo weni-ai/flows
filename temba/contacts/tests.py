@@ -6124,6 +6124,42 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertReadFetch(read_url, allow_viewers=True, allow_editors=True, context_object=imp)
 
 
+class ExportContactsByStatusNoGroupTest(TembaTest):
+    def test_task_success_without_group_memberships(self):
+        from temba.contacts.models import ExportContactsTask
+        from temba.contacts.tasks import export_contacts_by_status_task
+        from temba.msgs.models import Msg
+        from unittest.mock import Mock, patch
+
+        c1 = self.create_contact("NoGroup", urns=["tel:+12025550003"])
+        bcast = self.create_broadcast(self.admin, "ping", contacts=[c1])
+        bcast.msgs.update(status=Msg.STATUS_DELIVERED)
+
+        export = ExportContactsTask.create(self.org, self.admin, group=None, search=None, group_memberships=())
+
+        with patch("temba.contacts.tasks.get_asset_store") as mock_get_store, self.mockReadOnly():
+            mock_store = Mock()
+            mock_store.save.return_value = None
+            mock_get_store.return_value = mock_store
+
+            export_contacts_by_status_task(export.id, bcast.id, Msg.STATUS_DELIVERED)
+
+        export.refresh_from_db()
+        self.assertEqual(ExportContactsTask.STATUS_COMPLETE, export.status)
+
+
+class ExportContactsTaskFunctionTest(TembaTest):
+    def test_export_contacts_task_calls_perform(self):
+        from temba.contacts.models import ExportContactsTask
+        from temba.contacts.tasks import export_contacts_task
+        from unittest.mock import patch
+
+        export = ExportContactsTask.create(self.org, self.admin, group=None, search=None, group_memberships=())
+        with patch.object(ExportContactsTask, "perform") as mock_perform:
+            export_contacts_task(export.id)
+            mock_perform.assert_called_once()
+
+
 class ExportContactsByStatusTaskTest(TembaTest):
     def _make_broadcast_with_contacts(self):
         main = self.create_contact("Main", urns=["tel:+12025550000"])
@@ -6148,7 +6184,7 @@ class ExportContactsByStatusTaskTest(TembaTest):
 
         with patch("temba.contacts.tasks.get_asset_store") as mock_get_store, patch.object(
             Notification, "export_finished"
-        ) as mock_notify:
+        ) as mock_notify, self.mockReadOnly():
             mock_store = Mock()
             mock_store.save.return_value = None
             mock_get_store.return_value = mock_store
@@ -6178,7 +6214,7 @@ class ExportContactsByStatusTaskTest(TembaTest):
         export = ExportContactsTask.create(self.org, self.admin, group=None, search=None, group_memberships=())
 
         # force failure on asset save
-        with patch("temba.contacts.tasks.get_asset_store") as mock_get_store:
+        with patch("temba.contacts.tasks.get_asset_store") as mock_get_store, self.mockReadOnly():
             mock_store = Mock()
             mock_store.save.side_effect = RuntimeError("boom")
             mock_get_store.return_value = mock_store
