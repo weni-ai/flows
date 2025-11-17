@@ -1,9 +1,21 @@
 from datetime import timedelta
+from unittest.mock import patch
 
+import jwt as _pyjwt
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.test import APIRequestFactory
+
+from django.conf import settings as _dj_settings
 from django.contrib.auth.models import Group
 from django.test import override_settings
 from django.utils import timezone
 
+from temba.api.auth.jwt import (
+    JWTAuthMixinOptional,
+    JWTAuthMixinRequired,
+    OptionalJWTAuthentication,
+    RequiredJWTAuthentication,
+)
 from temba.api.models import APIToken, Resthook, WebHookEvent
 from temba.api.tasks import trim_webhook_event_task
 from temba.tests import TembaTest
@@ -95,3 +107,120 @@ class WebHookTest(TembaTest):
         with override_settings(RETENTION_PERIODS={"webhookevent": timedelta(hours=2)}):
             trim_webhook_event_task()
             self.assertFalse(WebHookEvent.objects.all())
+
+
+class JWTAuthCoverageTests(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.factory = APIRequestFactory()
+
+    def test_optional_invalid_header_and_missing_key_paths(self):
+        auth = OptionalJWTAuthentication()
+        # invalid header type
+        req = self.factory.get("/")
+        req.headers = {"Authorization": 123}
+        self.assertIsNone(auth.authenticate(req))
+        # invalid prefix
+        req = self.factory.get("/")
+        req.headers = {"Authorization": "Token abc"}
+        self.assertIsNone(auth.authenticate(req))
+        # missing key with Bearer
+        with self.settings(JWT_PUBLIC_KEY=None):
+            req = self.factory.get("/")
+            req.headers = {"Authorization": "Bearer token"}
+            self.assertIsNone(auth.authenticate(req))
+
+    def test_optional_decode_errors_return_none(self):
+        auth = OptionalJWTAuthentication()
+        with self.settings(JWT_PUBLIC_KEY="dummy"):
+            # invalid token
+            req = self.factory.get("/")
+            req.headers = {"Authorization": "Bearer bad"}
+            with patch("temba.api.auth.jwt.jwt.decode", side_effect=_pyjwt.InvalidTokenError("bad")):
+                self.assertIsNone(auth.authenticate(req))
+            # expired token
+            req = self.factory.get("/")
+            req.headers = {"Authorization": "Bearer expired"}
+            with patch("temba.api.auth.jwt.jwt.decode", side_effect=_pyjwt.ExpiredSignatureError("expired")):
+                self.assertIsNone(auth.authenticate(req))
+
+    def test_required_missing_key_and_header_and_prefix(self):
+        auth = RequiredJWTAuthentication()
+        # missing key
+        with self.settings(JWT_PUBLIC_KEY=None):
+            req = self.factory.get("/")
+            req.headers = {"Authorization": "Bearer any"}
+            with self.assertRaises(AuthenticationFailed):
+                auth.authenticate(req)
+        # missing header
+        with self.settings(JWT_PUBLIC_KEY="dummy"):
+            req = self.factory.get("/")
+            with self.assertRaises(AuthenticationFailed):
+                auth.authenticate(req)
+            # invalid prefix
+            req = self.factory.get("/")
+            req.headers = {"Authorization": "Token abc"}
+            with self.assertRaises(AuthenticationFailed):
+                auth.authenticate(req)
+
+    def test_required_decode_errors_and_success(self):
+        auth = RequiredJWTAuthentication()
+        with self.settings(JWT_PUBLIC_KEY="dummy"):
+            # expired
+            req = self.factory.get("/")
+            req.headers = {"Authorization": "Bearer expired"}
+            with patch("temba.api.auth.jwt.jwt.decode", side_effect=_pyjwt.ExpiredSignatureError("expired")):
+                with self.assertRaises(AuthenticationFailed):
+                    auth.authenticate(req)
+            # invalid
+            req = self.factory.get("/")
+            req.headers = {"Authorization": "Bearer bad"}
+            with patch("temba.api.auth.jwt.jwt.decode", side_effect=_pyjwt.InvalidTokenError("bad")):
+                with self.assertRaises(AuthenticationFailed):
+                    auth.authenticate(req)
+            # missing project_uuid
+            req = self.factory.get("/")
+            req.headers = {"Authorization": "Bearer ok"}
+            with patch("temba.api.auth.jwt.jwt.decode", return_value={"x": 1}):
+                with self.assertRaises(AuthenticationFailed):
+                    auth.authenticate(req)
+            # success
+            req = self.factory.get("/")
+            req.headers = {"Authorization": "Bearer ok"}
+            payload = {"project_uuid": "proj-xyz", "k": "v"}
+            with patch("temba.api.auth.jwt.jwt.decode", return_value=payload):
+                user, _ = auth.authenticate(req)
+            from django.contrib.auth.models import AnonymousUser
+
+            self.assertIsInstance(user, AnonymousUser)
+            self.assertEqual(getattr(req, "project_uuid", None), "proj-xyz")
+            self.assertEqual(getattr(req, "jwt_payload", None), payload)
+
+    def test_getters_and_mixins(self):
+        # Optional get_settings/get_jwt
+        opt = OptionalJWTAuthentication()
+        self.assertIs(opt.get_settings(), _dj_settings)
+        self.assertIs(opt.get_jwt(), _pyjwt)
+        # Required get_settings/get_jwt
+        req_auth = RequiredJWTAuthentication()
+        self.assertIs(req_auth.get_settings(), _dj_settings)
+        self.assertIs(req_auth.get_jwt(), _pyjwt)
+        # Mixins properties
+
+        class D1(JWTAuthMixinRequired):
+            request = None
+
+        class D2(JWTAuthMixinOptional):
+            request = None
+
+        r = self.factory.get("/")
+        r.project_uuid = "p1"
+        r.jwt_payload = {"a": 1}
+        d1 = D1()
+        d1.request = r
+        d2 = D2()
+        d2.request = r
+        self.assertEqual(d1.project_uuid, "p1")
+        self.assertEqual(d1.jwt_payload, {"a": 1})
+        self.assertEqual(d2.project_uuid, "p1")
+        self.assertEqual(d2.jwt_payload, {"a": 1})
