@@ -1,9 +1,12 @@
 import datetime as dt
 from functools import wraps
+from io import BytesIO
 from unittest.mock import MagicMock, patch
 
+from openpyxl import load_workbook
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.test import APIClient
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -11,6 +14,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
 
+from temba.api.v2.internals.contacts.services import ContactDownloadByStatusService, ContactImportDeduplicationService
 from temba.api.v2.validators import LambdaURLValidator
 from temba.contacts.models import ContactField
 from temba.msgs.models import Msg
@@ -163,6 +167,314 @@ class InternalContactViewTest(TembaTest):
             self.assertEqual(len(data.get("results")), 2)
 
             self.assertContains(response, str(contact1.uuid))
+
+
+class ContactsExportByStatusViewTest(TembaTest):
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
+    def test_export_contacts_by_status_enqueues_and_responds(self):
+        # use DRF APIClient to force authenticate a real user without OIDC
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        c1 = self.create_contact("C1", urns=["tel:+112"])
+        c2 = self.create_contact("C2", urns=["tel:+113"])
+        main = self.create_contact("A", urns=["tel:+111"])
+        broadcast = self.create_broadcast(self.admin, "hi", contacts=[main, c1, c2])
+        # mark only c1 and c2 as delivered for this broadcast
+        broadcast.msgs.filter(contact_id__in=[c1.id, c2.id]).update(status=Msg.STATUS_DELIVERED)
+
+        url = "/api/v2/internals/contacts_export_by_status"
+        with patch("temba.api.v2.internals.contacts.views.on_transaction_commit", side_effect=lambda fn: fn()), patch(
+            "temba.api.v2.internals.contacts.views.export_contacts_by_status_task.delay"
+        ) as mock_delay:
+            resp = client.post(
+                url,
+                data={
+                    "project_uuid": str(self.org.proj_uuid),
+                    "broadcast_id": broadcast.id,
+                    "status": Msg.STATUS_DELIVERED,
+                },
+                format="json",
+            )
+        self.assertEqual(resp.status_code, 201)
+        data = resp.json()
+        self.assertIn("export_id", data)
+        self.assertIn("message", data)
+        self.assertIn("count", data)
+        self.assertEqual(data["count"], 2)
+        mock_delay.assert_called_once()
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
+    def test_export_contacts_by_status_builds_file_eager(self):
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        c1 = self.create_contact("X1", urns=["tel:+115"])
+        c2 = self.create_contact("X2", urns=["tel:+116"])
+        main = self.create_contact("B", urns=["tel:+114"])
+        broadcast = self.create_broadcast(self.admin, "hi", contacts=[main, c1, c2])
+        broadcast.msgs.filter(contact_id__in=[c1.id, c2.id]).update(status=Msg.STATUS_DELIVERED)
+
+        url = "/api/v2/internals/contacts_export_by_status"
+        resp = client.post(
+            url,
+            data={
+                "project_uuid": str(self.org.proj_uuid),
+                "broadcast_id": broadcast.id,
+                "status": Msg.STATUS_DELIVERED,
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201)
+        data = resp.json()
+        self.assertIsNotNone(data.get("export_id"))
+        # In eager mode the view fills download_url immediately
+        self.assertTrue("download_url" in data)
+
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
+    def test_missing_project_returns_400(self):
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        url = "/api/v2/internals/contacts_export_by_status"
+        resp = client.post(
+            url,
+            data={
+                # no project_uuid
+                "broadcast_id": 123456,
+                "status": Msg.STATUS_DELIVERED,
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json().get("error"), "Project not provided")
+
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
+    def test_broadcast_not_found_for_project_returns_404(self):
+        # create a broadcast in self.org but use project_uuid from a different org
+        bcast = self.create_broadcast(self.admin, "hi other", contacts=[self.create_contact("O1", urns=["tel:+991"])])
+        # ensure org2 has a proj_uuid so lookup succeeds and we hit the mismatch branch
+        from uuid import uuid4
+
+        self.org2.proj_uuid = uuid4()
+        self.org2.save(update_fields=["proj_uuid"])
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        url = "/api/v2/internals/contacts_export_by_status"
+        resp = client.post(
+            url,
+            data={
+                "project_uuid": str(self.org2.proj_uuid),  # mismatched project/org
+                "broadcast_id": bcast.id,  # broadcast belongs to self.org
+                "status": Msg.STATUS_DELIVERED,
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json().get("error"), "Broadcast not found for project")
+
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
+    def test_invalid_status_returns_400(self):
+        # create a valid broadcast for current org
+        main = self.create_contact("A", urns=["tel:+110"])
+        bcast = self.create_broadcast(self.admin, "hi", contacts=[main])
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        url = "/api/v2/internals/contacts_export_by_status"
+        resp = client.post(
+            url,
+            data={
+                "project_uuid": str(self.org.proj_uuid),
+                "broadcast_id": bcast.id,
+                "status": "INVALID",
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json().get("error"), "Invalid status")
+
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
+    def test_status_required_returns_400(self):
+        main = self.create_contact("A", urns=["tel:+1110"])
+        bcast = self.create_broadcast(self.admin, "hello", contacts=[main])
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        url = "/api/v2/internals/contacts_export_by_status"
+        resp = client.post(
+            url,
+            data={
+                "project_uuid": str(self.org.proj_uuid),
+                "broadcast_id": bcast.id,
+                # missing status
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json().get("error"), "Status is required")
+
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
+    def test_project_or_broadcast_not_found_returns_404(self):
+        # project UUID does not exist -> triggers Org.DoesNotExist branch (lines 294-295)
+        main = self.create_contact("A", urns=["tel:+1112"])
+        bcast = self.create_broadcast(self.admin, "x", contacts=[main])
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        url = "/api/v2/internals/contacts_export_by_status"
+        from uuid import uuid4
+
+        resp = client.post(
+            url,
+            data={"project_uuid": str(uuid4()), "broadcast_id": bcast.id, "status": Msg.STATUS_DELIVERED},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json().get("error"), "Project or Broadcast not found")
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.authentication_classes", [])
+    @patch("temba.api.v2.internals.contacts.views.ContactsExportByStatusView.permission_classes", [])
+    def test_non_eager_sets_message_and_no_download_url(self):
+        # cover lines 316-317 path when CELERY_TASK_ALWAYS_EAGER is False
+        main = self.create_contact("A", urns=["tel:+1113"])
+        bcast = self.create_broadcast(self.admin, "x", contacts=[main])
+        bcast.msgs.update(status=Msg.STATUS_DELIVERED)
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        url = "/api/v2/internals/contacts_export_by_status"
+        with patch("temba.api.v2.internals.contacts.views.on_transaction_commit", side_effect=lambda fn: fn()), patch(
+            "temba.api.v2.internals.contacts.views.export_contacts_by_status_task.delay"
+        ) as mock_delay:
+            resp = client.post(
+                url,
+                data={
+                    "project_uuid": str(self.org.proj_uuid),
+                    "broadcast_id": bcast.id,
+                    "status": Msg.STATUS_DELIVERED,
+                },
+                format="json",
+            )
+        self.assertEqual(resp.status_code, 201)
+        data = resp.json()
+        self.assertIsNone(data.get("download_url"))
+        self.assertIn(self.admin.email, data.get("message", ""))
+        mock_delay.assert_called_once()
+
+    def test_generate_xlsx_for_contacts_basic(self):
+        # two contacts, one with URN and one without
+        c1 = self.create_contact("=Alice", urns=["tel:+55110001"])
+        c2 = self.create_contact("Bob")  # no urns
+        with self.mockReadOnly():
+            tmp, ext = ContactDownloadByStatusService._generate_xlsx_for_contacts(self.org, [c1.id, c2.id])
+        try:
+            self.assertEqual(ext, "xlsx")
+            wb = load_workbook(tmp.name)
+            ws = wb.active
+            # header columns
+            headers = [cell.value for cell in list(ws.rows)[0]]
+            self.assertEqual(headers, ["Contact UUID", "Name", "URNs", "Language", "Created On", "Last Seen On"])
+            # row for c1
+            row2 = [cell.value for cell in list(ws.rows)[1]]
+            self.assertIn(str(c1.uuid), row2)
+            expected_identity = c1.get_urns()[0].identity  # normalized by model (may drop '+')
+            self.assertIn(expected_identity, row2[2])
+            # name starting with '=' should be escaped with a leading apostrophe
+            self.assertTrue(str(row2[1]).startswith("'="))
+            # row for c2 (URNs empty)
+            row3 = [cell.value for cell in list(ws.rows)[2]]
+            self.assertIn(str(c2.uuid), row3)
+            self.assertEqual(row3[2], "")
+        finally:
+            if hasattr(tmp, "delete"):
+                try:
+                    tmp.delete()
+                except Exception:
+                    pass
+
+    def test_generate_xlsx_skips_missing_contact(self):
+        c1 = self.create_contact("Alice", urns=["tel:+5511222"])
+        missing_id = 99999999
+        with self.mockReadOnly():
+            tmp, ext = ContactDownloadByStatusService._generate_xlsx_for_contacts(self.org, [c1.id, missing_id])
+        try:
+            wb = load_workbook(tmp.name)
+            ws = wb.active
+            rows = list(ws.rows)
+            # header + 1 contact row
+            self.assertEqual(len(rows), 2)
+        finally:
+            if hasattr(tmp, "delete"):
+                try:
+                    tmp.delete()
+                except Exception:
+                    pass
+
+    def test_get_contact_ids_by_broadcast_status_service(self):
+        # create a broadcast and mark messages delivered
+        c1 = self.create_contact("A", urns=["tel:+5511333"])
+        c2 = self.create_contact("B", urns=["tel:+5511444"])
+        bcast = self.create_broadcast(self.admin, "hi", contacts=[c1, c2])
+        bcast.msgs.update(status=Msg.STATUS_DELIVERED)
+        ids = ContactDownloadByStatusService.get_contact_ids_by_broadcast_status(
+            broadcast_id=bcast.id, msg_status=Msg.STATUS_DELIVERED
+        )
+        self.assertCountEqual(ids, [c1.id, c2.id])
+        # invalid status
+        with self.assertRaises(ValidationError):
+            ContactDownloadByStatusService.get_contact_ids_by_broadcast_status(
+                broadcast_id=bcast.id, msg_status="INVALID"
+            )
+        # missing broadcast
+        with self.assertRaises(ValidationError):
+            ContactDownloadByStatusService.get_contact_ids_by_broadcast_status(
+                broadcast_id=None, msg_status=Msg.STATUS_DELIVERED
+            )
+
+    def test_contact_import_dedup_process_csv_with_duplicates_s3_presign(self):
+        csv = "URN:whatsapp,Name\nwhatsapp:5511999999999,Alice\nwhatsapp:5511999999999,AliceDup\n"
+        f = BytesIO(csv.encode("utf-8"))
+
+        # fake S3 client for presign path
+        class FakeS3:
+            def upload_fileobj(self, fh, bucket, key, ExtraArgs=None):
+                return None
+
+            def generate_presigned_url(self, *args, **kwargs):
+                return "/presigned/url"
+
+        with override_settings(AWS_STORAGE_BUCKET_NAME="bucket"):
+            with patch.object(ContactImportDeduplicationService, "_get_s3_client", return_value=FakeS3()):
+                (
+                    mappings,
+                    num_unique,
+                    dedup_tmp,
+                    ext,
+                    dup_url,
+                    dup_count,
+                    dup_err,
+                ) = ContactImportDeduplicationService.process(self.org, f, "data.csv")
+        try:
+            self.assertEqual(ext, "xlsx")
+            self.assertEqual(num_unique, 1)
+            self.assertEqual(dup_count, 1)
+            self.assertEqual(dup_err, None)
+            self.assertTrue(dup_url)
+        finally:
+            if hasattr(dedup_tmp, "delete"):
+                try:
+                    dedup_tmp.delete()
+                except Exception:
+                    pass
+
+    def test_contact_import_dedup_process_empty_header(self):
+        csv = "URN:whatsapp,Name,\n"
+        f = BytesIO(csv.encode("utf-8"))
+        with self.assertRaises(ValidationError):
+            ContactImportDeduplicationService.process(self.org, f, "data.csv")
 
 
 class ListContactFieldsEndpointTest(TembaTest):

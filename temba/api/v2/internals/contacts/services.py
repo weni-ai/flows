@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 
 import pyexcel
@@ -6,9 +7,12 @@ from xlsxlite.writer import XLSXBook
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.temp import NamedTemporaryFile
+from django.utils import timezone as dj_timezone
 from django.utils.text import slugify
 
-from temba.contacts.models import ContactImport
+from temba.contacts.models import Contact, ContactImport
+from temba.msgs.models import Msg
+from temba.utils.export import TableExporter
 from temba.utils.text import decode_stream
 from temba.utils.uuid import uuid4
 
@@ -181,3 +185,73 @@ class ContactImportDeduplicationService:
 
         # return mappings, counts, temp file, extension, url and error
         return mappings, num_unique, dedup_tmp, "xlsx", duplicates_url, num_dups, duplicates_error
+
+
+class ContactDownloadByStatusService:
+    @staticmethod
+    def _generate_xlsx_for_contacts(org, contact_ids):
+        columns = ["Contact UUID", "Name", "URNs", "Language", "Created On", "Last Seen On"]
+        exporter = TableExporter(task=None, sheet_name="Contacts", columns=columns)
+
+        def _prep(val):
+            if val is None:
+                return ""
+            if isinstance(val, str):
+                return "'" + val if val.startswith("=") else val
+            if isinstance(val, datetime):
+                v = val
+                if dj_timezone.is_aware(v):
+                    v = v.astimezone(org.timezone)
+                return v.replace(microsecond=0, tzinfo=None)
+            return str(val)
+
+        # write out contacts in batches to limit memory usage
+        def chunk_list(items, size):
+            for i in range(0, len(items), size):
+                yield items[i : i + size]
+
+        total_ids = list(contact_ids)
+        for batch_ids in chunk_list(total_ids, 1000):
+            batch_contacts = (
+                Contact.objects.filter(id__in=batch_ids)
+                .select_related("org")
+                .only("id", "uuid", "name", "language", "created_on", "last_seen_on", "org")
+                .using("readonly")
+            )
+
+            contact_by_id = {c.id: c for c in batch_contacts}
+
+            # cache URNs
+            Contact.bulk_urn_cache_initialize(batch_contacts, using="readonly")
+
+            for cid in batch_ids:
+                contact = contact_by_id.get(cid)
+                if not contact:
+                    continue
+
+                urns = contact.get_urns()
+                urns_str = ", ".join([u.identity for u in urns]) if urns else ""
+
+                exporter.write_row(
+                    [
+                        _prep(contact.uuid),
+                        _prep(contact.name or ""),
+                        _prep(urns_str),
+                        _prep(contact.language or ""),
+                        _prep(contact.created_on),
+                        _prep(contact.last_seen_on),
+                    ]
+                )
+
+        temp_file, ext = exporter.save_file()
+        return temp_file, ext
+
+    @staticmethod
+    def get_contact_ids_by_broadcast_status(*, broadcast_id: int, msg_status: str):
+        if not broadcast_id:
+            raise ValidationError("Broadcast ID is required")
+        valid_statuses = [s[0] for s in Msg.STATUS_CHOICES]
+        if msg_status not in valid_statuses:
+            raise ValidationError("Invalid status")
+        msgs = Msg.objects.filter(broadcast_id=broadcast_id, status=msg_status)
+        return list(msgs.values_list("contact_id", flat=True).distinct())

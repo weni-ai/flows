@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     ContactHasOpenTicketView,
+    ContactsExportByStatusView,
     ContactsImportConfirmView,
     ContactsImportUploadView,
     ContactsWithMessagesView,
@@ -26,4 +27,9 @@ urlpatterns = [
     ),
     path("contacts_with_messages", ContactsWithMessagesView.as_view(), name="contacts_with_messages"),
     path("groups_contact_fields", GroupsContactFieldsView.as_view(), name="groups_contact_fields"),
+    path(
+        "contacts_export_by_status",
+        ContactsExportByStatusView.as_view(),
+        name="contacts_export_by_status",
+    ),
 ]
