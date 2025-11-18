@@ -1,3 +1,16 @@
+3.44.1
+----------
+* Add jwt auth in internal whatsapp broadcast endpoint
+* Endpoint to download contacts according msgs status
+
+3.44.0
+----------
+* Add Freshchat ticketer integration
+
+3.43.3
+----------
+* Add migration to optimize broadcast statistics trigger
+
 3.43.2
 ----------
 * Update weni-rp-apps version to 2.10.7

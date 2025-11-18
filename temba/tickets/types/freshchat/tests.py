@@ -56,6 +56,25 @@ class FreshchatTypeTest(TembaTest):
             ["A Freshchat ticketer for this domain already exists in this workspace."],
         )
 
+        # try with freshchat_domain already taken by another org
+        Ticketer.create(
+            self.org2,
+            self.admin2,
+            ticketer_type=FreshchatType.slug,
+            name="Existing Other Org",
+            config={"oauth_token": "token999", "freshchat_domain": "other.freshchat.com"},
+        )
+        response = self.client.post(
+            connect_url,
+            {"name": "Test Ticketer", "oauth_token": "token456", "freshchat_domain": "other.freshchat.com"},
+        )
+        self.assertFormError(
+            response,
+            "form",
+            None,
+            ["A Freshchat ticketer for this domain already exists in another workspace."],
+        )
+
         # submitting with valid data should create ticketer and redirect
         response = self.client.post(
             connect_url, {"name": "My Freshchat", "oauth_token": "token789", "freshchat_domain": "acme.freshchat.com"}
