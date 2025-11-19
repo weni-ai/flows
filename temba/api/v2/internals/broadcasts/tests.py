@@ -554,6 +554,97 @@ class TestInternalBroadcastStatistics(TembaTest):
         self.assertIn("success_rate_30_days", body)
 
 
+class TestInternalBroadcastGroupsStats(TembaTest):
+    url = "/api/v2/internals/broadcasts/groups-stats"
+
+    def _disable_auth(self):
+        return patch(
+            "temba.api.v2.internals.broadcasts.views.InternalBroadcastGroupsStatsEndpoint.authentication_classes",
+            [],
+        ), patch(
+            "temba.api.v2.internals.broadcasts.views.InternalBroadcastGroupsStatsEndpoint.permission_classes",
+            [],
+        )
+
+    def test_missing_and_invalid_project(self):
+        # missing project_uuid
+        resp = self.client.get(self.url, data={"groups": []})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "Project UUID not provided"})
+
+        # invalid project_uuid
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(
+                self.url, data={"project_uuid": "00000000-0000-0000-0000-000000000000", "groups": []}
+            )
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {"error": "Project not found"})
+
+    def test_no_groups_or_invalid_groups(self):
+        # no groups provided
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(self.url, data={"project_uuid": str(self.org.proj_uuid)})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "Groups not provided"})
+
+        # invalid groups
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(
+                self.url,
+                data={"project_uuid": str(self.org.proj_uuid), "groups": ["00000000-0000-0000-0000-000000000000"]},
+            )
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "No valid groups found for this project"})
+
+    def test_create_endpoint_with_overlapping_groups(self):
+        # contacts
+        alice = self.create_contact("Alice", urns=["tel:+111"])
+        bob = self.create_contact("Bob", urns=["tel:+222"])
+        carlos = self.create_contact("Carlos", urns=["tel:+333"])
+
+        # groups with overlap on Bob
+        g1 = self.create_group("G1", contacts=[alice, bob])
+        g2 = self.create_group("G2", contacts=[bob, carlos])
+
+        # ensure counts are populated for deterministic member_count
+        from temba.contacts.models import ContactGroupCount
+
+        ContactGroupCount.populate_for_group(g1)
+        ContactGroupCount.populate_for_group(g2)
+
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(
+                self.url,
+                data={"project_uuid": str(self.org.proj_uuid), "groups": [str(g1.uuid), str(g2.uuid)]},
+            )
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(set(data["group_uuids"]), {str(g1.uuid), str(g2.uuid)})
+        self.assertEqual(data["total_groups_count"], g1.get_member_count() + g2.get_member_count())  # 2 + 2 = 4
+        self.assertEqual(data["duplicates_count"], 1)  # only Bob overlaps
+        self.assertEqual(data["real_contacts_counts"], 3)  # unique across both groups
+
+    def test_create_endpoint_single_group(self):
+        # contacts
+        alice = self.create_contact("Alice", urns=["tel:+111"])
+        bob = self.create_contact("Bob", urns=["tel:+222"])
+        g1 = self.create_group("G1", contacts=[alice, bob])
+
+        from temba.contacts.models import ContactGroupCount
+
+        ContactGroupCount.populate_for_group(g1)
+
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(self.url, data={"project_uuid": str(self.org.proj_uuid), "groups": [str(g1.uuid)]})
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["total_groups_count"], g1.get_member_count())
+        self.assertEqual(data["duplicates_count"], 0)
+        self.assertEqual(data["real_contacts_counts"], g1.get_member_count())
+
+
 class TestInternalWhatsappBroadcastJWT(TembaTest):
     url = "/api/v2/internals/whatsapp_broadcasts"
 
