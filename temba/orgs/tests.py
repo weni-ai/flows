@@ -2184,24 +2184,6 @@ class OrgTest(TembaTest):
 
         self.assertTrue(self.org.has_airtime_transfers())
 
-    def test_prometheus(self):
-        # admin can see it though
-        self.login(self.admin)
-
-        # enable it
-        prometheus_url = reverse("orgs.org_prometheus")
-        response = self.client.post(prometheus_url, {}, follow=True)
-        self.assertContains(response, "Disable Prometheus")
-
-        # make sure our API token exists
-        prometheus_group = Group.objects.get(name="Prometheus")
-        self.assertTrue(APIToken.objects.filter(org=self.org, role=prometheus_group, is_active=True))
-
-        # now disable it
-        response = self.client.post(prometheus_url, {}, follow=True)
-        self.assertFalse(APIToken.objects.filter(org=self.org, role=prometheus_group, is_active=True))
-        self.assertContains(response, "Enable Prometheus")
-
     def test_resthooks(self):
         resthook_url = reverse("orgs.org_resthooks")
 
