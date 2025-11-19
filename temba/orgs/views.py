@@ -3248,15 +3248,6 @@ class OrgCRUDL(SmartCRUDL):
             user = self.request.user
             org = user.get_org()
 
-            # if we are on the topups plan, show our usual credits view
-            if org.plan == settings.TOPUP_PLAN:
-                if self.has_org_perm("orgs.topup_list"):
-                    formax.add_section("topups", reverse("orgs.topup_list"), icon="icon-coins", action="link")
-
-            else:
-                if self.has_org_perm("orgs.org_plan"):  # pragma: needs cover
-                    formax.add_section("plan", reverse("orgs.org_plan"), icon="icon-credit", action="summary")
-
             if self.has_org_perm("channels.channel_update"):
                 # get any channel thats not a delegate
                 channels = Channel.objects.filter(org=org, is_active=True, parent=None).order_by("-role")
@@ -3311,30 +3302,8 @@ class OrgCRUDL(SmartCRUDL):
             if self.has_org_perm("orgs.org_languages"):
                 formax.add_section("languages", reverse("orgs.org_languages"), icon="icon-language")
 
-            if self.has_org_perm("orgs.org_country") and org.get_branding().get("location_support"):
-                formax.add_section("country", reverse("orgs.org_country"), icon="icon-location2")
-
-            if self.has_org_perm("orgs.org_smtp_server"):
-                formax.add_section("email", reverse("orgs.org_smtp_server"), icon="icon-envelop")
-
-            if self.has_org_perm("orgs.org_manage_integrations"):
-                for integration in IntegrationType.get_all():
-                    if integration.is_available_to(user):
-                        integration.management_ui(self.object, formax)
-
             if self.has_org_perm("orgs.org_token"):
                 formax.add_section("token", reverse("orgs.org_token"), icon="icon-cloud-upload", nobutton=True)
-
-            if self.has_org_perm("orgs.org_prometheus"):
-                formax.add_section("prometheus", reverse("orgs.org_prometheus"), icon="icon-prometheus", nobutton=True)
-
-            if self.has_org_perm("orgs.org_resthooks"):
-                formax.add_section(
-                    "resthooks",
-                    reverse("orgs.org_resthooks"),
-                    icon="icon-cloud-lightning",
-                    wide="true",
-                )
 
             if self.has_org_perm("orgs.org_two_factor"):
                 if user.get_settings().two_factor_enabled:
@@ -3345,10 +3314,6 @@ class OrgCRUDL(SmartCRUDL):
                     formax.add_section(
                         "two_factor", reverse("orgs.user_two_factor_enable"), icon="icon-two-factor", action="link"
                     )
-
-            # show globals and archives
-            formax.add_section("globals", reverse("globals.global_list"), icon="icon-global", action="link")
-            formax.add_section("archives", reverse("archives.archive_message"), icon="icon-box", action="link")
 
     class TwilioAccount(ComponentFormMixin, InferOrgMixin, OrgPermsMixin, SmartUpdateView):
         success_message = ""
