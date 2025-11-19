@@ -86,6 +86,12 @@
               .mt-3.button-light.block.mt-3(onclick="goto(event)" href="{% url 'request_logs.httplog_webhooks' %}")
                 -trans "Webhook Call Log"
 
+            .mt-3.button-light.block.mt-3(onclick="goto(event)" href="{% url 'globals.global_list' %}")
+              -trans "Globals"
+
+            .mt-3.button-light.block.mt-3(onclick="goto(event)" href="{% url 'archives.archive_run' %}")
+              -trans "Run Archives"
+
         .right
           -if org_has_flows
             .flex.w-full.items-end.mb-4

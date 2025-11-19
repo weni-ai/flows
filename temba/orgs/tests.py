@@ -481,7 +481,7 @@ class UserTest(TembaTest):
 
     @override_settings(USER_LOCKOUT_TIMEOUT=1, USER_FAILED_LOGIN_LIMIT=3)
     def test_confirm_access(self):
-        confirm_url = reverse("users.confirm_access") + f"?next=/msg/inbox/"
+        confirm_url = reverse("users.confirm_access") + "?next=/msg/inbox/"
         failed_url = reverse("users.user_failed")
 
         # try to access before logging in
@@ -1044,7 +1044,6 @@ class OrgTest(TembaTest):
     def test_country_view(self):
         self.setUpLocations()
 
-        home_url = reverse("orgs.org_home")
         country_url = reverse("orgs.org_country")
 
         rwanda = AdminBoundary.objects.get(name="Rwanda")
@@ -1064,15 +1063,6 @@ class OrgTest(TembaTest):
         self.org.refresh_from_db()
         self.assertEqual("Rwanda", str(self.org.country))
         self.assertEqual("RW", self.org.default_country_code)
-
-        response = self.client.get(home_url)
-        self.assertContains(response, "Rwanda")
-
-        # if location support is disabled in the branding, don't display country formax
-        current_branding = settings.BRANDING["rapidpro.io"]
-        with override_settings(BRANDING={"rapidpro.io": {**current_branding, "location_support": False}}):
-            response = self.client.get(home_url)
-            self.assertNotContains(response, "Rwanda")
 
     def test_default_country(self):
         # if country boundary is set and name is valid country, that has priority
@@ -2194,46 +2184,7 @@ class OrgTest(TembaTest):
 
         self.assertTrue(self.org.has_airtime_transfers())
 
-    def test_prometheus(self):
-        # visit as viewer, no prometheus section
-        self.login(self.user)
-        org_home_url = reverse("orgs.org_home")
-        response = self.client.get(org_home_url)
-
-        self.assertNotContains(response, "Prometheus")
-
-        # admin can see it though
-        self.login(self.admin)
-
-        response = self.client.get(org_home_url)
-        self.assertContains(response, "Prometheus")
-        self.assertContains(response, "Enable Prometheus")
-
-        # enable it
-        prometheus_url = reverse("orgs.org_prometheus")
-        response = self.client.post(prometheus_url, {}, follow=True)
-        self.assertContains(response, "Disable Prometheus")
-
-        # make sure our API token exists
-        prometheus_group = Group.objects.get(name="Prometheus")
-        self.assertTrue(APIToken.objects.filter(org=self.org, role=prometheus_group, is_active=True))
-
-        # other admin sees it enabled too
-        self.other_admin = self.create_user("Other Administrator")
-        self.org.administrators.add(self.other_admin)
-        self.login(self.other_admin)
-
-        response = self.client.get(org_home_url)
-        self.assertContains(response, "Prometheus")
-        self.assertContains(response, "Disable Prometheus")
-
-        # now disable it
-        response = self.client.post(prometheus_url, {}, follow=True)
-        self.assertFalse(APIToken.objects.filter(org=self.org, role=prometheus_group, is_active=True))
-        self.assertContains(response, "Enable Prometheus")
-
     def test_resthooks(self):
-        home_url = reverse("orgs.org_home")
         resthook_url = reverse("orgs.org_resthooks")
 
         # no hitting this page without auth
@@ -2247,9 +2198,6 @@ class OrgTest(TembaTest):
 
         # shouldn't have any resthooks listed yet
         self.assertFalse(response.context["current_resthooks"])
-
-        response = self.client.get(home_url)
-        self.assertContains(response, "You have <b>no flow events</b> configured.")
 
         # try to create one with name that's too long
         response = self.client.post(resthook_url, {"new_slug": "x" * 100})
@@ -2271,10 +2219,6 @@ class OrgTest(TembaTest):
             [{"field": f"resthook_{mother_reg.id}", "resthook": mother_reg}],
             list(response.context["current_resthooks"]),
         )
-
-        # and summarized on org home page
-        response = self.client.get(home_url)
-        self.assertContains(response, "You have <b>1 flow event</b> configured.")
 
         # let's try to create a repeat, should fail due to duplicate slug
         response = self.client.post(resthook_url, {"new_slug": "Mother-Registration"})
@@ -2300,14 +2244,7 @@ class OrgTest(TembaTest):
     def test_smtp_server(self):
         self.login(self.admin)
 
-        home_url = reverse("orgs.org_home")
         config_url = reverse("orgs.org_smtp_server")
-
-        # orgs without SMTP settings see default from address
-        response = self.client.get(home_url)
-        self.assertContains(response, "Emails sent from flows will be sent from <b>no-reply@temba.io</b>.")
-        self.assertEqual("no-reply@temba.io", response.context["from_email_default"])
-        self.assertEqual(None, response.context["from_email_custom"])
 
         self.assertFalse(self.org.has_smtp_config())
 
@@ -2860,7 +2797,7 @@ class OrgTest(TembaTest):
 
         sub_org.refresh_from_db()
 
-        self.assertEqual(response.url, f"/org/sub_orgs/")
+        self.assertEqual(response.url, "/org/sub_orgs/")
 
         # edit our sub org's details in a spa view
         response = self.client.post(

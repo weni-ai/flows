@@ -16,10 +16,6 @@ class DTOneTypeTest(TembaTest):
         self.login(self.admin)
 
         account_url = reverse("integrations.dtone.account")
-        home_url = reverse("orgs.org_home")
-
-        response = self.client.get(home_url)
-        self.assertContains(response, "Connect your DT One account.")
 
         # formax includes form to connect account
         response = self.client.get(account_url, HTTP_X_FORMAX=True)
@@ -45,11 +41,6 @@ class DTOneTypeTest(TembaTest):
         self.assertTrue(self.org.get_integrations(IntegrationType.Category.AIRTIME))
         self.assertEqual("key123", self.org.config["dtone_key"])
         self.assertEqual("sesame", self.org.config["dtone_secret"])
-
-        # and that stated on home page
-        response = self.client.get(home_url)
-        self.assertContains(response, "Connected to your DT One account.")
-        self.assertContains(response, reverse("airtime.airtimetransfer_list"))
 
         # formax includes the disconnect link
         response = self.client.get(account_url, HTTP_X_FORMAX=True)
@@ -89,4 +80,4 @@ class DTOneClientTest(TembaTest):
         with self.assertRaises(DTOneClient.Exception) as error:
             self.client.get_balances()
 
-        self.assertEqual(str(error.exception), f"Unauthorized")
+        self.assertEqual(str(error.exception), "Unauthorized")
