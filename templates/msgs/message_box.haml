@@ -93,6 +93,9 @@
                 %temba-modax{ header:'{% trans "Create Folder" %}', endpoint:"{% url 'msgs.label_create_folder' %}"}
                   .button-light.block.mt-3
                     -trans "Create Folder"
+                
+              .mt-3.button-light.block.mt-3(onclick="goto(event)" href="{% url 'archives.archive_message' %}")
+                -trans "Message Archives"
 
         -if has_messages
           .right
