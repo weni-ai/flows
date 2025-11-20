@@ -568,7 +568,8 @@ class TestInternalBroadcastGroupsStats(TembaTest):
 
     def test_missing_and_invalid_project(self):
         # missing project_uuid
-        resp = self.client.get(self.url, data={"groups": []})
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(self.url, data={"groups": []})
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.json(), {"error": "Project UUID not provided"})
 
@@ -620,10 +621,9 @@ class TestInternalBroadcastGroupsStats(TembaTest):
 
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
-        self.assertEqual(set(data["group_uuids"]), {str(g1.uuid), str(g2.uuid)})
-        self.assertEqual(data["total_groups_count"], g1.get_member_count() + g2.get_member_count())  # 2 + 2 = 4
+        self.assertEqual(data["total_count"], g1.get_member_count() + g2.get_member_count())  # 2 + 2 = 4
         self.assertEqual(data["duplicates_count"], 1)  # only Bob overlaps
-        self.assertEqual(data["real_contacts_counts"], 3)  # unique across both groups
+        self.assertEqual(data["distinct_count"], 3)  # unique across both groups
 
     def test_create_endpoint_single_group(self):
         # contacts
@@ -640,9 +640,9 @@ class TestInternalBroadcastGroupsStats(TembaTest):
 
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
-        self.assertEqual(data["total_groups_count"], g1.get_member_count())
+        self.assertEqual(data["total_count"], g1.get_member_count())
         self.assertEqual(data["duplicates_count"], 0)
-        self.assertEqual(data["real_contacts_counts"], g1.get_member_count())
+        self.assertEqual(data["distinct_count"], g1.get_member_count())
 
 
 class TestInternalWhatsappBroadcastJWT(TembaTest):
