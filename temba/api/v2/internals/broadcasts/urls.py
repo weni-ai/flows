@@ -4,6 +4,7 @@ from django.urls import path
 
 from .views import (
     BroadcastsViewSet,
+    InternalBroadcastGroupsStatsEndpoint,
     InternalBroadcastStatisticMontlyEndpoint,
     InternalBroadcastStatisticsEndpoint,
     InternalBroadcastsUploadMediaEndpoint,
@@ -20,6 +21,11 @@ urlpatterns = [
         name="internal-whatsapp-broadcasts",
     ),
     path("broadcasts-statistics", InternalBroadcastStatisticsEndpoint.as_view(), name="internal-broadcast-statistics"),
+    path(
+        "broadcasts/groups-stats",
+        InternalBroadcastGroupsStatsEndpoint.as_view(),
+        name="internal-broadcast-groups-stats",
+    ),
     path(
         "broadcasts-statistics-stats",
         InternalBroadcastStatisticMontlyEndpoint.as_view(),
