@@ -1080,6 +1080,11 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                                     "required": False,
                                     "help": "The variables to be used in the template body",
                                 },
+                                {
+                                    "name": "locale",
+                                    "required": False,
+                                    "help": "The locale of the template (e.g., pt-BR, en-US)",
+                                },
                             ],
                         },
                         {
