@@ -2966,6 +2966,42 @@ class BroadcastCreateWithGroupsTest(TembaTest):
         self.assertEqual(stats.contact_count, self.group_a.get_member_count())
 
 
+class MsgsServicesCountsTest(TembaTest):
+    def test_count_unique_and_duplicates_empty(self):
+        from temba.msgs.services import count_unique_contacts_in_groups, count_duplicate_contacts_across_groups
+
+        self.assertEqual(count_unique_contacts_in_groups([]), 0)
+        self.assertEqual(count_duplicate_contacts_across_groups([]), 0)
+
+    def test_unique_and_duplicates_with_overlap(self):
+        from temba.msgs.services import count_unique_contacts_in_groups, count_duplicate_contacts_across_groups
+
+        a = self.create_contact("A", phone="111")
+        b = self.create_contact("B", phone="222")
+        c = self.create_contact("C", phone="333")
+
+        g1 = self.create_group("G1", contacts=[a, b])
+        g2 = self.create_group("G2", contacts=[b, c])
+
+        # unique across both is 3, duplicates is 1 (B)
+        self.assertEqual(count_unique_contacts_in_groups([g1.id, g2.id]), 3)
+        self.assertEqual(count_duplicate_contacts_across_groups([g1.id, g2.id]), 1)
+
+    def test_unique_single_group_equals_member_count(self):
+        from temba.msgs.services import count_unique_contacts_in_groups, count_duplicate_contacts_across_groups
+        from temba.contacts.models import ContactGroupCount
+
+        a = self.create_contact("A", phone="111")
+        b = self.create_contact("B", phone="222")
+        g1 = self.create_group("G", contacts=[a, b])
+
+        ContactGroupCount.populate_for_group(g1)
+
+        # unique equals member count; duplicates 0
+        self.assertEqual(count_unique_contacts_in_groups([g1.id]), g1.get_member_count())
+        self.assertEqual(count_duplicate_contacts_across_groups([g1.id]), 0)
+
+
 class MsgTasksTest(TembaTest):
     def test_fail_channel_outgoing_messages_task(self):
         contact = self.create_contact("Bob", phone="+250700000001")
