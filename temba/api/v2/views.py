@@ -763,7 +763,8 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                 "text": "This is a test message for @contact.name",
                 "template":{
                     "uuid":"c3e129a2-5802-4248-a5f0-620566ef4345",
-                    "variables": ["@contact.name"]
+                    "variables": ["@contact.name"],
+                    "locale": "pt-BR"
                 }
                 "attachments": ["image/png:https://example.com/image.png"]
                 "header": {
@@ -883,7 +884,8 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                 "text": "This is a test message for @contact.name",
                 "template":{
                     "uuid":"c3e129a2-5802-4248-a5f0-620566ef4345",
-                    "variables": ["@contact.name"]
+                    "variables": ["@contact.name"],
+                    "locale": "pt-BR"
                 }
                 "attachments": ["image/png:https://example.com/image.png"]
                 "header": {
@@ -1077,6 +1079,11 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                                     "name": "variables",
                                     "required": False,
                                     "help": "The variables to be used in the template body",
+                                },
+                                {
+                                    "name": "locale",
+                                    "required": False,
+                                    "help": "The locale of the template (e.g., pt-BR, en-US)",
                                 },
                             ],
                         },
