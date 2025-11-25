@@ -7,8 +7,11 @@
 .envrc
 .direnv
 .commit
-
+docker-compose.yml
+static/brands/push
 rp-indexer
+.python-version
+
 
 # temba
 dump.rdb

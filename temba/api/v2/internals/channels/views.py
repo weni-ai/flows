@@ -7,9 +7,10 @@ from weni.internal.authenticators import InternalOIDCAuthentication
 
 from django.conf import settings
 
+from temba.api.auth.jwt import RequiredJWTAuthentication
 from temba.api.v2.internals.channels.serializers import ChannelProjectSerializer
 from temba.api.v2.internals.views import APIViewMixin
-from temba.api.v2.permissions import IsUserInOrg
+from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel
 from temba.orgs.models import Org
 
@@ -89,6 +90,9 @@ class InternalChannelView(APIViewMixin, APIView):
 
 
 class ChannelAllowedDomainsView(APIViewMixin, APIView):
+    authentication_classes = [RequiredJWTAuthentication]
+    permission_classes = [(IsAuthenticated & HasValidJWT)]
+
     def get(self, request: Request):
         params = request.query_params
         channelUUID = params.get("channel")
