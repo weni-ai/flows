@@ -7,7 +7,6 @@
 .envrc
 .direnv
 .commit
-code_check.py
 docker-compose.yml
 static/brands/push
 rp-indexer
