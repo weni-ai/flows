@@ -4,6 +4,7 @@ from weni.internal.models import Project
 
 from django.test import override_settings
 
+from temba.api.v2.internals.views import JWTAuthMockMixin
 from temba.tests import TembaTest
 
 
@@ -63,10 +64,10 @@ class ChannelProjectViewTest(TembaTest):
             self.assertEqual(result_wac.get("project_uuid"), str(project.project_uuid))
 
 
-class ChannelAllowedDomainsViewTest(TembaTest):
+class ChannelAllowedDomainsViewTest(JWTAuthMockMixin, TembaTest):
     def test_request_without_channel_uuid(self):
         url = "/api/v2/internals/channel_allowed_domains"
-        response = self.client.get(url)
+        response = self.client.get(url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 400)
 
@@ -80,7 +81,7 @@ class ChannelAllowedDomainsViewTest(TembaTest):
 
         url = f"/api/v2/internals/channel_allowed_domains?channel={wchan.uuid}"
 
-        response = self.client.get(url)
+        response = self.client.get(url, **self.auth_headers)
 
         data = response.json()
 
@@ -96,7 +97,7 @@ class ChannelAllowedDomainsViewTest(TembaTest):
 
         url = f"/api/v2/internals/channel_allowed_domains?channel={wchan.uuid}"
 
-        response = self.client.get(url)
+        response = self.client.get(url, **self.auth_headers)
 
         data = response.json()
 
@@ -104,7 +105,7 @@ class ChannelAllowedDomainsViewTest(TembaTest):
 
     def test_request_with_channel_uuid_notfound(self):
         url = "/api/v2/internals/channel_allowed_domains?channel=2337712f-dcbc-48f3-9ae7-7f832445f6c9"
-        response = self.client.get(url)
+        response = self.client.get(url, **self.auth_headers)
         self.assertEqual(response.status_code, 404)
 
 
