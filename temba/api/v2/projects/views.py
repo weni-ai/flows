@@ -4,8 +4,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
 
+from temba.api.auth.jwt import RequiredJWTAuthentication
 from temba.api.v2.internals.views import APIViewMixin
-from temba.api.v2.permissions import IsUserInOrg
+from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel
 from temba.orgs.models import Org
 
@@ -36,6 +37,9 @@ class GetProjectView(APIViewMixin, APIView):
 
 
 class ProjectLanguageView(APIViewMixin, APIView):
+    authentication_classes = [RequiredJWTAuthentication]
+    permission_classes = [(IsAuthenticated & HasValidJWT)]
+
     def get(self, request: Request):
         params = request.query_params
         project_uuid = params.get("project_uuid")

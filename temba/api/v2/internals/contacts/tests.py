@@ -17,6 +17,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from temba.api.v2.internals.contacts.services import ContactDownloadByStatusService, ContactImportDeduplicationService
+from temba.api.v2.internals.views import JWTAuthMockMixin
 from temba.api.v2.validators import LambdaURLValidator
 from temba.contacts.models import ContactField
 from temba.msgs.models import Msg
@@ -889,25 +890,25 @@ class InternalContactGroupsViewTest(TembaTest):
         self.assertEqual(response.json(), {"error": "Project not found"})
 
 
-class HasOpenTicketViewTest(TembaTest):
+class HasOpenTicketViewTest(JWTAuthMockMixin, TembaTest):
     def test_missing_contact_urn_param(self):
         """Test that the endpoint returns 400 when contact_urn parameter is missing"""
         url = "/api/v2/internals/contact_has_open_ticket"
-        response = self.client.get(url)
+        response = self.client.get(url, **self.auth_headers)
         self.assertEqual(response.status_code, 400)
 
     def test_contact_not_found(self):
         """Test that the endpoint returns 404 when contact is not found"""
         url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
-        response = self.client.get(url)
+        response = self.client.get(url, **self.auth_headers)
         self.assertEqual(response.status_code, 404)
 
     def test_contact_without_open_ticket(self):
         """Test that the endpoint returns false when contact has no open tickets"""
         self.create_contact("Bob", urns=["tel:+1234567890"])
 
-        url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
-        response = self.client.get(url)
+        url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
+        response = self.client.get(url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"has_open_ticket": False})
@@ -918,8 +919,8 @@ class HasOpenTicketViewTest(TembaTest):
         ticketer = Ticketer.create(self.org, self.admin, WeniChatsType.slug, "bob@acme.com", {})
         self.create_ticket(ticketer, contact, "Test ticket")
 
-        url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
-        response = self.client.get(url)
+        url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
+        response = self.client.get(url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"has_open_ticket": True})
@@ -936,8 +937,8 @@ class HasOpenTicketViewTest(TembaTest):
         ticket.refresh_from_db()
         self.assertEqual(ticket.status, "C")
 
-        url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
-        response = self.client.get(url)
+        url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
+        response = self.client.get(url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"has_open_ticket": False})

@@ -7,6 +7,7 @@ from rest_framework.authentication import BasicAuthentication
 from django.test import SimpleTestCase, override_settings
 from django.urls import resolve, reverse
 
+from temba.api.v2.internals.views import JWTAuthMockMixin
 from temba.api.v2.projects.views import GetProjectView, ProjectLanguageView
 from temba.tests import TembaTest
 
@@ -73,7 +74,7 @@ class GetProjectViewTest(TembaTest):
 
 
 @override_settings(ROOT_URLCONF="temba.api.v2.projects.urls")
-class ProjectsUrlsTest(SimpleTestCase):
+class ProjectsUrlsTest(JWTAuthMockMixin, SimpleTestCase):
     def test_projects_url_resolves_to_get_project_view(self):
         url = reverse("projects")
         self.assertEqual(url, "/projects")
@@ -87,7 +88,7 @@ class ProjectsUrlsTest(SimpleTestCase):
         self.assertEqual(getattr(match.func, "view_class", None), ProjectLanguageView)
 
 
-class ProjectLanguageViewTest(TembaTest):
+class ProjectLanguageViewTest(JWTAuthMockMixin, TembaTest):
     def setUp(self):
         super().setUp()
         self.org.proj_uuid = uuid.uuid4()
@@ -96,26 +97,26 @@ class ProjectLanguageViewTest(TembaTest):
         self.url = reverse("api.v2.project_language")
 
     def test_request_without_project_uuid_and_channel_uuid(self):
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, **self.auth_headers)
         self.assertEqual(response.status_code, 400)
 
     def test_request_with_channel_uuid(self):
         channel = self.create_channel("TG", "Test Channel", "test", org=self.org)
-        response = self.client.get(f"{self.url}?channel_uuid={channel.uuid}")
+        response = self.client.get(f"{self.url}?channel_uuid={channel.uuid}", **self.auth_headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"language": self.org.language})
 
     def test_request_with_channel_uuid_notfound(self):
         url = f"{self.url}?channel_uuid=2337712f-dcbc-48f3-9ae7-7f832445f6c9"
-        response = self.client.get(url)
+        response = self.client.get(url, **self.auth_headers)
         self.assertEqual(response.status_code, 404)
 
     def test_request_with_project_uuid(self):
-        response = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}")
+        response = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}", **self.auth_headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"language": self.org.language})
 
     def test_request_with_project_uuid_notfound(self):
         url = f"{self.url}?project_uuid=2337712f-dcbc-48f3-9ae7-7f832445f6c9"
-        response = self.client.get(url)
+        response = self.client.get(url, **self.auth_headers)
         self.assertEqual(response.status_code, 404)
