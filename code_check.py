@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     if not args.skip_flake:
         status("Running flake8")
-        cmd("flake8 temba")
+        cmd("flake8")
 
     status("Running isort")
     cmd("isort -rc temba")
