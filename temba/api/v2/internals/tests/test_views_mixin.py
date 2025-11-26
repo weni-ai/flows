@@ -36,4 +36,3 @@ class JWTAuthMockMixinTests(JWTAuthMockMixin, TestCase):
         self.assertEqual(request.user.email, "real@example.com")
         self.assertEqual(request.jwt_payload["project_uuid"], str(project_uuid))
         self.assertEqual(request.project_uuid, str(project_uuid))
-
