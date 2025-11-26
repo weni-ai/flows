@@ -38,7 +38,7 @@ class GetProjectView(APIViewMixin, APIView):
 
 class ProjectLanguageView(APIViewMixin, APIView):
     authentication_classes = [RequiredJWTAuthentication]
-    permission_classes = [(IsAuthenticated & HasValidJWT)]
+    permission_classes = [HasValidJWT]
 
     def get(self, request: Request):
         params = request.query_params

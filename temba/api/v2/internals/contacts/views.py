@@ -335,7 +335,7 @@ class ContactsExportByStatusView(APIViewMixin, APIView):
 
 class ContactHasOpenTicketView(APIViewMixin, APIView):
     authentication_classes = [RequiredJWTAuthentication]
-    permission_classes = [(IsAuthenticated & HasValidJWT)]
+    permission_classes = [HasValidJWT]
 
     def get(self, request: Request):
         contact_urn = request.query_params.get("contact_urn")
