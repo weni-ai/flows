@@ -738,7 +738,8 @@ class InternalContactFieldsEndpointTest(TembaTest):
         super().setUp()
         User.objects.create(username="Mordecai", email="mordecai@msn.com")
 
-    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_request_without_body(self):
         url = "/api/v2/internals/contacts_fields"
         response = self.client.post(url)
@@ -746,7 +747,8 @@ class InternalContactFieldsEndpointTest(TembaTest):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {"error": "Project not provided"})
 
-    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_project_not_found(self):
         url = "/api/v2/internals/contacts_fields"
         body = {
@@ -759,7 +761,8 @@ class InternalContactFieldsEndpointTest(TembaTest):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json(), {"error": "Project not found"})
 
-    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_user_not_found(self):
         mock_user = MagicMock(spec=User)
         mock_user.is_authenticated = False
@@ -778,7 +781,8 @@ class InternalContactFieldsEndpointTest(TembaTest):
             self.assertEqual(response.status_code, 404)
             self.assertEqual(response.json(), {"error": "User not found"})
 
-    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_serializer_error(self):
         mock_user = MagicMock(spec=User)
         mock_user.is_authenticated = True
@@ -796,7 +800,8 @@ class InternalContactFieldsEndpointTest(TembaTest):
 
             self.assertEqual(response.status_code, 400)
 
-    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_success(self):
         mock_user = MagicMock(spec=User)
         mock_user.is_authenticated = True

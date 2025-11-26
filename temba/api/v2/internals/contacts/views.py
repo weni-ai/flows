@@ -28,6 +28,7 @@ from django.db.transaction import on_commit as on_transaction_commit
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
+from temba.api.auth.jwt import JWTAuthMixinOptional, OptionalJWTAuthentication
 from temba.api.v2.internals.contacts.serializers import (
     ContactWithMessagesListSerializer,
     InternalContactFieldsValuesSerializer,
@@ -35,7 +36,7 @@ from temba.api.v2.internals.contacts.serializers import (
 )
 from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
 from temba.api.v2.internals.views import APIViewMixin
-from temba.api.v2.permissions import IsUserInOrg
+from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.api.v2.serializers import (
     ContactFieldReadSerializer,
     ContactFieldWriteSerializer,
@@ -93,8 +94,8 @@ class InternalContactView(APIViewMixin, APIView):
 
 
 class InternalContactFieldsEndpoint(APIViewMixin, APIView):
-    authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)]
+    authentication_classes = [OptionalJWTAuthentication, InternalOIDCAuthentication]
+    permission_classes = [(IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)) | HasValidJWT]
 
     def get(self, request, *args, **kwargs):
         query_params = request.query_params
@@ -143,7 +144,7 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
+class UpdateContactFieldsView(APIViewMixin, APIView, JWTAuthMixinOptional, LambdaURLValidator):
     renderer_classes = [JSONRenderer]
 
     def patch(self, request, *args, **kwargs):
