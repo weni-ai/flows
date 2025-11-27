@@ -7,6 +7,9 @@
 .envrc
 .direnv
 .commit
+.env
+Makefile
+custom_code_check.py
 
 rp-indexer
 

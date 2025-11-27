@@ -28,7 +28,7 @@ from django.db.transaction import on_commit as on_transaction_commit
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
-from temba.api.auth.jwt import JWTAuthMixinOptional, OptionalJWTAuthentication
+from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.v2.internals.contacts.serializers import (
     ContactWithMessagesListSerializer,
     InternalContactFieldsValuesSerializer,
@@ -136,26 +136,27 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
         serializer = ContactFieldWriteSerializer(
             data=request.data, context={"request": request, "org": org, "user": user}
         )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
 
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.validated_data)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.validated_data)
 
 
-class UpdateContactFieldsView(APIViewMixin, APIView, JWTAuthMixinOptional, LambdaURLValidator):
+class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
+    authentication_classes = [OptionalJWTAuthentication]
     renderer_classes = [JSONRenderer]
 
     def patch(self, request, *args, **kwargs):
-        validation_response = self.protected_resource(request)  # pragma: no cover
-        if validation_response.status_code != 200:  # pragma: no cover
-            return validation_response
+        if not getattr(request, "jwt_payload", None):
+            validation_response = self.protected_resource(request)  # pragma: no cover
+            if validation_response.status_code != 200:  # pragma: no cover
+                return validation_response
+
         serializer = InternalContactFieldsValuesSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.update(instance=None, validated_data=serializer.validated_data)
-            return Response({"message": "Contact fields updated successfully"}, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        serializer.update(instance=None, validated_data=serializer.validated_data)
+
+        return Response({"message": "Contact fields updated successfully"}, status=status.HTTP_200_OK)
 
 
 class ContactGroupsService:

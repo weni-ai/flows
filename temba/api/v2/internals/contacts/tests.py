@@ -15,6 +15,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from temba.api.v2.internals.contacts.services import ContactDownloadByStatusService, ContactImportDeduplicationService
+from temba.api.v2.internals.views import JWTAuthMockMixin
 from temba.api.v2.validators import LambdaURLValidator
 from temba.contacts.models import ContactField
 from temba.msgs.models import Msg
@@ -729,6 +730,79 @@ class UpdateContactFieldsViewTest(TembaTest):
 
         contact.refresh_from_db()
         self.assertEqual(contact.name, "Novo Nome")
+        nickname_field = ContactField.get_by_key(contact.org, "nickname")
+        self.assertEqual(contact.get_field_display(nickname_field), "Felix")
+
+
+class UpdateContactFieldsViewJWTTest(JWTAuthMockMixin, TembaTest):
+    jwt_patch_target = "temba.api.auth.jwt.OptionalJWTAuthentication.authenticate"
+
+    def setUp(self):
+        super().setUp()
+        self.url = "/api/v2/internals/update_contacts_fields"
+
+    def test_request_without_body(self):
+        response = self.client.patch(self.url, data={}, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_request_no_project(self):
+        body = {
+            "contact_urn": "Nick Name",
+            "contact_fields": {"cpf": "12345678912"},
+        }
+
+        response = self.client.patch(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"project": ["This field is required."]})
+
+    def test_request_invalid_contact_urn(self):
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "ext:missing@contact",
+            "contact_fields": {"cpf": "12345678912"},
+        }
+
+        response = self.client.patch(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"contact_urn": ["Contact URN not found"]})
+
+    def test_request_no_contact_fields(self):
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "twitterid:11111",
+            "contact_fields": {},
+        }
+
+        response = self.client.patch(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            {"contact_fields": ["contact_fields must not be an empty dictionary"]},
+        )
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    def test_success_updates_contact_fields(self, mr_mocks):
+        contact = self.create_contact("Old Name", urns=["twitterid:44444"])
+        self.create_field("nickname", "Apelido")
+
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "twitterid:44444",
+            "contact_fields": {"name": "New Name", "nickname": "Felix"},
+        }
+
+        response = self.client.patch(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Contact fields updated successfully"})
+
+        contact.refresh_from_db()
+        self.assertEqual(contact.name, "New Name")
         nickname_field = ContactField.get_by_key(contact.org, "nickname")
         self.assertEqual(contact.get_field_display(nickname_field), "Felix")
 
