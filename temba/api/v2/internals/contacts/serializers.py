@@ -2,7 +2,9 @@ from rest_framework import serializers
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
 
+from temba.channels.models import Channel
 from temba.contacts.models import ContactField, ContactURN
 from temba.orgs.models import Org
 
@@ -14,19 +16,30 @@ class InternalContactSerializer(serializers.Serializer):
 
 
 class InternalContactFieldsValuesSerializer(serializers.Serializer):
-    project = serializers.UUIDField()
+    project_uuid = serializers.UUIDField(required=False)
+    channel_uuid = serializers.UUIDField(required=False)
     contact_fields = serializers.DictField(child=serializers.CharField(allow_null=True, allow_blank=True))
     contact_urn = serializers.CharField(required=True)
 
     def validate(self, data):
-        project_uuid = data.get("project")
+        project_uuid = data.get("project_uuid")
+        channel_uuid = data.get("channel_uuid")
         contact_urn = data.get("contact_urn")
 
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
+        if project_uuid:
+            org = get_object_or_404(Org, proj_uuid=project_uuid)
 
-        except Org.DoesNotExist:
-            raise serializers.ValidationError({"project": "Project not found"})
+        elif channel_uuid:
+            channel = get_object_or_404(Channel, uuid=channel_uuid)
+            try:
+                org = channel.org
+            except Org.DoesNotExist:
+                raise serializers.ValidationError({"channel": "Channel is not associated with a project"})
+
+        else:
+            raise serializers.ValidationError("At least either a channel or a project is required")
+
+        data["org"] = org
 
         contact = ContactURN.lookup(org, contact_urn)
         if not contact:
@@ -40,12 +53,11 @@ class InternalContactFieldsValuesSerializer(serializers.Serializer):
         return value
 
     def update(self, instance, validated_data):
-        project_uuid = validated_data.get("project")
+        org = validated_data.get("org")
         contact_urn = validated_data.get("contact_urn")
         contact_fields = validated_data.get("contact_fields", {})
         user = User.objects.get(email=settings.INTERNAL_USER_EMAIL)
 
-        org = Org.objects.get(proj_uuid=project_uuid)
         urn = ContactURN.lookup(org, contact_urn)
         contact = urn.contact
 

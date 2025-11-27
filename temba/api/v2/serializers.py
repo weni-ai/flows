@@ -11,6 +11,7 @@ from rest_framework import serializers
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.shortcuts import get_object_or_404
 
 from temba import mailroom
 from temba.api.models import Resthook, ResthookSubscriber, WebHookEvent
@@ -938,6 +939,9 @@ class ContactFieldWriteSerializer(WriteSerializer):
         max_length=ContactField.MAX_LABEL_LEN,
         validators=[UniqueForOrgValidator(ContactField.user_fields.filter(is_active=True), ignore_case=True)],
     )
+    channel_uuid = serializers.UUIDField(required=False)
+    project_uuid = serializers.UUIDField(required=False)
+    email = serializers.EmailField(required=True)
     value_type = serializers.ChoiceField(required=True, choices=list(VALUE_TYPES.keys()))
 
     def validate_label(self, value):
@@ -954,16 +958,26 @@ class ContactFieldWriteSerializer(WriteSerializer):
         return self.VALUE_TYPES[value]
 
     def validate(self, data):
-        org = self.context["org"]
-        org_active_fields_limit = org.get_limit(Org.LIMIT_FIELDS)
+        channel_uuid = data.get("channel_uuid")
+        project_uuid = data.get("project_uuid")
 
-        field_count = ContactField.user_fields.count_active_for_org(org=org)
-        if not self.instance and field_count >= org_active_fields_limit:
-            raise serializers.ValidationError(
-                "This org has %s contact fields and the limit is %s. "
-                "You must delete existing ones before you can "
-                "create new ones." % (field_count, org_active_fields_limit)
-            )
+        if channel_uuid:
+            channel = get_object_or_404(Channel, uuid=channel_uuid)
+            try:
+                org = channel.org
+            except Org.DoesNotExist:
+                raise serializers.ValidationError({"channel": "Channel is not associated with a project"})
+
+        elif project_uuid:
+            org = get_object_or_404(Org, proj_uuid=project_uuid)
+
+        else:
+            raise serializers.ValidationError("At least either a channel or a project is required")
+
+        data["org"] = org
+
+        user = get_object_or_404(User, email=data.get("email"))
+        data["user"] = user
 
         return data
 
@@ -976,7 +990,9 @@ class ContactFieldWriteSerializer(WriteSerializer):
         else:
             key = ContactField.make_key(label)
 
-        return ContactField.get_or_create(self.context["org"], self.context["user"], key, label, value_type=value_type)
+        return ContactField.get_or_create(
+            self.validated_data["org"], self.validated_data["user"], key, label, value_type=value_type
+        )
 
 
 class ContactGroupReadSerializer(ReadSerializer):
