@@ -29,7 +29,6 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
-from temba.api.support import OrgUserRateThrottle
 from temba.api.v2.internals.contacts.serializers import (
     ContactWithMessagesListSerializer,
     InternalContactFieldsValuesSerializer,
@@ -145,8 +144,6 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
 
 class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
     authentication_classes = [OptionalJWTAuthentication]
-    throttle_classes = [OrgUserRateThrottle]
-    throttle_scope = "v2.contacts"
     renderer_classes = [JSONRenderer]
 
     def patch(self, request, *args, **kwargs):
