@@ -34,6 +34,7 @@ from temba.api.v2.internals.contacts.serializers import (
     InternalContactFieldsValuesSerializer,
     InternalContactSerializer,
 )
+from temba.api.support import OrgUserRateThrottle
 from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
@@ -144,6 +145,8 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
 
 class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
     authentication_classes = [OptionalJWTAuthentication]
+    throttle_classes = [OrgUserRateThrottle]
+    throttle_scope = "v2.contacts"
     renderer_classes = [JSONRenderer]
 
     def patch(self, request, *args, **kwargs):
