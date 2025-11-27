@@ -29,12 +29,12 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
+from temba.api.support import OrgUserRateThrottle
 from temba.api.v2.internals.contacts.serializers import (
     ContactWithMessagesListSerializer,
     InternalContactFieldsValuesSerializer,
     InternalContactSerializer,
 )
-from temba.api.support import OrgUserRateThrottle
 from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
