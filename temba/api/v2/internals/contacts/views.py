@@ -119,19 +119,29 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
         return Response({"results": serializer.data})
 
     def post(self, request, *args, **kwargs):
-        project_uuid = request.data.get("project")
+        project_uuid = request.data.get("project") or getattr(request, "project_uuid", None)
 
         if not project_uuid:
-            return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Project not provided"}, status=401)
 
         try:
             org = Org.objects.get(proj_uuid=project_uuid)
-            user = User.objects.get(email=request.user.email)
-        except (Org.DoesNotExist, django_exceptions.ValidationError):
-            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+            # When authenticated via JWT, prefer email from token; otherwise use request.user
+            if getattr(request, "jwt_payload", None):
+                email = (
+                    request.jwt_payload.get("email")
+                    or request.jwt_payload.get("user_email")
+                    or request.data.get("user_email")
+                )
+            else:
+                email = getattr(request.user, "email", None)
 
-        except User.DoesNotExist:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            if not email:
+                return Response({"error": "User email not provided"}, status=401)
+
+            user, _ = User.objects.get_or_create(email=email)
+        except Org.DoesNotExist:
+            return Response({"error": "Project not found"}, status=404)
 
         serializer = ContactFieldWriteSerializer(
             data=request.data, context={"request": request, "org": org, "user": user}
