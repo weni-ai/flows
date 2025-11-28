@@ -95,6 +95,23 @@ class OptionalJWTAuthenticationTests(TestCase):
         with patch("temba.api.auth.jwt.jwt.decode", side_effect=jwt.ExpiredSignatureError("expired")):
             self.assertIsNone(self.auth.authenticate(request))
 
+    @patch("temba.api.auth.jwt.jwt.decode")
+    @patch("temba.api.auth.jwt.settings")
+    def test_success_sets_payload_and_channel_uuid(self, mock_settings, mock_jwt_decode):
+        mock_settings.JWT_PUBLIC_KEY = "dummy-public-key"
+        payload = {"channel_uuid": "chan-456", "email": "user@example.com"}
+        mock_jwt_decode.return_value = payload
+
+        request = self.factory.get("/")
+        request.headers = {"Authorization": "Bearer valid-token"}
+
+        user, _ = self.auth.authenticate(request)
+        from django.contrib.auth.models import AnonymousUser
+
+        self.assertIsInstance(user, AnonymousUser)
+        self.assertEqual(getattr(request, "jwt_payload", None), payload)
+        self.assertEqual(getattr(request, "channel_uuid", None), "chan-456")
+
 
 class RequiredJWTAuthenticationTests(TestCase):
     def setUp(self):
