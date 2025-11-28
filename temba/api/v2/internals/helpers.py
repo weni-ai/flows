@@ -1,5 +1,6 @@
 from rest_framework.exceptions import NotFound
 
+from django.core import exceptions as django_exceptions
 from django.db.models import Model
 from django.shortcuts import _get_queryset
 
@@ -23,5 +24,5 @@ def get_object_or_404(cls: Model, field_error_name: str, *args, **kwargs):
         )
     try:
         return queryset.get(*args, **kwargs)
-    except queryset.model.DoesNotExist:
+    except (queryset.model.DoesNotExist, django_exceptions.ValidationError):
         raise NotFound({field_error_name: f"{field_error_name} not found"})
