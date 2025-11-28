@@ -14,7 +14,6 @@ from django.contrib.auth.models import User
 
 from temba import mailroom
 from temba.api.models import Resthook, ResthookSubscriber, WebHookEvent
-from temba.api.v2.internals.helpers import get_object_or_404
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
@@ -968,11 +967,10 @@ class ContactFieldWriteSerializer(WriteSerializer):
                 "create new ones." % (field_count, org_active_fields_limit)
             )
 
-        self.user = get_object_or_404(User, field_error_name="user", email=self.context["email"])
-
         return data
 
     def save(self):
+        user = self.context["user"]
         label = self.validated_data.get("label")
         value_type = self.validated_data.get("value_type")
 
@@ -981,7 +979,7 @@ class ContactFieldWriteSerializer(WriteSerializer):
         else:
             key = ContactField.make_key(label)
 
-        return ContactField.get_or_create(self.org, self.user, key, label, value_type=value_type)
+        return ContactField.get_or_create(self.org, user, key, label, value_type=value_type)
 
 
 class ContactGroupReadSerializer(ReadSerializer):

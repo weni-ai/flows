@@ -121,7 +121,6 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
         return Response({"results": serializer.data})
 
     def post(self, request, *args, **kwargs):
-        email = self._get_request_email(request)
         project_uuid = request.data.get("project_uuid") or request.data.get("project")
         channel_uuid = request.data.get("channel_uuid") or request.data.get("channel")
 
@@ -141,9 +140,12 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
                 {"error": "At least either a channel or a project is required"}, status=status.HTTP_400_BAD_REQUEST
             )
 
+        email = self._get_request_email(request)
+        user = get_object_or_404(User, field_error_name="user", email=email)
+
         serializer = ContactFieldWriteSerializer(
             data=request.data,
-            context={"request": request, "email": email, "org": self.org},
+            context={"request": request, "user": user, "org": self.org},
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()

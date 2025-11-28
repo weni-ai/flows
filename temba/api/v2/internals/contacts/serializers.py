@@ -22,8 +22,8 @@ class InternalContactFieldsValuesSerializer(serializers.Serializer):
     contact_urn = serializers.CharField(required=True)
 
     def validate(self, data):
-        project_uuid = data.get("project_uuid") or data.get("project")
-        channel_uuid = data.get("channel_uuid") or data.get("channel")
+        project_uuid = data.get("project")
+        channel_uuid = data.get("channel_uuid")
         contact_urn = data.get("contact_urn")
 
         if project_uuid:
