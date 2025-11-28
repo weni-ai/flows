@@ -16,6 +16,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
 
+from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.v2.internals.contacts.services import ContactDownloadByStatusService, ContactImportDeduplicationService
 from temba.api.v2.internals.helpers import get_object_or_404
 from temba.api.v2.internals.views import JWTAuthMockMixin
@@ -1027,6 +1028,8 @@ class InternalContactFieldsEndpointJWTTest(PatchedJWTAuthMixin, TembaTest):
     def _set_jwt_payload(self, **kwargs):
         self.jwt_payload_patch = kwargs
 
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [OptionalJWTAuthentication])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_success_with_channel_uuid_in_jwt(self):
         channel = self.create_channel("TG", "JWT Channel", "12345", org=self.org)
         self._set_jwt_payload(channel_uuid=str(channel.uuid), project_uuid=None, email=self.user.email)
@@ -1042,6 +1045,8 @@ class InternalContactFieldsEndpointJWTTest(PatchedJWTAuthMixin, TembaTest):
         self.assertEqual(response.json(), {"label": "JWT Field", "value_type": "T"})
         self._set_jwt_payload(project_uuid=str(self.org.proj_uuid), email=self.user.email)
 
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [OptionalJWTAuthentication])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_invalid_channel_uuid_in_jwt_returns_404(self):
         invalid_uuid = "invalid-uuid"
         self._set_jwt_payload(channel_uuid=invalid_uuid, project_uuid=None, email=self.user.email)
