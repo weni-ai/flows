@@ -740,6 +740,13 @@ class UpdateContactFieldsViewJWTTest(JWTAuthMockMixin, TembaTest):
     def setUp(self):
         super().setUp()
         self.url = "/api/v2/internals/update_contacts_fields"
+        self.jwt_payload_patch = None
+
+    def _mock_jwt_authenticate(self, request, *args, **kwargs):
+        result = super()._mock_jwt_authenticate(request, *args, **kwargs)
+        if getattr(self, "jwt_payload_patch", None):
+            request.jwt_payload.update(self.jwt_payload_patch)
+        return result
 
     def test_request_without_body(self):
         response = self.client.patch(self.url, data={}, content_type="application/json", **self.auth_headers)
@@ -805,6 +812,31 @@ class UpdateContactFieldsViewJWTTest(JWTAuthMockMixin, TembaTest):
         self.assertEqual(contact.name, "New Name")
         nickname_field = ContactField.get_by_key(contact.org, "nickname")
         self.assertEqual(contact.get_field_display(nickname_field), "Felix")
+        self.jwt_payload_patch = None
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    def test_success_updates_contact_fields_with_channel_in_jwt(self, mr_mocks):
+        contact = self.create_contact("Channel User", urns=["twitterid:55555"])
+        self.create_field("nickname", "Apelido")
+        channel = self.create_channel("TG", "Test Channel", "12345", org=self.org)
+
+        self.jwt_payload_patch = {"channel_uuid": str(channel.uuid)}
+        body = {
+            "channel_uuid": str(channel.uuid),
+            "contact_urn": "twitterid:55555",
+            "contact_fields": {"nickname": "Chan"},
+        }
+
+        response = self.client.patch(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Contact fields updated successfully"})
+
+        contact.refresh_from_db()
+        nickname_field = ContactField.get_by_key(contact.org, "nickname")
+        self.assertEqual(contact.get_field_display(nickname_field), "Chan")
+        self.jwt_payload_patch = None
 
 
 class InternalContactFieldsEndpointTest(TembaTest):
@@ -895,6 +927,63 @@ class InternalContactFieldsEndpointTest(TembaTest):
             self.assertEqual(response.json(), {"label": "Nick Name", "value_type": "T"})
 
 
+class InternalContactFieldsEndpointJWTTest(JWTAuthMockMixin, TembaTest):
+    jwt_patch_target = "temba.api.auth.jwt.OptionalJWTAuthentication.authenticate"
+
+    def setUp(self):
+        super().setUp()
+        self.url = "/api/v2/internals/contacts_fields"
+        self.user = self.create_user("jwt-contact-fields@example.com")
+        self.jwt_payload_patch = None
+
+    def _mock_jwt_authenticate(self, request, *args, **kwargs):
+        result = super()._mock_jwt_authenticate(request, *args, **kwargs)
+        if getattr(self, "jwt_payload_patch", None):
+            request.jwt_payload.update(self.jwt_payload_patch)
+        return result
+
+    def test_success_with_channel_uuid_in_jwt(self):
+        channel = self.create_channel("TG", "JWT Channel", "12345", org=self.org)
+        self.jwt_payload_patch = {"channel_uuid": str(channel.uuid), "email": self.user.email}
+
+        body = {
+            "channel_uuid": str(channel.uuid),
+            "label": "JWT Field",
+            "value_type": "text",
+        }
+
+        response = self.client.post(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "label": "JWT Field",
+                "value_type": "T",
+                "channel_uuid": str(channel.uuid),
+            },
+        )
+        self.jwt_payload_patch = None
+
+    def test_invalid_channel_uuid_in_jwt_returns_404(self):
+        from uuid import uuid4
+
+        invalid_uuid = str(uuid4())
+        self.jwt_payload_patch = {"channel_uuid": invalid_uuid, "email": self.user.email}
+
+        body = {
+            "channel_uuid": invalid_uuid,
+            "label": "JWT Field",
+            "value_type": "text",
+        }
+
+        response = self.client.post(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"channel": "channel not found"})
+        self.jwt_payload_patch = None
+
+
 class InternalContactGroupsViewTest(TembaTest):
     @patch(
         "temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes",
@@ -983,7 +1072,7 @@ class HasOpenTicketViewTest(TembaTest):
         """Test that the endpoint returns false when contact has no open tickets"""
         self.create_contact("Bob", urns=["tel:+1234567890"])
 
-        url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
+        url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -995,7 +1084,7 @@ class HasOpenTicketViewTest(TembaTest):
         ticketer = Ticketer.create(self.org, self.admin, WeniChatsType.slug, "bob@acme.com", {})
         self.create_ticket(ticketer, contact, "Test ticket")
 
-        url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
+        url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -1013,7 +1102,7 @@ class HasOpenTicketViewTest(TembaTest):
         ticket.refresh_from_db()
         self.assertEqual(ticket.status, "C")
 
-        url = f"/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
+        url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
