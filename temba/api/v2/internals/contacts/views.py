@@ -119,17 +119,23 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
         return Response({"results": serializer.data})
 
     def post(self, request, *args, **kwargs):
-        email = (
-            request.jwt_payload.get("email") or request.jwt_payload.get("user_email")
-            if request.jwt_payload
-            else request.data.get("user_email")
-        )
+        email = self._get_request_email(request)
 
-        serializer = ContactFieldWriteSerializer(data=request.data, context={"request": request, "email": email})
+        serializer = ContactFieldWriteSerializer(
+            data=request.data,
+            context={"request": request, "email": email},
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
         return Response(serializer.validated_data)
+
+    def _get_request_email(self, request):
+        payload = getattr(request, "jwt_payload", None)
+        if payload:
+            return payload.get("email") or payload.get("user_email") or request.data.get("user_email")
+        else:
+            return request.data.get("user_email") or getattr(request.user, "email", None)
 
 
 class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):

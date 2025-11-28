@@ -31,9 +31,8 @@ class InternalContactFieldsValuesSerializer(serializers.Serializer):
 
         elif channel_uuid:
             channel = get_object_or_404(Channel, uuid=channel_uuid)
-            try:
-                org = channel.org
-            except Org.DoesNotExist:
+            org = channel.org
+            if not org:
                 raise serializers.ValidationError({"channel": "Channel is not associated with a project"})
 
         else:

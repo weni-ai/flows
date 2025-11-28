@@ -963,9 +963,8 @@ class ContactFieldWriteSerializer(WriteSerializer):
 
         if channel_uuid:
             channel = get_object_or_404(Channel, uuid=channel_uuid)
-            try:
-                org = channel.org
-            except Org.DoesNotExist:
+            org = channel.org
+            if not org:
                 raise serializers.ValidationError({"channel": "Channel is not associated with a project"})
 
         elif project_uuid:
@@ -975,6 +974,15 @@ class ContactFieldWriteSerializer(WriteSerializer):
             raise serializers.ValidationError("At least either a channel or a project is required")
 
         data["org"] = org
+
+        org_active_fields_limit = org.get_limit(Org.LIMIT_FIELDS)
+        field_count = ContactField.user_fields.count_active_for_org(org=org)
+        if not self.instance and field_count >= org_active_fields_limit:
+            raise serializers.ValidationError(
+                "This org has %s contact fields and the limit is %s. "
+                "You must delete existing ones before you can "
+                "create new ones." % (field_count, org_active_fields_limit)
+            )
 
         user = get_object_or_404(User, email=data.get("email"))
         data["user"] = user
