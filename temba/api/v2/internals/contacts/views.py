@@ -132,7 +132,9 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
             channel = get_object_or_404(Channel, field_error_name="channel", uuid=channel_uuid)
             self.org = channel.org
             if not self.org:
-                return Response({"channel": "Channel is not associated with a project"})
+                return Response(
+                    {"channel": "Channel is not associated with a project"}, status=status.HTTP_400_BAD_REQUEST
+                )
 
         else:
             return Response(

@@ -890,7 +890,6 @@ class InternalContactFieldsEndpointTest(TembaTest):
                 "value_type": "text",
             }
             response = self.client.post(url, data=body, content_type="application/json")
-            breakpoint()
 
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json(), {"label": "Nick Name", "value_type": "T"})
