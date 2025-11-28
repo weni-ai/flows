@@ -738,15 +738,7 @@ class UpdateContactFieldsViewTest(TembaTest):
         self.assertEqual(contact.get_field_display(nickname_field), "Felix")
 
 
-class UpdateContactFieldsViewJWTTest(JWTAuthMockMixin, TembaTest):
-    jwt_patch_target = "temba.api.auth.jwt.OptionalJWTAuthentication.authenticate"
-
-    def setUp(self):
-        super().setUp()
-        self.url = "/api/v2/internals/update_contacts_fields"
-        self.jwt_payload_patch = {}
-        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
-
+class PatchedJWTAuthMixin(JWTAuthMockMixin):
     def _mock_jwt_authenticate(self, request, *args, **kwargs):
         result = super()._mock_jwt_authenticate(request, *args, **kwargs)
         payload = request.jwt_payload
@@ -755,6 +747,16 @@ class UpdateContactFieldsViewJWTTest(JWTAuthMockMixin, TembaTest):
         if getattr(self, "jwt_payload_patch", None):
             payload.update(self.jwt_payload_patch)
         return result
+
+
+class UpdateContactFieldsViewJWTTest(PatchedJWTAuthMixin, TembaTest):
+    jwt_patch_target = "temba.api.auth.jwt.OptionalJWTAuthentication.authenticate"
+
+    def setUp(self):
+        super().setUp()
+        self.url = "/api/v2/internals/update_contacts_fields"
+        self.jwt_payload_patch = {}
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
 
     def _set_jwt_payload(self, **kwargs):
         self.jwt_payload_patch = kwargs
@@ -1012,7 +1014,7 @@ class InternalContactFieldsEndpointTest(TembaTest):
         self.assertEqual(response.json(), {"channel": "Channel is not associated with a project"})
 
 
-class InternalContactFieldsEndpointJWTTest(JWTAuthMockMixin, TembaTest):
+class InternalContactFieldsEndpointJWTTest(PatchedJWTAuthMixin, TembaTest):
     jwt_patch_target = "temba.api.auth.jwt.OptionalJWTAuthentication.authenticate"
 
     def setUp(self):
@@ -1021,15 +1023,6 @@ class InternalContactFieldsEndpointJWTTest(JWTAuthMockMixin, TembaTest):
         self.user = self.create_user("jwt-contact-fields@example.com")
         self.jwt_payload_patch = {"email": self.user.email}
         self._set_jwt_payload(project_uuid=str(self.org.proj_uuid), email=self.user.email)
-
-    def _mock_jwt_authenticate(self, request, *args, **kwargs):
-        result = super()._mock_jwt_authenticate(request, *args, **kwargs)
-        payload = request.jwt_payload
-        if getattr(self.org, "proj_uuid", None) and not payload.get("project_uuid"):
-            payload["project_uuid"] = str(self.org.proj_uuid)
-        if getattr(self, "jwt_payload_patch", None):
-            payload.update(self.jwt_payload_patch)
-        return result
 
     def _set_jwt_payload(self, **kwargs):
         self.jwt_payload_patch = kwargs
