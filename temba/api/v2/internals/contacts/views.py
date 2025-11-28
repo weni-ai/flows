@@ -121,8 +121,12 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
         return Response({"results": serializer.data})
 
     def post(self, request, *args, **kwargs):
-        project_uuid = request.data.get("project_uuid") or request.data.get("project")
-        channel_uuid = request.data.get("channel_uuid") or request.data.get("channel")
+        project_uuid = (
+            request.data.get("project_uuid") or request.data.get("project") or getattr(request, "project_uuid", None)
+        )
+        channel_uuid = (
+            request.data.get("channel_uuid") or request.data.get("channel") or getattr(request, "channel_uuid", None)
+        )
 
         if project_uuid:
             self.org = get_object_or_404(Org, field_error_name="project", proj_uuid=project_uuid)
@@ -170,7 +174,16 @@ class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
             if validation_response.status_code != 200:  # pragma: no cover
                 return validation_response
 
-        serializer = InternalContactFieldsValuesSerializer(data=request.data)
+        project_uuid = (
+            request.data.get("project_uuid") or request.data.get("project") or getattr(request, "project_uuid", None)
+        )
+        channel_uuid = (
+            request.data.get("channel_uuid") or request.data.get("channel") or getattr(request, "channel_uuid", None)
+        )
+
+        serializer = InternalContactFieldsValuesSerializer(
+            data=request.data, context={"project_uuid": project_uuid, "channel_uuid": channel_uuid}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.update(instance=None, validated_data=serializer.validated_data)
 
