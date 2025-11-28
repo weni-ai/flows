@@ -11,10 +11,10 @@ from rest_framework import serializers
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.shortcuts import get_object_or_404
 
 from temba import mailroom
 from temba.api.models import Resthook, ResthookSubscriber, WebHookEvent
+from temba.api.v2.internals.helpers import get_object_or_404
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
@@ -941,7 +941,6 @@ class ContactFieldWriteSerializer(WriteSerializer):
     )
     channel_uuid = serializers.UUIDField(required=False)
     project_uuid = serializers.UUIDField(required=False)
-    email = serializers.EmailField(required=True)
     value_type = serializers.ChoiceField(required=True, choices=list(VALUE_TYPES.keys()))
 
     def validate_label(self, value):
@@ -958,25 +957,10 @@ class ContactFieldWriteSerializer(WriteSerializer):
         return self.VALUE_TYPES[value]
 
     def validate(self, data):
-        channel_uuid = data.get("channel_uuid")
-        project_uuid = data.get("project_uuid")
+        self.org = self.context["org"]
 
-        if channel_uuid:
-            channel = get_object_or_404(Channel, uuid=channel_uuid)
-            org = channel.org
-            if not org:
-                raise serializers.ValidationError({"channel": "Channel is not associated with a project"})
-
-        elif project_uuid:
-            org = get_object_or_404(Org, proj_uuid=project_uuid)
-
-        else:
-            raise serializers.ValidationError("At least either a channel or a project is required")
-
-        data["org"] = org
-
-        org_active_fields_limit = org.get_limit(Org.LIMIT_FIELDS)
-        field_count = ContactField.user_fields.count_active_for_org(org=org)
+        org_active_fields_limit = self.org.get_limit(Org.LIMIT_FIELDS)
+        field_count = ContactField.user_fields.count_active_for_org(org=self.org)
         if not self.instance and field_count >= org_active_fields_limit:
             raise serializers.ValidationError(
                 "This org has %s contact fields and the limit is %s. "
@@ -984,8 +968,7 @@ class ContactFieldWriteSerializer(WriteSerializer):
                 "create new ones." % (field_count, org_active_fields_limit)
             )
 
-        user = get_object_or_404(User, email=data.get("email"))
-        data["user"] = user
+        self.user = get_object_or_404(User, field_error_name="user", email=self.context["email"])
 
         return data
 
@@ -998,9 +981,7 @@ class ContactFieldWriteSerializer(WriteSerializer):
         else:
             key = ContactField.make_key(label)
 
-        return ContactField.get_or_create(
-            self.validated_data["org"], self.validated_data["user"], key, label, value_type=value_type
-        )
+        return ContactField.get_or_create(self.org, self.user, key, label, value_type=value_type)
 
 
 class ContactGroupReadSerializer(ReadSerializer):

@@ -579,7 +579,7 @@ class UpdateContactFieldsViewTest(TembaTest):
         response = self.client.patch(url, data=body, content_type="application/json")
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"project": ["This field is required."]})
+        self.assertEqual(response.json(), {"non_field_errors": ["At least either a channel or a project is required"]})
 
     @patch.object(LambdaURLValidator, "protected_resource")
     def test_request_incorrect_project(self, mock_protected_resource):
@@ -596,8 +596,8 @@ class UpdateContactFieldsViewTest(TembaTest):
 
         response = self.client.patch(url, data=body, content_type="application/json")
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"project": ["Project not found"]})
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"project": "project not found"})
 
     @patch.object(LambdaURLValidator, "protected_resource")
     def test_request_invalid_contact_urn(self, mock_protected_resource):
@@ -755,7 +755,7 @@ class UpdateContactFieldsViewJWTTest(JWTAuthMockMixin, TembaTest):
         response = self.client.patch(self.url, data=body, content_type="application/json", **self.auth_headers)
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"project": ["This field is required."]})
+        self.assertEqual(response.json(), {"non_field_errors": ["At least either a channel or a project is required"]})
 
     def test_request_invalid_contact_urn(self):
         body = {
@@ -819,7 +819,7 @@ class InternalContactFieldsEndpointTest(TembaTest):
         response = self.client.post(url)
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"error": "Project not provided"})
+        self.assertEqual(response.json(), {"error": "At least either a channel or a project is required"})
 
     @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
     @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
@@ -833,7 +833,7 @@ class InternalContactFieldsEndpointTest(TembaTest):
         response = self.client.post(url, data=body, content_type="application/json")
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json(), {"error": "Project not found"})
+        self.assertEqual(response.json(), {"project": "project not found"})
 
     @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
     @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
@@ -853,7 +853,7 @@ class InternalContactFieldsEndpointTest(TembaTest):
             response = self.client.post(url, data=body, content_type="application/json")
 
             self.assertEqual(response.status_code, 404)
-            self.assertEqual(response.json(), {"error": "User not found"})
+            self.assertEqual(response.json(), {"user": "user not found"})
 
     @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
     @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
@@ -890,6 +890,7 @@ class InternalContactFieldsEndpointTest(TembaTest):
                 "value_type": "text",
             }
             response = self.client.post(url, data=body, content_type="application/json")
+            breakpoint()
 
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json(), {"label": "Nick Name", "value_type": "T"})

@@ -35,6 +35,7 @@ from temba.api.v2.internals.contacts.serializers import (
     InternalContactSerializer,
 )
 from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
+from temba.api.v2.internals.helpers import get_object_or_404
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.api.v2.serializers import (
@@ -44,6 +45,7 @@ from temba.api.v2.serializers import (
 )
 from temba.api.v2.validators import LambdaURLValidator
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
+from temba.channels.models import Channel
 from temba.contacts.models import Contact, ContactField, ContactGroup, ContactImport, ContactURN, ExportContactsTask
 from temba.contacts.tasks import export_contacts_by_status_task
 from temba.contacts.views import ContactImportCRUDL
@@ -120,10 +122,26 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
 
     def post(self, request, *args, **kwargs):
         email = self._get_request_email(request)
+        project_uuid = request.data.get("project_uuid") or request.data.get("project")
+        channel_uuid = request.data.get("channel_uuid") or request.data.get("channel")
+
+        if project_uuid:
+            self.org = get_object_or_404(Org, field_error_name="project", proj_uuid=project_uuid)
+
+        elif channel_uuid:
+            channel = get_object_or_404(Channel, field_error_name="channel", uuid=channel_uuid)
+            self.org = channel.org
+            if not self.org:
+                return Response({"channel": "Channel is not associated with a project"})
+
+        else:
+            return Response(
+                {"error": "At least either a channel or a project is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         serializer = ContactFieldWriteSerializer(
             data=request.data,
-            context={"request": request, "email": email},
+            context={"request": request, "email": email, "org": self.org},
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()

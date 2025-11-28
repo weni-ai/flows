@@ -2,8 +2,8 @@ from rest_framework import serializers
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.shortcuts import get_object_or_404
 
+from temba.api.v2.internals.helpers import get_object_or_404
 from temba.channels.models import Channel
 from temba.contacts.models import ContactField, ContactURN
 from temba.orgs.models import Org
@@ -16,31 +16,31 @@ class InternalContactSerializer(serializers.Serializer):
 
 
 class InternalContactFieldsValuesSerializer(serializers.Serializer):
-    project_uuid = serializers.UUIDField(required=False)
+    project = serializers.UUIDField(required=False)
     channel_uuid = serializers.UUIDField(required=False)
     contact_fields = serializers.DictField(child=serializers.CharField(allow_null=True, allow_blank=True))
     contact_urn = serializers.CharField(required=True)
 
     def validate(self, data):
-        project_uuid = data.get("project_uuid")
-        channel_uuid = data.get("channel_uuid")
+        project_uuid = data.get("project_uuid") or data.get("project")
+        channel_uuid = data.get("channel_uuid") or data.get("channel")
         contact_urn = data.get("contact_urn")
 
         if project_uuid:
-            org = get_object_or_404(Org, proj_uuid=project_uuid)
+            self.org = get_object_or_404(Org, field_error_name="project", proj_uuid=project_uuid)
 
         elif channel_uuid:
-            channel = get_object_or_404(Channel, uuid=channel_uuid)
-            org = channel.org
-            if not org:
+            channel = get_object_or_404(Channel, field_error_name="channel", uuid=channel_uuid)
+            self.org = channel.org
+            if not self.org:
                 raise serializers.ValidationError({"channel": "Channel is not associated with a project"})
 
         else:
             raise serializers.ValidationError("At least either a channel or a project is required")
 
-        data["org"] = org
+        data["org"] = self.org
 
-        contact = ContactURN.lookup(org, contact_urn)
+        contact = ContactURN.lookup(self.org, contact_urn)
         if not contact:
             raise serializers.ValidationError({"contact_urn": "Contact URN not found"})
 
