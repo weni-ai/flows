@@ -19,6 +19,7 @@ class TestUpdateProjectConfig(TembaTest):
             created_by=self.user,
             modified_by=self.user,
             config={"description": "Old description"},
+            language="en-us",
         )
 
         updated_project = update_project_config(project.project_uuid, "New description", self.user.email)
@@ -33,3 +34,11 @@ class TestUpdateProjectConfig(TembaTest):
 
         self.assertEqual(reloaded_project.config["description"], "New description 2")
         self.assertEqual(updated_project_without_user_email, reloaded_project)
+
+        updated_project_with_language = update_project_config(project.project_uuid, "New description 3", language="pt-br")
+        reloaded_project = Project.objects.get(project_uuid=project.project_uuid)
+
+        self.assertEqual(reloaded_project.config["description"], "New description 3")
+        self.assertEqual(reloaded_project.language, "pt-br")
+        self.assertEqual(updated_project_with_language, reloaded_project)
+
