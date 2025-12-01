@@ -1,3 +1,7 @@
+3.45.2
+----------
+* Fix: package-lock.json issue
+
 3.45.1
 ----------
 * Fix: floweditor lock file issue
