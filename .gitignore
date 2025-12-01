@@ -7,10 +7,9 @@
 .envrc
 .direnv
 .commit
-.env
 Makefile
 custom_code_check.py
-
+docker-compose.yml
 rp-indexer
 
 # temba
