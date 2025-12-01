@@ -7,8 +7,10 @@
 .envrc
 .direnv
 .commit
-docker-compose.yml
 static/brands/push
+Makefile
+custom_code_check.py
+docker-compose.yml
 rp-indexer
 .python-version
 

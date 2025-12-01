@@ -28,13 +28,14 @@ from django.db.transaction import on_commit as on_transaction_commit
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
-from temba.api.auth.jwt import RequiredJWTAuthentication
+from temba.api.auth.jwt import OptionalJWTAuthentication, RequiredJWTAuthentication
 from temba.api.v2.internals.contacts.serializers import (
     ContactWithMessagesListSerializer,
     InternalContactFieldsValuesSerializer,
     InternalContactSerializer,
 )
 from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
+from temba.api.v2.internals.helpers import get_object_or_404
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.api.v2.serializers import (
@@ -44,6 +45,7 @@ from temba.api.v2.serializers import (
 )
 from temba.api.v2.validators import LambdaURLValidator
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
+from temba.channels.models import Channel
 from temba.contacts.models import Contact, ContactField, ContactGroup, ContactImport, ContactURN, ExportContactsTask
 from temba.contacts.tasks import export_contacts_by_status_task
 from temba.contacts.views import ContactImportCRUDL
@@ -94,8 +96,8 @@ class InternalContactView(APIViewMixin, APIView):
 
 
 class InternalContactFieldsEndpoint(APIViewMixin, APIView):
-    authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)]
+    authentication_classes = [OptionalJWTAuthentication, InternalOIDCAuthentication]
+    permission_classes = [(IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)) | HasValidJWT]
 
     def get(self, request, *args, **kwargs):
         query_params = request.query_params
@@ -119,43 +121,73 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
         return Response({"results": serializer.data})
 
     def post(self, request, *args, **kwargs):
-        project_uuid = request.data.get("project")
-
-        if not project_uuid:
-            return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-            user = User.objects.get(email=request.user.email)
-        except (Org.DoesNotExist, django_exceptions.ValidationError):
-            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        except User.DoesNotExist:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        serializer = ContactFieldWriteSerializer(
-            data=request.data, context={"request": request, "org": org, "user": user}
+        project_uuid = (
+            request.data.get("project_uuid") or request.data.get("project") or getattr(request, "project_uuid", None)
+        )
+        channel_uuid = (
+            request.data.get("channel_uuid") or request.data.get("channel") or getattr(request, "channel_uuid", None)
         )
 
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.validated_data)
+        if project_uuid:
+            self.org = get_object_or_404(Org, field_error_name="project", proj_uuid=project_uuid)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        elif channel_uuid:
+            channel = get_object_or_404(Channel, field_error_name="channel", uuid=channel_uuid)
+            self.org = channel.org
+            if not self.org:
+                return Response(
+                    {"channel": "Channel is not associated with a project"}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+        else:
+            return Response(
+                {"error": "At least either a channel or a project is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        email = self._get_request_email(request)
+        user = get_object_or_404(User, field_error_name="user", email=email)
+
+        serializer = ContactFieldWriteSerializer(
+            data=request.data,
+            context={"request": request, "user": user, "org": self.org},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(serializer.validated_data)
+
+    def _get_request_email(self, request):
+        payload = getattr(request, "jwt_payload", None)
+        if payload:
+            return payload.get("email") or payload.get("user_email") or request.data.get("user_email")
+        else:
+            return request.data.get("user_email") or getattr(request.user, "email", None)
 
 
 class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
+    authentication_classes = [OptionalJWTAuthentication]
     renderer_classes = [JSONRenderer]
 
     def patch(self, request, *args, **kwargs):
-        validation_response = self.protected_resource(request)  # pragma: no cover
-        if validation_response.status_code != 200:  # pragma: no cover
-            return validation_response
-        serializer = InternalContactFieldsValuesSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.update(instance=None, validated_data=serializer.validated_data)
-            return Response({"message": "Contact fields updated successfully"}, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if not getattr(request, "jwt_payload", None):
+            validation_response = self.protected_resource(request)  # pragma: no cover
+            if validation_response.status_code != 200:  # pragma: no cover
+                return validation_response
+
+        project_uuid = (
+            request.data.get("project_uuid") or request.data.get("project") or getattr(request, "project_uuid", None)
+        )
+        channel_uuid = (
+            request.data.get("channel_uuid") or request.data.get("channel") or getattr(request, "channel_uuid", None)
+        )
+
+        serializer = InternalContactFieldsValuesSerializer(
+            data=request.data, context={"project_uuid": project_uuid, "channel_uuid": channel_uuid}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.update(instance=None, validated_data=serializer.validated_data)
+
+        return Response({"message": "Contact fields updated successfully"}, status=status.HTTP_200_OK)
 
 
 class ContactGroupsService:

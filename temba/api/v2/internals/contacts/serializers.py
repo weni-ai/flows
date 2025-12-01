@@ -3,6 +3,8 @@ from rest_framework import serializers
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
+from temba.api.v2.internals.helpers import get_object_or_404
+from temba.channels.models import Channel
 from temba.contacts.models import ContactField, ContactURN
 from temba.orgs.models import Org
 
@@ -14,21 +16,31 @@ class InternalContactSerializer(serializers.Serializer):
 
 
 class InternalContactFieldsValuesSerializer(serializers.Serializer):
-    project = serializers.UUIDField()
+    project = serializers.UUIDField(required=False)
+    channel_uuid = serializers.UUIDField(required=False)
     contact_fields = serializers.DictField(child=serializers.CharField(allow_null=True, allow_blank=True))
     contact_urn = serializers.CharField(required=True)
 
     def validate(self, data):
-        project_uuid = data.get("project")
+        project_uuid = data.get("project") or self.context.get("project_uuid")
+        channel_uuid = data.get("channel_uuid") or self.context.get("channel_uuid")
         contact_urn = data.get("contact_urn")
 
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
+        if project_uuid:
+            self.org = get_object_or_404(Org, field_error_name="project", proj_uuid=project_uuid)
 
-        except Org.DoesNotExist:
-            raise serializers.ValidationError({"project": "Project not found"})
+        elif channel_uuid:
+            channel = get_object_or_404(Channel, field_error_name="channel", uuid=channel_uuid)
+            self.org = channel.org
+            if not self.org:
+                raise serializers.ValidationError({"channel": "Channel is not associated with a project"})
 
-        contact = ContactURN.lookup(org, contact_urn)
+        else:
+            raise serializers.ValidationError("At least either a channel or a project is required")
+
+        data["org"] = self.org
+
+        contact = ContactURN.lookup(self.org, contact_urn)
         if not contact:
             raise serializers.ValidationError({"contact_urn": "Contact URN not found"})
 
@@ -40,12 +52,11 @@ class InternalContactFieldsValuesSerializer(serializers.Serializer):
         return value
 
     def update(self, instance, validated_data):
-        project_uuid = validated_data.get("project")
+        org = validated_data.get("org")
         contact_urn = validated_data.get("contact_urn")
         contact_fields = validated_data.get("contact_fields", {})
         user = User.objects.get(email=settings.INTERNAL_USER_EMAIL)
 
-        org = Org.objects.get(proj_uuid=project_uuid)
         urn = ContactURN.lookup(org, contact_urn)
         contact = urn.contact
 

@@ -938,6 +938,8 @@ class ContactFieldWriteSerializer(WriteSerializer):
         max_length=ContactField.MAX_LABEL_LEN,
         validators=[UniqueForOrgValidator(ContactField.user_fields.filter(is_active=True), ignore_case=True)],
     )
+    channel_uuid = serializers.UUIDField(required=False)
+    project_uuid = serializers.UUIDField(required=False)
     value_type = serializers.ChoiceField(required=True, choices=list(VALUE_TYPES.keys()))
 
     def validate_label(self, value):
@@ -954,10 +956,10 @@ class ContactFieldWriteSerializer(WriteSerializer):
         return self.VALUE_TYPES[value]
 
     def validate(self, data):
-        org = self.context["org"]
-        org_active_fields_limit = org.get_limit(Org.LIMIT_FIELDS)
+        self.org = self.context["org"]
 
-        field_count = ContactField.user_fields.count_active_for_org(org=org)
+        org_active_fields_limit = self.org.get_limit(Org.LIMIT_FIELDS)
+        field_count = ContactField.user_fields.count_active_for_org(org=self.org)
         if not self.instance and field_count >= org_active_fields_limit:
             raise serializers.ValidationError(
                 "This org has %s contact fields and the limit is %s. "
@@ -968,6 +970,7 @@ class ContactFieldWriteSerializer(WriteSerializer):
         return data
 
     def save(self):
+        user = self.context["user"]
         label = self.validated_data.get("label")
         value_type = self.validated_data.get("value_type")
 
@@ -976,7 +979,7 @@ class ContactFieldWriteSerializer(WriteSerializer):
         else:
             key = ContactField.make_key(label)
 
-        return ContactField.get_or_create(self.context["org"], self.context["user"], key, label, value_type=value_type)
+        return ContactField.get_or_create(self.org, user, key, label, value_type=value_type)
 
 
 class ContactGroupReadSerializer(ReadSerializer):

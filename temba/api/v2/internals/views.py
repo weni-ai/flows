@@ -1,6 +1,5 @@
 from types import SimpleNamespace
 from unittest.mock import patch
-from uuid import uuid4
 
 from rest_framework.renderers import JSONRenderer
 
@@ -34,14 +33,15 @@ class JWTAuthMockMixin:
                 self._jwt_dummy_user = SimpleNamespace(is_authenticated=True, email="jwt-test@example.com")
             user = self._jwt_dummy_user
 
-        project_uuid = None
-        org = getattr(self, "org", None)
-        if org and getattr(org, "proj_uuid", None):
-            project_uuid = org.proj_uuid
-        if project_uuid is None:
-            project_uuid = uuid4()
+        payload = {
+            "project_uuid": kwargs.get("project_uuid"),
+            "channel_uuid": kwargs.get("channel_uuid"),
+        }
+        if getattr(self, "jwt_payload_patch", None):
+            payload.update(self.jwt_payload_patch)
 
-        request.jwt_payload = {"project_uuid": str(project_uuid)}
-        request.project_uuid = str(project_uuid)
+        request.jwt_payload = payload
+        request.project_uuid = payload.get("project_uuid")
+        request.channel_uuid = payload.get("channel_uuid")
         request.user = user
         return (user, None)
