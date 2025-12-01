@@ -15,6 +15,7 @@ class UpdateProjectConsumer(EDAConsumer):
                 project_uuid=body.get("project_uuid"),
                 description=body.get("description"),
                 user_email=body.get("user_email"),
+                language=body.get("language"),
             )
 
             message.channel.basic_ack(message.delivery_tag)
