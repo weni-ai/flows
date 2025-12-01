@@ -1,6 +1,8 @@
 import datetime as dt
+import uuid
 from functools import wraps
 from io import BytesIO
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 import uuid
 
@@ -16,9 +18,12 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
 
+from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.v2.internals.contacts.services import ContactDownloadByStatusService, ContactImportDeduplicationService
+from temba.api.v2.internals.helpers import get_object_or_404
 from temba.api.v2.internals.views import JWTAuthMockMixin
 from temba.api.v2.validators import LambdaURLValidator
+from temba.channels.models import Channel
 from temba.contacts.models import ContactField
 from temba.msgs.models import Msg
 from temba.tests import TembaTest
@@ -581,7 +586,7 @@ class UpdateContactFieldsViewTest(TembaTest):
         response = self.client.patch(url, data=body, content_type="application/json")
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"project": ["This field is required."]})
+        self.assertEqual(response.json(), {"non_field_errors": ["At least either a channel or a project is required"]})
 
     @patch.object(LambdaURLValidator, "protected_resource")
     def test_request_incorrect_project(self, mock_protected_resource):
@@ -598,8 +603,8 @@ class UpdateContactFieldsViewTest(TembaTest):
 
         response = self.client.patch(url, data=body, content_type="application/json")
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"project": ["Project not found"]})
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"project": "project not found"})
 
     @patch.object(LambdaURLValidator, "protected_resource")
     def test_request_invalid_contact_urn(self, mock_protected_resource):
@@ -736,20 +741,170 @@ class UpdateContactFieldsViewTest(TembaTest):
         self.assertEqual(contact.get_field_display(nickname_field), "Felix")
 
 
+class PatchedJWTAuthMixin(JWTAuthMockMixin):
+    def _mock_jwt_authenticate(self, request, *args, **kwargs):
+        result = super()._mock_jwt_authenticate(request, *args, **kwargs)
+        payload = request.jwt_payload
+        if getattr(self.org, "proj_uuid", None) and not payload.get("project_uuid"):
+            payload["project_uuid"] = str(self.org.proj_uuid)
+        if getattr(self, "jwt_payload_patch", None):
+            payload.update(self.jwt_payload_patch)
+        return result
+
+
+class UpdateContactFieldsViewJWTTest(PatchedJWTAuthMixin, TembaTest):
+    jwt_patch_target = "temba.api.auth.jwt.OptionalJWTAuthentication.authenticate"
+
+    def setUp(self):
+        super().setUp()
+        self.url = "/api/v2/internals/update_contacts_fields"
+        self.jwt_payload_patch = {}
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
+
+    def _set_jwt_payload(self, **kwargs):
+        self.jwt_payload_patch = kwargs
+
+    def test_request_without_body(self):
+        response = self.client.patch(self.url, data={}, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_request_no_project(self):
+        self._set_jwt_payload(project_uuid=None)
+        self.create_contact("Name Contact", urns=["twitterid:12342"])
+        body = {
+            "contact_urn": "twitterid:12342",
+            "contact_fields": {"cpf": "12345678912"},
+        }
+
+        response = self.client.patch(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"non_field_errors": ["At least either a channel or a project is required"]})
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
+
+    def test_request_invalid_contact_urn(self):
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
+        body = {
+            "contact_urn": "ext:missing@contact",
+            "contact_fields": {"cpf": "12345678912"},
+        }
+
+        response = self.client.patch(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"contact_urn": ["Contact URN not found"]})
+
+    def test_request_no_contact_fields(self):
+        body = {
+            "contact_urn": "twitterid:11111",
+            "contact_fields": {},
+        }
+
+        response = self.client.patch(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            {"contact_fields": ["contact_fields must not be an empty dictionary"]},
+        )
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    def test_success_updates_contact_fields(self, mr_mocks):
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
+        contact = self.create_contact("Old Name", urns=["twitterid:44444"])
+        self.create_field("nickname", "Apelido")
+
+        body = {
+            "contact_urn": "twitterid:44444",
+            "contact_fields": {"name": "New Name", "nickname": "Felix"},
+        }
+
+        response = self.client.patch(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Contact fields updated successfully"})
+
+        contact.refresh_from_db()
+        self.assertEqual(contact.name, "New Name")
+        nickname_field = ContactField.get_by_key(contact.org, "nickname")
+        self.assertEqual(contact.get_field_display(nickname_field), "Felix")
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    def test_success_updates_contact_fields_with_channel_in_jwt(self, mr_mocks):
+        contact = self.create_contact("Channel User", urns=["twitterid:55555"])
+        self.create_field("nickname", "Apelido")
+        channel = self.create_channel("TG", "Test Channel", "12345", org=self.org)
+
+        self._set_jwt_payload(channel_uuid=str(channel.uuid), project_uuid=None)
+        body = {
+            "contact_urn": "twitterid:55555",
+            "contact_fields": {"nickname": "Chan"},
+        }
+
+        response = self.client.patch(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Contact fields updated successfully"})
+
+        contact.refresh_from_db()
+        nickname_field = ContactField.get_by_key(contact.org, "nickname")
+        self.assertEqual(contact.get_field_display(nickname_field), "Chan")
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
+
+    def test_channel_in_jwt_not_found_returns_404(self):
+        self.create_contact("No Channel User", urns=["twitterid:99999"])
+        self._set_jwt_payload(channel_uuid=str(uuid.uuid4()), project_uuid=None)
+        body = {
+            "contact_urn": "twitterid:99999",
+            "contact_fields": {"nickname": "Fail"},
+        }
+
+        response = self.client.patch(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"channel": "channel not found"})
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
+
+    def test_channel_in_jwt_without_project_returns_400(self):
+        self.create_contact("No Channel Project", urns=["twitterid:88888"])
+        channel = self.create_channel("TG", "Orphan Channel", "54321", org=None)
+        channel.org = None
+        channel.save()
+        self._set_jwt_payload(channel_uuid=str(channel.uuid), project_uuid=None)
+        body = {
+            "contact_urn": "twitterid:88888",
+            "contact_fields": {"nickname": "Fail"},
+        }
+
+        dummy_channel = SimpleNamespace(org=None, uuid=channel.uuid)
+        with patch("temba.api.v2.internals.contacts.views.get_object_or_404", return_value=dummy_channel):
+            response = self.client.patch(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"channel": ["Channel is not associated with a project"]})
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
+
+
 class InternalContactFieldsEndpointTest(TembaTest):
     def setUp(self):
         super().setUp()
         User.objects.create(username="Mordecai", email="mordecai@msn.com")
 
-    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_request_without_body(self):
         url = "/api/v2/internals/contacts_fields"
         response = self.client.post(url)
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"error": "Project not provided"})
+        self.assertEqual(response.json(), {"error": "At least either a channel or a project is required"})
 
-    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_project_not_found(self):
         url = "/api/v2/internals/contacts_fields"
         body = {
@@ -760,9 +915,10 @@ class InternalContactFieldsEndpointTest(TembaTest):
         response = self.client.post(url, data=body, content_type="application/json")
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json(), {"error": "Project not found"})
+        self.assertEqual(response.json(), {"project": "project not found"})
 
-    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_user_not_found(self):
         mock_user = MagicMock(spec=User)
         mock_user.is_authenticated = False
@@ -779,9 +935,10 @@ class InternalContactFieldsEndpointTest(TembaTest):
             response = self.client.post(url, data=body, content_type="application/json")
 
             self.assertEqual(response.status_code, 404)
-            self.assertEqual(response.json(), {"error": "User not found"})
+            self.assertEqual(response.json(), {"user": "user not found"})
 
-    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_serializer_error(self):
         mock_user = MagicMock(spec=User)
         mock_user.is_authenticated = True
@@ -799,7 +956,8 @@ class InternalContactFieldsEndpointTest(TembaTest):
 
             self.assertEqual(response.status_code, 400)
 
-    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_success(self):
         mock_user = MagicMock(spec=User)
         mock_user.is_authenticated = True
@@ -817,6 +975,94 @@ class InternalContactFieldsEndpointTest(TembaTest):
 
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json(), {"label": "Nick Name", "value_type": "T"})
+
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
+    def test_channel_not_found(self):
+        from uuid import uuid4
+
+        url = "/api/v2/internals/contacts_fields"
+        body = {
+            "channel_uuid": str(uuid4()),
+            "label": "New Field",
+            "value_type": "text",
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"channel": "channel not found"})
+
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
+    def test_channel_without_project_returns_400(self):
+        url = "/api/v2/internals/contacts_fields"
+        body = {
+            "channel_uuid": str(uuid.uuid4()),
+            "label": "Field",
+            "value_type": "text",
+        }
+
+        real_get = get_object_or_404
+
+        def fake_get(model, field_error_name=None, *args, **kwargs):
+            if model is Channel:
+                dummy = SimpleNamespace(uuid=kwargs.get("uuid"), org=None)
+                return dummy
+            return real_get(model, field_error_name, *args, **kwargs)
+
+        with patch("temba.api.v2.internals.contacts.views.get_object_or_404", side_effect=fake_get):
+            response = self.client.post(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"channel": "Channel is not associated with a project"})
+
+
+class InternalContactFieldsEndpointJWTTest(PatchedJWTAuthMixin, TembaTest):
+    jwt_patch_target = "temba.api.auth.jwt.OptionalJWTAuthentication.authenticate"
+
+    def setUp(self):
+        super().setUp()
+        self.url = "/api/v2/internals/contacts_fields"
+        self.user = self.create_user("jwt-contact-fields@example.com")
+        self.jwt_payload_patch = {"email": self.user.email}
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid), email=self.user.email)
+
+    def _set_jwt_payload(self, **kwargs):
+        self.jwt_payload_patch = kwargs
+
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [OptionalJWTAuthentication])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
+    def test_success_with_channel_uuid_in_jwt(self):
+        channel = self.create_channel("TG", "JWT Channel", "12345", org=self.org)
+        self._set_jwt_payload(channel_uuid=str(channel.uuid), project_uuid=None, email=self.user.email)
+
+        body = {
+            "label": "JWT Field",
+            "value_type": "text",
+        }
+
+        response = self.client.post(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"label": "JWT Field", "value_type": "T"})
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid), email=self.user.email)
+
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [OptionalJWTAuthentication])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
+    def test_invalid_channel_uuid_in_jwt_returns_404(self):
+        invalid_uuid = "invalid-uuid"
+        self._set_jwt_payload(channel_uuid=invalid_uuid, project_uuid=None, email=self.user.email)
+
+        body = {
+            "label": "JWT Field",
+            "value_type": "text",
+        }
+
+        response = self.client.post(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"channel": "channel not found"})
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid), email=self.user.email)
 
 
 class InternalContactGroupsViewTest(TembaTest):
@@ -908,7 +1154,7 @@ class HasOpenTicketViewTest(JWTAuthMockMixin, TembaTest):
         self.create_contact("Bob", urns=["tel:+1234567890"])
 
         url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
-        response = self.client.get(url, **self.auth_headers)
+        response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"has_open_ticket": False})
@@ -920,7 +1166,7 @@ class HasOpenTicketViewTest(JWTAuthMockMixin, TembaTest):
         self.create_ticket(ticketer, contact, "Test ticket")
 
         url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
-        response = self.client.get(url, **self.auth_headers)
+        response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"has_open_ticket": True})
@@ -938,7 +1184,7 @@ class HasOpenTicketViewTest(JWTAuthMockMixin, TembaTest):
         self.assertEqual(ticket.status, "C")
 
         url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
-        response = self.client.get(url, **self.auth_headers)
+        response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"has_open_ticket": False})
