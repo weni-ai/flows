@@ -1,3 +1,11 @@
+3.45.0
+----------
+* Add locale field to WhatsApp broadcast template documentation
+* Change FlowPathCount squash to avoid distinct on query
+* Update @weni/flow-editor dependency to version 3.6.4
+* Add language field to project update consumer
+* Refactor OrgCRUDL view to remove unused sections
+
 3.44.1
 ----------
 * Add jwt auth in internal whatsapp broadcast endpoint
