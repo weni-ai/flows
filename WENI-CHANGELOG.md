@@ -1,3 +1,7 @@
+3.45.1
+----------
+* Fix: floweditor lock file issue
+
 3.45.0
 ----------
 * Add locale field to WhatsApp broadcast template documentation
