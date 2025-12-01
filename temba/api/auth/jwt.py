@@ -5,6 +5,8 @@ from rest_framework.exceptions import AuthenticationFailed
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 
+logger = logging.getLogger(__name__)
+
 
 class OptionalJWTAuthentication(BaseAuthentication):
     """
@@ -39,8 +41,14 @@ class OptionalJWTAuthentication(BaseAuthentication):
                 algorithms=["RS256"],
                 options={"verify_aud": False},
             )
-        except (self.get_jwt().ExpiredSignatureError, self.get_jwt().InvalidTokenError):
+        except (self.get_jwt().ExpiredSignatureError):
+            print("Token expired.", token)
+            logger.warning("Expired token: %s", token)
+            return None
             # Not a valid JWT for this auth; allow other authenticators to run
+        except (self.get_jwt().InvalidTokenError):
+            print("Invalid token.", token)
+            logger.warning("Invalid token: %s", token)
             return None
 
         request.jwt_payload = payload

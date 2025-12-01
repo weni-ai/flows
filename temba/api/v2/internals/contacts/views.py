@@ -174,6 +174,8 @@ class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
             validation_response = self.protected_resource(request)  # pragma: no cover
             if validation_response.status_code != 200:  # pragma: no cover
                 return validation_response
+            
+        breakpoint()
 
         project_uuid = (
             request.data.get("project_uuid") or request.data.get("project") or getattr(request, "project_uuid", None)
