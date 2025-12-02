@@ -94,8 +94,7 @@ class ChannelAllowedDomainsView(APIViewMixin, APIView):
     permission_classes = [HasValidJWT]
 
     def get(self, request: Request):
-        params = request.query_params
-        channelUUID = params.get("channel")
+        channelUUID = getattr(request, "channel_uuid", None)
 
         if channelUUID is None:
             return Response(status=400)
