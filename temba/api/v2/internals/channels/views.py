@@ -95,6 +95,7 @@ class ChannelAllowedDomainsView(APIViewMixin, APIView):
 
     def get(self, request: Request):
         channelUUID = getattr(request, "channel_uuid", None)
+        breakpoint()
 
         if channelUUID is None:
             return Response(status=400)

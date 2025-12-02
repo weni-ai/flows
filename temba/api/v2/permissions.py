@@ -39,6 +39,4 @@ class HasValidJWT(BasePermission):
     """
 
     def has_permission(self, request, view):
-        breakpoint()
-        print("request.jwt_payload", request.jwt_payload)
         return getattr(request, "jwt_payload", None) is not None

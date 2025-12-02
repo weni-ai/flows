@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import patch
 
 from weni.internal.models import Project
@@ -64,10 +65,31 @@ class ChannelProjectViewTest(TembaTest):
             self.assertEqual(result_wac.get("project_uuid"), str(project.project_uuid))
 
 
-class ChannelAllowedDomainsViewTest(JWTAuthMockMixin, TembaTest):
+class PatchedJWTAuthMixin(JWTAuthMockMixin):
+    jwt_patch_target = "temba.api.auth.jwt.RequiredJWTAuthentication.authenticate"
+
+    def _mock_jwt_authenticate(self, request, *args, **kwargs):
+        result = super()._mock_jwt_authenticate(request, *args, **kwargs)
+        payload = request.jwt_payload
+        if getattr(self.org, "proj_uuid", None) and not payload.get("project_uuid"):
+            payload["project_uuid"] = str(self.org.proj_uuid)
+        if getattr(self, "jwt_payload_patch", None):
+            payload.update(self.jwt_payload_patch)
+        return result
+
+
+class ChannelAllowedDomainsViewTest(PatchedJWTAuthMixin, TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.url = "/api/v2/internals/channel_allowed_domains"
+        self.jwt_payload_patch = {}
+
+    def _set_jwt_payload(self, **kwargs):
+        self.jwt_payload_patch = kwargs
+
     def test_request_without_channel_uuid(self):
-        url = "/api/v2/internals/channel_allowed_domains"
-        response = self.client.get(url, **self.auth_headers)
+        self._set_jwt_payload(channel_uuid=None)
+        response = self.client.get(self.url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 400)
 
@@ -79,9 +101,8 @@ class ChannelAllowedDomainsViewTest(JWTAuthMockMixin, TembaTest):
             config={"allowed_domains": ["dash.weni.ai", "flows.weni.ai"]},
         )
 
-        url = f"/api/v2/internals/channel_allowed_domains?channel={wchan.uuid}"
-
-        response = self.client.get(url, **self.auth_headers)
+        self._set_jwt_payload(channel_uuid=str(wchan.uuid))
+        response = self.client.get(self.url, **self.auth_headers)
 
         data = response.json()
 
@@ -95,17 +116,16 @@ class ChannelAllowedDomainsViewTest(JWTAuthMockMixin, TembaTest):
             "wwctest2",
         )
 
-        url = f"/api/v2/internals/channel_allowed_domains?channel={wchan.uuid}"
-
-        response = self.client.get(url, **self.auth_headers)
+        self._set_jwt_payload(channel_uuid=str(wchan.uuid))
+        response = self.client.get(self.url, **self.auth_headers)
 
         data = response.json()
 
         self.assertEqual(len(data), 0)
 
     def test_request_with_channel_uuid_notfound(self):
-        url = "/api/v2/internals/channel_allowed_domains?channel=2337712f-dcbc-48f3-9ae7-7f832445f6c9"
-        response = self.client.get(url, **self.auth_headers)
+        self._set_jwt_payload(channel_uuid=str(uuid.uuid4()))
+        response = self.client.get(self.url, **self.auth_headers)
         self.assertEqual(response.status_code, 404)
 
 
