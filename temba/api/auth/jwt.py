@@ -89,6 +89,7 @@ class BaseJWTAuthentication(BaseAuthentication):
                 algorithms=["RS256"],
                 options={"verify_aud": False},
             )
+            request.jwt_payload = payload
         except self.get_jwt().ExpiredSignatureError:
             raise AuthenticationFailed("Token expired.")
         except self.get_jwt().InvalidTokenError:
@@ -117,13 +118,12 @@ class RequiredJWTAuthentication(BaseJWTAuthentication):
 
     def authenticate(self, request):
         payload = self.verify_and_decode_token(request)
-        request.jwt_payload = payload
 
         project_uuid = payload.get("project_uuid")
         channel_uuid = payload.get("channel_uuid")
 
-        if not project_uuid or not channel_uuid:
-            raise AuthenticationFailed("project_uuid or channel_uuid not found in token payload.")
+        if not project_uuid and not channel_uuid:
+            raise AuthenticationFailed("project_uuid or channel_uuid must be present in token payload.")
 
         if project_uuid:
             request.project_uuid = project_uuid
