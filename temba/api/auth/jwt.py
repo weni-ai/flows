@@ -45,9 +45,11 @@ class OptionalJWTAuthentication(BaseAuthentication):
 
         request.jwt_payload = payload
         project_uuid = payload.get("project_uuid") or payload.get("project")
+        channel_uuid = payload.get("channel_uuid") or payload.get("channel")
         if project_uuid:
             request.project_uuid = project_uuid
-
+        if channel_uuid:
+            request.channel_uuid = channel_uuid
         return (AnonymousUser(), None)
 
 
