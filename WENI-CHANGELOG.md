@@ -1,3 +1,8 @@
+3.46.0
+----------
+* Implementing optional jwt auth on 2 endpoints
+* Endpoint and validation to avoid contact duplication in contacts count
+
 3.45.2
 ----------
 * Fix: package-lock.json issue
