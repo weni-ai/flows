@@ -24,29 +24,60 @@ def refresh_teams_tokens():
         # iterate across each of our teams channels and get a new token
         for channel in Channel.objects.filter(is_active=True, channel_type="TM").order_by("id"):
             try:
-                url = "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token"
+                # Build candidate endpoints: prefer Graph using the channel tenant, fall back to Bot Framework tenant
+                tenant_id = channel.config.get(TeamsType.CONFIG_TEAMS_TENANT_ID)
+                candidates = []
+                if tenant_id:
+                    candidates.append(
+                        (
+                            f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
+                            "https://graph.microsoft.com/.default",
+                            "graph",
+                        )
+                    )
+                candidates.append(
+                    (
+                        "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token",
+                        "https://api.botframework.com/.default",
+                        "botframework",
+                    )
+                )
 
-                request_body = {
+                # common pieces
+                common_body = {
                     "client_id": channel.config[TeamsType.CONFIG_TEAMS_APPLICATION_ID],
                     "grant_type": "client_credentials",
-                    "scope": "https://api.botframework.com/.default",
                     "client_secret": channel.config[TeamsType.CONFIG_TEAMS_APPLICATION_PASSWORD],
                 }
                 headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
-                start = timezone.now()
-                resp = requests.post(url, data=request_body, headers=headers)
-                elapsed = (timezone.now() - start).total_seconds() * 1000
+                token_obtained = None
+                for url, scope, source in candidates:
+                    request_body = dict(common_body, scope=scope)
 
-                HTTPLog.create_from_response(
-                    HTTPLog.TEAMS_TOKENS_SYNCED, url, resp, channel=channel, request_time=elapsed
-                )
+                    start = timezone.now()
+                    resp = requests.post(url, data=request_body, headers=headers, timeout=15)
+                    elapsed = (timezone.now() - start).total_seconds() * 1000
 
-                if resp.status_code != 200:
+                    HTTPLog.create_from_response(
+                        HTTPLog.TEAMS_TOKENS_SYNCED, url, resp, channel=channel, request_time=elapsed
+                    )
+
+                    if resp.status_code != 200:
+                        continue
+
+                    access_token = (resp.json() or {}).get("access_token")
+                    if access_token:
+                        token_obtained = access_token
+                        # store which source produced the token to aid debugging, but don't rely on it elsewhere
+                        channel.config["auth_token"] = access_token
+                        channel.config["teams_token_source"] = source  # purely informational
+                        channel.save(update_fields=["config"])
+                        break
+
+                if not token_obtained:
+                    # Nothing succeeded, move on to next channel
                     continue
-
-                channel.config["auth_token"] = resp.json()["access_token"]
-                channel.save(update_fields=["config"])
 
             except Exception as e:
                 logger.error(f"Error refreshing teams tokens: {str(e)}", exc_info=True)

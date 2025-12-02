@@ -1098,7 +1098,8 @@ CELERY_BEAT_SCHEDULE = {
     "trim-sync-events": {"task": "trim_sync_events_task", "schedule": crontab(hour=3, minute=0)},
     "trim-webhook-event": {"task": "trim_webhook_event_task", "schedule": crontab(hour=3, minute=0)},
     "update-org-activity": {"task": "update_org_activity_task", "schedule": crontab(hour=3, minute=5)},
-    "refresh-teams-tokens": {"task": "refresh_teams_tokens", "schedule": crontab(hour=8, minute=0)},
+    # Teams tokens (Graph/Bot Framework) typically expire around 1 hour; refresh proactively.
+    "refresh-teams-tokens": {"task": "refresh_teams_tokens", "schedule": timedelta(minutes=55)},
     "squash-flow-category-counts": {"task": "squash_flow_category_counts", "schedule": timedelta(seconds=60)},
 }
 

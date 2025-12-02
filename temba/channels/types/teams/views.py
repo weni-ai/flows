@@ -19,23 +19,38 @@ class ClaimView(ClaimViewMixin, SmartFormView):
         def clean(self):
             try:
                 headers = {"Content-Type": "application/x-www-form-urlencoded"}
-                request_body = {
+                common_body = {
                     "client_id": self.cleaned_data["app_id"],
                     "grant_type": "client_credentials",
-                    "scope": "https://api.botframework.com/.default",
                     "client_secret": self.cleaned_data["app_password"],
                 }
 
-                resp = requests.post(
-                    "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token",
-                    data=request_body,
-                    headers=headers,
-                )
+                # Prefer Graph with the provided tenant, fall back to Bot Framework tenant
+                tenant_id = self.cleaned_data["tenant_id"]
+                candidates = [
+                    (
+                        f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
+                        "https://graph.microsoft.com/.default",
+                    ),
+                    (
+                        "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token",
+                        "https://api.botframework.com/.default",
+                    ),
+                ]
 
-                if resp.status_code != 200:  # pragma: no cover
-                    raise Exception("Received non-200 response: %d", resp.status_code)
+                token = None
+                for url, scope in candidates:
+                    request_body = dict(common_body, scope=scope)
+                    resp = requests.post(url, data=request_body, headers=headers, timeout=15)
+                    if resp.status_code == 200:
+                        token = (resp.json() or {}).get("access_token")
+                        if token:
+                            break
 
-                self.cleaned_data["auth_token"] = resp.json()["access_token"]
+                if not token:  # pragma: no cover
+                    raise Exception("Failed to obtain access token from Microsoft")
+
+                self.cleaned_data["auth_token"] = token
 
             except Exception:
                 raise forms.ValidationError(
