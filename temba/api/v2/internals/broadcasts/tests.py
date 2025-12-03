@@ -554,6 +554,167 @@ class TestInternalBroadcastStatistics(TembaTest):
         self.assertIn("success_rate_30_days", body)
 
 
+class TestInternalBroadcastGroupsStats(TembaTest):
+    url = "/api/v2/internals/broadcasts/groups-stats"
+
+    def _disable_auth(self):
+        return patch(
+            "temba.api.v2.internals.broadcasts.views.InternalBroadcastGroupsStatsEndpoint.authentication_classes",
+            [],
+        ), patch(
+            "temba.api.v2.internals.broadcasts.views.InternalBroadcastGroupsStatsEndpoint.permission_classes",
+            [],
+        )
+
+    def test_missing_and_invalid_project(self):
+        # missing project_uuid
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(self.url, data={"groups": []})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "Project UUID not provided"})
+
+        # invalid project_uuid
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(
+                self.url, data={"project_uuid": "00000000-0000-0000-0000-000000000000", "groups": []}
+            )
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {"error": "Project not found"})
+
+    def test_no_groups_or_invalid_groups(self):
+        # no groups provided
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(self.url, data={"project_uuid": str(self.org.proj_uuid)})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "Groups not provided"})
+
+        # invalid groups
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(
+                self.url,
+                data={"project_uuid": str(self.org.proj_uuid), "groups": ["00000000-0000-0000-0000-000000000000"]},
+            )
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "No valid groups found for this project"})
+
+    def test_create_endpoint_with_overlapping_groups(self):
+        # contacts
+        alice = self.create_contact("Alice", urns=["tel:+111"])
+        bob = self.create_contact("Bob", urns=["tel:+222"])
+        carlos = self.create_contact("Carlos", urns=["tel:+333"])
+
+        # groups with overlap on Bob
+        g1 = self.create_group("G1", contacts=[alice, bob])
+        g2 = self.create_group("G2", contacts=[bob, carlos])
+
+        # ensure counts are populated for deterministic member_count
+        from temba.contacts.models import ContactGroupCount
+
+        ContactGroupCount.populate_for_group(g1)
+        ContactGroupCount.populate_for_group(g2)
+
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(
+                self.url,
+                data={"project_uuid": str(self.org.proj_uuid), "groups": [str(g1.uuid), str(g2.uuid)]},
+            )
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["total_count"], g1.get_member_count() + g2.get_member_count())  # 2 + 2 = 4
+        self.assertEqual(data["duplicates_count"], 1)  # only Bob overlaps
+        self.assertEqual(data["distinct_count"], 3)  # unique across both groups
+
+    def test_create_endpoint_single_group(self):
+        # contacts
+        alice = self.create_contact("Alice", urns=["tel:+111"])
+        bob = self.create_contact("Bob", urns=["tel:+222"])
+        g1 = self.create_group("G1", contacts=[alice, bob])
+
+        from temba.contacts.models import ContactGroupCount
+
+        ContactGroupCount.populate_for_group(g1)
+
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(self.url, data={"project_uuid": str(self.org.proj_uuid), "groups": [str(g1.uuid)]})
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["total_count"], g1.get_member_count())
+        self.assertEqual(data["duplicates_count"], 0)
+        self.assertEqual(data["distinct_count"], g1.get_member_count())
+
+    def test_accepts_comma_separated_group_ids(self):
+        # contacts and groups
+        a = self.create_contact("A", urns=["tel:+1"])
+        b = self.create_contact("B", urns=["tel:+2"])
+        c = self.create_contact("C", urns=["tel:+3"])
+        g1 = self.create_group("G1", contacts=[a, b])
+        g2 = self.create_group("G2", contacts=[b, c])  # overlap on B
+
+        from temba.contacts.models import ContactGroupCount
+
+        ContactGroupCount.populate_for_group(g1)
+        ContactGroupCount.populate_for_group(g2)
+
+        groups_param = f"{g1.id},{g2.id}"
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(self.url, data={"project_uuid": str(self.org.proj_uuid), "group_ids": groups_param})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["total_count"], g1.get_member_count() + g2.get_member_count())
+        self.assertEqual(data["duplicates_count"], 1)
+        self.assertEqual(data["distinct_count"], 3)
+
+    def test_accepts_comma_separated_group_uuids(self):
+        a = self.create_contact("A", urns=["tel:+1"])
+        b = self.create_contact("B", urns=["tel:+2"])
+        c = self.create_contact("C", urns=["tel:+3"])
+        g1 = self.create_group("G1", contacts=[a, b])
+        g2 = self.create_group("G2", contacts=[b, c])
+
+        from temba.contacts.models import ContactGroupCount
+
+        ContactGroupCount.populate_for_group(g1)
+        ContactGroupCount.populate_for_group(g2)
+
+        groups_param = f"{g1.uuid},{g2.uuid}"
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(self.url, data={"project_uuid": str(self.org.proj_uuid), "groups": groups_param})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["total_count"], g1.get_member_count() + g2.get_member_count())
+        self.assertEqual(data["duplicates_count"], 1)
+        self.assertEqual(data["distinct_count"], 3)
+
+    def test_mixed_ids_and_uuids_and_dedupe(self):
+        a = self.create_contact("A", urns=["tel:+1"])
+        b = self.create_contact("B", urns=["tel:+2"])
+        c = self.create_contact("C", urns=["tel:+3"])
+        g1 = self.create_group("G1", contacts=[a, b])
+        g2 = self.create_group("G2", contacts=[b, c])
+
+        from temba.contacts.models import ContactGroupCount
+
+        ContactGroupCount.populate_for_group(g1)
+        ContactGroupCount.populate_for_group(g2)
+
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(
+                self.url,
+                data={
+                    "project_uuid": str(self.org.proj_uuid),
+                    "group_ids": [str(g1.id)],
+                    "groups": [str(g1.uuid), str(g2.uuid)],  # g1 duplicated by id and uuid
+                },
+            )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["total_count"], g1.get_member_count() + g2.get_member_count())
+        self.assertEqual(data["duplicates_count"], 1)
+        self.assertEqual(data["distinct_count"], 3)
+
+
 class TestInternalWhatsappBroadcastJWT(TembaTest):
     url = "/api/v2/internals/whatsapp_broadcasts"
 

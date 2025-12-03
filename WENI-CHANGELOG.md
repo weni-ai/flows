@@ -1,3 +1,24 @@
+3.46.0
+----------
+* Implementing optional jwt auth on 2 endpoints
+* Endpoint and validation to avoid contact duplication in contacts count
+
+3.45.2
+----------
+* Fix: package-lock.json issue
+
+3.45.1
+----------
+* Fix: floweditor lock file issue
+
+3.45.0
+----------
+* Add locale field to WhatsApp broadcast template documentation
+* Change FlowPathCount squash to avoid distinct on query
+* Update @weni/flow-editor dependency to version 3.6.4
+* Add language field to project update consumer
+* Refactor OrgCRUDL view to remove unused sections
+
 3.44.1
 ----------
 * Add jwt auth in internal whatsapp broadcast endpoint

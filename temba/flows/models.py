@@ -1629,18 +1629,68 @@ class FlowPathCount(SquashableModel):
 
     @classmethod
     def get_squash_query(cls, distinct_set):
-        sql = """
-        WITH removed as (
-            DELETE FROM %(table)s WHERE "flow_id" = %%s AND "from_uuid" = %%s AND "to_uuid" = %%s AND "period" = date_trunc('hour', %%s) RETURNING "count"
+        delete_limit = int(getattr(settings, "FLOW_PATH_COUNT_DELETE_BATCH_LIMIT", 10000))
+        sql = f"""
+        WITH removed AS (
+          DELETE FROM {cls._meta.db_table} t
+          USING (
+            SELECT id FROM {cls._meta.db_table}
+            WHERE is_squashed = false
+              AND "flow_id" = %s AND "from_uuid" = %s AND "to_uuid" = %s AND "period" = date_trunc('hour', %s)
+            LIMIT {delete_limit}
+          ) s
+          WHERE t.id = s.id
+          RETURNING t.count
         )
-        INSERT INTO %(table)s("flow_id", "from_uuid", "to_uuid", "period", "count", "is_squashed")
-        VALUES (%%s, %%s, %%s, date_trunc('hour', %%s), GREATEST(0, (SELECT SUM("count") FROM removed)), TRUE);
-        """ % {
-            "table": cls._meta.db_table
-        }
+        INSERT INTO {cls._meta.db_table}("flow_id", "from_uuid", "to_uuid", "period", "count", "is_squashed")
+        VALUES (%s, %s, %s, date_trunc('hour', %s), GREATEST(0, (SELECT COALESCE(SUM("count"), 0) FROM removed)), TRUE);
+        """
 
         params = (distinct_set.flow_id, distinct_set.from_uuid, distinct_set.to_uuid, distinct_set.period) * 2
         return sql, params
+
+    @classmethod
+    def squash(cls):
+        """
+        Optimized squashing that avoids DISTINCT ON over the entire unsquashed set.
+        Mirrors the approach used by FlowCategoryCount.squash:
+        - Read a window of unsquashed rows ordered by id
+        - Build up to `batch_size` distinct keys in memory
+        - Execute the squash SQL per key
+        """
+        from collections import OrderedDict
+        from django.db import connection
+
+        batch_size = cls.squash_batch_size or settings.SQUASH_BATCH_SIZE
+
+        # Pull a small window of candidate rows (ordered by id) and derive distinct keys client-side
+        rows = list(
+            cls.objects.filter(is_squashed=False)
+            .order_by("id")
+            .values_list("flow_id", "from_uuid", "to_uuid", "period")[: batch_size * 10]
+        )
+
+        distinct_keys = OrderedDict()
+        for r in rows:
+            # r is (flow_id, from_uuid, to_uuid, period)
+            distinct_keys.setdefault(r, None)
+            if len(distinct_keys) >= batch_size:
+                break
+
+        if not distinct_keys:
+            return
+
+        with connection.cursor() as cursor:
+            cursor.execute("SET application_name = 'flows_nokill';")
+            for (flow_id, from_uuid, to_uuid, period) in distinct_keys.keys():
+                # Build a light object carrying the attributes expected by get_squash_query
+                distinct_set = type(
+                    "_K",
+                    (),
+                    dict(flow_id=flow_id, from_uuid=from_uuid, to_uuid=to_uuid, period=period),
+                )
+                sql, params = cls.get_squash_query(distinct_set)
+                cursor.execute(sql, params)
 
     @classmethod
     def get_totals(cls, flow):

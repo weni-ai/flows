@@ -16,7 +16,9 @@ from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.api.v2.serializers import WhatsappBroadcastWriteSerializer
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
+from temba.contacts.models import ContactGroup
 from temba.msgs.models import Broadcast, BroadcastStatistics
+from temba.msgs.services import count_duplicate_contacts_across_groups, count_unique_contacts_in_groups
 from temba.orgs.models import Org
 
 from .serializers import BroadcastSerializer, BroadcastWithStatisticsSerializer, UserAndProjectSerializer
@@ -150,6 +152,60 @@ class InternalBroadcastStatisticMontlyEndpoint(APIViewMixin, APIView):
         result["success_rate_30_days"] = BroadcastStatistics.success_rate_30_days(org)
 
         return Response(result)
+
+
+class InternalBroadcastGroupsStatsEndpoint(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
+
+    def get(self, request, *args, **kwargs):
+        project_uuid = request.query_params.get("project_uuid") or request.query_params.get("project")
+        if not project_uuid:
+            return Response({"error": "Project UUID not provided"}, status=400)
+
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except Org.DoesNotExist:
+            return Response({"error": "Project not found"}, status=404)
+
+        # Accept both repeated query params (?groups=...&groups=...) and comma-separated values
+        group_ids = request.query_params.getlist("group_ids") or []
+        group_uuids = request.query_params.getlist("groups") or request.query_params.getlist("group_uuids") or []
+
+        if len(group_ids) == 1 and "," in (group_ids[0] or ""):
+            group_ids = [gid for gid in group_ids[0].split(",") if gid]
+        if len(group_uuids) == 1 and "," in (group_uuids[0] or ""):
+            group_uuids = [g for g in group_uuids[0].split(",") if g]
+
+        if not group_ids and not group_uuids:
+            return Response({"error": "Groups not provided"}, status=400)
+
+        groups_qs = ContactGroup.user_groups.filter(org=org, is_active=True)
+        groups = []
+        if group_ids:
+            groups += list(groups_qs.filter(id__in=group_ids))
+        if group_uuids:
+            groups += list(groups_qs.filter(uuid__in=group_uuids))
+
+        # dedupe in case of overlap
+        groups = {g.id: g for g in groups}.values()
+        groups = list(groups)
+
+        if not groups:
+            return Response({"error": "No valid groups found for this project"}, status=400)
+
+        total_groups_count = sum((g.get_member_count() or 0) for g in groups)
+        group_ids = [g.id for g in groups]
+        duplicates_count = count_duplicate_contacts_across_groups(group_ids) if len(groups) > 1 else 0
+        distinct_count = count_unique_contacts_in_groups(group_ids)
+
+        return Response(
+            {
+                "total_count": total_groups_count,
+                "duplicates_count": duplicates_count,
+                "distinct_count": distinct_count,
+            }
+        )
 
 
 class InternalBroadcastsUploadMediaEndpoint(APIViewMixin, APIView):
