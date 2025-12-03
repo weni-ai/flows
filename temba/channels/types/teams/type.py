@@ -16,6 +16,7 @@ class TeamsType(ChannelType):
     CONFIG_TEAMS_TENANT_ID = "tenantID"
     CONFIG_TEAMS_APPLICATION_PASSWORD = "app_password"
     CONFIG_TEAMS_BOT_NAME = "bot_name"
+    CONFIG_TEAMS_TOKEN_PREFERENCE = "teams_token_pref"  # 'graph' or 'botframework'
 
     code = "TM"
     category = ChannelType.Category.SOCIAL_MEDIA

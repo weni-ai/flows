@@ -65,26 +65,17 @@ class TeamsTypeTest(TembaTest):
 
         self.client.post(url, post_data)
 
-        # Accept either Graph tenant flow or BotFramework tenant flow
-        possible_urls = {
+        # Expect BF-only during claim (compat default)
+        mock_post.assert_any_call(
             "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token",
-            f"https://login.microsoftonline.com/{post_data['tenant_id']}/oauth2/v2.0/token",
-        }
-        # Ensure at least one call targeted a supported endpoint with expected body
-        called_supported_endpoint = False
-        for args, kwargs in mock_post.call_args_list:
-            url_called = args[0] if args else kwargs.get("url")  # requests.post(url, ...)
-            if url_called in possible_urls:
-                data = kwargs.get(
-                    "data", {}
-                )  # note: tests use kwargs; production code uses kwargs as well
-                if data.get("client_id") == "123456" and data.get("grant_type") == "client_credentials":
-                    if data.get("client_secret") == "a1b2c3" and (
-                        data.get("scope") in ("https://api.botframework.com/.default", "https://graph.microsoft.com/.default")
-                    ):
-                        called_supported_endpoint = True
-                        break
-        self.assertTrue(called_supported_endpoint)
+            data={
+                "client_id": "123456",
+                "grant_type": "client_credentials",
+                "scope": "https://api.botframework.com/.default",
+                "client_secret": "a1b2c3",
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
 
         # assert our channel got created
         channel = Channel.objects.get(address="45612")
@@ -141,14 +132,14 @@ class TeamsTypeTest(TembaTest):
             channel.refresh_from_db()
             self.assertEqual("abc345", channel.config[Channel.CONFIG_AUTH_TOKEN])
 
+        # Graph fallback when BF returns empty body
+        channel2.delete()
         with patch("requests.post") as mock_post:
             mock_post.side_effect = [MockResponse(200, ""), MockResponse(200, '{"access_token": "abc098"}')]
             refresh_teams_tokens()
 
             channel.refresh_from_db()
-            channel2.refresh_from_db()
-            self.assertEqual("abc345", channel.config[Channel.CONFIG_AUTH_TOKEN])
-            self.assertEqual("abc098", channel2.config[Channel.CONFIG_AUTH_TOKEN])
+            self.assertEqual("abc098", channel.config[Channel.CONFIG_AUTH_TOKEN])
 
     def test_exception_handling(self):
         form_data = {

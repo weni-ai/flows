@@ -24,24 +24,44 @@ def refresh_teams_tokens():
         # iterate across each of our teams channels and get a new token
         for channel in Channel.objects.filter(is_active=True, channel_type="TM").order_by("id"):
             try:
-                # Build candidate endpoints: prefer Graph using the channel tenant, fall back to Bot Framework tenant
+                # Build candidate endpoints based on per-channel preference
                 tenant_id = channel.config.get(TeamsType.CONFIG_TEAMS_TENANT_ID)
+                preference = channel.config.get(TeamsType.CONFIG_TEAMS_TOKEN_PREFERENCE, "botframework")
+
+                # Assemble candidates explicitly based on preference
                 candidates = []
-                if tenant_id:
+                if preference == "graph":
+                    if tenant_id:
+                        candidates.append(
+                            (
+                                f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
+                                "https://graph.microsoft.com/.default",
+                                "graph",
+                            )
+                        )
                     candidates.append(
                         (
-                            f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
-                            "https://graph.microsoft.com/.default",
-                            "graph",
+                            "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token",
+                            "https://api.botframework.com/.default",
+                            "botframework",
                         )
                     )
-                candidates.append(
-                    (
-                        "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token",
-                        "https://api.botframework.com/.default",
-                        "botframework",
+                else:  # default and any other value: botframework first
+                    candidates.append(
+                        (
+                            "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token",
+                            "https://api.botframework.com/.default",
+                            "botframework",
+                        )
                     )
-                )
+                    if tenant_id:
+                        candidates.append(
+                            (
+                                f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
+                                "https://graph.microsoft.com/.default",
+                                "graph",
+                            )
+                        )
 
                 # common pieces
                 common_body = {
@@ -71,7 +91,7 @@ def refresh_teams_tokens():
                         token_obtained = access_token
                         # store which source produced the token to aid debugging, but don't rely on it elsewhere
                         channel.config["auth_token"] = access_token
-                        channel.config["teams_token_source"] = source  # purely informational
+                        channel.config["teams_token_source"] = source  # informational
                         channel.save(update_fields=["config"])
                         break
 
