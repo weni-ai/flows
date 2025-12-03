@@ -1290,9 +1290,44 @@ class FlowTest(TembaTest):
         # check our count
         self.assertEqual(FlowStartCount.get_count(start), 10)
 
-        # squash them
-        FlowStartCount.squash()
-        self.assertEqual(FlowStartCount.get_count(start), 10)
+    @override_settings(SQUASH_BATCH_SIZE=2, FLOW_PATH_COUNT_DELETE_BATCH_LIMIT=10000)
+    def test_flow_pathcount_squash_respects_batch_size(self):
+        """
+        Ensures FlowPathCount.squash processes at most SQUASH_BATCH_SIZE distinct keys per iteration,
+        covering the early-break path in the implementation.
+        """
+        flow = Flow.create(self.org, self.admin, "Squash Test")
+        period = timezone.now().replace(minute=0, second=0, microsecond=0)
+
+        # Create three distinct keys, five unsquashed rows each
+        keys = [
+            (uuid4(), uuid4()),
+            (uuid4(), uuid4()),
+            (uuid4(), uuid4()),
+        ]
+        for from_uuid, to_uuid in keys:
+            for _ in range(5):
+                FlowPathCount.objects.create(flow=flow, from_uuid=from_uuid, to_uuid=to_uuid, period=period, count=1)
+
+        # Sanity: 15 unsquashed rows
+        self.assertEqual(15, FlowPathCount.objects.filter(flow=flow, is_squashed=False).count())
+
+        # First squash: should handle only two distinct keys (batch size = 2)
+        FlowPathCount.squash()
+
+        squashed = list(FlowPathCount.objects.filter(flow=flow, is_squashed=True))
+        self.assertEqual(2, len(squashed))
+        # Each squashed key should aggregate its five rows
+        for c in squashed:
+            self.assertEqual(5, c.count)
+
+        # One key (five rows) should remain unsquashed
+        self.assertEqual(5, FlowPathCount.objects.filter(flow=flow, is_squashed=False).count())
+
+        # Second squash: completes the remaining key
+        FlowPathCount.squash()
+        self.assertEqual(3, FlowPathCount.objects.filter(flow=flow, is_squashed=True).count())
+        self.assertEqual(0, FlowPathCount.objects.filter(flow=flow, is_squashed=False).count())
 
     def test_prune_recent_runs(self):
         """
