@@ -94,8 +94,6 @@ class BaseJWTAuthentication(BaseAuthentication):
             raise AuthenticationFailed("Token expired.")
         except self.get_jwt().InvalidTokenError:
             raise AuthenticationFailed("Invalid token.")
-        except Exception as e:
-            raise AuthenticationFailed(f"Authentication error: {str(e)}")
 
         return payload
 

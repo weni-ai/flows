@@ -11,6 +11,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from temba.api.auth.jwt import (
+    BaseJWTAuthentication,
     JWTAuthMixinOptional,
     JWTAuthMixinRequired,
     OptionalJWTAuthentication,
@@ -144,6 +145,36 @@ class JWTAuthCoverageTests(TembaTest):
             with patch("temba.api.auth.jwt.jwt.decode", side_effect=_pyjwt.ExpiredSignatureError("expired")):
                 self.assertIsNone(auth.authenticate(req))
 
+    def test_optional_sets_project_and_channel_aliases(self):
+        auth = OptionalJWTAuthentication()
+        with self.settings(JWT_PUBLIC_KEY="dummy"):
+            # direct fields take precedence
+            req = self.factory.get("/")
+            req.headers = {"Authorization": "Bearer good"}
+            payload = {
+                "project_uuid": "proj-direct",
+                "project": "proj-alias",
+                "channel_uuid": "chan-direct",
+                "channel": "chan-alias",
+            }
+            with patch("temba.api.auth.jwt.jwt.decode", return_value=payload):
+                user, _ = auth.authenticate(req)
+            from django.contrib.auth.models import AnonymousUser
+
+            self.assertIsInstance(user, AnonymousUser)
+            self.assertEqual(req.project_uuid, "proj-direct")
+            self.assertEqual(req.channel_uuid, "chan-direct")
+            self.assertEqual(req.jwt_payload, payload)
+
+            # alias fallback when direct keys are missing
+            req = self.factory.get("/")
+            req.headers = {"Authorization": "Bearer good"}
+            alias_payload = {"project": "proj-alias-only", "channel": "chan-alias-only"}
+            with patch("temba.api.auth.jwt.jwt.decode", return_value=alias_payload):
+                auth.authenticate(req)
+            self.assertEqual(req.project_uuid, "proj-alias-only")
+            self.assertEqual(req.channel_uuid, "chan-alias-only")
+
     def test_required_missing_key_and_header_and_prefix(self):
         auth = RequiredJWTAuthentication()
         # missing key
@@ -195,6 +226,47 @@ class JWTAuthCoverageTests(TembaTest):
             self.assertIsInstance(user, AnonymousUser)
             self.assertEqual(getattr(req, "project_uuid", None), "proj-xyz")
             self.assertEqual(getattr(req, "jwt_payload", None), payload)
+
+    def test_required_allows_channel_only_payloads(self):
+        auth = RequiredJWTAuthentication()
+        with self.settings(JWT_PUBLIC_KEY="dummy"):
+            req = self.factory.get("/")
+            req.headers = {"Authorization": "Bearer ok"}
+            payload = {"channel_uuid": "chan-123"}
+            with patch("temba.api.auth.jwt.jwt.decode", return_value=payload):
+                user, _ = auth.authenticate(req)
+            from django.contrib.auth.models import AnonymousUser
+
+            self.assertIsInstance(user, AnonymousUser)
+            self.assertEqual(req.channel_uuid, "chan-123")
+            self.assertIsNone(getattr(req, "project_uuid", None))
+
+    def test_base_authenticate_missing_config_and_header(self):
+        base_auth = BaseJWTAuthentication()
+
+        req = self.factory.get("/")
+        req.headers = {"Authorization": "Bearer token"}
+        with self.settings(JWT_PUBLIC_KEY=None):
+            with self.assertRaises(AuthenticationFailed):
+                base_auth.authenticate(req)
+
+        with self.settings(JWT_PUBLIC_KEY="dummy"):
+            req = self.factory.get("/")
+            with self.assertRaises(AuthenticationFailed):
+                base_auth.authenticate(req)
+
+    def test_base_authenticate_success_sets_payload(self):
+        base_auth = BaseJWTAuthentication()
+        with self.settings(JWT_PUBLIC_KEY="dummy"):
+            req = self.factory.get("/")
+            req.headers = {"Authorization": "Bearer nice"}
+            payload = {"foo": "bar"}
+            with patch("temba.api.auth.jwt.jwt.decode", return_value=payload):
+                user, _ = base_auth.authenticate(req)
+            from django.contrib.auth.models import AnonymousUser
+
+            self.assertIsInstance(user, AnonymousUser)
+            self.assertEqual(req.jwt_payload, payload)
 
     def test_getters_and_mixins(self):
         # Optional get_settings/get_jwt
