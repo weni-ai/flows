@@ -88,35 +88,59 @@ class ProjectsUrlsTest(JWTAuthMockMixin, SimpleTestCase):
         self.assertEqual(getattr(match.func, "view_class", None), ProjectLanguageView)
 
 
-class ProjectLanguageViewTest(JWTAuthMockMixin, TembaTest):
+class PatchedJWTAuthMixin(JWTAuthMockMixin):
+    def setUp(self):
+        super().setUp()
+        self.jwt_payload_patch = {}
+        self._set_jwt_payload()
+
+    def _set_jwt_payload(self, **kwargs):
+        self.jwt_payload_patch = kwargs
+
+    def _mock_jwt_authenticate(self, request, *args, **kwargs):
+        result = super()._mock_jwt_authenticate(request, *args, **kwargs)
+        if getattr(self, "jwt_payload_patch", None):
+            request.jwt_payload.update(self.jwt_payload_patch)
+            request.project_uuid = request.jwt_payload.get("project_uuid")
+            request.channel_uuid = request.jwt_payload.get("channel_uuid")
+        return result
+
+
+class ProjectLanguageViewTest(PatchedJWTAuthMixin, TembaTest):
     def setUp(self):
         super().setUp()
         self.org.proj_uuid = uuid.uuid4()
         self.org.save(update_fields=("proj_uuid",))
 
         self.url = reverse("api.v2.project_language")
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
 
     def test_request_without_project_uuid_and_channel_uuid(self):
+        self._set_jwt_payload(project_uuid=None, channel_uuid=None)
         response = self.client.get(self.url, **self.auth_headers)
         self.assertEqual(response.status_code, 400)
 
     def test_request_with_channel_uuid(self):
         channel = self.create_channel("TG", "Test Channel", "test", org=self.org)
-        response = self.client.get(f"{self.url}?channel_uuid={channel.uuid}", **self.auth_headers)
+        self._set_jwt_payload(channel_uuid=str(channel.uuid), project_uuid=None)
+        response = self.client.get(self.url, **self.auth_headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"language": self.org.language})
 
     def test_request_with_channel_uuid_notfound(self):
-        url = f"{self.url}?channel_uuid=2337712f-dcbc-48f3-9ae7-7f832445f6c9"
-        response = self.client.get(url, **self.auth_headers)
+        missing_uuid = "2337712f-dcbc-48f3-9ae7-7f832445f6c9"
+        self._set_jwt_payload(channel_uuid=missing_uuid, project_uuid=None)
+        response = self.client.get(self.url, **self.auth_headers)
         self.assertEqual(response.status_code, 404)
 
     def test_request_with_project_uuid(self):
-        response = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}", **self.auth_headers)
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid), channel_uuid=None)
+        response = self.client.get(self.url, **self.auth_headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"language": self.org.language})
 
     def test_request_with_project_uuid_notfound(self):
-        url = f"{self.url}?project_uuid=2337712f-dcbc-48f3-9ae7-7f832445f6c9"
-        response = self.client.get(url, **self.auth_headers)
+        missing_uuid = "2337712f-dcbc-48f3-9ae7-7f832445f6c9"
+        self._set_jwt_payload(project_uuid=missing_uuid, channel_uuid=None)
+        response = self.client.get(self.url, **self.auth_headers)
         self.assertEqual(response.status_code, 404)
