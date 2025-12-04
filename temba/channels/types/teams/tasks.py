@@ -24,7 +24,10 @@ def refresh_teams_tokens():
         # iterate across each of our teams channels and get a new token
         for channel in Channel.objects.filter(is_active=True, channel_type="TM").order_by("id"):
             try:
-                url = "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token"
+                if channel.config.get("version") == "v2":
+                    url = f"https://login.microsoftonline.com/{channel.config[TeamsType.CONFIG_TEAMS_TENANT_ID]}/oauth2/v2.0/token"
+                else:
+                    url = "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token"
 
                 request_body = {
                     "client_id": channel.config[TeamsType.CONFIG_TEAMS_APPLICATION_ID],
