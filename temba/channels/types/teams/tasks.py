@@ -15,7 +15,9 @@ from .type import TeamsType
 logger = logging.getLogger(__name__)
 
 
-@shared_task(track_started=True, name="refresh_teams_tokens")
+@shared_task(
+    track_started=True, name="refresh_teams_tokens", autoretry_for=(Exception,), max_retries=3, retry_backoff=True
+)
 def refresh_teams_tokens():
     r = get_redis_connection()
     if r.get("refresh_teams_tokens"):  # pragma: no cover
