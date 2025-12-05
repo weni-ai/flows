@@ -7,9 +7,10 @@ from weni.internal.authenticators import InternalOIDCAuthentication
 
 from django.conf import settings
 
+from temba.api.auth.jwt import RequiredJWTAuthentication
 from temba.api.v2.internals.channels.serializers import ChannelProjectSerializer
 from temba.api.v2.internals.views import APIViewMixin
-from temba.api.v2.permissions import IsUserInOrg
+from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel
 from temba.orgs.models import Org
 
@@ -89,14 +90,16 @@ class InternalChannelView(APIViewMixin, APIView):
 
 
 class ChannelAllowedDomainsView(APIViewMixin, APIView):
-    def get(self, request: Request):
-        params = request.query_params
-        channelUUID = params.get("channel")
+    authentication_classes = [RequiredJWTAuthentication]
+    permission_classes = [HasValidJWT]
 
-        if channelUUID is None:
+    def get(self, request: Request):
+        channel_uuid = getattr(request, "channel_uuid", None)
+
+        if channel_uuid is None:
             return Response(status=400)
         try:
-            channel = Channel.objects.get(uuid=channelUUID)
+            channel = Channel.objects.get(uuid=channel_uuid)
         except Channel.DoesNotExist:
             return Response(status=404)
 

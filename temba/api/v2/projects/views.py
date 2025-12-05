@@ -4,8 +4,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
 
+from temba.api.auth.jwt import RequiredJWTAuthentication
 from temba.api.v2.internals.views import APIViewMixin
-from temba.api.v2.permissions import IsUserInOrg
+from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel
 from temba.orgs.models import Org
 
@@ -36,10 +37,12 @@ class GetProjectView(APIViewMixin, APIView):
 
 
 class ProjectLanguageView(APIViewMixin, APIView):
+    authentication_classes = [RequiredJWTAuthentication]
+    permission_classes = [HasValidJWT]
+
     def get(self, request: Request):
-        params = request.query_params
-        project_uuid = params.get("project_uuid")
-        channel_uuid = params.get("channel_uuid")
+        project_uuid = getattr(request, "project_uuid", None)
+        channel_uuid = getattr(request, "channel_uuid", None)
 
         if project_uuid is None and channel_uuid is None:
             return Response(status=400, data={"error": "project_uuid or channel_uuid is required"})

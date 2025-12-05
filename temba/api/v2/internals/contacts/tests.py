@@ -1134,29 +1134,71 @@ class InternalContactGroupsViewTest(TembaTest):
         self.assertEqual(response.json(), {"error": "Project not found"})
 
 
-class HasOpenTicketViewTest(TembaTest):
+class HasOpenTicketViewTest(PatchedJWTAuthMixin, TembaTest):
+    jwt_patch_target = "temba.api.auth.jwt.OptionalJWTAuthentication.authenticate"
+
+    def setUp(self):
+        super().setUp()
+        self.jwt_payload_patch = {}
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
+
+    def _set_jwt_payload(self, **kwargs):
+        self.jwt_payload_patch = kwargs
+
+    @patch(
+        "temba.api.v2.internals.contacts.views.ContactHasOpenTicketView.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.contacts.views.ContactHasOpenTicketView.permission_classes",
+        [],
+    )
     def test_missing_contact_urn_param(self):
         """Test that the endpoint returns 400 when contact_urn parameter is missing"""
         url = "/api/v2/internals/contact_has_open_ticket"
-        response = self.client.get(url)
+        response = self.client.get(url, **self.auth_headers)
         self.assertEqual(response.status_code, 400)
 
+    @patch(
+        "temba.api.v2.internals.contacts.views.ContactHasOpenTicketView.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.contacts.views.ContactHasOpenTicketView.permission_classes",
+        [],
+    )
     def test_contact_not_found(self):
         """Test that the endpoint returns 404 when contact is not found"""
         url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
-        response = self.client.get(url)
+        response = self.client.get(url, **self.auth_headers)
         self.assertEqual(response.status_code, 404)
 
+    @patch(
+        "temba.api.v2.internals.contacts.views.ContactHasOpenTicketView.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.contacts.views.ContactHasOpenTicketView.permission_classes",
+        [],
+    )
     def test_contact_without_open_ticket(self):
         """Test that the endpoint returns false when contact has no open tickets"""
         self.create_contact("Bob", urns=["tel:+1234567890"])
 
         url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
-        response = self.client.get(url)
+        response = self.client.get(url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"has_open_ticket": False})
 
+    @patch(
+        "temba.api.v2.internals.contacts.views.ContactHasOpenTicketView.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.contacts.views.ContactHasOpenTicketView.permission_classes",
+        [],
+    )
     def test_contact_with_open_ticket(self):
         """Test that the endpoint returns true when contact has an open ticket"""
         contact = self.create_contact("Bob", urns=["tel:+1234567890"])
@@ -1164,11 +1206,19 @@ class HasOpenTicketViewTest(TembaTest):
         self.create_ticket(ticketer, contact, "Test ticket")
 
         url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
-        response = self.client.get(url)
+        response = self.client.get(url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"has_open_ticket": True})
 
+    @patch(
+        "temba.api.v2.internals.contacts.views.ContactHasOpenTicketView.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.contacts.views.ContactHasOpenTicketView.permission_classes",
+        [],
+    )
     def test_contact_with_closed_ticket(self):
         """Test that the endpoint returns false when contact has only closed tickets"""
         contact = self.create_contact("Bob", urns=["tel:+1234567890"])
@@ -1182,7 +1232,7 @@ class HasOpenTicketViewTest(TembaTest):
         self.assertEqual(ticket.status, "C")
 
         url = "/api/v2/internals/contact_has_open_ticket?contact_urn=tel:1234567890"
-        response = self.client.get(url)
+        response = self.client.get(url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"has_open_ticket": False})
