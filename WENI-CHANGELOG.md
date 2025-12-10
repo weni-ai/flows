@@ -1,3 +1,8 @@
+3.47.0
+----------
+* Changing log error to see if the getbyhostname will still fail on tests
+* Feature/adding jwt auth to 3 endpoints 
+
 3.46.1
 ----------
 * Adjust Broadcast Statistics trigger count
