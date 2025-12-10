@@ -172,7 +172,7 @@ class RequiredJWTAuthenticationTests(TestCase):
         request.headers = {"Authorization": "Bearer valid-token"}
         with self.assertRaises(AuthenticationFailed) as ctx:
             self.auth.authenticate(request)
-        self.assertIn("project_uuid not found in token payload", str(ctx.exception))
+        self.assertIn("project_uuid or channel_uuid must be present in token payload.", str(ctx.exception))
 
     @patch("temba.api.auth.jwt.jwt.decode")
     @patch("temba.api.auth.jwt.settings")
