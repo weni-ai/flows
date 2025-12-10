@@ -1,5 +1,7 @@
 from django.urls import reverse
 
+from unittest.mock import patch
+
 from temba.tests import TembaTest
 
 from ...models import Channel
@@ -38,7 +40,8 @@ class TelesomTypeTest(TembaTest):
         post_data["secret"] = "secret"
         post_data["number"] = "1212"
 
-        response = self.client.post(url, post_data)
+        with patch("temba.utils.fields.socket.gethostbyname", return_value="93.184.216.34"):
+            response = self.client.post(url, post_data)
         channel = Channel.objects.get()
 
         self.assertEqual("SO", channel.country)
