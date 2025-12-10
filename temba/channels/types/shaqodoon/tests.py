@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.urls import reverse
 
 from temba.tests import TembaTest
@@ -37,8 +39,8 @@ class ShaqodoonTypeTest(TembaTest):
         post_data["url"] = "http://test.com/send.php"
         post_data["number"] = "301"
 
-        response = self.client.post(url, post_data)
-
+        with patch("temba.utils.fields.socket.gethostbyname", return_value="93.184.216.34"):
+            response = self.client.post(url, post_data)
         channel = Channel.objects.get()
 
         self.assertEqual("SO", channel.country)
