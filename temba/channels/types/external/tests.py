@@ -1,6 +1,6 @@
-from django.urls import reverse
-
 from unittest.mock import patch
+
+from django.urls import reverse
 
 from temba.tests import TembaTest
 
