@@ -8,8 +8,6 @@
 .direnv
 .commit
 rp-indexer
-.python-version
-
 
 # temba
 dump.rdb
