@@ -5,11 +5,17 @@ import iso8601
 from rest_framework import generics, mixins, status
 from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
+from weni.internal.authenticators import InternalOIDCAuthentication
 
 from django.db import transaction
 
 from temba.api.models import APIPermission, SSLPermission
-from temba.api.support import InvalidQueryError
+from temba.api.support import (
+    APIBasicAuthentication,
+    APISessionAuthentication,
+    APITokenAuthentication,
+    InvalidQueryError,
+)
 from temba.contacts.models import URN
 from temba.utils import str_to_bool
 from temba.utils.views import NonAtomicMixin
@@ -23,10 +29,44 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
     """
 
     permission_classes = (SSLPermission, APIPermission)
+    authentication_classes = (
+        InternalOIDCAuthentication,
+        APISessionAuthentication,
+        APITokenAuthentication,
+        APIBasicAuthentication,
+    )
     throttle_scope = "v2"
     model = None
     model_manager = "objects"
     lookup_params = {"uuid": "uuid"}
+
+    def perform_authentication(self, request):
+        super().perform_authentication(request)
+        # For internal token (not APIToken), set org context from project parameter before permission checks
+        try:
+            if not getattr(request.user, "is_authenticated", False):
+                return
+            if getattr(request.user, "using_token", False):
+                return  # APIToken path already sets org
+
+            if hasattr(request.user, "get_org") and request.user.get_org():
+                return
+
+            params = request.query_params
+            print(f"params: {params}")
+            print(f"user: {request.user.email}")
+            project_uuid = params.get("project_uuid") or params.get("project")
+            if not project_uuid:
+                return
+
+            from temba.orgs.models import Org
+
+            org = Org.objects.filter(proj_uuid=project_uuid).first()
+            if org:
+                print(f"org: {org}")
+                request.user.set_org(org)
+        except Exception:
+            return
 
     def options(self, request, *args, **kwargs):
         """
