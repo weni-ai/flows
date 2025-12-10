@@ -1068,7 +1068,7 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
         try:
             response = client.contact_modify(org.id, user.id, [c.id for c in contacts], mods)
         except mailroom.MailroomException as e:
-            logger.error(f"Contact update failed: {str(e)}", exc_info=True)
+            logger.error(f"Failed to update contacts: {str(e)}", exc_info=True)
             raise e
 
         def modified(contact):
