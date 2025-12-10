@@ -91,16 +91,15 @@ class InternalChannelView(APIViewMixin, APIView):
 
 class ChannelAllowedDomainsView(APIViewMixin, APIView):
     authentication_classes = [RequiredJWTAuthentication]
-    permission_classes = [(IsAuthenticated & HasValidJWT)]
+    permission_classes = [HasValidJWT]
 
     def get(self, request: Request):
-        params = request.query_params
-        channelUUID = params.get("channel")
+        channel_uuid = getattr(request, "channel_uuid", None)
 
-        if channelUUID is None:
+        if channel_uuid is None:
             return Response(status=400)
         try:
-            channel = Channel.objects.get(uuid=channelUUID)
+            channel = Channel.objects.get(uuid=channel_uuid)
         except Channel.DoesNotExist:
             return Response(status=404)
 

@@ -62,13 +62,13 @@ class OptionalJWTAuthentication(BaseAuthentication):
         return (AnonymousUser(), None)
 
 
-class RequiredJWTAuthentication(BaseAuthentication):
+class BaseJWTAuthentication(BaseAuthentication):
     """
-    Strict JWT authentication matching legacy behavior used in conversion app:
-    - Requires JWT_PUBLIC_KEY configured, otherwise raises AuthenticationFailed
-    - Requires Authorization: Bearer <token>, otherwise raises AuthenticationFailed
-    - Validates token and requires project_uuid in payload, otherwise raises AuthenticationFailed
-    - Sets request.jwt_payload and request.project_uuid, returns AnonymousUser
+    Base class that handles the low-level mechanics of JWT validation:
+    - Retrieves the Public Key.
+    - Extracts the Bearer token from the header.
+    - Decodes and validates the token signature/expiration.
+    Returns the decoded payload if successful, or raises AuthenticationFailed.
     """
 
     def get_settings(self):
@@ -77,7 +77,11 @@ class RequiredJWTAuthentication(BaseAuthentication):
     def get_jwt(self):
         return jwt
 
-    def authenticate(self, request):
+    def verify_and_decode_token(self, request):
+        """
+        Orchestrates the validation process and returns the payload.
+        This method is meant to be called by subclasses.
+        """
         public_key = getattr(self.get_settings(), "JWT_PUBLIC_KEY", None)
         if not public_key:
             raise AuthenticationFailed("JWT_PUBLIC_KEY not configured in settings.")
@@ -94,17 +98,45 @@ class RequiredJWTAuthentication(BaseAuthentication):
                 algorithms=["RS256"],
                 options={"verify_aud": False},
             )
+            request.jwt_payload = payload
         except self.get_jwt().ExpiredSignatureError:
             raise AuthenticationFailed("Token expired.")
         except self.get_jwt().InvalidTokenError:
             raise AuthenticationFailed("Invalid token.")
 
-        project_uuid = payload.get("project_uuid")
-        if not project_uuid:
-            raise AuthenticationFailed("project_uuid not found in token payload.")
+        return payload
 
-        request.project_uuid = project_uuid
-        request.jwt_payload = payload
+    def authenticate(self, request):
+        """
+        Base implementation. Can be used if you just want to validate the token
+        without specific payload extraction requirements.
+        """
+        self.verify_and_decode_token(request)
+
+        return (AnonymousUser(), None)
+
+
+class RequiredJWTAuthentication(BaseJWTAuthentication):
+    """
+    Implementation that requires specific fields in the JWT payload.
+    Uses the base class to validate the token mechanics, then checks for
+    project/channel UUIDs.
+    """
+
+    def authenticate(self, request):
+        payload = self.verify_and_decode_token(request)
+
+        project_uuid = payload.get("project_uuid")
+        channel_uuid = payload.get("channel_uuid")
+
+        if not project_uuid and not channel_uuid:
+            raise AuthenticationFailed("project_uuid or channel_uuid must be present in token payload.")
+
+        if project_uuid:
+            request.project_uuid = project_uuid
+        if channel_uuid:
+            request.channel_uuid = channel_uuid
+
         return (AnonymousUser(), None)
 
 

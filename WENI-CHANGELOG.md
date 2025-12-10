@@ -1,3 +1,8 @@
+3.46.1
+----------
+* Adjust Broadcast Statistics trigger count
+* Add v2 option in refresh teams token
+
 3.46.0
 ----------
 * Implementing optional jwt auth on 2 endpoints

@@ -961,7 +961,7 @@ class JWTModuleAuthenticationTestCase(TestCase):
         request.headers = {"Authorization": "Bearer valid-token"}
         with self.assertRaises(AuthenticationFailed) as context:
             self.auth.authenticate(request)
-        self.assertIn("project_uuid not found in token payload", str(context.exception))
+        self.assertIn("project_uuid or channel_uuid must be present in token payload.", str(context.exception))
 
     @patch("temba.conversion_events.jwt_auth.jwt.decode")
     @patch("temba.conversion_events.jwt_auth.settings")

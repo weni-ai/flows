@@ -28,8 +28,7 @@ from django.db.transaction import on_commit as on_transaction_commit
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
-from temba.api.auth.jwt import RequiredJWTAuthentication
-from temba.api.auth.jwt import OptionalJWTAuthentication
+from temba.api.auth.jwt import BaseJWTAuthentication, OptionalJWTAuthentication
 from temba.api.v2.internals.contacts.serializers import (
     ContactWithMessagesListSerializer,
     InternalContactFieldsValuesSerializer,
@@ -368,8 +367,8 @@ class ContactsExportByStatusView(APIViewMixin, APIView):
 
 
 class ContactHasOpenTicketView(APIViewMixin, APIView):
-    authentication_classes = [RequiredJWTAuthentication]
-    permission_classes = [(IsAuthenticated & HasValidJWT)]
+    authentication_classes = [BaseJWTAuthentication]
+    permission_classes = [HasValidJWT]
 
     def get(self, request: Request):
         contact_urn = request.query_params.get("contact_urn")

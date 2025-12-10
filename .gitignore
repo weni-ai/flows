@@ -7,15 +7,7 @@
 .envrc
 .direnv
 .commit
-docker-compose.yml
-static/brands/push
-.env
-Makefile
-custom_code_check.py
-
 rp-indexer
-.python-version
-
 
 # temba
 dump.rdb

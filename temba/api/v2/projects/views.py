@@ -38,12 +38,11 @@ class GetProjectView(APIViewMixin, APIView):
 
 class ProjectLanguageView(APIViewMixin, APIView):
     authentication_classes = [RequiredJWTAuthentication]
-    permission_classes = [(IsAuthenticated & HasValidJWT)]
+    permission_classes = [HasValidJWT]
 
     def get(self, request: Request):
-        params = request.query_params
-        project_uuid = params.get("project_uuid")
-        channel_uuid = params.get("channel_uuid")
+        project_uuid = getattr(request, "project_uuid", None)
+        channel_uuid = getattr(request, "channel_uuid", None)
 
         if project_uuid is None and channel_uuid is None:
             return Response(status=400, data={"error": "project_uuid or channel_uuid is required"})
