@@ -20,5 +20,7 @@ def create_authorizations(authorizations: dict, project: Project):
             project.administrators.add(user)
         if authorization.get("role") == 5:
             project.agents.add(user)
+        if authorization.get("role") == 6:
+            project.marketing.add(user)
 
     project.save()

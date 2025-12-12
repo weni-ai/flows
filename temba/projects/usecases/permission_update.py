@@ -18,6 +18,8 @@ def create_user_permission(role: int, project: Project, user: User):  # pragma: 
         project.administrators.add(user)
     if role == 5:
         project.agents.add(user)
+    if role == 6:
+        project.marketing.add(user)
 
     project.save()
 
@@ -31,6 +33,8 @@ def get_name_permisssions(role: int):  # pragma: no cover
         return "administrator"
     if role == 5:
         return "agent"
+    if role == 6:
+        return "marketing"
 
 
 def update_permission(project_uuid: Project, action: str, user_email: str, role: int) -> Project:  # pragma: no cover
@@ -85,4 +89,5 @@ def _get_permissions(project: Project) -> dict:  # pragma: no cover
         "editor": project.editors,
         "surveyor": project.surveyors,
         "agent": project.agents,
+        "marketing": project.marketing,
     }
