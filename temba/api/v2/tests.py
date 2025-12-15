@@ -385,7 +385,16 @@ class APITest(TembaTest):
             OrderedDict([("a", 1), ("b", 2), ("c", 3), ("d", 4)]),
             normalize_extra({"a": 1, "b": 2, "c": 3, "d": 4, "e": 5}),
         )
-        self.assertEqual(OrderedDict([("a", "x" * 640)]), normalize_extra({"a": "x" * 641}))
+        # Test default limit of 4096 (4k)
+        self.assertEqual(OrderedDict([("a", "x" * 4096)]), normalize_extra({"a": "x" * 4097}))
+
+    @override_settings(FLOW_START_PARAMS_SIZE=4, FLOW_START_EXTRA_STRING_SIZE=8192)
+    def test_normalize_extra_custom_limit(self):
+        """Test that FLOW_START_EXTRA_STRING_SIZE setting is respected"""
+        # Test with custom limit of 8192 (8k)
+        self.assertEqual(OrderedDict([("a", "x" * 8192)]), normalize_extra({"a": "x" * 8193}))
+        # Test that strings within limit are not truncated
+        self.assertEqual(OrderedDict([("a", "x" * 4096)]), normalize_extra({"a": "x" * 4096}))
 
     def test_authentication(self):
         def request(endpoint, **headers):

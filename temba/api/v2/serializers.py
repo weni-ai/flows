@@ -51,8 +51,8 @@ def format_datetime(value):
 
 def normalize_extra(extra):
     """
-    Normalizes a dict of extra passed to the flow start endpoint. We need to do this for backwards compatibility with
-    old engine.
+    Normalizes a dict of extra passed to the flow start endpoint.
+    Ensures consistent format and enforces size limits for flow start parameters.
     """
 
     return _normalize_extra(extra, -1)[0]
@@ -63,7 +63,8 @@ def _normalize_extra(extra, count):
         return INVALID_EXTRA_KEY_CHARS.sub("_", key)[:255]
 
     if isinstance(extra, str):
-        return extra[:640], count + 1
+        max_string_size = getattr(settings, "FLOW_START_EXTRA_STRING_SIZE", 4096)
+        return extra[:max_string_size], count + 1
 
     elif isinstance(extra, numbers.Number) or isinstance(extra, bool):
         return extra, count + 1
