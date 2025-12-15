@@ -1355,6 +1355,9 @@ IP_ADDRESSES = ("172.16.10.10", "162.16.10.20")
 # -----------------------------------------------------------------------------------
 MSG_FIELD_SIZE = os.environ.get("MSG_FIELD_SIZE", 1500)  # used for broadcast text and message campaign events
 FLOW_START_PARAMS_SIZE = 256  # used for params passed to flow start API endpoint
+FLOW_START_EXTRA_STRING_SIZE = int(
+    os.environ.get("FLOW_START_EXTRA_STRING_SIZE", 4096)
+)  # max length of string values in extra params
 GLOBAL_VALUE_SIZE = 10_000  # max length of global values
 
 ORG_LIMIT_DEFAULTS = {
