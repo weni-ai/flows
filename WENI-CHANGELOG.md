@@ -1,3 +1,8 @@
+3.47.1
+----------
+* Fix read status trigger
+* Update events.json API doc
+
 3.47.0
 ----------
 * Changing log error to see if the getbyhostname will still fail on tests
