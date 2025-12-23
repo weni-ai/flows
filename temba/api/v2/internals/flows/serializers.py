@@ -64,3 +64,4 @@ class FlowStartSerializer(WriteSerializer):
 class FlowImportSerializer(serializers.Serializer):
     project_uuid = serializers.CharField(required=True)
     definition = serializers.JSONField(required=True)
+    is_mutable = serializers.BooleanField(required=False, default=True)

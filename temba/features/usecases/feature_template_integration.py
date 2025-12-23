@@ -3,6 +3,7 @@ from weni.internal.models import Project
 from django.contrib.auth import get_user_model
 
 from temba.event_driven.publisher.rabbitmq_publisher import RabbitmqPublisher
+from temba.flows.services import set_flows_mutability
 from temba.projects.usecases.globals_creation import create_globals
 
 User = get_user_model()
@@ -25,7 +26,7 @@ def integrate_feature_template_consumer(
 
     new_flows = project.import_app(definition, user)
 
-    set_is_mutable_flow(new_flows)
+    set_flows_mutability(new_flows, is_mutable=False)
 
     disable_flows_has_issues(project, definition)
 
@@ -51,12 +52,6 @@ def format_new_flows_data(new_flows):
         flows_list.append(flow_data)
 
     return flows_list
-
-
-def set_is_mutable_flow(new_flows):
-    for flow in new_flows:
-        flow.is_mutable = False
-        flow.save()
 
 
 def publish_integrate_success(project_uuid, feature_version_uuid, feature_uuid, imported_data):  # pragma: no cover
