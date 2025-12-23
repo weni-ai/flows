@@ -62,6 +62,7 @@ class FlowImportView(APIViewMixin, APIView):
             project_uuid=serializer.validated_data["project_uuid"],
             user_email=request.user.email,
             definition=serializer.validated_data["definition"],
+            is_mutable=serializer.validated_data.get("is_mutable", True),
         )
 
         usecase = FlowImportUseCase()
