@@ -1,7 +1,8 @@
 import uuid
 
-from temba.features.usecases.feature_template_integration import format_new_flows_data, set_is_mutable_flow
+from temba.features.usecases.feature_template_integration import format_new_flows_data
 from temba.flows.models import Flow
+from temba.flows.services import set_flows_mutability
 from temba.tests.base import TembaTest
 
 
@@ -36,7 +37,7 @@ class TestFormatNewFlowsData(TembaTest):
 
         flows = [flow3, flow4]
 
-        set_is_mutable_flow(flows)
+        set_flows_mutability(flows, is_mutable=False)
 
         for flow in flows:
             self.assertFalse(flow.is_mutable)
