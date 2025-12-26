@@ -1,3 +1,7 @@
+3.47.2
+----------
+* Add is_mutable in Flow Import API
+
 3.47.1
 ----------
 * Fix read status trigger
