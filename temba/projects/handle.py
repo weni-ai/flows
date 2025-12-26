@@ -1,6 +1,7 @@
 import amqp
 
 from .consumers import (  # pragma: no cover
+    DeleteProjectConsumer,
     ProjectConsumer,
     TemplateTypeConsumer,
     UpdateBrainOnConsumer,
@@ -15,3 +16,4 @@ def handle_consumers(channel: amqp.Channel):
     channel.basic_consume("flows.update-project", callback=UpdateProjectConsumer().handle)  # pragma: no cover
     channel.basic_consume("flows.update-permission", callback=UpdatePermissionConsumer().handle)  # pragma: no cover
     channel.basic_consume("recent-activity.flows", callback=UpdateBrainOnConsumer().handle)  # pragma: no cover
+    channel.basic_consume("flows.project-events", callback=DeleteProjectConsumer().handle)  # pragma: no cover
