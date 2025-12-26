@@ -6,9 +6,9 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import urlencode
 
-from temba.tests.base import TembaTest
-from temba.msgs.models import Msg
 from temba.channels.models import Channel
+from temba.msgs.models import Msg
+from temba.tests.base import TembaTest
 
 User = get_user_model()
 
@@ -311,9 +311,7 @@ class TestInternalMessages(TembaTest):
         }
         response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
         self.assertEqual(response.status_code, 201)
-        data = response.json()
-        self.assertEqual(data["direction"], "in")
-        msg = Msg.objects.get(id=data["id"])
+        msg = Msg.objects.get(id=response.json()["id"])
         self.assertEqual(msg.direction, Msg.DIRECTION_IN)
         self.assertEqual(msg.status, Msg.STATUS_HANDLED)
 
@@ -443,3 +441,45 @@ class TestInternalMessages(TembaTest):
         }
         response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
         self.assertEqual(response.status_code, 404)
+
+    @patch("temba.event_driven.publisher.rabbitmq_publisher.RabbitmqPublisher.send_message")
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_publishes_billing_outgoing(self, *_mocks, mock_publish):
+        contact = self.create_contact("Ivan", urns=["tel:+250788001234"])
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "O",
+            "contact_uuid": str(contact.uuid),
+            "text": "bill me",
+            "template": "template-uuid",
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(mock_publish.called)
+        args, kwargs = mock_publish.call_args
+        self.assertEqual(kwargs.get("exchange"), "msgs.topic")
+        self.assertEqual(kwargs.get("routing_key"), "billing;msgs-create")
+        self.assertIn("body", kwargs)
+        body = kwargs["body"]
+        self.assertEqual(body["direction"], "O")
+        self.assertEqual(body["text"], "bill me")
+        self.assertEqual(body["template"], "template-uuid")
+
+    @patch("temba.event_driven.publisher.rabbitmq_publisher.RabbitmqPublisher.send_message")
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_publishes_billing_incoming(self, *_mocks, mock_publish):
+        self.create_contact("Judy", urns=["telegram:844380532"])
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "I",
+            "urn": "telegram:844380532",
+            "text": "hello",
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(mock_publish.called)
+        body = mock_publish.call_args.kwargs["body"]
+        self.assertEqual(body["contact_urn"], "telegram:844380532")
+        self.assertEqual(body["direction"], "I")

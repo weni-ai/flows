@@ -176,9 +176,9 @@ class MsgStreamView(APIViewMixin, APIView, JWTAuthMixinRequired):
                 attachments=data.get("attachments"),
                 visibility=data.get("visibility"),
                 labels=data.get("labels"),
+                template=data.get("template"),
             )
         except ValueError as e:
             return Response({"error": str(e)}, status=400)
 
-        read = InternalMsgReadSerializer(msg, context={"org": org, "user": user})
-        return Response(read.data, status=201)
+        return Response({"id": msg.id}, status=201)

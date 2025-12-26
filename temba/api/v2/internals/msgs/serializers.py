@@ -40,6 +40,8 @@ class MsgStreamSerializer(serializers.Serializer):
     urn = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     # optional channel override
     channel_uuid = serializers.UUIDField(required=False)
+    # optional template identifier to forward to billing
+    template = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     # content
     text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     message = serializers.CharField(required=False, allow_blank=True, allow_null=True)
