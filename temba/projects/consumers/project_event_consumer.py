@@ -74,15 +74,16 @@ class ProjectEventConsumer(EDAConsumer):
                     print(f"[ProjectEventConsumer] - Project {project_uuid} not found for deletion")
 
             elif action == "updated":
-                project = update_project_config(
+                org = update_project_config(
                     project_uuid=project_uuid,
-                    description=body.get("description"),
                     user_email=user_email,
+                    name=body.get("name"),
+                    description=body.get("description"),
                     language=body.get("language"),
                 )
 
-                if project:
-                    print(f"[ProjectEventConsumer] - Successfully updated project ({project_uuid})")
+                if org:
+                    print(f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid})")
                 else:
                     print(f"[ProjectEventConsumer] - Project {project_uuid} not found for update")
 
