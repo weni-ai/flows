@@ -103,14 +103,7 @@ class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
     serializer_class = BroadcastWithStatisticsSerializer
 
     def get(self, request, *args, **kwargs):
-        project_uuid = request.query_params.get("project_uuid")
-        if not project_uuid:
-            return Response({"error": "Project UUID not provided"}, status=400)
-
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except Org.DoesNotExist:
-            return Response({"error": "Project not found"}, status=404)
+        org = request.org
         qs = Broadcast.objects.filter(org=org, is_bulk_send=True)
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
@@ -138,14 +131,7 @@ class InternalBroadcastStatisticMontlyEndpoint(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def get(self, request, *args, **kwargs):
-        project_uuid = request.query_params.get("project_uuid")
-        if not project_uuid:
-            return Response({"error": "Project UUID not provided"}, status=400)
-
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except Org.DoesNotExist:
-            return Response({"error": "Project not found"}, status=404)
+        org = request.org
 
         result = {}
         result["last_30_days_stats"] = BroadcastStatistics.last_30_days_stats(org)
@@ -159,14 +145,7 @@ class InternalBroadcastGroupsStatsEndpoint(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def get(self, request, *args, **kwargs):
-        project_uuid = request.query_params.get("project_uuid") or request.query_params.get("project")
-        if not project_uuid:
-            return Response({"error": "Project UUID not provided"}, status=400)
-
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except Org.DoesNotExist:
-            return Response({"error": "Project not found"}, status=404)
+        org = request.org
 
         # Accept both repeated query params (?groups=...&groups=...) and comma-separated values
         group_ids = request.query_params.getlist("group_ids") or []
