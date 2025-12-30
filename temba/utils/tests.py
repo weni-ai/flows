@@ -352,8 +352,9 @@ class TemplateTagTest(TembaTest):
 
             # given the time as now, should display "Hour:Minutes AM|PM" eg. "5:05 pm"
             now = timezone.now()
-            modified_now = now.replace(hour=17, minute=5)
+            modified_now = now.replace(hour=17, minute=5, second=30)
             self.assertEqual("7:05 pm", short_datetime(context, modified_now))
+            self.assertEqual("7:05:30 pm", short_datetime(context, modified_now, seconds=True))
 
             # given the time beyond 12 hours ago within the same month, should display "MonthName DayOfMonth" eg. "Jan 2"
             test_date = now.replace(day=2)
