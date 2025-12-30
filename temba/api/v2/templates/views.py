@@ -29,13 +29,18 @@ class TemplatesTranslationsEndpoint(APIViewMixin, APIView):
 
     authentication_classes = [InternalOIDCAuthentication]
     permission_classes = [IsAuthenticated, IsUserInOrg]
-    project_uuid_required_status = 401
-    project_uuid_required_detail = "Project not provided"
 
     # Using limit/offset pagination with shared defaults
 
     def get(self, request, *args, **kwargs):
-        org = request.org
+        org = self.get_org_from_request(
+            request,
+            require_project_uuid=True,
+            missing_status=401,
+            missing_error="Project not provided",
+        )
+        if isinstance(org, Response):
+            return org
 
         queryset = (
             TemplateTranslation.objects.filter(is_active=True, template__org=org, template__is_active=True)
@@ -101,11 +106,16 @@ class TemplateByIdEndpoint(APIViewMixin, APIView):
 
     authentication_classes = [InternalOIDCAuthentication]
     permission_classes = [IsAuthenticated, IsUserInOrg]
-    project_uuid_required_status = 401
-    project_uuid_required_detail = "Project not provided"
 
     def get(self, request, *args, **kwargs):
-        org = request.org
+        org = self.get_org_from_request(
+            request,
+            require_project_uuid=True,
+            missing_status=401,
+            missing_error="Project not provided",
+        )
+        if isinstance(org, Response):
+            return org
 
         template_id = kwargs.get("template_id")
         try:

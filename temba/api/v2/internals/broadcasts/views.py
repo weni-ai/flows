@@ -103,7 +103,14 @@ class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
     serializer_class = BroadcastWithStatisticsSerializer
 
     def get(self, request, *args, **kwargs):
-        org = request.org
+        org = self.get_org_from_request(
+            request,
+            missing_status=400,
+            missing_error="Project UUID not provided",
+            not_found_error="Project not found",
+        )
+        if isinstance(org, Response):
+            return org
         qs = Broadcast.objects.filter(org=org, is_bulk_send=True)
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
@@ -131,7 +138,14 @@ class InternalBroadcastStatisticMontlyEndpoint(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def get(self, request, *args, **kwargs):
-        org = request.org
+        org = self.get_org_from_request(
+            request,
+            missing_status=400,
+            missing_error="Project UUID not provided",
+            not_found_error="Project not found",
+        )
+        if isinstance(org, Response):
+            return org
 
         result = {}
         result["last_30_days_stats"] = BroadcastStatistics.last_30_days_stats(org)
@@ -145,7 +159,15 @@ class InternalBroadcastGroupsStatsEndpoint(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def get(self, request, *args, **kwargs):
-        org = request.org
+        org = self.get_org_from_request(
+            request,
+            query_keys=("project_uuid", "project"),
+            missing_status=400,
+            missing_error="Project UUID not provided",
+            not_found_error="Project not found",
+        )
+        if isinstance(org, Response):
+            return org
 
         # Accept both repeated query params (?groups=...&groups=...) and comma-separated values
         group_ids = request.query_params.getlist("group_ids") or []

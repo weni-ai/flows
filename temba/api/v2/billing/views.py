@@ -21,6 +21,14 @@ class BillingPricingEndpoint(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def get(self, request, *args, **kwargs):
+        org = self.get_org_from_request(
+            request,
+            missing_status=400,
+            missing_error="project_uuid is required",
+            not_found_error="Project not found",
+        )
+        if isinstance(org, Response):
+            return org
         project_uuid = request.project_uuid
 
         try:

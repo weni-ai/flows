@@ -114,7 +114,14 @@ class InternalFlowsAPIView(APIViewMixin, APIView):
         page_size_query_param = "limit"
 
     def get(self, request: Request):
-        org = request.org
+        org = self.get_org_from_request(
+            request,
+            missing_status=400,
+            missing_error="project_uuid is required",
+            not_found_error="Project not found",
+        )
+        if isinstance(org, Response):
+            return org
 
         queryset = Flow.objects.filter(org=org, is_active=True)
 

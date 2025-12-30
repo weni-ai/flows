@@ -1,4 +1,3 @@
-from rest_framework.exceptions import NotAuthenticated, NotFound, ParseError, PermissionDenied
 from rest_framework.permissions import BasePermission
 
 from django.contrib.auth import get_user_model
@@ -16,9 +15,10 @@ class IsUserInOrg(BasePermission):
       - request.project_uuid (str)
       - request.org (Org)
 
-    Note: some endpoints historically return 401 when project is missing; those can set:
-      - project_uuid_required_status = 401
-      - project_uuid_required_detail = "Project not provided"
+    IMPORTANT:
+    - This permission intentionally does NOT raise DRF exceptions for missing/invalid project_uuid.
+      Many endpoints have legacy `{error: ...}` payloads and some tests patch out permissions.
+      Views should resolve org (or error) themselves when needed.
     """
 
     PROJECT_UUID_QUERY_KEYS = ("project_uuid", "project")
@@ -43,13 +43,6 @@ class IsUserInOrg(BasePermission):
                 return v
 
         return None
-
-    def _raise_project_uuid_missing(self, view):
-        status = getattr(view, "project_uuid_required_status", 400)
-        detail = getattr(view, "project_uuid_required_detail", "project_uuid is required")
-        if status == 401:
-            raise NotAuthenticated(detail=detail)
-        raise ParseError(detail=detail)
 
     def _get_user_for_membership_check(self, request):
         """
@@ -76,19 +69,21 @@ class IsUserInOrg(BasePermission):
     def has_permission(self, request, view):
         project_uuid = self._get_project_uuid(request, view)
         if not project_uuid:
-            self._raise_project_uuid_missing(view)
+            # Let the view return its own legacy error response (400/401 etc)
+            return True
 
         try:
             org = Org.objects.get(proj_uuid=project_uuid)
         except (Org.DoesNotExist, django_exceptions.ValidationError, ValueError):
-            raise NotFound(detail="Project not found")
+            # Let the view return 404 with `{error: ...}` consistently
+            return True
 
         user = self._get_user_for_membership_check(request)
         if not user:
-            raise PermissionDenied(detail="User not found")
+            return False
 
         if not org.has_user(user):
-            raise PermissionDenied(detail="User does not belong to this project")
+            return False
 
         # attach for downstream view reuse
         setattr(request, "org", org)
