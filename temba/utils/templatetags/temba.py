@@ -209,7 +209,7 @@ def to_json(value):
 
 
 @register.simple_tag(takes_context=True)
-def short_datetime(context, dtime):
+def short_datetime(context, dtime, seconds: bool = False):
     if dtime.tzinfo is None:
         dtime = dtime.replace(tzinfo=pytz.utc)
 
@@ -227,14 +227,14 @@ def short_datetime(context, dtime):
 
     if org_format == "D":
         if dtime > twelve_hours_ago:
-            return f"{dtime.strftime('%H')}:{dtime.strftime('%M')}"
+            return dtime.strftime("%H:%M:%S" if seconds else "%H:%M")
         elif now.year == dtime.year:
             return f"{int(_date(dtime, 'd'))} {_date(dtime, 'M')}"
         else:
             return f"{int(dtime.strftime('%d'))}/{int(dtime.strftime('%m'))}/{dtime.strftime('%y')}"
     elif org_format == "Y":
         if dtime > twelve_hours_ago:
-            return f"{dtime.strftime('%H')}:{dtime.strftime('%M')}"
+            return dtime.strftime("%H:%M:%S" if seconds else "%H:%M")
         elif now.year == dtime.year:
             return f"{_date(dtime, 'M')} {int(_date(dtime, 'd'))}"
         else:
@@ -242,7 +242,10 @@ def short_datetime(context, dtime):
 
     else:
         if dtime > twelve_hours_ago:
-            return f"{int(dtime.strftime('%I'))}:{dtime.strftime('%M')} {dtime.strftime('%p').lower()}"
+            hour = int(dtime.strftime("%I"))
+            if seconds:
+                return f"{hour}:{dtime.strftime('%M')}:{dtime.strftime('%S')} {dtime.strftime('%p').lower()}"
+            return f"{hour}:{dtime.strftime('%M')} {dtime.strftime('%p').lower()}"
         elif now.year == dtime.year:
             return f"{_date(dtime, 'M')} {int(_date(dtime, 'd'))}"
         else:

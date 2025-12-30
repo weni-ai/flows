@@ -325,8 +325,9 @@ class TemplateTagTest(TembaTest):
 
             # date without timezone
             test_date = datetime.datetime.now()
-            modified_now = test_date.replace(hour=17, minute=5)
+            modified_now = test_date.replace(hour=17, minute=5, second=30)
             self.assertEqual("19:05", short_datetime(context, modified_now))
+            self.assertEqual("19:05:30", short_datetime(context, modified_now, seconds=True))
 
             # given the time as now, should display as 24 hour time
             now = timezone.now()
