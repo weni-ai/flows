@@ -7,7 +7,6 @@ from weni.internal.authenticators import InternalOIDCAuthentication
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import IsUserInOrg
 from temba.msgs.cost_service import get_billing_pricing
-from temba.orgs.models import Org
 
 
 class BillingPricingEndpoint(APIViewMixin, APIView):
