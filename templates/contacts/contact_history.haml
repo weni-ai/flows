@@ -174,9 +174,9 @@
     %td.created_on
       .time.flex.items-end.justify-end
         %span.short
-          {% short_datetime event.created_on|parse_isodate %}
+          {% short_datetime event.created_on|parse_isodate seconds=True %}
         %span.long.hide
-          {% format_datetime event.created_on|parse_isodate %}
+          {% format_datetime event.created_on|parse_isodate seconds=True %}
 
     %td.text-center{style:"padding-left:0px"}
       -if event.logs_url
