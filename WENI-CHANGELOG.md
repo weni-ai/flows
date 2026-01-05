@@ -1,3 +1,7 @@
+3.47.3
+----------
+* Update @weni/flow-editor dependency to version 3.6.5
+
 3.47.2
 ----------
 * Add is_mutable in Flow Import API
