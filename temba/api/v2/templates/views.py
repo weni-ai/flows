@@ -8,7 +8,6 @@ from django.db.models import F
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import IsUserInOrg
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
-from temba.orgs.models import Org
 from temba.templates.models import Template, TemplateTranslation
 
 from .serializers import TemplateTranslationDetailsSerializer
@@ -34,14 +33,14 @@ class TemplatesTranslationsEndpoint(APIViewMixin, APIView):
     # Using limit/offset pagination with shared defaults
 
     def get(self, request, *args, **kwargs):
-        project_uuid = request.query_params.get("project_uuid")
-        if not project_uuid:
-            return Response({"error": "Project not provided"}, status=401)
-
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except Org.DoesNotExist:
-            return Response({"error": "Project not found"}, status=404)
+        org = self.get_org_from_request(
+            request,
+            require_project_uuid=True,
+            missing_status=401,
+            missing_error="Project not provided",
+        )
+        if isinstance(org, Response):
+            return org
 
         queryset = (
             TemplateTranslation.objects.filter(is_active=True, template__org=org, template__is_active=True)
@@ -109,14 +108,14 @@ class TemplateByIdEndpoint(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def get(self, request, *args, **kwargs):
-        project_uuid = request.query_params.get("project_uuid")
-        if not project_uuid:
-            return Response({"error": "Project not provided"}, status=401)
-
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except Org.DoesNotExist:
-            return Response({"error": "Project not found"}, status=404)
+        org = self.get_org_from_request(
+            request,
+            require_project_uuid=True,
+            missing_status=401,
+            missing_error="Project not provided",
+        )
+        if isinstance(org, Response):
+            return org
 
         template_id = kwargs.get("template_id")
         try:

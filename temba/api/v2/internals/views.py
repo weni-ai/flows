@@ -2,6 +2,11 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from rest_framework.renderers import JSONRenderer
+from rest_framework.response import Response
+
+from django.core import exceptions as django_exceptions
+
+from temba.orgs.models import Org
 
 
 class APIViewMixin:
@@ -10,6 +15,66 @@ class APIViewMixin:
     pagination_class = None
     renderer_classes = [JSONRenderer]
     throttle_classes = []
+
+    def get_org_from_request(
+        self,
+        request,
+        *,
+        query_keys=("project_uuid", "project"),
+        body_keys=("project_uuid", "project"),
+        require_project_uuid=False,
+        missing_status=400,
+        missing_error="Project not provided",
+        not_found_status=404,
+        not_found_error="Project not found",
+    ):
+        """
+        Returns Org for this request, attaching `request.org` and `request.project_uuid`.
+
+        If org can't be resolved, returns a DRF Response with the legacy `{error: ...}` payload.
+        This is intentionally view-level (not permission-level) because many unit tests (and some
+        internal callers) patch out DRF authentication/permissions.
+        """
+
+        # If an explicit project UUID is required, don't fall back to request.org (which may be
+        # set by legacy middleware / session context) because many endpoints and tests require the
+        # caller to provide project_uuid/project explicitly.
+        if not require_project_uuid:
+            org = getattr(request, "org", None)
+            if org is not None:
+                return org
+
+        project_uuid = getattr(request, "project_uuid", None)
+
+        query_params = getattr(request, "query_params", None) or {}
+        data = getattr(request, "data", None) or {}
+
+        # Prefer explicit project_uuid/project from params/body over any pre-attached org
+        if not project_uuid:
+            for k in query_keys:
+                v = query_params.get(k)
+                if v:
+                    project_uuid = v
+                    break
+
+        if not project_uuid:
+            for k in body_keys:
+                v = data.get(k)
+                if v:
+                    project_uuid = v
+                    break
+
+        if not project_uuid:
+            return Response({"error": missing_error}, status=missing_status)
+
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except (Org.DoesNotExist, django_exceptions.ValidationError, ValueError):
+            return Response({"error": not_found_error}, status=not_found_status)
+
+        setattr(request, "org", org)
+        setattr(request, "project_uuid", str(org.proj_uuid))
+        return org
 
 
 class JWTAuthMockMixin:
