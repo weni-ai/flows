@@ -5402,6 +5402,8 @@ class EventsEndpoint(BaseAPIView):
                 {"name": "event_name", "required": False, "help": "An event_name to filter by"},
                 {"name": "silver", "required": False, "help": "If true, also include data from silver"},
                 {"name": "table", "required": False, "help": "Required when silver=true; silver table name"},
+                {"name": "limit", "required": False, "help": "The number of events to return, default is 100"},
+                {"name": "offset", "required": False, "help": "The offset to return, default is 0"},
             ],
         }
 

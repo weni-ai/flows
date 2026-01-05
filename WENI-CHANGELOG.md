@@ -1,3 +1,26 @@
+3.47.3
+----------
+* Update @weni/flow-editor dependency to version 3.6.5
+
+3.47.2
+----------
+* Add is_mutable in Flow Import API
+
+3.47.1
+----------
+* Fix read status trigger
+* Update events.json API doc
+
+3.47.0
+----------
+* Changing log error to see if the getbyhostname will still fail on tests
+* Feature/adding jwt auth to 3 endpoints 
+
+3.46.1
+----------
+* Adjust Broadcast Statistics trigger count
+* Add v2 option in refresh teams token
+
 3.46.0
 ----------
 * Implementing optional jwt auth on 2 endpoints
