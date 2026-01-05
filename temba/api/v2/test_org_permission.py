@@ -16,12 +16,14 @@ class IsUserInOrgPermissionTests(TembaTest):
 
     def test_denies_when_project_param_missing(self):
         request = SimpleNamespace(query_params={}, data={}, user=self.user)
-        self.assertFalse(self.permission.has_permission(request, view=object()))
+        # missing project is handled by the view layer; permission doesn't decide status code
+        self.assertTrue(self.permission.has_permission(request, view=object()))
 
     def test_denies_when_org_not_found(self):
         random_proj = uuid.uuid4()
         request = SimpleNamespace(query_params={"project": str(random_proj)}, data={}, user=self.user)
-        self.assertFalse(self.permission.has_permission(request, view=object()))
+        # org not found is handled by the view layer; permission doesn't decide status code
+        self.assertTrue(self.permission.has_permission(request, view=object()))
 
     def test_denies_when_user_not_in_org(self):
         request = SimpleNamespace(
@@ -32,10 +34,14 @@ class IsUserInOrgPermissionTests(TembaTest):
     def test_allows_when_user_in_org_with_query_param_project(self):
         request = SimpleNamespace(query_params={"project": str(self.org.proj_uuid)}, data={}, user=self.user)
         self.assertTrue(self.permission.has_permission(request, view=object()))
+        self.assertEqual(request.project_uuid, str(self.org.proj_uuid))
+        self.assertEqual(request.org.id, self.org.id)
 
     def test_allows_when_user_in_org_with_body_project_uuid(self):
         request = SimpleNamespace(query_params={}, data={"project_uuid": str(self.org.proj_uuid)}, user=self.user)
         self.assertTrue(self.permission.has_permission(request, view=object()))
+        self.assertEqual(request.project_uuid, str(self.org.proj_uuid))
+        self.assertEqual(request.org.id, self.org.id)
 
     def test_denies_when_user_email_not_found(self):
         # simulate a request with an email that doesn't exist in the auth user table

@@ -16,16 +16,9 @@ class GetProjectView(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def get(self, request: Request):
-        params = request.query_params
-        project_uuid = params.get("project_uuid")
-
-        if project_uuid is None:
-            return Response(status=400, data={"error": "project_uuid is required"})
-
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except Org.DoesNotExist:
-            return Response(status=404, data={"error": "Project not found"})
+        org = self.get_org_from_request(request, missing_status=400, missing_error="project_uuid is required")
+        if isinstance(org, Response):
+            return org
 
         project_data = {
             "project_uuid": str(org.proj_uuid),
