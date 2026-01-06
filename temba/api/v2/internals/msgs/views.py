@@ -156,11 +156,13 @@ class MsgStreamView(APIViewMixin, APIView, JWTAuthMixinRequired):
         except Org.DoesNotExist:
             return Response({"error": "Project not found"}, status=404)
 
-        # Prefer a real user for response context if available
-        user, _ = User.objects.get_or_create(email=getattr(request.user, "email", None) or "internal@weni.ai")
-
         # pick content field
-        text = data.get("text") or data.get("message") or ""
+        msg_data = data.get("msg") or {}
+        text = data.get("text") or data.get("message") or msg_data.get("text") or ""
+        attachments = data.get("attachments") or msg_data.get("attachments")
+
+        # template can be a string (legacy) or a dict (whatsapp)
+        template = data.get("template") or msg_data.get("template")
 
         try:
             msg = create_message_db_only(
@@ -173,10 +175,11 @@ class MsgStreamView(APIViewMixin, APIView, JWTAuthMixinRequired):
                 status=data.get("status"),
                 created_on=data.get("created_on"),
                 sent_on=data.get("sent_on"),
-                attachments=data.get("attachments"),
+                attachments=attachments,
                 visibility=data.get("visibility"),
                 labels=data.get("labels"),
-                template=data.get("template"),
+                template=template,
+                metadata=msg_data,
             )
         except ValueError as e:
             return Response({"error": str(e)}, status=400)

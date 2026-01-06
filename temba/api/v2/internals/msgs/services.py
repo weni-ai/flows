@@ -28,7 +28,8 @@ def create_message_db_only(
     attachments: Optional[Sequence[str]] = None,
     visibility: Optional[str] = None,
     labels: Optional[Iterable[str]] = None,
-    template: Optional[str] = None,
+    template: Optional[str | dict] = None,
+    metadata: Optional[dict] = None,
 ) -> Msg:
     """
     Creates a message record only, without invoking mailroom/courier.
@@ -37,6 +38,7 @@ def create_message_db_only(
     now = timezone.now()
     attachments = list(attachments or [])
     visibility = visibility or Msg.VISIBILITY_VISIBLE
+    metadata = metadata or {}
 
     # normalize direction
     direction = (direction or "").strip().upper()
@@ -108,6 +110,10 @@ def create_message_db_only(
     ):
         sent_on = now
 
+    template_name = template
+    if isinstance(template, dict):
+        template_name = template.get("name")
+
     msg = Msg.objects.create(
         org=org,
         contact=contact,
@@ -121,6 +127,8 @@ def create_message_db_only(
         visibility=visibility,
         created_on=created_on or now,
         sent_on=sent_on,
+        metadata=metadata,
+        template=template_name,
     )
 
     # attach labels if provided
@@ -134,7 +142,7 @@ def create_message_db_only(
     return msg
 
 
-def _publish_billing_msg_create(*, msg: Msg, template: Optional[str] = None) -> None:
+def _publish_billing_msg_create(*, msg: Msg, template: Optional[str | dict] = None) -> None:
     """
     Publishes a message creation event to the billing queue.
     Non-blocking: failures are logged and ignored.
