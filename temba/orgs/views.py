@@ -2526,6 +2526,7 @@ class OrgCRUDL(SmartCRUDL):
             OrgRole.VIEWER: "msgs.msg_inbox",
             OrgRole.AGENT: "tickets.ticket_list",
             OrgRole.SURVEYOR: "orgs.org_surveyor",
+            OrgRole.MARKETING: "msgs.msg_inbox",
         }
 
         def get_user_orgs(self):
