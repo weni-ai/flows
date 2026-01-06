@@ -1974,6 +1974,7 @@ class UserReadSerializer(ReadSerializer):
         OrgRole.VIEWER: "viewer",
         OrgRole.AGENT: "agent",
         OrgRole.SURVEYOR: "surveyor",
+        OrgRole.MARKETING: "marketing",
     }
 
     role = serializers.SerializerMethodField()
