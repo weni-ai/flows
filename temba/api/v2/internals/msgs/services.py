@@ -39,13 +39,13 @@ def create_message_db_only(
     visibility = visibility or Msg.VISIBILITY_VISIBLE
 
     # normalize direction
-    direction = direction.upper()
-    if direction not in ("I", "O"):
-        raise ValueError("direction must be one of: I, O, in, out")
-    if direction == "IN":
+    direction = (direction or "").strip().upper()
+    if direction in ("IN", "I"):
         direction = "I"
-    if direction == "OUT":
+    elif direction in ("OUT", "O"):
         direction = "O"
+    else:
+        raise ValueError("direction must be one of: I, O, in, out")
 
     # resolve contact and contact_urn
     contact: Optional[Contact] = None

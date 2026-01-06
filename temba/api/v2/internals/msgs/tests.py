@@ -445,7 +445,7 @@ class TestInternalMessages(TembaTest):
     @patch("temba.event_driven.publisher.rabbitmq_publisher.RabbitmqPublisher.send_message")
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
-    def test_stream_publishes_billing_outgoing(self, *_mocks, mock_publish):
+    def test_stream_publishes_billing_outgoing(self, mock_publish, *_mocks):
         contact = self.create_contact("Ivan", urns=["tel:+250788001234"])
         payload = {
             "project_uuid": str(self.org.proj_uuid),
@@ -469,7 +469,7 @@ class TestInternalMessages(TembaTest):
     @patch("temba.event_driven.publisher.rabbitmq_publisher.RabbitmqPublisher.send_message")
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
-    def test_stream_publishes_billing_incoming(self, *_mocks, mock_publish):
+    def test_stream_publishes_billing_incoming(self, mock_publish, *_mocks):
         self.create_contact("Judy", urns=["telegram:844380532"])
         payload = {
             "project_uuid": str(self.org.proj_uuid),
