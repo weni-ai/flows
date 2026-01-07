@@ -1,3 +1,12 @@
+3.47.4
+----------
+* Feat/adding seconds on history logs
+* Feat/refactor is org
+
+3.47.3
+----------
+* Update @weni/flow-editor dependency to version 3.6.5
+
 3.47.2
 ----------
 * Add is_mutable in Flow Import API
