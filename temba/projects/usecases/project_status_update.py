@@ -13,23 +13,27 @@ logger = logging.getLogger(__name__)
 
 def get_or_create_user_by_email(email: str) -> tuple:  # pragma: no cover
     """Get or create a user by email."""
-    return User.objects.get_or_create(email=email, username=email)
+    # We lookup by email only because the existing user might have a different username.
+    user = User.objects.filter(email=email).first()
+    if user:
+        return user, False
+    return User.objects.get_or_create(email=email, defaults={"username": email})
 
 
 def update_project_status(project_uuid: str, status: str, user_email: str) -> Optional[Org]:
     """
     Update project (Org) active status based on the received status.
-    
+
     Status mapping:
     - ACTIVE: Sets is_active to True
     - IN_TEST: Sets is_active to True
     - INACTIVE: Sets is_active to False (soft delete)
-    
+
     Args:
         project_uuid: UUID of the project (stored in Org.proj_uuid)
         status: Status to set ('ACTIVE', 'IN_TEST', or 'INACTIVE')
         user_email: Email of the user performing the update
-    
+
     Returns:
         The updated Org object, or None if not found
     """
@@ -59,7 +63,7 @@ def update_project_status(project_uuid: str, status: str, user_email: str) -> Op
         org.modified_by = user
         org.modified_on = timezone.now()
         org.save(update_fields=["is_active", "modified_by", "modified_on"])
-        
+
         logger.info(
             f"Project '{org.name}' ({project_uuid}) status updated to {status} "
             f"(is_active={new_is_active}) by {user_email}"

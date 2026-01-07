@@ -7,7 +7,11 @@ User = get_user_model()
 
 
 def get_or_create_user_by_email(email: str) -> tuple:  # pragma: no cover
-    return User.objects.get_or_create(email=email, username=email)
+    # We lookup by email only because the existing user might have a different username.
+    user = User.objects.filter(email=email).first()
+    if user:
+        return user, False
+    return User.objects.get_or_create(email=email, defaults={"username": email})
 
 
 def update_project_config(
@@ -19,14 +23,14 @@ def update_project_config(
 ) -> Org:
     """
     Update project (Org) configuration.
-    
+
     Args:
         project_uuid: UUID of the project (stored in Org.proj_uuid)
         user_email: Email of the user performing the update
         name: New name for the project
         description: New description for the project
         language: New language for the project
-    
+
     Returns:
         The updated Org object
     """

@@ -52,7 +52,7 @@ class ProjectEventConsumer(EDAConsumer):
         action = body.get("action")
         if action not in ["deleted", "updated", "status_updated"]:
             raise ValueError(f"Invalid action: {action}. Must be 'deleted', 'updated', or 'status_updated'")
-        
+
         # Validate status field for status_updated action
         if action == "status_updated":
             status = body.get("status")
@@ -119,4 +119,3 @@ class ProjectEventConsumer(EDAConsumer):
         except Exception as e:
             print(f"[ProjectEventConsumer] - Error processing {action} for project {project_uuid}: {e}")
             raise
-

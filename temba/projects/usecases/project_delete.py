@@ -12,7 +12,11 @@ logger = logging.getLogger(__name__)
 
 def get_or_create_user_by_email(email: str) -> tuple:
     """Get or create a user by email."""
-    return User.objects.get_or_create(email=email, username=email)
+    # We lookup by email only because the existing user might have a different username.
+    user = User.objects.filter(email=email).first()
+    if user:
+        return user, False
+    return User.objects.get_or_create(email=email, defaults={"username": email})
 
 
 def delete_project(project_uuid: str, user_email: str) -> Optional[Org]:
@@ -45,4 +49,3 @@ def delete_project(project_uuid: str, user_email: str) -> Optional[Org]:
     logger.info(f"Project '{org.name}' ({project_uuid}) released by {user_email}")
 
     return org
-
