@@ -48,3 +48,15 @@ class IsUserInOrgPermissionTests(TembaTest):
         ghost_user = SimpleNamespace(email="ghost.user.notfound@example.com")
         request = SimpleNamespace(query_params={"project": str(self.org.proj_uuid)}, data={}, user=ghost_user)
         self.assertFalse(self.permission.has_permission(request, view=object()))
+
+    def test_get_project_uuid_uses_existing_request_project_uuid(self):
+        request = SimpleNamespace(project_uuid=str(self.org.proj_uuid), query_params={}, data={})
+        self.assertEqual(self.permission._get_project_uuid(request, view=object()), str(self.org.proj_uuid))
+
+    def test_get_project_uuid_returns_none_when_missing_everywhere(self):
+        request = SimpleNamespace(query_params={}, data={})
+        self.assertIsNone(self.permission._get_project_uuid(request, view=object()))
+
+    def test_get_user_for_membership_check_returns_none_when_request_user_missing(self):
+        request = SimpleNamespace(user=None)
+        self.assertIsNone(self.permission._get_user_for_membership_check(request))

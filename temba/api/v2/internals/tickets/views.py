@@ -64,7 +64,10 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
         protocol = serializer.validated_data.get("protocol")
         assignee_id = self.get_assignee_id(request)
 
-        extra_data = {"history_after": str(serializer.validated_data["conversation_started_on"])}
+        extra_data = {}
+        conversation_started_on = serializer.validated_data.get("conversation_started_on")
+        if conversation_started_on:
+            extra_data["history_after"] = str(conversation_started_on)
         if protocol:
             extra_data["protocol"] = protocol
         extra = str(extra_data).replace("'", '"')

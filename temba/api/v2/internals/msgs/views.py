@@ -7,14 +7,17 @@ from weni.internal.permissions import CanCommunicateInternally
 from django.contrib.auth.models import User
 from django.db.models import Prefetch
 
+from temba.api.auth.jwt import JWTAuthMixinRequired
 from temba.api.support import InvalidQueryError
-from temba.api.v2.internals.msgs.serializers import InternalMsgReadSerializer
+from temba.api.v2.internals.msgs.serializers import InternalMsgReadSerializer, MsgStreamSerializer
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.views_base import CreatedOnCursorPagination
 from temba.channels.models import Channel
 from temba.contacts.models import URN, Contact, ContactURN
 from temba.msgs.models import Label, Msg, SystemLabel
 from temba.orgs.models import Org
+
+from .services import create_message_db_only
 
 
 class InternalMessagesView(APIViewMixin, APIView):
@@ -139,3 +142,46 @@ class InternalMessagesView(APIViewMixin, APIView):
         serializer = InternalMsgReadSerializer(page, many=True, context={"org": org, "user": user})
 
         return pagination.get_paginated_response(serializer.data)
+
+
+class MsgStreamView(APIViewMixin, APIView, JWTAuthMixinRequired):
+    def post(self, request, *args, **kwargs):
+        serializer = MsgStreamSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+        project_uuid = data["project_uuid"]
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except Org.DoesNotExist:
+            return Response({"error": "Project not found"}, status=404)
+
+        # pick content field
+        msg_data = data.get("msg") or {}
+        text = data.get("text") or data.get("message") or msg_data.get("text") or ""
+        attachments = data.get("attachments") or msg_data.get("attachments")
+
+        # template can be a string (legacy) or a dict (whatsapp)
+        template = data.get("template") or msg_data.get("template")
+
+        try:
+            msg = create_message_db_only(
+                org=org,
+                direction=data["direction"],
+                text=text,
+                contact_uuid=str(data.get("contact_uuid")) if data.get("contact_uuid") else None,
+                urn=data.get("urn"),
+                channel_uuid=str(data.get("channel_uuid")) if data.get("channel_uuid") else None,
+                status=data.get("status"),
+                created_on=data.get("created_on"),
+                sent_on=data.get("sent_on"),
+                attachments=attachments,
+                visibility=data.get("visibility"),
+                labels=data.get("labels"),
+                template=template,
+                metadata=msg_data,
+            )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=400)
+
+        return Response({"id": msg.id}, status=201)
