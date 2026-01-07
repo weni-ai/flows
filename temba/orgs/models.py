@@ -153,6 +153,7 @@ class OrgRole(Enum):
     VIEWER = ("V", _("Viewer"), _("Viewers"), "Viewers", "viewers", "org_viewers")
     AGENT = ("T", _("Agent"), _("Agents"), "Agents", "agents", "org_agents")
     SURVEYOR = ("S", _("Surveyor"), _("Surveyors"), "Surveyors", "surveyors", "org_surveyors")
+    MARKETING = ("M", _("Marketing"), _("Marketing"), "Marketing", "marketing", "org_marketing")
 
     def __init__(self, code: str, display: str, display_plural: str, group_name: str, m2m_name: str, rel_name: str):
         self.code = code
@@ -300,6 +301,7 @@ class Org(SmartModel):
     viewers = models.ManyToManyField(User, related_name=OrgRole.VIEWER.rel_name)
     agents = models.ManyToManyField(User, related_name=OrgRole.AGENT.rel_name)
     surveyors = models.ManyToManyField(User, related_name=OrgRole.SURVEYOR.rel_name)
+    marketing = models.ManyToManyField(User, related_name=OrgRole.MARKETING.rel_name)
 
     language = models.CharField(
         verbose_name=_("Default Language"),

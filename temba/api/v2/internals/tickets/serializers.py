@@ -24,7 +24,7 @@ class OpenTicketSerializer(serializers.Serializer):
     contact = serializers.UUIDField(required=False, allow_null=True)
     contact_urn = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     assignee = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
-    conversation_started_on = serializers.DateTimeField()
+    conversation_started_on = serializers.DateTimeField(required=False)
     protocol = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=64)
 
     def validate(self, data):
