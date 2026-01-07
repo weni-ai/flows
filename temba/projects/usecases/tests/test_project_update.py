@@ -19,6 +19,7 @@ class TestUpdateProjectConfig(TembaTest):
             name="Test Org",
             timezone=pytz.timezone("Africa/Kigali"),
             brand=settings.DEFAULT_BRAND,
+            proj_uuid=uuid.uuid4(),
             created_by=self.user,
             modified_by=self.user,
             config={"description": "Old description"},
@@ -107,8 +108,8 @@ class TestUpdateProjectConfig(TembaTest):
     def test_update_with_new_user_email(self):
         """Test updating with a new user email (creates user if not exists)"""
         new_user_email = "newuser@example.com"
-        
-        updated_org = update_project_config(
+
+        update_project_config(
             project_uuid=self.project_uuid,
             user_email=new_user_email,
             description="Updated by new user",
@@ -125,8 +126,8 @@ class TestUpdateProjectConfig(TembaTest):
         """Test that passing None values doesn't change existing fields"""
         original_name = self.test_org.name
         original_language = self.test_org.language
-        
-        updated_org = update_project_config(
+
+        update_project_config(
             project_uuid=self.project_uuid,
             user_email=self.user.email,
             name=None,
@@ -146,6 +147,7 @@ class TestUpdateProjectConfig(TembaTest):
             name="Org Without Config",
             timezone=pytz.timezone("Africa/Kigali"),
             brand=settings.DEFAULT_BRAND,
+            proj_uuid=uuid.uuid4(),
             created_by=self.user,
             modified_by=self.user,
             config=None,
@@ -153,7 +155,7 @@ class TestUpdateProjectConfig(TembaTest):
         )
         org_uuid = str(org_without_config.proj_uuid)
 
-        updated_org = update_project_config(
+        update_project_config(
             project_uuid=org_uuid,
             user_email=self.user.email,
             description="New description for empty config",
@@ -178,7 +180,7 @@ class TestUpdateProjectConfig(TembaTest):
     def test_update_nonexistent_project_raises_error(self):
         """Test that updating a non-existent project raises an error"""
         fake_uuid = str(uuid.uuid4())
-        
+
         with self.assertRaises(Org.DoesNotExist):
             update_project_config(
                 project_uuid=fake_uuid,

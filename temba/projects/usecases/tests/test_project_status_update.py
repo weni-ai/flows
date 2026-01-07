@@ -19,6 +19,7 @@ class TestUpdateProjectStatus(TembaTest):
             name="Test Org",
             timezone=pytz.timezone("Africa/Kigali"),
             brand=settings.DEFAULT_BRAND,
+            proj_uuid=uuid.uuid4(),
             created_by=self.user,
             modified_by=self.user,
             config={"description": "Test description"},
@@ -177,7 +178,7 @@ class TestUpdateProjectStatus(TembaTest):
         # Test ACTIVE -> True
         self.test_org.is_active = False
         self.test_org.save()
-        
+
         update_project_status(self.project_uuid, "ACTIVE", self.user.email)
         self.test_org.refresh_from_db()
         self.assertTrue(self.test_org.is_active)
@@ -185,7 +186,7 @@ class TestUpdateProjectStatus(TembaTest):
         # Test IN_TEST -> True
         self.test_org.is_active = False
         self.test_org.save()
-        
+
         update_project_status(self.project_uuid, "IN_TEST", self.user.email)
         self.test_org.refresh_from_db()
         self.assertTrue(self.test_org.is_active)
@@ -193,7 +194,7 @@ class TestUpdateProjectStatus(TembaTest):
         # Test INACTIVE -> False
         self.test_org.is_active = True
         self.test_org.save()
-        
+
         update_project_status(self.project_uuid, "INACTIVE", self.user.email)
         self.test_org.refresh_from_db()
         self.assertFalse(self.test_org.is_active)

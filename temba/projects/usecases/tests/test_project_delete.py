@@ -19,6 +19,7 @@ class TestDeleteProject(TembaTest):
             name="Test Org",
             timezone=pytz.timezone("Africa/Kigali"),
             brand=settings.DEFAULT_BRAND,
+            proj_uuid=uuid.uuid4(),
             created_by=self.user,
             modified_by=self.user,
             config={"description": "Test description"},
@@ -98,7 +99,7 @@ class TestDeleteProject(TembaTest):
         # Add some users to the org
         viewer = self.create_user("viewer@example.com")
         editor = self.create_user("editor@example.com")
-        
+
         self.test_org.viewers.add(viewer)
         self.test_org.editors.add(editor)
 
@@ -112,7 +113,7 @@ class TestDeleteProject(TembaTest):
         )
 
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
-        
+
         # Verify users were removed
         self.assertEqual(reloaded_org.viewers.count(), 0)
         self.assertEqual(reloaded_org.editors.count(), 0)

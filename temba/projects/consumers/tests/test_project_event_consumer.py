@@ -1,6 +1,6 @@
 import json
 import uuid
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytz
 
@@ -19,6 +19,7 @@ class TestProjectEventConsumer(TembaTest):
             name="Test Org",
             timezone=pytz.timezone("Africa/Kigali"),
             brand=settings.DEFAULT_BRAND,
+            proj_uuid=uuid.uuid4(),
             created_by=self.user,
             modified_by=self.user,
             config={"description": "Test description"},
@@ -30,7 +31,8 @@ class TestProjectEventConsumer(TembaTest):
     def _create_mock_message(self, body_dict):
         """Helper to create a mock AMQP message"""
         message = Mock()
-        message.body = json.dumps(body_dict)
+        # ensure we can serialize UUIDs etc in test payloads
+        message.body = json.dumps(body_dict, default=str)
         message.channel = Mock()
         message.delivery_tag = "test-delivery-tag"
         return message
@@ -154,14 +156,14 @@ class TestProjectEventConsumer(TembaTest):
             # Verify message was rejected
             message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
             message.channel.basic_ack.assert_not_called()
-            
+
             # Verify exception was captured
             mock_capture.assert_called_once()
 
     def test_consume_missing_action_rejects_message(self):
         """Test that missing action causes message rejection"""
         body = {
-            "project_uuid": self.project.project_uuid,
+            "project_uuid": self.project_uuid,
             "user_email": self.user.email,
         }
         message = self._create_mock_message(body)
@@ -176,7 +178,7 @@ class TestProjectEventConsumer(TembaTest):
     def test_consume_missing_user_email_rejects_message(self):
         """Test that missing user_email causes message rejection"""
         body = {
-            "project_uuid": self.project.project_uuid,
+            "project_uuid": self.project_uuid,
             "action": "updated",
         }
         message = self._create_mock_message(body)
@@ -191,7 +193,7 @@ class TestProjectEventConsumer(TembaTest):
     def test_consume_invalid_action_rejects_message(self):
         """Test that invalid action causes message rejection"""
         body = {
-            "project_uuid": self.project.project_uuid,
+            "project_uuid": self.project_uuid,
             "user_email": self.user.email,
             "action": "invalid_action",
         }
@@ -207,7 +209,7 @@ class TestProjectEventConsumer(TembaTest):
     def test_consume_status_updated_missing_status_rejects_message(self):
         """Test that status_updated action without status field rejects message"""
         body = {
-            "project_uuid": self.project.project_uuid,
+            "project_uuid": self.project_uuid,
             "user_email": self.user.email,
             "action": "status_updated",
             # Missing "status" field
@@ -224,7 +226,7 @@ class TestProjectEventConsumer(TembaTest):
     def test_consume_status_updated_invalid_status_rejects_message(self):
         """Test that status_updated action with invalid status rejects message"""
         body = {
-            "project_uuid": self.project.project_uuid,
+            "project_uuid": self.project_uuid,
             "user_email": self.user.email,
             "action": "status_updated",
             "status": "INVALID_STATUS",
@@ -336,7 +338,7 @@ class TestProjectEventConsumer(TembaTest):
                 "user_email": self.user.email,
                 "action": action,
             }
-            
+
             if action == "status_updated":
                 body["status"] = "ACTIVE"
 
@@ -376,7 +378,7 @@ class TestProjectEventConsumer(TembaTest):
 
         with patch("temba.projects.consumers.project_event_consumer.update_project_config") as mock_update:
             mock_update.side_effect = Exception("Database error")
-            
+
             with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
                 self.consumer.consume(message)
 
