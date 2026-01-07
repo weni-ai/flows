@@ -3,10 +3,10 @@ import uuid
 from unittest.mock import MagicMock, Mock, patch
 
 import pytz
-from weni.internal.models import Project
 
 from django.conf import settings
 
+from temba.orgs.models import Org
 from temba.projects.consumers.project_event_consumer import ProjectEventConsumer
 from temba.tests.base import TembaTest
 
@@ -15,9 +15,8 @@ class TestProjectEventConsumer(TembaTest):
     def setUp(self):
         super().setUp()
         self.consumer = ProjectEventConsumer()
-        self.project = Project.objects.create(
-            project_uuid=str(uuid.uuid4()),
-            name="Test Project",
+        self.test_org = Org.objects.create(
+            name="Test Org",
             timezone=pytz.timezone("Africa/Kigali"),
             brand=settings.DEFAULT_BRAND,
             created_by=self.user,
@@ -26,6 +25,7 @@ class TestProjectEventConsumer(TembaTest):
             language="en-us",
             is_active=True,
         )
+        self.project_uuid = str(self.test_org.proj_uuid)
 
     def _create_mock_message(self, body_dict):
         """Helper to create a mock AMQP message"""
@@ -38,10 +38,10 @@ class TestProjectEventConsumer(TembaTest):
     def test_consume_update_action_successfully(self):
         """Test consuming an update action message"""
         body = {
-            "project_uuid": self.project.project_uuid,
+            "project_uuid": self.project_uuid,
             "user_email": self.user.email,
             "action": "updated",
-            "name": "Updated Project Name",
+            "name": "Updated Org Name",
             "description": "Updated description",
             "language": "pt-br",
         }
@@ -53,21 +53,21 @@ class TestProjectEventConsumer(TembaTest):
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
         # Verify project was updated
-        reloaded_project = Project.objects.get(project_uuid=self.project.project_uuid)
-        self.assertEqual(reloaded_project.name, "Updated Project Name")
-        self.assertEqual(reloaded_project.config["description"], "Updated description")
-        self.assertEqual(reloaded_project.language, "pt-br")
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertEqual(reloaded_org.name, "Updated Org Name")
+        self.assertEqual(reloaded_org.config["description"], "Updated description")
+        self.assertEqual(reloaded_org.language, "pt-br")
 
     def test_consume_delete_action_successfully(self):
         """Test consuming a delete action message"""
         body = {
-            "project_uuid": self.project.project_uuid,
+            "project_uuid": self.project_uuid,
             "user_email": self.user.email,
             "action": "deleted",
         }
         message = self._create_mock_message(body)
 
-        self.assertTrue(self.project.is_active)
+        self.assertTrue(self.test_org.is_active)
 
         self.consumer.consume(message)
 
@@ -75,21 +75,21 @@ class TestProjectEventConsumer(TembaTest):
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
         # Verify project was deleted (soft delete)
-        reloaded_project = Project.objects.get(project_uuid=self.project.project_uuid)
-        self.assertFalse(reloaded_project.is_active)
-        self.assertIsNotNone(reloaded_project.released_on)
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertFalse(reloaded_org.is_active)
+        self.assertIsNotNone(reloaded_org.released_on)
 
     def test_consume_status_updated_action_successfully(self):
         """Test consuming a status_updated action message"""
         body = {
-            "project_uuid": self.project.project_uuid,
+            "project_uuid": self.project_uuid,
             "user_email": self.user.email,
             "action": "status_updated",
             "status": "INACTIVE",
         }
         message = self._create_mock_message(body)
 
-        self.assertTrue(self.project.is_active)
+        self.assertTrue(self.test_org.is_active)
 
         self.consumer.consume(message)
 
@@ -97,16 +97,16 @@ class TestProjectEventConsumer(TembaTest):
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
         # Verify project status was updated
-        reloaded_project = Project.objects.get(project_uuid=self.project.project_uuid)
-        self.assertFalse(reloaded_project.is_active)
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertFalse(reloaded_org.is_active)
 
     def test_consume_status_updated_to_active(self):
         """Test consuming a status_updated action to ACTIVE"""
-        self.project.is_active = False
-        self.project.save()
+        self.test_org.is_active = False
+        self.test_org.save()
 
         body = {
-            "project_uuid": self.project.project_uuid,
+            "project_uuid": self.project_uuid,
             "user_email": self.user.email,
             "action": "status_updated",
             "status": "ACTIVE",
@@ -117,16 +117,16 @@ class TestProjectEventConsumer(TembaTest):
 
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
-        reloaded_project = Project.objects.get(project_uuid=self.project.project_uuid)
-        self.assertTrue(reloaded_project.is_active)
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertTrue(reloaded_org.is_active)
 
     def test_consume_status_updated_to_in_test(self):
         """Test consuming a status_updated action to IN_TEST"""
-        self.project.is_active = False
-        self.project.save()
+        self.test_org.is_active = False
+        self.test_org.save()
 
         body = {
-            "project_uuid": self.project.project_uuid,
+            "project_uuid": self.project_uuid,
             "user_email": self.user.email,
             "action": "status_updated",
             "status": "IN_TEST",
@@ -137,8 +137,8 @@ class TestProjectEventConsumer(TembaTest):
 
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
-        reloaded_project = Project.objects.get(project_uuid=self.project.project_uuid)
-        self.assertTrue(reloaded_project.is_active)
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertTrue(reloaded_org.is_active)
 
     def test_consume_missing_project_uuid_rejects_message(self):
         """Test that missing project_uuid causes message rejection"""
@@ -292,7 +292,7 @@ class TestProjectEventConsumer(TembaTest):
     def test_consume_update_partial_fields(self):
         """Test updating only some fields"""
         body = {
-            "project_uuid": self.project.project_uuid,
+            "project_uuid": self.project_uuid,
             "user_email": self.user.email,
             "action": "updated",
             "name": "Only Name Updated",
@@ -300,17 +300,17 @@ class TestProjectEventConsumer(TembaTest):
         }
         message = self._create_mock_message(body)
 
-        original_description = self.project.config["description"]
-        original_language = self.project.language
+        original_description = self.test_org.config["description"]
+        original_language = self.test_org.language
 
         self.consumer.consume(message)
 
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
-        reloaded_project = Project.objects.get(project_uuid=self.project.project_uuid)
-        self.assertEqual(reloaded_project.name, "Only Name Updated")
-        self.assertEqual(reloaded_project.config["description"], original_description)
-        self.assertEqual(reloaded_project.language, original_language)
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertEqual(reloaded_org.name, "Only Name Updated")
+        self.assertEqual(reloaded_org.config["description"], original_description)
+        self.assertEqual(reloaded_org.language, original_language)
 
     def test_consume_invalid_json_rejects_message(self):
         """Test that invalid JSON in message body causes rejection"""
@@ -332,7 +332,7 @@ class TestProjectEventConsumer(TembaTest):
 
         for action in valid_actions:
             body = {
-                "project_uuid": self.project.project_uuid,
+                "project_uuid": self.project_uuid,
                 "user_email": self.user.email,
                 "action": action,
             }
@@ -352,7 +352,7 @@ class TestProjectEventConsumer(TembaTest):
 
         for status in valid_statuses:
             body = {
-                "project_uuid": self.project.project_uuid,
+                "project_uuid": self.project_uuid,
                 "user_email": self.user.email,
                 "action": "status_updated",
                 "status": status,
@@ -367,7 +367,7 @@ class TestProjectEventConsumer(TembaTest):
     def test_process_event_with_exception_in_usecase_rejects_message(self):
         """Test that exceptions in usecases are properly handled"""
         body = {
-            "project_uuid": self.project.project_uuid,
+            "project_uuid": self.project_uuid,
             "user_email": self.user.email,
             "action": "updated",
             "name": "New Name",

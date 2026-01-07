@@ -1,11 +1,11 @@
 import uuid
 
 import pytz
-from weni.internal.models import Project
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
+from temba.orgs.models import Org
 from temba.projects.usecases.project_status_update import update_project_status
 from temba.tests.base import TembaTest
 
@@ -15,9 +15,8 @@ User = get_user_model()
 class TestUpdateProjectStatus(TembaTest):
     def setUp(self):
         super().setUp()
-        self.project = Project.objects.create(
-            project_uuid=str(uuid.uuid4()),
-            name="Test Project",
+        self.test_org = Org.objects.create(
+            name="Test Org",
             timezone=pytz.timezone("Africa/Kigali"),
             brand=settings.DEFAULT_BRAND,
             created_by=self.user,
@@ -26,64 +25,65 @@ class TestUpdateProjectStatus(TembaTest):
             language="en-us",
             is_active=True,
         )
+        self.project_uuid = str(self.test_org.proj_uuid)
 
     def test_update_status_to_active(self):
         """Test updating project status to ACTIVE"""
-        self.project.is_active = False
-        self.project.save()
+        self.test_org.is_active = False
+        self.test_org.save()
 
-        updated_project = update_project_status(
-            project_uuid=self.project.project_uuid,
+        updated_org = update_project_status(
+            project_uuid=self.project_uuid,
             status="ACTIVE",
             user_email=self.user.email,
         )
 
-        reloaded_project = Project.objects.get(project_uuid=self.project.project_uuid)
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
 
-        self.assertIsNotNone(updated_project)
-        self.assertTrue(reloaded_project.is_active)
-        self.assertEqual(updated_project, reloaded_project)
-        self.assertEqual(reloaded_project.modified_by, self.user)
+        self.assertIsNotNone(updated_org)
+        self.assertTrue(reloaded_org.is_active)
+        self.assertEqual(updated_org, reloaded_org)
+        self.assertEqual(reloaded_org.modified_by, self.user)
 
     def test_update_status_to_in_test(self):
         """Test updating project status to IN_TEST (should set is_active to True)"""
-        self.project.is_active = False
-        self.project.save()
+        self.test_org.is_active = False
+        self.test_org.save()
 
-        updated_project = update_project_status(
-            project_uuid=self.project.project_uuid,
+        updated_org = update_project_status(
+            project_uuid=self.project_uuid,
             status="IN_TEST",
             user_email=self.user.email,
         )
 
-        reloaded_project = Project.objects.get(project_uuid=self.project.project_uuid)
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
 
-        self.assertIsNotNone(updated_project)
-        self.assertTrue(reloaded_project.is_active)
-        self.assertEqual(updated_project, reloaded_project)
+        self.assertIsNotNone(updated_org)
+        self.assertTrue(reloaded_org.is_active)
+        self.assertEqual(updated_org, reloaded_org)
 
     def test_update_status_to_inactive(self):
         """Test updating project status to INACTIVE (should set is_active to False)"""
-        self.assertTrue(self.project.is_active)
+        self.assertTrue(self.test_org.is_active)
 
-        updated_project = update_project_status(
-            project_uuid=self.project.project_uuid,
+        updated_org = update_project_status(
+            project_uuid=self.project_uuid,
             status="INACTIVE",
             user_email=self.user.email,
         )
 
-        reloaded_project = Project.objects.get(project_uuid=self.project.project_uuid)
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
 
-        self.assertIsNotNone(updated_project)
-        self.assertFalse(reloaded_project.is_active)
-        self.assertEqual(updated_project, reloaded_project)
+        self.assertIsNotNone(updated_org)
+        self.assertFalse(reloaded_org.is_active)
+        self.assertEqual(updated_org, reloaded_org)
 
     def test_update_status_with_new_user(self):
         """Test updating status with a new user email"""
         new_user_email = "statusupdater@example.com"
 
-        updated_project = update_project_status(
-            project_uuid=self.project.project_uuid,
+        updated_org = update_project_status(
+            project_uuid=self.project_uuid,
             status="INACTIVE",
             user_email=new_user_email,
         )
@@ -93,34 +93,34 @@ class TestUpdateProjectStatus(TembaTest):
         self.assertEqual(new_user.username, new_user_email)
 
         # Verify project was updated
-        reloaded_project = Project.objects.get(project_uuid=self.project.project_uuid)
-        self.assertFalse(reloaded_project.is_active)
-        self.assertEqual(reloaded_project.modified_by, new_user)
-        self.assertIsNotNone(updated_project)
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertFalse(reloaded_org.is_active)
+        self.assertEqual(reloaded_org.modified_by, new_user)
+        self.assertIsNotNone(updated_org)
 
     def test_update_status_same_value_does_not_modify(self):
         """Test that updating to the same status doesn't change modified_on"""
-        self.assertTrue(self.project.is_active)
-        original_modified_on = self.project.modified_on
+        self.assertTrue(self.test_org.is_active)
+        original_modified_on = self.test_org.modified_on
 
-        updated_project = update_project_status(
-            project_uuid=self.project.project_uuid,
+        updated_org = update_project_status(
+            project_uuid=self.project_uuid,
             status="ACTIVE",  # Already active
             user_email=self.user.email,
         )
 
-        reloaded_project = Project.objects.get(project_uuid=self.project.project_uuid)
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
 
-        self.assertIsNotNone(updated_project)
-        self.assertTrue(reloaded_project.is_active)
+        self.assertIsNotNone(updated_org)
+        self.assertTrue(reloaded_org.is_active)
         # modified_on should not change
-        self.assertEqual(reloaded_project.modified_on, original_modified_on)
+        self.assertEqual(reloaded_org.modified_on, original_modified_on)
 
     def test_update_status_invalid_status_raises_error(self):
         """Test that invalid status raises ValueError"""
         with self.assertRaises(ValueError) as context:
             update_project_status(
-                project_uuid=self.project.project_uuid,
+                project_uuid=self.project_uuid,
                 status="INVALID_STATUS",
                 user_email=self.user.email,
             )
@@ -143,57 +143,57 @@ class TestUpdateProjectStatus(TembaTest):
     def test_update_status_transitions(self):
         """Test multiple status transitions"""
         # Start with ACTIVE
-        self.assertTrue(self.project.is_active)
+        self.assertTrue(self.test_org.is_active)
 
         # Change to INACTIVE
         update_project_status(
-            project_uuid=self.project.project_uuid,
+            project_uuid=self.project_uuid,
             status="INACTIVE",
             user_email=self.user.email,
         )
-        reloaded_project = Project.objects.get(project_uuid=self.project.project_uuid)
-        self.assertFalse(reloaded_project.is_active)
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertFalse(reloaded_org.is_active)
 
         # Change to IN_TEST
         update_project_status(
-            project_uuid=self.project.project_uuid,
+            project_uuid=self.project_uuid,
             status="IN_TEST",
             user_email=self.user.email,
         )
-        reloaded_project = Project.objects.get(project_uuid=self.project.project_uuid)
-        self.assertTrue(reloaded_project.is_active)
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertTrue(reloaded_org.is_active)
 
         # Change to ACTIVE
         update_project_status(
-            project_uuid=self.project.project_uuid,
+            project_uuid=self.project_uuid,
             status="ACTIVE",
             user_email=self.user.email,
         )
-        reloaded_project = Project.objects.get(project_uuid=self.project.project_uuid)
-        self.assertTrue(reloaded_project.is_active)
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertTrue(reloaded_org.is_active)
 
     def test_status_mapping_correctness(self):
         """Test that status mapping is correct for all valid statuses"""
         # Test ACTIVE -> True
-        self.project.is_active = False
-        self.project.save()
+        self.test_org.is_active = False
+        self.test_org.save()
         
-        update_project_status(self.project.project_uuid, "ACTIVE", self.user.email)
-        self.project.refresh_from_db()
-        self.assertTrue(self.project.is_active)
+        update_project_status(self.project_uuid, "ACTIVE", self.user.email)
+        self.test_org.refresh_from_db()
+        self.assertTrue(self.test_org.is_active)
 
         # Test IN_TEST -> True
-        self.project.is_active = False
-        self.project.save()
+        self.test_org.is_active = False
+        self.test_org.save()
         
-        update_project_status(self.project.project_uuid, "IN_TEST", self.user.email)
-        self.project.refresh_from_db()
-        self.assertTrue(self.project.is_active)
+        update_project_status(self.project_uuid, "IN_TEST", self.user.email)
+        self.test_org.refresh_from_db()
+        self.assertTrue(self.test_org.is_active)
 
         # Test INACTIVE -> False
-        self.project.is_active = True
-        self.project.save()
+        self.test_org.is_active = True
+        self.test_org.save()
         
-        update_project_status(self.project.project_uuid, "INACTIVE", self.user.email)
-        self.project.refresh_from_db()
-        self.assertFalse(self.project.is_active)
+        update_project_status(self.project_uuid, "INACTIVE", self.user.email)
+        self.test_org.refresh_from_db()
+        self.assertFalse(self.test_org.is_active)
