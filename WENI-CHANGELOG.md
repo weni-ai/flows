@@ -1,3 +1,8 @@
+3.48.0
+----------
+* Add project event consumer
+* Update OpenTicketSerializer to make conversation_started_on field optional
+
 3.47.4
 ----------
 * Feat/adding seconds on history logs
