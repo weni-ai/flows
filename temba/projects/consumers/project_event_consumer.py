@@ -4,17 +4,19 @@ from sentry_sdk import capture_exception
 from temba.event_driven.consumers import EDAConsumer
 from temba.event_driven.parsers.json_parser import JSONParser
 from temba.projects.usecases.project_delete import delete_project
+from temba.projects.usecases.project_status_update import update_project_status
 from temba.projects.usecases.project_update import update_project_config
 
 
 class ProjectEventConsumer(EDAConsumer):
     """
-    Consumer for handling project events (update and delete).
+    Consumer for handling project events (update, delete, and status update).
 
     Handles messages from update-projects.topic exchange.
     Events are differentiated by the 'action' field:
     - action: "deleted" -> calls delete_project
     - action: "updated" -> calls update_project_config
+    - action: "status_updated" -> calls update_project_status
     """
 
     def consume(self, message: amqp.Message):  # pragma: no cover
@@ -48,8 +50,16 @@ class ProjectEventConsumer(EDAConsumer):
                 raise ValueError(f"Missing required field: {field}")
 
         action = body.get("action")
-        if action not in ["deleted", "updated"]:
-            raise ValueError(f"Invalid action: {action}. Must be 'deleted' or 'updated'")
+        if action not in ["deleted", "updated", "status_updated"]:
+            raise ValueError(f"Invalid action: {action}. Must be 'deleted', 'updated', or 'status_updated'")
+        
+        # Validate status field for status_updated action
+        if action == "status_updated":
+            status = body.get("status")
+            if not status:
+                raise ValueError("Missing required field 'status' for status_updated action")
+            if status not in ["ACTIVE", "IN_TEST", "INACTIVE"]:
+                raise ValueError(f"Invalid status: {status}. Must be 'ACTIVE', 'IN_TEST', or 'INACTIVE'")
 
     def _process_event(self, project_uuid: str, user_email: str, action: str, body: dict):
         """
@@ -58,7 +68,7 @@ class ProjectEventConsumer(EDAConsumer):
         Args:
             project_uuid: UUID of the project
             user_email: Email of the user performing the action
-            action: Action to perform ('deleted' or 'updated')
+            action: Action to perform ('deleted', 'updated', or 'status_updated')
             body: Full message body
         """
         try:
@@ -86,6 +96,22 @@ class ProjectEventConsumer(EDAConsumer):
                     print(f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid})")
                 else:
                     print(f"[ProjectEventConsumer] - Project {project_uuid} not found for update")
+
+            elif action == "status_updated":
+                status = body.get("status")
+                org = update_project_status(
+                    project_uuid=project_uuid,
+                    status=status,
+                    user_email=user_email,
+                )
+
+                if org:
+                    print(
+                        f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid}) "
+                        f"status to {status} (is_active={org.is_active})"
+                    )
+                else:
+                    print(f"[ProjectEventConsumer] - Project {project_uuid} not found for status update")
 
             else:
                 raise ValueError(f"Unknown action: {action}")
