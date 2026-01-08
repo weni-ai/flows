@@ -1,6 +1,6 @@
 # syntax = docker/dockerfile:1
 
-ARG PYTHON_VERSION="3.9"
+ARG PYTHON_VERSION="3.11"
 ARG DEBIAN_VERSION="bookworm"
 ARG POETRY_VERSION="1.8.5"
 ARG REQUESTS_VERSION="2.29.0"
@@ -71,7 +71,7 @@ ARG POETRY_VERSION
 ARG REQUESTS_VERSION
 ARG NODE_VERSION
 
-COPY pyproject.toml poetry.lock .
+COPY pyproject.toml poetry.lock ./
 
 RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip \
   pip install --cache-dir /pip_cache -U poetry=="${POETRY_VERSION}" \
