@@ -8,18 +8,29 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('orgs', '0092_org_proj_uuid'),
+        ("orgs", "0092_org_proj_uuid"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='org',
-            name='marketing',
-            field=models.ManyToManyField(related_name='org_marketing', to=settings.AUTH_USER_MODEL),
+            model_name="org",
+            name="marketing",
+            field=models.ManyToManyField(related_name="org_marketing", to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
-            model_name='invitation',
-            name='user_group',
-            field=models.CharField(choices=[('A', 'Administrator'), ('E', 'Editor'), ('V', 'Viewer'), ('T', 'Agent'), ('S', 'Surveyor'), ('M', 'Marketing')], default='V', max_length=1),
+            model_name="invitation",
+            name="user_group",
+            field=models.CharField(
+                choices=[
+                    ("A", "Administrator"),
+                    ("E", "Editor"),
+                    ("V", "Viewer"),
+                    ("T", "Agent"),
+                    ("S", "Surveyor"),
+                    ("M", "Marketing"),
+                ],
+                default="V",
+                max_length=1,
+            ),
         ),
     ]
