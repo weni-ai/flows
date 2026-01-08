@@ -17,4 +17,3 @@ from .temba_celery import app as celery_app  # noqa
 for _name in ("Mapping", "MutableMapping", "Sequence"):
     if not hasattr(collections, _name):
         setattr(collections, _name, getattr(collections.abc, _name))
-
