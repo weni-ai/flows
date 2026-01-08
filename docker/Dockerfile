@@ -74,7 +74,7 @@ ARG NODE_VERSION
 COPY pyproject.toml poetry.lock ./
 
 RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip \
-  pip install --cache-dir /pip_cache -U poetry=="${POETRY_VERSION}" \
+  pip install --cache-dir /pip_cache -U poetry=="${POETRY_VERSION}" poetry-plugin-export \
   && poetry cache clear -n --all pypi \
   && pip install --cache-dir /pip_cache requests=="${REQUESTS_VERSION}" \
   && poetry export --without-hashes --output requirements.txt
