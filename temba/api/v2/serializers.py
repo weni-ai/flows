@@ -379,6 +379,8 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 "variables": template_data.get("variables", []),
                 "locale": template_data.get("locale", None),
                 "category": template_data.get("category", None),
+                "is_carousel": template_data.get("is_carousel", False),
+                "carousel": template_data.get("carousel", []),
             }
             data["msg"]["template_id"] = template_id
 
