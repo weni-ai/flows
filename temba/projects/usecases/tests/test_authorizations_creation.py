@@ -11,19 +11,19 @@ from temba.tests.base import TembaTest
 
 class CreateAuthorizationsTestCase(TembaTest):
     def test_get_or_create_user_by_email(self):
-        # Crie um usuário com um email específico e verifique se ele é retornado corretamente
+        # Create a user with a specific email and verify it is returned correctly
         email = "test@example.com"
         user, created = get_or_create_user_by_email(email)
         self.assertEqual(user.email, email)
         self.assertTrue(created)
 
-        # Tente criar o mesmo usuário novamente e verifique se ele não é criado novamente
+        # Try to create the same user again and verify it is not created again
         user, created = get_or_create_user_by_email(email)
         self.assertEqual(user.email, email)
         self.assertFalse(created)
 
     def test_create_authorizations(self):
-        # Crie um projeto fictício
+        # Create a mock project
         project = Project.objects.create(
             project_uuid=uuid.uuid4(),
             name="Temba New",
@@ -33,16 +33,17 @@ class CreateAuthorizationsTestCase(TembaTest):
             modified_by=self.user,
         )
 
-        # Crie uma lista de autorizações fictícias
+        # Create a list of mock authorizations
         authorizations = [
             {"user_email": "user1@example.com", "role": 1},
             {"user_email": "user2@example.com", "role": 2},
             {"user_email": "user3@example.com", "role": 3},
             {"user_email": "user4@example.com", "role": 4},
             {"user_email": "user5@example.com", "role": 5},
+            {"user_email": "user6@example.com", "role": 6},
         ]
 
-        # Chame a função create_authorizations e verifique se as associações de roles são corretas
+        # Call create_authorizations and verify role associations are correct
         create_authorizations(authorizations, project)
 
         self.assertEqual(list(project.viewers.all().values_list("email", flat=True)), ["user1@example.com"])
@@ -52,3 +53,4 @@ class CreateAuthorizationsTestCase(TembaTest):
             ["user3@example.com", "user4@example.com"],
         )
         self.assertEqual(list(project.agents.all().values_list("email", flat=True)), ["user5@example.com"])
+        self.assertEqual(list(project.marketing.all().values_list("email", flat=True)), ["user6@example.com"])
