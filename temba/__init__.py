@@ -14,6 +14,6 @@ import collections.abc
 
 from .temba_celery import app as celery_app  # noqa
 
-for _name in ("Mapping", "MutableMapping", "Sequence"):
+for _name in ("Mapping", "MutableMapping", "Sequence", "Callable"):
     if not hasattr(collections, _name):
         setattr(collections, _name, getattr(collections.abc, _name))
