@@ -971,7 +971,14 @@ class APITest(TembaTest):
 
         # try to send msg with an existing template
         expected_metadata = {
-            "template": {"name": template.name, "uuid": template.uuid, "variables": [], "locale": None},
+            "template": {
+                "name": template.name,
+                "uuid": template.uuid,
+                "variables": [],
+                "locale": None,
+                "is_carousel": False,
+                "carousel": [],
+            },
             "text": "Send a message",
             "template_id": Template.objects.get(uuid=template.uuid).id,
         }
@@ -1155,7 +1162,14 @@ class APITest(TembaTest):
         )
 
         expected_metadata = {
-            "template": {"name": template.name, "uuid": template.uuid, "variables": ["1"], "locale": None},
+            "template": {
+                "name": template.name,
+                "uuid": template.uuid,
+                "variables": ["1"],
+                "locale": None,
+                "is_carousel": False,
+                "carousel": [],
+            },
             "template_id": Template.objects.get(uuid=template.uuid).id,
         }
         broadcast = Broadcast.objects.get(id=response.json()["id"])
@@ -1199,7 +1213,14 @@ class APITest(TembaTest):
         )
 
         expected_metadata = {
-            "template": {"name": template.name, "uuid": template.uuid, "variables": ["1"], "locale": None},
+            "template": {
+                "name": template.name,
+                "uuid": template.uuid,
+                "variables": ["1"],
+                "locale": None,
+                "is_carousel": False,
+                "carousel": [],
+            },
             "template_id": Template.objects.get(uuid=template.uuid).id,
         }
         broadcast = Broadcast.objects.get(id=response.json()["id"])
