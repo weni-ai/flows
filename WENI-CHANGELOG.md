@@ -1,3 +1,8 @@
+3.49.1
+----------
+* feat: Delay Hotjar tracking script execution until DOM is fully loaded
+* feat: smtp server config
+
 3.49.0
 ----------
 * Add Marketing role and permissions to Org model and related functions
