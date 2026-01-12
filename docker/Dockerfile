@@ -6,7 +6,7 @@ ARG POETRY_VERSION="2.2.0"
 ARG REQUESTS_VERSION="2.29.0"
 
 ARG BUILD_DEPS="\
-  gcc bzip2 git curl libpq-dev gettext \
+  gcc bzip2 git curl libpq-dev gettext libffi-dev \
   libgdal-dev python3-cffi python3-gdal \
   python3-dev default-libmysqlclient-dev build-essential \
   cmake \
