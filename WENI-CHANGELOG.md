@@ -1,3 +1,7 @@
+3.49.0
+----------
+* Add Marketing role and permissions to Org model and related functions
+
 3.48.0
 ----------
 * Add project event consumer
