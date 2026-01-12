@@ -1,3 +1,7 @@
+3.50.1
+----------
+* update: coverage-version
+
 3.50.0
 ----------
 * feat: updating python and poetry
