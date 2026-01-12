@@ -1,3 +1,8 @@
+3.50.0
+----------
+* feat: updating python and poetry
+* update: weni-rp-apps-2.10.8
+
 3.49.1
 ----------
 * feat: Delay Hotjar tracking script execution until DOM is fully loaded
