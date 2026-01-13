@@ -1,3 +1,7 @@
+3.51.0
+----------
+* feat: Add is_carousel and carousel fields to WhatsappBroadcastWriteSerializer and update corresponding tests
+
 3.50.1
 ----------
 * update: coverage-version
