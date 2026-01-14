@@ -267,7 +267,7 @@ class TestInternalBroadcastsUploadMedia(TembaTest):
         upload = SimpleUploadedFile("file.txt", b"hello world", content_type="text/plain")
 
         with patch(
-            "temba.api.v2.internals.broadcasts.services.public_file_storage.save",
+            "temba.api.v2.internals.broadcasts.services.private_file_storage.save",
         ) as mock_save:
             mock_save.return_value = f"attachments/{self.org.id}/broadcasts/abcd/file.txt"
 
@@ -300,7 +300,7 @@ class TestInternalBroadcastsUploadMedia(TembaTest):
         upload = SimpleUploadedFile("audio.m4a", b"data", content_type="audio/m4a")
 
         with patch(
-            "temba.api.v2.internals.broadcasts.services.public_file_storage.save",
+            "temba.api.v2.internals.broadcasts.services.private_file_storage.save",
         ) as mock_save:
             mock_save.return_value = f"attachments/{self.org.id}/broadcasts/abcd/audio.m4a"
 
@@ -372,7 +372,7 @@ class TestUploadBroadcastMediaService(TembaTest):
         upload = SimpleUploadedFile("clip.m4a", b"123", content_type="audio/m4a")
 
         with patch("temba.api.v2.internals.broadcasts.services.uuid4", return_value="fixeduuid"), patch(
-            "temba.api.v2.internals.broadcasts.services.public_file_storage.save"
+            "temba.api.v2.internals.broadcasts.services.private_file_storage.save"
         ) as mock_save:
             mock_save.return_value = f"attachments/{self.org.id}/broadcasts/fixeduuid/clip.m4a"
 
@@ -392,7 +392,7 @@ class TestUploadBroadcastMediaService(TembaTest):
         upload = SimpleUploadedFile("note.txt", b"abc", content_type="text/plain")
 
         with patch("temba.api.v2.internals.broadcasts.services.uuid4", return_value="abc123"), patch(
-            "temba.api.v2.internals.broadcasts.services.public_file_storage.save"
+            "temba.api.v2.internals.broadcasts.services.private_file_storage.save"
         ) as mock_save:
             mock_save.return_value = f"attachments/{self.org.id}/broadcasts/abc123/note.txt"
 
