@@ -168,7 +168,7 @@ class ProjectMessageCountViewTest(PatchedJWTAuthMixin, TembaTest):
         ch2 = self.create_channel("TG", "Test Channel 2", "test2", org=self.org)
 
         # another org should not affect totals
-        other_org = self.create_org("Other")
+        other_org = self.org2
         other_org.proj_uuid = uuid.uuid4()
         other_org.save(update_fields=("proj_uuid",))
         other_ch = self.create_channel("TG", "Other Channel", "other", org=other_org)
