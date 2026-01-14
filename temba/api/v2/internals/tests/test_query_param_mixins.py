@@ -1,7 +1,8 @@
 from types import SimpleNamespace
 
-from django.test import SimpleTestCase
 from rest_framework.response import Response
+
+from django.test import SimpleTestCase
 
 from temba.api.v2.mixins import ISO8601DateFilterQueryParamsMixin
 
