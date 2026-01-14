@@ -213,3 +213,40 @@ class ProjectMessageCountViewTest(PatchedJWTAuthMixin, TembaTest):
     def test_invalid_date_returns_400(self):
         resp = self.client.get(f"{self.url}?after=not-a-date", **self.auth_headers)
         self.assertEqual(resp.status_code, 400)
+
+    def test_request_without_project_uuid_and_channel_uuid_returns_400(self):
+        # Normally prevented by RequiredJWTAuthentication, but possible in patched tests/callers
+        self._set_jwt_payload(project_uuid=None, channel_uuid=None)
+        resp = self.client.get(self.url, **self.auth_headers)
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "project_uuid or channel_uuid is required"})
+
+    def test_request_with_project_uuid_notfound_returns_404(self):
+        missing_uuid = "2337712f-dcbc-48f3-9ae7-7f832445f6c9"
+        self._set_jwt_payload(project_uuid=missing_uuid, channel_uuid=None)
+        resp = self.client.get(self.url, **self.auth_headers)
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {"error": "Project not found"})
+
+    def test_request_with_channel_uuid_notfound_returns_404(self):
+        missing_uuid = "2337712f-dcbc-48f3-9ae7-7f832445f6c9"
+        self._set_jwt_payload(channel_uuid=missing_uuid, project_uuid=None)
+        resp = self.client.get(self.url, **self.auth_headers)
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {"error": "Channel not found"})
+
+    def test_request_with_channel_uuid(self):
+        # create one channel in our org and set counts
+        ch = self.create_channel("TG", "Test Channel", "test", org=self.org)
+        ChannelCount.objects.create(
+            channel=ch, count_type=ChannelCount.INCOMING_MSG_TYPE, day=date(2026, 1, 1), count=4
+        )
+        ChannelCount.objects.create(
+            channel=ch, count_type=ChannelCount.OUTGOING_MSG_TYPE, day=date(2026, 1, 1), count=6
+        )
+
+        # call endpoint using channel_uuid (no project_uuid in token)
+        self._set_jwt_payload(channel_uuid=str(ch.uuid), project_uuid=None)
+        resp = self.client.get(self.url, **self.auth_headers)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {"incoming_amount": 4, "outgoing_amount": 6, "total_amount": 10})

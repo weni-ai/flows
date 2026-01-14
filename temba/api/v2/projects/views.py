@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
 
+from django.core import exceptions as django_exceptions
 from django.db.models import Q, Sum
 
 from temba.api.auth.jwt import RequiredJWTAuthentication
@@ -102,14 +103,20 @@ class ProjectMessageCountView(ISO8601DateFilterQueryParamsMixin, APIViewMixin, A
 
     def get(self, request: Request):
         project_uuid = getattr(request, "project_uuid", None)
-
-        if project_uuid is None:
-            return Response(status=400, data={"error": "project_uuid is required"})
+        channel_uuid = getattr(request, "channel_uuid", None)
 
         try:
-            Org.objects.only("id").get(proj_uuid=project_uuid)
-        except Org.DoesNotExist:
+            if project_uuid:
+                Org.objects.only("id").get(proj_uuid=project_uuid)
+            elif channel_uuid:
+                channel = Channel.objects.select_related("org").only("org__proj_uuid").get(uuid=channel_uuid)
+                project_uuid = str(channel.org.proj_uuid)
+            else:
+                return Response(status=400, data={"error": "project_uuid or channel_uuid is required"})
+        except (Org.DoesNotExist, django_exceptions.ValidationError, ValueError):
             return Response(status=404, data={"error": "Project not found"})
+        except Channel.DoesNotExist:
+            return Response(status=404, data={"error": "Channel not found"})
 
         date_filters = self.get_date_range_from_request(request)
         if isinstance(date_filters, Response):
