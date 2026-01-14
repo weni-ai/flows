@@ -1,3 +1,17 @@
+3.50.1
+----------
+* update: coverage-version
+
+3.50.0
+----------
+* feat: updating python and poetry
+* update: weni-rp-apps-2.10.8
+
+3.49.1
+----------
+* feat: Delay Hotjar tracking script execution until DOM is fully loaded
+* feat: smtp server config
+
 3.49.0
 ----------
 * Add Marketing role and permissions to Org model and related functions
