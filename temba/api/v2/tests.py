@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 from urllib.parse import quote_plus
 
 import iso8601
+import jwt
 import pytz
 from rest_framework import serializers
 from rest_framework.test import APIClient
@@ -484,6 +485,45 @@ class APITest(TembaTest):
 
         response = request_by_basic_auth(contacts_url, self.admin.username, token2.key)
         self.assertResponseError(response, None, "Invalid token or email", status_code=403)
+
+    def test_optional_jwt_auth_no_header(self):
+        self.login(self.admin)
+
+        response = self.client.get(
+            reverse("api.v2.fields") + ".json",
+            content_type="application/json",
+            HTTP_X_FORWARDED_HTTPS="https",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(JWT_PUBLIC_KEY="fake-public-key")
+    @patch("temba.api.auth.jwt.jwt.decode")
+    def test_optional_jwt_auth_invalid_token_falls_back(self, mock_decode):
+        mock_decode.side_effect = jwt.InvalidTokenError("bad token")
+        self.login(self.admin)
+
+        response = self.client.get(
+            reverse("api.v2.fields") + ".json",
+            content_type="application/json",
+            HTTP_X_FORWARDED_HTTPS="https",
+            HTTP_AUTHORIZATION="Bearer bad.token.value",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(JWT_PUBLIC_KEY=None)
+    def test_optional_jwt_auth_ignores_without_public_key(self):
+        self.login(self.admin)
+
+        response = self.client.get(
+            reverse("api.v2.fields") + ".json",
+            content_type="application/json",
+            HTTP_X_FORWARDED_HTTPS="https",
+            HTTP_AUTHORIZATION="Bearer any.token.value",
+        )
+
+        self.assertEqual(response.status_code, 200)
 
     @override_settings(SECURE_PROXY_SSL_HEADER=("HTTP_X_FORWARDED_HTTPS", "https"))
     def test_root(self):
