@@ -4,6 +4,7 @@ import uuid
 from collections import OrderedDict
 from datetime import datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from urllib.parse import quote_plus
 
@@ -21,10 +22,13 @@ from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from temba.api.models import APIToken, Resthook, WebHookEvent
 from temba.api.auth.jwt import OptionalJWTAuthentication
+from temba.api.models import APIToken, Resthook, WebHookEvent
+from temba.api.support import InvalidQueryError
 from temba.api.v2.views import (
     ContactsTemplatesEndpoint,
+    EventsEndpoint,
+    EventsGroupByCountEndpoint,
     ExternalServicesEndpoint,
     FilterTemplatesEndpoint,
     FlowsLabelsEndpoint,
@@ -32,6 +36,7 @@ from temba.api.v2.views import (
     TemplatesEndpoint,
     WhatsappFlowsEndpoint,
 )
+from temba.api.v2.views_base import BaseAPIView
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
@@ -63,7 +68,13 @@ from temba.wpp_flows.models import WhatsappFlow
 from temba.wpp_products.models import Catalog, Product
 
 from . import fields
-from .serializers import ExternalServicesReadSerializer, ProductReadSerializer, format_datetime, normalize_extra
+from .serializers import (
+    ContactReadSerializer,
+    ExternalServicesReadSerializer,
+    ProductReadSerializer,
+    format_datetime,
+    normalize_extra,
+)
 
 NUM_BASE_REQUEST_QUERIES = 6  # number of db queries required for any API request
 
@@ -539,6 +550,134 @@ class APITest(TembaTest):
         response = self.fetchJSON(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["runs"], "https://testserver:80/api/v2/runs")  # endpoints are listed
+
+    def test_base_api_view_org_resolution(self):
+        class DummyView(BaseAPIView):
+            model = Contact
+            serializer_class = ContactReadSerializer
+            authentication_classes = ()
+
+        def make_request(query=None, user=None):
+            factory = APIRequestFactory()
+            django_request = factory.get("/api/v2/contacts.json", data=query or {})
+            view = DummyView()
+            view.format_kwarg = None
+            request = view.initialize_request(django_request)
+            request.user = user or SimpleNamespace()
+            view.request = request
+            return view, request
+
+        # set org from project uuid (query param)
+        view, request = make_request(query={"project": str(self.org.proj_uuid)})
+        view.set_org_from_request(request)
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user.get_org(), self.org)
+
+        # set org from channel uuid (query param)
+        channel = self.create_channel("TT", "Test Channel", "11111")
+        view, request = make_request(query={"channel": str(channel.uuid)})
+        view.set_org_from_request(request)
+        self.assertEqual(request._org, channel.org)
+
+        # invalid project uuid raises
+        view, request = make_request(query={"project": "not-a-project"})
+        with self.assertRaises(InvalidQueryError):
+            view.set_org_from_request(request)
+
+        # perform_authentication uses set_org_from_request
+        view, request = make_request(query={"project": str(self.org.proj_uuid)})
+        view.perform_authentication(request)
+        self.assertEqual(request._org, self.org)
+
+        # get_org prefers request._org and caches user org when possible
+        view, request = make_request(user=SimpleNamespace(get_org=lambda: self.org2))
+        request._org = self.org
+        self.assertEqual(view.get_org(), self.org)
+
+        view, request = make_request(user=SimpleNamespace(get_org=lambda: self.org))
+        self.assertEqual(view.get_org(), self.org)
+        self.assertEqual(request._org, self.org)
+
+        view, request = make_request()
+        self.assertIsNone(view.get_org())
+
+        # derive_queryset filters by org and errors without org
+        contact1 = self.create_contact("Org1", org=self.org)
+        self.create_contact("Org2", org=self.org2)
+        view, request = make_request()
+        request._org = self.org
+        qs = view.derive_queryset()
+        self.assertIn(contact1, qs)
+        self.assertTrue(all(c.org_id == self.org.id for c in qs))
+
+        view, request = make_request()
+        with self.assertRaises(InvalidQueryError):
+            view.derive_queryset()
+
+        # get_serializer_context uses resolved org
+        view, request = make_request()
+        request._org = self.org
+        context = view.get_serializer_context()
+        self.assertEqual(context["org"], self.org)
+
+        # normalize_urn requires org and rejects anonymous org
+        view, request = make_request()
+        with self.assertRaises(InvalidQueryError):
+            view.normalize_urn("tel:+250788123123")
+
+        view, request = make_request()
+        request._org = self.org
+        self.assertTrue(view.normalize_urn("tel:+250788123123").startswith("tel:"))
+
+        view, request = make_request()
+        request._org = self.org
+        with AnonymousOrg(self.org):
+            with self.assertRaises(InvalidQueryError):
+                view.normalize_urn("tel:+250788123123")
+
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_endpoint_uses_org_without_user(self, mock_fetch_events):
+        mock_fetch_events.return_value = [{"event": "ok"}]
+        factory = APIRequestFactory()
+        django_request = factory.get(
+            "/api/v2/events.json",
+            data={"date_start": "2025-01-01T00:00:00Z", "date_end": "2025-01-02T00:00:00Z"},
+        )
+        view = EventsEndpoint()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = None
+        request._org = self.org
+        view.request = request
+
+        response = view.get(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, [{"event": "ok"}])
+        called_user = mock_fetch_events.call_args[0][0]
+        self.assertEqual(called_user.get_org(), self.org)
+
+    @patch("temba.api.v2.services.events.fetch_event_counts_for_org")
+    def test_events_group_by_endpoint_uses_org_without_user(self, mock_fetch_counts):
+        mock_fetch_counts.return_value = [{"count": 1}]
+        factory = APIRequestFactory()
+        django_request = factory.get(
+            "/api/v2/events_group_by.json",
+            data={"date_start": "2025-01-01T00:00:00Z", "date_end": "2025-01-02T00:00:00Z"},
+        )
+        view = EventsGroupByCountEndpoint()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = None
+        request._org = self.org
+        view.request = request
+
+        response = view.get(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, [{"count": 1}])
+        called_user = mock_fetch_counts.call_args[0][0]
+        self.assertEqual(called_user.get_org(), self.org)
 
     def test_explorer(self):
         url = reverse("api.v2.explorer")
