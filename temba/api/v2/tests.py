@@ -579,6 +579,33 @@ class APITest(TembaTest):
         view.set_org_from_request(request)
         self.assertEqual(request._org, channel.org)
 
+        # invalid channel uuid raises
+        view, request = make_request(query={"channel": "not-a-uuid"})
+        with self.assertRaises(InvalidQueryError):
+            view.set_org_from_request(request)
+
+        # invalid channel (valid UUID but not found) raises
+        view, request = make_request(query={"channel": str(uuid.uuid4())})
+        with self.assertRaises(InvalidQueryError):
+            view.set_org_from_request(request)
+
+        # user with set_org gets it called
+        user_with_set_org = SimpleNamespace(set_org=Mock())
+        view, request = make_request(query={"project": str(self.org.proj_uuid)}, user=user_with_set_org)
+        view.set_org_from_request(request)
+        user_with_set_org.set_org.assert_called_once_with(self.org)
+
+        # user without set_org gets get_org attached
+        view, request = make_request(query={"project": str(self.org.proj_uuid)}, user=SimpleNamespace())
+        view.set_org_from_request(request)
+        self.assertTrue(hasattr(request.user, "get_org"))
+        self.assertEqual(request.user.get_org(), self.org)
+
+        # user is None is handled safely
+        view, request = make_request(query={"project": str(self.org.proj_uuid)}, user=None)
+        view.set_org_from_request(request)
+        self.assertEqual(request._org, self.org)
+
         # invalid project uuid raises
         view, request = make_request(query={"project": "not-a-project"})
         with self.assertRaises(InvalidQueryError):
