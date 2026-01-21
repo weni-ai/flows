@@ -7,8 +7,10 @@ from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
 from weni.internal.authenticators import InternalOIDCAuthentication
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 
+from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.models import APIPermission, SSLPermission
 from temba.api.support import (
     APIBasicAuthentication,
@@ -30,6 +32,7 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
 
     permission_classes = (SSLPermission, APIPermission)
     authentication_classes = (
+        OptionalJWTAuthentication,
         InternalOIDCAuthentication,
         APISessionAuthentication,
         APITokenAuthentication,
@@ -43,30 +46,73 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
     def perform_authentication(self, request):
         super().perform_authentication(request)
         # For internal token (not APIToken), set org context from project parameter before permission checks
-        try:
-            if not getattr(request.user, "is_authenticated", False):
-                return
-            if getattr(request.user, "using_token", False):
-                return  # APIToken path already sets org
 
-            if hasattr(request.user, "get_org") and request.user.get_org():
-                return
+        self.set_org_from_request(request)
 
-            params = request.query_params
-            print(f"params: {params}")
-            print(f"user: {request.user.email}")
-            project_uuid = params.get("project_uuid") or params.get("project")
-            if not project_uuid:
-                return
+    def set_org_from_request(self, request):
+        org = getattr(request, "_org", None)
+        if not org and hasattr(request.user, "get_org"):
+            org = request.user.get_org()
 
-            from temba.orgs.models import Org
-
-            org = Org.objects.filter(proj_uuid=project_uuid).first()
-            if org:
-                print(f"org: {org}")
-                request.user.set_org(org)
-        except Exception:
+        if org:
+            request._org = org
             return
+
+        project_uuid = (
+            getattr(request, "project_uuid", None)
+            or request.query_params.get("project_uuid")
+            or request.query_params.get("project")
+        )
+        channel_uuid = (
+            getattr(request, "channel_uuid", None)
+            or request.query_params.get("channel_uuid")
+            or request.query_params.get("channel")
+        )
+
+        if not project_uuid and not channel_uuid:
+            return
+
+        from temba.channels.models import Channel
+        from temba.orgs.models import Org
+
+        if project_uuid:
+            try:
+                org = Org.objects.filter(proj_uuid=project_uuid).first()
+            except ValidationError:
+                org = None
+            if not org:
+                raise InvalidQueryError("Invalid project")
+        else:
+            try:
+                channel = Channel.objects.select_related("org").filter(uuid=channel_uuid).first()
+            except ValidationError:
+                channel = None
+            if not channel:
+                raise InvalidQueryError("Invalid channel")
+            org = channel.org
+
+        request._org = org
+
+        if hasattr(request.user, "set_org"):
+            request.user.set_org(org)
+        else:
+            try:
+                request.user.get_org = lambda: org
+            except Exception:
+                pass
+
+    def get_org(self):
+        org = getattr(self.request, "_org", None)
+        if org:
+            return org
+
+        if hasattr(self.request.user, "get_org"):
+            org = self.request.user.get_org()
+            if org:
+                self.request._org = org
+            return org
+
+        return None
 
     def options(self, request, *args, **kwargs):
         """
@@ -76,7 +122,9 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
         return self.http_method_not_allowed(request, *args, **kwargs)
 
     def derive_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
+        if not org:
+            raise InvalidQueryError("Organization not found")
         return getattr(self.model, self.model_manager).filter(org=org)
 
     def get_queryset(self):
@@ -131,12 +179,15 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["org"] = self.request.user.get_org()
+        context["org"] = self.get_org()
         context["user"] = self.request.user
         return context
 
     def normalize_urn(self, value):
-        org = self.request.user.get_org()
+        org = self.get_org()
+
+        if not org:
+            raise InvalidQueryError("Organization not found")
 
         if org.is_anon:
             raise InvalidQueryError("URN lookups not allowed for anonymous organizations")
