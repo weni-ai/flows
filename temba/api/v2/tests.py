@@ -6212,6 +6212,200 @@ class EventsEndpointTest(APITest):
         self.assertEqual(call_kwargs["date_end"], "2025-10-08T23:59:59Z")
 
 
+class EventsV2EndpointTest(APITest):
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_v2_defaults_limit_offset(self, mock_fetch_events_for_org):
+        url = reverse("api.v2.events_v2")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_fetch_events_for_org.return_value = [{"event": "test"}]
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"event": "test"}])
+
+        mock_fetch_events_for_org.assert_called_once()
+        _, call_kwargs = mock_fetch_events_for_org.call_args
+        self.assertEqual(call_kwargs["limit"], 10)
+        self.assertEqual(call_kwargs["offset"], 0)
+
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_v2_respects_limit_offset(self, mock_fetch_events_for_org):
+        url = reverse("api.v2.events_v2")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_fetch_events_for_org.return_value = [{"event": "test"}]
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}&limit=25&offset=5"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"event": "test"}])
+
+        mock_fetch_events_for_org.assert_called_once()
+        _, call_kwargs = mock_fetch_events_for_org.call_args
+        self.assertEqual(call_kwargs["limit"], 25)
+        self.assertEqual(call_kwargs["offset"], 5)
+
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_v2_requires_table_when_silver_true(self, mock_fetch_events_for_org):
+        url = reverse("api.v2.events_v2")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}&silver=true"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 400)
+        mock_fetch_events_for_org.assert_not_called()
+
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_v2_passes_silver_and_table(self, mock_fetch_events_for_org):
+        url = reverse("api.v2.events_v2")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_fetch_events_for_org.return_value = []
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}&silver=true&table=my_table"
+
+        response = self.fetchJSON(url, query)
+        self.assertEqual(response.status_code, 200)
+
+        mock_fetch_events_for_org.assert_called_once()
+        _, call_kwargs = mock_fetch_events_for_org.call_args
+        self.assertTrue(call_kwargs["silver"])
+        self.assertEqual(call_kwargs["table"], "my_table")
+
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_events_v2_json_payload_parsing(self, mock_dl_get_events):
+        url = reverse("api.v2.events_v2")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_dl_get_events.return_value = [{"payload": '{"key": "value"}'}]
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}"
+
+        response = self.fetchJSON(url, query)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"payload": {"key": "value"}}])
+
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_events_v2_invalid_json_payload(self, mock_dl_get_events):
+        url = reverse("api.v2.events_v2")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_dl_get_events.return_value = [{"payload": '{"key": "value"invalid}'}]
+
+        self.login(self.admin)
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}"
+
+        response = self.fetchJSON(url, query)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"payload": '{"key": "value"invalid}'}])
+
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_v2_get_events_exception(self, mock_fetch_events_for_org):
+        url = reverse("api.v2.events_v2")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        error_message = "Something went wrong"
+        mock_fetch_events_for_org.side_effect = Exception(error_message)
+
+        self.login(self.admin)
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}"
+
+        response = self.fetchJSON(url, query)
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {"error": error_message})
+
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_events_v2_non_json_string_in_payload(self, mock_dl_get_events):
+        self.login(self.admin)
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_dl_get_events.return_value = [{"key": "non-json-string"}]
+
+        url = reverse("api.v2.events_v2")
+        query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"key": "non-json-string"}])
+
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_events_v2_payload_with_other_types(self, mock_dl_get_events):
+        self.login(self.admin)
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_dl_get_events.return_value = [{"key_int": 123, "key_bool": False, "key_none": None}]
+
+        url = reverse("api.v2.events_v2")
+        query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"key_int": 123, "key_bool": False, "key_none": None}])
+
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_events_v2_datetime_conversion_to_utc(self, mock_dl_get_events):
+        self.login(self.admin)
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_dl_get_events.return_value = []
+
+        url = reverse("api.v2.events_v2")
+        query = "date_start=2025-10-08T00:00:00Z&date_end=2025-10-08T23:59:59Z"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 200)
+
+        mock_dl_get_events.assert_called_once()
+        call_kwargs = mock_dl_get_events.call_args[1]
+        self.assertEqual(call_kwargs["date_start"], "2025-10-08T00:00:00Z")
+        self.assertEqual(call_kwargs["date_end"], "2025-10-08T23:59:59Z")
+
+
 class EventsGroupByCountEndpointTest(APITest):
     @patch("temba.api.v2.services.events.fetch_event_counts_for_org")
     def test_events_group_by_count_endpoint(self, mock_fetch_event_counts_for_org):

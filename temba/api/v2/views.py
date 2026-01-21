@@ -28,6 +28,7 @@ from temba.api.v2.views_base import (
     ContactsTemplateCursorPagination,
     CreatedOnCursorPagination,
     DateJoinedCursorPagination,
+    DefaultLimitOffsetPagination,
     DeleteAPIMixin,
     ListAPIMixin,
     ModifiedOnCursorPagination,
@@ -5403,6 +5404,63 @@ class EventsEndpoint(BaseAPIView):
                 {"name": "silver", "required": False, "help": "If true, also include data from silver"},
                 {"name": "table", "required": False, "help": "Required when silver=true; silver table name"},
                 {"name": "limit", "required": False, "help": "The number of events to return, default is 100"},
+                {"name": "offset", "required": False, "help": "The offset to return, default is 0"},
+            ],
+        }
+
+
+class EventsV2Endpoint(BaseAPIView):
+    permission = "orgs.org_api"
+
+    def get(self, request, *args, **kwargs):
+        serializer = EventFilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        pagination = DefaultLimitOffsetPagination()
+        limit = pagination.get_limit(request)
+        offset = pagination.get_offset(request)
+        filters = dict(serializer.validated_data)
+        if limit is not None:
+            filters["limit"] = limit
+        if offset is not None:
+            filters["offset"] = offset
+
+        try:
+            from temba.api.v2.services.events import fetch_events_for_org
+
+            processed_events = fetch_events_for_org(request.user, **filters)
+
+            return Response(processed_events)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Datalake Events (v2)",
+            "url": reverse("api.v2.events_v2"),
+            "slug": "events-list-v2",
+            "params": [
+                {
+                    "name": "date_start",
+                    "required": True,
+                    "help": "The start date for the filter, ex: 2025-06-03T00:00:00Z",
+                },
+                {
+                    "name": "date_end",
+                    "required": True,
+                    "help": "The end date for the filter, ex: 2025-06-20T23:59:59Z",
+                },
+                {"name": "key", "required": False, "help": "A key to filter by"},
+                {"name": "contact_urn", "required": False, "help": "A contact URN to filter by"},
+                {"name": "value_type", "required": False, "help": "A value_type to filter by"},
+                {"name": "value", "required": False, "help": "A value to filter by"},
+                {"name": "metadata", "required": False, "help": "A metadata to filter by"},
+                {"name": "event_name", "required": False, "help": "An event_name to filter by"},
+                {"name": "silver", "required": False, "help": "If true, also include data from silver"},
+                {"name": "table", "required": False, "help": "Required when silver=true; silver table name"},
+                {"name": "limit", "required": False, "help": "The number of events to return, default is 10"},
                 {"name": "offset", "required": False, "help": "The offset to return, default is 0"},
             ],
         }
