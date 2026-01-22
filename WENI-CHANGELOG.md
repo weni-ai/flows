@@ -1,3 +1,8 @@
+3.52.0
+----------
+* feat: msg count endpoint
+* feat: changing whatsapp broadcast internal response
+
 3.51.0
 ----------
 * feat: Add is_carousel and carousel fields to WhatsappBroadcastWriteSerializer and update corresponding tests
