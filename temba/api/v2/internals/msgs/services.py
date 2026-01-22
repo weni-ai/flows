@@ -163,6 +163,7 @@ def _publish_billing_msg_create(*, msg: Msg, template: Optional[str | dict] = No
             "channel_type": channel_type,
             "text": msg.text or "",
             "template": template,
+            "status": msg.status,
         }
 
         RabbitmqPublisher().send_message(body=payload, exchange="msgs.topic", routing_key="create")
