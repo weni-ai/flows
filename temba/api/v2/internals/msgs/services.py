@@ -165,6 +165,6 @@ def _publish_billing_msg_create(*, msg: Msg, template: Optional[str | dict] = No
             "template": template,
         }
 
-        RabbitmqPublisher().send_message(body=payload, exchange="msgs.topic", routing_key="billing;msgs-create")
+        RabbitmqPublisher().send_message(body=payload, exchange="msgs.topic", routing_key="create")
     except Exception as exc:  # pragma: no cover - best effort emit
         logging.getLogger(__name__).warning("Failed to publish billing msg create: %s", exc)

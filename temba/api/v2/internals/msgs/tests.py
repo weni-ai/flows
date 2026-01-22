@@ -459,7 +459,7 @@ class TestInternalMessages(TembaTest):
         self.assertTrue(mock_publish.called)
         args, kwargs = mock_publish.call_args
         self.assertEqual(kwargs.get("exchange"), "msgs.topic")
-        self.assertEqual(kwargs.get("routing_key"), "billing;msgs-create")
+        self.assertEqual(kwargs.get("routing_key"), "create")
         self.assertIn("body", kwargs)
         body = kwargs["body"]
         self.assertEqual(body["direction"], "O")
