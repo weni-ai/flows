@@ -6,6 +6,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import urlencode
 
+from temba.channels.models import Channel
+from temba.msgs.models import Msg
 from temba.tests.base import TembaTest
 
 User = get_user_model()
@@ -296,3 +298,188 @@ class TestInternalMessages(TembaTest):
             self.assertEqual(response.status_code, 200)
             results = response.json()["results"]
             self.assertEqual(len(results), 2)
+
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_create_incoming_with_contact_uuid(self):
+        contact = self.create_contact("Alice", urns=["tel:+250788000111"])
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "in",
+            "contact_uuid": str(contact.uuid),
+            "text": "Olá!",
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        msg = Msg.objects.get(id=response.json()["ids"][0])
+        self.assertEqual(msg.direction, Msg.DIRECTION_IN)
+        self.assertEqual(msg.status, Msg.STATUS_HANDLED)
+
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_create_outgoing_default_sent(self):
+        contact = self.create_contact("Bob", urns=["tel:+250788000222"])
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "out",
+            "contact_uuid": str(contact.uuid),
+            "text": "Hey!",
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        created = Msg.objects.get(id=response.json()["ids"][0])
+        self.assertEqual(created.direction, Msg.DIRECTION_OUT)
+        self.assertEqual(created.status, Msg.STATUS_SENT)
+        self.assertIsNotNone(created.sent_on)
+
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_create_with_urn_only(self):
+        contact = self.create_contact("Carol", urns=["tel:+250788000333"])
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "in",
+            "urns": ["tel:+250788000333"],
+            "text": "ping",
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        msg = Msg.objects.get(id=response.json()["ids"][0])
+        self.assertEqual(msg.contact_id, contact.id)
+        self.assertEqual(msg.direction, Msg.DIRECTION_IN)
+
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_labels_association(self):
+        contact = self.create_contact("Dora", urns=["tel:+250788000444"])
+        label = self.create_label("demo")
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "out",
+            "contact_uuid": str(contact.uuid),
+            "text": "with label",
+            "labels": [str(label.uuid)],
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        msg = Msg.objects.get(id=response.json()["ids"][0])
+        self.assertEqual(list(msg.labels.all()), [label])
+
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_channel_override_validation(self):
+        # create a channel in a different org
+        other_channel = Channel.create(
+            self.org2,
+            self.admin2,
+            "RW",
+            "A",
+            name="Other Channel",
+            address="+250789000999",
+            device="Test",
+            secret="xyz",
+            config={},
+        )
+        contact = self.create_contact("Eve", urns=["tel:+250788000555"])
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "out",
+            "contact_uuid": str(contact.uuid),
+            "text": "wrong channel",
+            "channel_uuid": str(other_channel.uuid),
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Channel not found", response.json()["error"])
+
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_missing_identifiers(self):
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "out",
+            "text": "no identifiers",
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_missing_content(self):
+        contact = self.create_contact("Frank", urns=["tel:+250788000666"])
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "out",
+            "contact_uuid": str(contact.uuid),
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_invalid_urn(self):
+        contact = self.create_contact("Grace", urns=["tel:+250788000777"])
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "in",
+            "contact_uuid": str(contact.uuid),
+            "urns": ["invalid-urn"],
+            "text": "hi",
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_project_not_found(self):
+        contact = self.create_contact("Hank", urns=["tel:+250788000888"])
+        payload = {
+            "project_uuid": str(uuid4()),
+            "direction": "out",
+            "contact_uuid": str(contact.uuid),
+            "text": "hi",
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 404)
+
+    @patch("temba.event_driven.publisher.rabbitmq_publisher.RabbitmqPublisher.send_message")
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_publishes_billing_outgoing(self, mock_publish, *_mocks):
+        contact = self.create_contact("Ivan", urns=["tel:+250788001234"])
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "O",
+            "contact_uuid": str(contact.uuid),
+            "text": "bill me",
+            "template": "template-uuid",
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(mock_publish.called)
+        args, kwargs = mock_publish.call_args
+        self.assertEqual(kwargs.get("exchange"), "msgs.topic")
+        self.assertEqual(kwargs.get("routing_key"), "create")
+        self.assertIn("body", kwargs)
+        body = kwargs["body"]
+        self.assertEqual(body["direction"], "O")
+        self.assertEqual(body["text"], "bill me")
+        self.assertEqual(body["template"], "template-uuid")
+
+    @patch("temba.event_driven.publisher.rabbitmq_publisher.RabbitmqPublisher.send_message")
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_publishes_billing_incoming(self, mock_publish, *_mocks):
+        self.create_contact("Judy", urns=["telegram:844380532"])
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "I",
+            "urns": ["telegram:844380532"],
+            "text": "hello",
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(mock_publish.called)
+        body = mock_publish.call_args.kwargs["body"]
+        self.assertEqual(body["contact_urn"], "telegram:844380532")
+        self.assertEqual(body["direction"], "I")
