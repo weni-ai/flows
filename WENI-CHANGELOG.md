@@ -1,3 +1,43 @@
+3.51.0
+----------
+* feat: Add is_carousel and carousel fields to WhatsappBroadcastWriteSerializer and update corresponding tests
+
+3.50.1
+----------
+* update: coverage-version
+
+3.50.0
+----------
+* feat: updating python and poetry
+* update: weni-rp-apps-2.10.8
+
+3.49.1
+----------
+* feat: Delay Hotjar tracking script execution until DOM is fully loaded
+* feat: smtp server config
+
+3.49.0
+----------
+* Add Marketing role and permissions to Org model and related functions
+
+3.48.0
+----------
+* Add project event consumer
+* Update OpenTicketSerializer to make conversation_started_on field optional
+
+3.47.4
+----------
+* Feat/adding seconds on history logs
+* Feat/refactor is org
+
+3.47.3
+----------
+* Update @weni/flow-editor dependency to version 3.6.5
+
+3.47.2
+----------
+* Add is_mutable in Flow Import API
+
 3.47.1
 ----------
 * Fix read status trigger

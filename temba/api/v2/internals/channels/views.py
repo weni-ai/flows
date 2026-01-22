@@ -12,7 +12,6 @@ from temba.api.v2.internals.channels.serializers import ChannelProjectSerializer
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel
-from temba.orgs.models import Org
 
 
 class ChannelProjectView(APIViewMixin, APIView):
@@ -58,16 +57,14 @@ class InternalChannelView(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def get(self, request: Request):
-        params = request.query_params
-        project_uuid = params.get("project_uuid")
-
-        if project_uuid is None:
-            return Response(status=400, data={"error": "project_uuid is required"})
-
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except Org.DoesNotExist:
-            return Response(status=404, data={"error": "Project not found"})
+        org = self.get_org_from_request(
+            request,
+            missing_status=400,
+            missing_error="project_uuid is required",
+            not_found_error="Project not found",
+        )
+        if isinstance(org, Response):
+            return org
 
         response = {"results": []}
 

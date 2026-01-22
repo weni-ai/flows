@@ -479,6 +479,33 @@ class OpenTicketTest(TembaTest):
 
         self.assertEqual(response.status_code, 200)
 
+    @patch.object(LambdaURLValidator, "protected_resource")
+    @patch("temba.mailroom.client.MailroomClient.ticket_open")
+    def test_open_ticket_without_conversation_started_on(self, mock_ticket_open, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        mock_ticket_open.return_value = self.ticket_open_return_value()
+
+        url = "/api/v2/internals/open_ticket"
+        body = {
+            "project": self.org.proj_uuid,
+            "ticketer": self.ticketer.uuid,
+            "contact": self.joe.uuid,
+            "topic": self.org.default_ticket_topic.uuid,
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
+
+        mock_ticket_open.assert_called_once_with(
+            self.org.id,
+            self.joe.id,
+            self.ticketer.id,
+            self.org.default_ticket_topic.id,
+            0,
+            "{}",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
 
 class GetDepartmentsViewTest(TembaTest):
     @patch.object(LambdaURLValidator, "protected_resource")

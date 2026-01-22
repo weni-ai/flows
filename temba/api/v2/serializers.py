@@ -378,6 +378,8 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 "uuid": str(template.uuid),
                 "variables": template_data.get("variables", []),
                 "locale": template_data.get("locale", None),
+                "is_carousel": template_data.get("is_carousel", False),
+                "carousel": template_data.get("carousel", []),
             }
             data["msg"]["template_id"] = template_id
 
@@ -1974,6 +1976,7 @@ class UserReadSerializer(ReadSerializer):
         OrgRole.VIEWER: "viewer",
         OrgRole.AGENT: "agent",
         OrgRole.SURVEYOR: "surveyor",
+        OrgRole.MARKETING: "marketing",
     }
 
     role = serializers.SerializerMethodField()

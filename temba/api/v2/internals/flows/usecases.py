@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from django.contrib.auth import get_user_model
 
+from temba.flows.services import set_flows_mutability
 from temba.orgs.models import Org
 
 User = get_user_model()
@@ -12,6 +13,7 @@ class FlowImportDTO:
     project_uuid: str
     user_email: str
     definition: dict
+    is_mutable: bool
 
 
 class FlowImportUseCase:
@@ -26,6 +28,8 @@ class FlowImportUseCase:
         user = self.get_user_by_email(dto.user_email)
 
         new_flows = org.import_app(dto.definition, user)
+
+        set_flows_mutability(new_flows, dto.is_mutable)
 
         return [
             {

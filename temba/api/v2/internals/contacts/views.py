@@ -106,10 +106,12 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
 
         if not project_uuid:
             return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except (Org.DoesNotExist, django_exceptions.ValidationError):
-            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+        org = getattr(request, "org", None)
+        if not org:
+            try:
+                org = Org.objects.get(proj_uuid=project_uuid)
+            except (Org.DoesNotExist, django_exceptions.ValidationError):
+                return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
         contact_fields = ContactField.user_fields.filter(org=org, is_active=True)
 
@@ -225,14 +227,9 @@ class InternalContactGroupsView(APIViewMixin, APIView):
         """
         Get all contact groups from an organization (org) from the project_uuid.
         """
-        project_uuid = request.query_params.get("project_uuid")
-        if not project_uuid:
-            return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except (Org.DoesNotExist, django_exceptions.ValidationError):
-            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+        org = self.get_org_from_request(request, missing_status=400, missing_error="Project not provided")
+        if isinstance(org, Response):
+            return org
 
         name_filter = request.query_params.get("name")
         order_by = request.query_params.get("order_by") or request.query_params.get("order")
@@ -312,15 +309,21 @@ class ContactsExportByStatusView(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def post(self, request, *args, **kwargs):
-        project_uuid = request.data.get("project_uuid") or request.data.get("project")
         broadcast_id = request.data.get("broadcast_id")
         msg_status = request.data.get("status")
-        if not project_uuid:
-            return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
+        org = self.get_org_from_request(
+            request,
+            body_keys=("project_uuid", "project"),
+            missing_status=400,
+            missing_error="Project not provided",
+            not_found_status=status.HTTP_404_NOT_FOUND,
+            not_found_error="Project or Broadcast not found",
+        )
+        if isinstance(org, Response):
+            return org
 
         # validate broadcast belongs to org
         try:
-            org = Org.objects.get(proj_uuid=project_uuid)
             broadcast = Broadcast.objects.get(id=broadcast_id)
             if broadcast.org_id != org.id:
                 return Response({"error": "Broadcast not found for project"}, status=status.HTTP_404_NOT_FOUND)
@@ -388,14 +391,21 @@ class ContactsImportUploadView(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def post(self, request, *args, **kwargs):
-        project_uuid = request.data.get("project_uuid")
+        project_uuid = request.data.get("project_uuid") or request.data.get("project")
         uploaded_file = request.FILES.get("file")
         if not project_uuid or not uploaded_file:
             return Response({"error": "Project and file are required."}, status=400)
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except Org.DoesNotExist:
-            return Response({"error": "Project not found."}, status=404)
+
+        org = self.get_org_from_request(
+            request,
+            body_keys=("project_uuid", "project"),
+            missing_status=400,
+            missing_error="Project and file are required.",
+            not_found_status=404,
+            not_found_error="Project not found.",
+        )
+        if isinstance(org, Response):
+            return org
         # Deduplicate uploaded file by UUID/URN and build duplicates XLSX if needed
         try:
             (
@@ -773,18 +783,14 @@ class GroupsContactFieldsView(APIViewMixin, APIView):
 
     def get(self, request: Request):
         params = request.query_params
-        project_uuid = params.get("project_uuid") or params.get("project")
         group_ids_param = params.get("group_ids")
 
-        if not project_uuid:
-            return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
         if not group_ids_param:
             return Response({"error": "group_ids not provided"}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except (Org.DoesNotExist, django_exceptions.ValidationError):
-            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+        org = self.get_org_from_request(request, missing_status=400, missing_error="Project not provided")
+        if isinstance(org, Response):
+            return org
 
         # parse comma-separated list; accept ONLY numeric IDs
         raw_tokens = [t.strip() for t in group_ids_param.split(",") if t.strip()]
