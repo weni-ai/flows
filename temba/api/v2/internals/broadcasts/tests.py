@@ -36,8 +36,12 @@ class TestInternalWhatsappBroadcast(TembaTest):
             }
             response = self.client.post(url, data=body, content_type="application/json")
 
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json(), {"message": "Success"})
+            self.assertEqual(response.status_code, 201)
+            data = response.json()
+            self.assertIn("id", data)
+            self.assertIn("created_on", data)
+            self.assertEqual(data["contacts"][0]["uuid"], str(contact.uuid))
+            self.assertEqual(data["metadata"].get("text"), body["msg"]["text"])
 
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
@@ -240,8 +244,10 @@ class TestInternalWhatsappBroadcast(TembaTest):
             }
             response = self.client.post(url, data=body, content_type="application/json")
 
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json(), {"message": "Success"})
+            self.assertEqual(response.status_code, 201)
+            data = response.json()
+            self.assertIn("id", data)
+            self.assertEqual(data["metadata"].get("text"), body["msg"]["text"])
 
 
 class TestInternalBroadcastsUploadMedia(TembaTest):
@@ -772,17 +778,15 @@ class TestInternalWhatsappBroadcastJWT(TembaTest):
         self.assertEqual(resp.status_code, 401)
         self.assertIn("User email not provided", resp.json().get("error", ""))
 
-    @patch("temba.api.v2.serializers.Broadcast.create")
     @patch("temba.api.auth.jwt.settings")
     @patch("temba.api.auth.jwt.jwt.decode")
     @patch(
         "temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes",
         [OptionalJWTAuthentication],
     )
-    def test_jwt_success_returns_200(self, mock_decode, mock_settings, mock_broadcast_create):
+    def test_jwt_success_returns_201(self, mock_decode, mock_settings):
         mock_settings.JWT_PUBLIC_KEY = "dummy"
         mock_decode.return_value = {"project_uuid": str(self.org.proj_uuid), "email": "user@example.com"}
-        mock_broadcast_create.return_value = MagicMock()
 
         resp = self.client.post(
             self.url,
@@ -790,8 +794,10 @@ class TestInternalWhatsappBroadcastJWT(TembaTest):
             content_type="application/json",
             HTTP_AUTHORIZATION="Bearer token",
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertIn("Success", resp.json().get("message", ""))
+        self.assertEqual(resp.status_code, 201)
+        data = resp.json()
+        self.assertIn("id", data)
+        self.assertEqual(data["metadata"].get("text"), "Hi")
 
 
 class BroadcastWithStatisticsSerializerTests(TembaTest):
