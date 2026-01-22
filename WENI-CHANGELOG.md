@@ -1,3 +1,7 @@
+3.53.0
+----------
+* feat: Endpoint to save msg without pass to mailroom
+
 3.52.0
 ----------
 * feat: msg count endpoint
