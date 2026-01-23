@@ -1,5 +1,10 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+      - staging
+  pull_request:
 jobs:
   test:
     name: Test (${{ matrix.test_group }})
