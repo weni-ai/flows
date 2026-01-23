@@ -1,5 +1,6 @@
 import itertools
 from enum import Enum
+from types import SimpleNamespace
 
 from rest_framework import generics, status, views
 from rest_framework.pagination import CursorPagination
@@ -538,7 +539,7 @@ class BoundariesEndpoint(ListAPIMixin, BaseAPIView):
     pagination_class = Pagination
 
     def derive_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
         if not org.country:
             return AdminBoundary.objects.none()
 
@@ -640,7 +641,7 @@ class BroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     throttle_scope = "v2.broadcasts"
 
     def filter_queryset(self, queryset):
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         queryset = queryset.filter(broadcast_type=Broadcast.BROADCAST_TYPE_DEFAULT)
 
@@ -1002,7 +1003,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     throttle_scope = "v2.broadcasts"
 
     def filter_queryset(self, queryset):
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         queryset = queryset.filter(broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP)
 
@@ -1339,12 +1340,12 @@ class CampaignEventsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAP
     pagination_class = CreatedOnCursorPagination
 
     def derive_queryset(self):
-        return self.model.objects.filter(campaign__org=self.request.user.get_org(), is_active=True)
+        return self.model.objects.filter(campaign__org=self.get_org(), is_active=True)
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
         queryset = queryset.filter(is_active=True)
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         # filter by UUID (optional)
         uuid = params.get("uuid")
@@ -1572,7 +1573,7 @@ class ChannelEventsEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         # filter by id (optional)
         call_id = self.get_int_param("id")
@@ -1749,7 +1750,7 @@ class ClassifiersEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         queryset = queryset.filter(org=org, is_active=True)
 
@@ -1928,7 +1929,7 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         deleted_only = str_to_bool(params.get("deleted"))
         queryset = queryset.filter(is_active=(not deleted_only))
@@ -1986,7 +1987,7 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
         So that we only fetch active contact fields once for all contacts
         """
         context = super().get_serializer_context()
-        context["contact_fields"] = ContactField.user_fields.active_for_org(org=self.request.user.get_org())
+        context["contact_fields"] = ContactField.user_fields.active_for_org(org=self.get_org())
         return context
 
     def get_object(self):
@@ -1994,7 +1995,7 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
 
         # don't blow up if posted a URN that doesn't exist - we'll let the serializer create a new contact
         if self.request.method == "POST" and "urns__identity" in self.lookup_values:
-            org = self.request.user.get_org()
+            org = self.get_org()
             urn = self.lookup_values.get("urns__identity")
 
             contact = queryset.first()
@@ -2151,7 +2152,7 @@ class ContactsLeanEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         deleted_only = str_to_bool(params.get("deleted"))
         queryset = queryset.filter(is_active=(not deleted_only))
@@ -2354,11 +2355,11 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
     pagination_class = ContactsTemplateCursorPagination
 
     def get_queryset(self):
-        return self.model.objects.filter(org=self.request.user.get_org(), is_active=True)
+        return self.model.objects.filter(org=self.get_org(), is_active=True)
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         contact = params.get("contact")
         if contact:
@@ -2475,11 +2476,11 @@ class ContactsTemplatesEndpointNew(ListAPIMixin, BaseAPIView):
     pagination_class = ContactsTemplateCursorPagination
 
     def get_queryset(self):
-        return self.model.objects.filter(org=self.request.user.get_org(), is_active=True)
+        return self.model.objects.filter(org=self.get_org(), is_active=True)
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         contact = params.get("contact")
         if contact:
@@ -2593,7 +2594,7 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
 
     def get(self, request, *args, **kwargs):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         serializer = FilterTemplateSerializer(data=params)
         serializer.is_valid(raise_exception=True)
@@ -2855,7 +2856,7 @@ class DefinitionsEndpoint(BaseAPIView):
         all = 2
 
     def get(self, request, *args, **kwargs):
-        org = request.user.get_org()
+        org = self.get_org()
         params = request.query_params
 
         if "flow_uuid" in params or "campaign_uuid" in params:  # deprecated
@@ -3004,7 +3005,7 @@ class FieldsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     lookup_params = {"key": "key"}
 
     def derive_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
         return self.model.user_fields.filter(org=org, is_active=True)
 
     def filter_queryset(self, queryset):
@@ -3205,7 +3206,7 @@ class FlowsLabelsEndpoint(ListAPIMixin, BaseAPIView):
     pagination_class = NameCursorPagination
 
     def filter_queryset(self, queryset):
-        org = self.request.user.get_org()
+        org = self.get_org()
         return org.flow_labels.all()
 
     @classmethod
@@ -3698,7 +3699,7 @@ class MediaEndpoint(BaseAPIView):
     permission = "msgs.msg_api"
 
     def post(self, request, format=None, *args, **kwargs):
-        org = self.request.user.get_org()
+        org = self.get_org()
         media_file = request.data.get("media_file", None)
         extension = request.data.get("extension", None)
 
@@ -3803,7 +3804,7 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
     }
 
     def derive_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
         folder = self.request.query_params.get("folder")
 
         if folder:
@@ -3819,7 +3820,7 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         # filter by id (optional)
         msg_id = self.get_int_param("id")
@@ -4105,7 +4106,7 @@ class ResthookSubscribersEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, B
     lookup_params = {"id": "id"}
 
     def get_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
         return self.model.objects.filter(resthook__org=org, is_active=True)
 
     def filter_queryset(self, queryset):
@@ -4346,7 +4347,7 @@ class RunsEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         # filter by flow (optional)
         flow_uuid = params.get("flow")
@@ -4682,7 +4683,7 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         active_translations = Prefetch(
             "translations", queryset=TemplateTranslation.objects.filter(is_active=True), to_attr="active_translations"
@@ -4766,7 +4767,7 @@ class TicketersEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         queryset = queryset.filter(org=org, is_active=True)
 
@@ -4843,7 +4844,7 @@ class ExternalServicesEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         queryset = queryset.filter(org=org, is_active=True)
         # filter by uuid (optional)
@@ -4925,7 +4926,7 @@ class TicketsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         queryset = queryset.filter(org=org)
 
@@ -5114,7 +5115,7 @@ class UsersEndpoint(ListAPIMixin, BaseAPIView):
     pagination_class = DateJoinedCursorPagination
 
     def derive_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         # limit to roles if specified
         roles = self.request.query_params.getlist("role")
@@ -5130,7 +5131,7 @@ class UsersEndpoint(ListAPIMixin, BaseAPIView):
         context = super().get_serializer_context()
 
         # build a map of users to roles so that serializing multiple users only uses on query per role
-        org = self.request.user.get_org()
+        org = self.get_org()
         user_roles = {}
         for role in OrgRole:
             for user in role.get_users(org):
@@ -5180,7 +5181,7 @@ class WorkspaceEndpoint(BaseAPIView):
     permission = "orgs.org_api"
 
     def get(self, request, *args, **kwargs):
-        org = request.user.get_org()
+        org = self.get_org()
         serializer = WorkspaceReadSerializer(org)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -5260,7 +5261,7 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
     pagination_class = CreatedOnCursorPagination
 
     def get_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
         catalog = org.catalogs.exclude(is_active=False).first()
         return Product.objects.filter(catalog=catalog)
 
@@ -5332,7 +5333,7 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
     pagination_class = CreatedOnCursorPagination
 
     def get_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
         return WhatsappFlow.objects.filter(org=org, is_active=True)
 
     def filter_queryset(self, queryset):
@@ -5370,7 +5371,12 @@ class EventsEndpoint(BaseAPIView):
         try:
             from temba.api.v2.services.events import fetch_events_for_org
 
-            processed_events = fetch_events_for_org(request.user, **serializer.validated_data)
+            org = self.get_org()
+            user = request.user or SimpleNamespace()
+            if not hasattr(user, "get_org") or not user.get_org():
+                user = SimpleNamespace(get_org=lambda: org)
+
+            processed_events = fetch_events_for_org(user, **serializer.validated_data)
 
             return Response(processed_events)
         except Exception as e:
@@ -5418,7 +5424,12 @@ class EventsGroupByCountEndpoint(BaseAPIView):
         try:
             from temba.api.v2.services.events import fetch_event_counts_for_org
 
-            processed_events = fetch_event_counts_for_org(request.user, **serializer.validated_data)
+            org = self.get_org()
+            user = request.user or SimpleNamespace()
+            if not hasattr(user, "get_org") or not user.get_org():
+                user = SimpleNamespace(get_org=lambda: org)
+
+            processed_events = fetch_event_counts_for_org(user, **serializer.validated_data)
 
             return Response(processed_events)
         except Exception as e:
