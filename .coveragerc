@@ -1,8 +1,6 @@
 # .coveragerc to control coverage.py
 [run]
 source = ./temba
-parallel = true
-concurrency = multiprocessing
 
 [report]
 ignore_errors = True

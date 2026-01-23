@@ -2,7 +2,7 @@ name: CI
 on: [push, pull_request]
 jobs:
   test:
-    name: Test
+    name: Test (${{ matrix.test_group }})
     env:
       python-version: ${{ matrix.python-version }}
       postgis-version: '3.5'
@@ -13,9 +13,24 @@ jobs:
       mailroom-version: '7.1.22'
       DJANGO_SETTINGS_MODULE: temba.settings_ci
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.11.x']
         pg-version: ['15']
+        test_group:
+          - api
+          - channels
+          - core
+          - others
+        include:
+          - test_group: api
+            test_labels: temba.api
+          - test_group: channels
+            test_labels: temba.channels
+          - test_group: core
+            test_labels: temba.contacts temba.flows temba.orgs temba.msgs
+          - test_group: others
+            test_labels: temba.airtime temba.apks temba.archives temba.assets temba.auth_tweaks temba.campaigns temba.classifiers temba.conversion_events temba.dashboard temba.externals temba.features temba.globals temba.ivr temba.locations temba.mailroom temba.notifications temba.policies temba.projects temba.public temba.request_logs temba.schedules temba.templates temba.tests temba.tickets temba.triggers temba.utils temba.wpp_flows temba.wpp_products
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -65,7 +80,6 @@ jobs:
     - name: Initialize environment
       run: |
         poetry add git+https://github.com/noumar/iso639.git
-        #poetry add -n --lock $(cat ${{ github.workspace }}/docker/pip-requires.txt)
         poetry install
         npm install
         sudo npm install -g less
@@ -80,6 +94,7 @@ jobs:
         ./mailroom -db=postgres://temba:temba@localhost:5432/temba?sslmode=disable -redis=redis://localhost:6379/10 -log-level=info > mailroom.log &
 
     - name: Run pre-test checks
+      if: matrix.test_group == 'api'
       run: |
         # test that everything is well formatted, no missing migrations etc
         poetry run ./code_check.py --debug
@@ -89,23 +104,37 @@ jobs:
 
     - name: Run tests
       run: |
-        # Stop mailroom to release database connections (tests use mock_mailroom)
-        pkill -f mailroom || true
-        # Terminate any remaining connections to allow parallel test database cloning
-        PGPASSWORD=temba psql -h localhost -U temba -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'temba' AND pid <> pg_backend_pid();" || true
-        poetry run coverage run manage.py test --keepdb --noinput --verbosity=2 --parallel
-        poetry run coverage combine
+        poetry run coverage run manage.py test --keepdb --noinput --verbosity=2 ${{ matrix.test_labels }}
         poetry run coverage report -i
-        poetry run coverage report -i --rcfile .coveragerc_todo
-        poetry run coverage xml
+        poetry run coverage xml -o coverage-${{ matrix.test_group }}.xml
 
     - name: Mailroom log
       if: failure()
       run: cat mailroom.log
 
-    - name: Upload coverage
-      if: success()
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-${{ matrix.test_group }}
+        path: coverage-${{ matrix.test_group }}.xml
+
+  coverage:
+    name: Upload Coverage
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download coverage artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: coverage-*
+        merge-multiple: true
+
+    - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+        files: coverage-api.xml,coverage-channels.xml,coverage-core.xml,coverage-others.xml
         fail_ci_if_error: true
