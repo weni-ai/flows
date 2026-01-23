@@ -649,6 +649,18 @@ class UserTest(TembaTest):
 
 class OrgDeleteTest(TembaNonAtomicTest):
     def setUp(self):
+        # Start mailroom mocks to avoid connection errors during flow imports
+        self.flow_migrate_patcher = patch(
+            "temba.mailroom.client.MailroomClient.flow_migrate",
+            side_effect=lambda flow, to_version=None: flow
+        )
+        self.flow_inspect_patcher = patch(
+            "temba.mailroom.client.MailroomClient.flow_inspect",
+            return_value={"results": [], "dependencies": [], "waiting_exits": [], "parent_refs": [], "issues": []}
+        )
+        self.flow_migrate_patcher.start()
+        self.flow_inspect_patcher.start()
+
         self.setUpOrgs()
         self.setUpLocations()
 
@@ -862,6 +874,10 @@ class OrgDeleteTest(TembaNonAtomicTest):
 
         # make sure we don't have any uncredited topups
         self.parent_org.apply_topups()
+
+    def tearDown(self):
+        self.flow_migrate_patcher.stop()
+        self.flow_inspect_patcher.stop()
 
     def release_org(self, org, child_org=None, delete=False, expected_files=3):
         with patch("temba.utils.s3.client", return_value=self.mock_s3):
