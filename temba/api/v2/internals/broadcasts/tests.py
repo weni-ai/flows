@@ -192,9 +192,10 @@ class TestInternalWhatsappBroadcast(TembaTest):
                 response.json()["non_field_errors"][0],
             )
 
+    @patch("temba.mailroom.client.MailroomClient.flow_migrate", side_effect=lambda flow, to_version=None: flow)
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
-    def test_trigger_flow_uuid_not_found_and_wrong_type(self):
+    def test_trigger_flow_uuid_not_found_and_wrong_type(self, mock_flow_migrate):
         mock_user = MagicMock(spec=User)
         mock_user.is_authenticated = True
         mock_user.email = "mockuser@example.com"
@@ -222,9 +223,10 @@ class TestInternalWhatsappBroadcast(TembaTest):
             self.assertEqual(response.status_code, 400)
             self.assertIn("Trigger flow must be a messaging or voice flow", response.json()["non_field_errors"][0])
 
+    @patch("temba.mailroom.client.MailroomClient.flow_migrate", side_effect=lambda flow, to_version=None: flow)
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
-    def test_trigger_flow_uuid_success(self):
+    def test_trigger_flow_uuid_success(self, mock_flow_migrate):
         mock_user = MagicMock(spec=User)
         mock_user.is_authenticated = True
         mock_user.email = "mockuser@example.com"
