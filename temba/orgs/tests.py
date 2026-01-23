@@ -651,12 +651,11 @@ class OrgDeleteTest(TembaNonAtomicTest):
     def setUp(self):
         # Start mailroom mocks to avoid connection errors during flow imports
         self.flow_migrate_patcher = patch(
-            "temba.mailroom.client.MailroomClient.flow_migrate",
-            side_effect=lambda flow, to_version=None: flow
+            "temba.mailroom.client.MailroomClient.flow_migrate", side_effect=lambda flow, to_version=None: flow
         )
         self.flow_inspect_patcher = patch(
             "temba.mailroom.client.MailroomClient.flow_inspect",
-            return_value={"results": [], "dependencies": [], "waiting_exits": [], "parent_refs": [], "issues": []}
+            return_value={"results": [], "dependencies": [], "waiting_exits": [], "parent_refs": [], "issues": []},
         )
         self.flow_migrate_patcher.start()
         self.flow_inspect_patcher.start()

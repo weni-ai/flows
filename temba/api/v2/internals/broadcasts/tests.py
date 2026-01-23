@@ -192,7 +192,10 @@ class TestInternalWhatsappBroadcast(TembaTest):
                 response.json()["non_field_errors"][0],
             )
 
-    @patch("temba.mailroom.client.MailroomClient.flow_inspect", return_value={"results": [], "dependencies": [], "waiting_exits": [], "parent_refs": [], "issues": []})
+    @patch(
+        "temba.mailroom.client.MailroomClient.flow_inspect",
+        return_value={"results": [], "dependencies": [], "waiting_exits": [], "parent_refs": [], "issues": []},
+    )
     @patch("temba.mailroom.client.MailroomClient.flow_migrate", side_effect=lambda flow, to_version=None: flow)
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
@@ -224,7 +227,10 @@ class TestInternalWhatsappBroadcast(TembaTest):
             self.assertEqual(response.status_code, 400)
             self.assertIn("Trigger flow must be a messaging or voice flow", response.json()["non_field_errors"][0])
 
-    @patch("temba.mailroom.client.MailroomClient.flow_inspect", return_value={"results": [], "dependencies": [], "waiting_exits": [], "parent_refs": [], "issues": []})
+    @patch(
+        "temba.mailroom.client.MailroomClient.flow_inspect",
+        return_value={"results": [], "dependencies": [], "waiting_exits": [], "parent_refs": [], "issues": []},
+    )
     @patch("temba.mailroom.client.MailroomClient.flow_migrate", side_effect=lambda flow, to_version=None: flow)
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
