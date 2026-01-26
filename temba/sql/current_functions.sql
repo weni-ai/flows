@@ -417,8 +417,10 @@ CREATE OR REPLACE FUNCTION
 RETURNS VOID AS $$
 BEGIN
   IF _start_id IS NOT NULL THEN
-    INSERT INTO flows_flowstartcount("start_id", "count", "is_squashed")
-    VALUES(_start_id, _count, FALSE);
+    IF EXISTS (SELECT 1 FROM flows_flowstart WHERE id = _start_id) THEN
+      INSERT INTO flows_flowstartcount("start_id", "count", "is_squashed")
+      VALUES(_start_id, _count, FALSE);
+    END IF;
   END IF;
 END;
 $$ LANGUAGE plpgsql;
