@@ -135,10 +135,22 @@ jobs:
           # Dynamically discover apps not covered by other test groups
           # Apps in other groups: api, channels, contacts, flows, orgs, msgs
           EXCLUDED="api channels contacts flows orgs msgs"
-          TEST_LABELS=$(find temba -maxdepth 1 -type d ! -name "__pycache__" ! -name "temba" -printf "%f\n" | \
-            grep -v -E "^($(echo $EXCLUDED | tr ' ' '|'))$" | \
-            sed 's/^/temba./' | tr '\n' ' ')
+          
+          # List all directories in temba/, exclude __pycache__ and apps in other groups
+          for dir in temba/*/; do
+            app=$(basename "$dir")
+            if [[ "$app" != "__pycache__" ]] && [[ ! " $EXCLUDED " =~ " $app " ]]; then
+              TEST_LABELS="${TEST_LABELS}temba.$app "
+            fi
+          done
+          
           echo "Dynamically detected test labels: $TEST_LABELS"
+          
+          # Fail if no labels detected (safety check)
+          if [ -z "$TEST_LABELS" ]; then
+            echo "ERROR: No test labels detected!"
+            exit 1
+          fi
         fi
         poetry run coverage run manage.py test --keepdb --noinput --verbosity=2 $TEST_LABELS
         poetry run coverage report -i
