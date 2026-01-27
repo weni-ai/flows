@@ -34,7 +34,7 @@ jobs:
           - test_group: core
             test_labels: temba.contacts temba.flows temba.orgs temba.msgs
           - test_group: others
-            test_labels: temba.airtime temba.apks temba.archives temba.assets temba.auth_tweaks temba.campaigns temba.classifiers temba.conversion_events temba.dashboard temba.externals temba.features temba.globals temba.ivr temba.locations temba.mailroom temba.notifications temba.policies temba.projects temba.public temba.request_logs temba.schedules temba.templates temba.tests temba.tickets temba.triggers temba.utils temba.wpp_flows temba.wpp_products
+            test_labels: ""  # dynamically detected - all apps not in other groups
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -130,7 +130,17 @@ jobs:
 
     - name: Run tests
       run: |
-        poetry run coverage run manage.py test --keepdb --noinput --verbosity=2 ${{ matrix.test_labels }}
+        TEST_LABELS="${{ matrix.test_labels }}"
+        if [ -z "$TEST_LABELS" ]; then
+          # Dynamically discover apps not covered by other test groups
+          # Apps in other groups: api, channels, contacts, flows, orgs, msgs
+          EXCLUDED="api channels contacts flows orgs msgs"
+          TEST_LABELS=$(find temba -maxdepth 1 -type d ! -name "__pycache__" ! -name "temba" -printf "%f\n" | \
+            grep -v -E "^($(echo $EXCLUDED | tr ' ' '|'))$" | \
+            sed 's/^/temba./' | tr '\n' ' ')
+          echo "Dynamically detected test labels: $TEST_LABELS"
+        fi
+        poetry run coverage run manage.py test --keepdb --noinput --verbosity=2 $TEST_LABELS
         poetry run coverage report -i
         poetry run coverage xml -o coverage-${{ matrix.test_group }}.xml
 
