@@ -5981,6 +5981,17 @@ class FilterTemplatesEndpointTest(TembaTest):
 
         self.assertEqual(response.status_code, 200)
 
+        # verify filter by contact
+        response = self.client.get(url, data={"template": "template_test_2", "contact": contact.uuid})
+
+        self.assertEqual(response.status_code, 200)
+        results = response.json().get("results", [])
+
+        self.assertGreater(len(results), 0)
+        
+        for result in results:
+            self.assertEqual(result["uuid"], str(contact.uuid))
+
 
 class WhatsappFlowsEndpointViewSetTest(TembaTest):
     def test_whatsapp_flow(self):
