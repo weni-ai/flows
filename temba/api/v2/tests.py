@@ -6020,7 +6020,8 @@ class FilterTemplatesEndpointNewTest(TembaTest):
         self.client.force_login(self.user)
         url = reverse("api.v2.filter_templates_new") + ".json"
 
-        response = self.client.get(url, data={"template": "template_new_test"})
+        with self.mockReadOnly():
+            response = self.client.get(url, data={"template": "template_new_test"})
         self.assertEqual(response.status_code, 200)
 
         data = response.json()
