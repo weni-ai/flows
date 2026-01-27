@@ -5987,6 +5987,71 @@ class FilterTemplatesEndpointTest(TembaTest):
 
         self.assertEqual(response.status_code, 200)
 
+    def test_filter_templates_anon_masks_contact_urn(self):
+        contact = self.create_contact(name="Anon", org=self.org, user=self.user, phone="+250783835666")
+
+        metadata = {
+            "templating": {
+                "template": {"uuid": "44019537-9afe-4898-9626-a5c724d169gh", "name": "template_test_2"},
+                "language": "eng",
+                "country": "USA",
+                "variables": ["321"],
+                "namespace": "",
+            },
+            "text_language": "eng-US",
+        }
+
+        Msg.objects.create(
+            org=self.org,
+            direction="O",
+            contact=contact,
+            contact_urn=None,
+            text="Hello",
+            channel=self.channel,
+            topup_id=None,
+            status="S",
+            msg_type="",
+            attachments=None,
+            visibility="V",
+            external_id=None,
+            high_priority=None,
+            created_on=timezone.now(),
+            sent_on=timezone.now(),
+            broadcast=None,
+            metadata=metadata,
+            next_attempt=None,
+        )
+
+        view = FilterTemplatesEndpoint
+        view.permission_classes = []
+
+        self.client.force_login(self.user)
+        url = reverse("api.v2.filter_templates") + ".json"
+
+        with AnonymousOrg(self.org):
+            response = self.client.get(url, data={"template": "template_test_2"})
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(1, len(data["results"]))
+        self.assertEqual(f"tel:{ContactURN.ANON_MASK}", data["results"][0]["contact_urn"])
+
+
+class FilterTemplateSerializerNewTest(TembaTest):
+    def test_get_contact_urn_returns_none_without_contact(self):
+        from temba.api.v2.serializers import FilterTemplateSerializerNew
+
+        serializer = FilterTemplateSerializerNew(context={"org": self.org})
+
+        class Dummy:
+            pass
+
+        self.assertIsNone(serializer.get_contact_urn(Dummy()))
+
+        dummy = Dummy()
+        dummy.contact = None
+        self.assertIsNone(serializer.get_contact_urn(dummy))
+
 
 class FilterTemplatesEndpointNewTest(TembaTest):
     def test_filter_templates_new(self):
