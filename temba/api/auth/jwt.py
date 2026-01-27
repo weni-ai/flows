@@ -107,6 +107,25 @@ class BaseJWTAuthentication(BaseAuthentication):
         return (AnonymousUser(), None)
 
 
+class InternalJWTAuthentication(BaseJWTAuthentication):
+    """
+    Implementation that requires specific fields in the JWT payload.
+    Uses the base class to validate the token mechanics, then checks for the
+    can_communicate_internally permission.
+    """
+
+    def authenticate(self, request):
+        payload = self.verify_and_decode_token(request)
+
+        internal_secret_key = payload.get("internal_secret_key")
+        if not internal_secret_key:
+            raise AuthenticationFailed("internal_secret_key must be present in token payload.")
+
+        if internal_secret_key != settings.INTERNAL_SECRET_KEY:
+            raise AuthenticationFailed("Invalid internal_secret_key.")
+
+        return (AnonymousUser(), None)
+
 class RequiredJWTAuthentication(BaseJWTAuthentication):
     """
     Implementation that requires specific fields in the JWT payload.

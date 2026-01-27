@@ -5,12 +5,13 @@ from django.urls import reverse
 
 from temba.tests.base import TembaTest
 
-from .views import (
-    MediaAccessDeniedException,
-    MediaFileNotFoundException,
-    PRESIGNED_URL_EXPIRES,
-    S3MediaProxyView,
+from .exceptions import (
+    EmptyFileIdException,
+    InvalidFileIdFormatException,
+    PresignedUrlGenerationException,
+    S3BucketNotConfiguredException,
 )
+from .views import PRESIGNED_URL_EXPIRES, S3MediaProxyView
 
 
 class TestS3MediaProxyView(TembaTest):
@@ -71,21 +72,25 @@ class TestS3MediaProxyView(TembaTest):
         """Test error when no default bucket is configured."""
         mock_settings.AWS_STORAGE_BUCKET_NAME = None
 
-        with self.assertRaises(MediaFileNotFoundException) as context:
+        with self.assertRaises(S3BucketNotConfiguredException) as context:
             self.view._resolve_file_location("org/123/file.jpg")
 
-        self.assertIn("not configured", str(context.exception))
+        self.assertEqual(str(context.exception), S3BucketNotConfiguredException.message)
 
     def test_validate_file_access_empty_file_id(self):
         """Test validation fails for empty file_id."""
-        with self.assertRaises(MediaFileNotFoundException):
+        with self.assertRaises(EmptyFileIdException) as context:
             self.view._validate_file_access("", None)
+
+        self.assertEqual(str(context.exception), EmptyFileIdException.message)
 
     def test_validate_file_access_too_long_file_id(self):
         """Test validation fails for overly long file_id."""
         long_file_id = "a" * 2000
-        with self.assertRaises(MediaAccessDeniedException):
+        with self.assertRaises(InvalidFileIdFormatException) as context:
             self.view._validate_file_access(long_file_id, None)
+
+        self.assertEqual(str(context.exception), InvalidFileIdFormatException.message)
 
     def test_validate_file_access_valid_file_id(self):
         """Test validation passes for valid file_id."""
@@ -115,10 +120,10 @@ class TestS3MediaProxyView(TembaTest):
         mock_client.generate_presigned_url.side_effect = Exception("S3 error")
         mock_s3.client.return_value = mock_client
 
-        with self.assertRaises(MediaFileNotFoundException) as context:
+        with self.assertRaises(PresignedUrlGenerationException) as context:
             self.view._generate_presigned_url("test-bucket", "test-key")
 
-        self.assertIn("Unable to generate", str(context.exception))
+        self.assertEqual(str(context.exception), PresignedUrlGenerationException.message)
 
 
 class TestS3MediaProxyEndpoint(TembaTest):

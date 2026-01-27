@@ -21,23 +21,20 @@ from django.http import HttpResponseRedirect
 from temba.api.v2.internals.views import APIViewMixin
 from temba.utils import s3
 
+from .exceptions import (
+    EmptyFileIdException,
+    InvalidFileIdFormatException,
+    MediaAccessDeniedException,
+    MediaFileNotFoundException,
+    PresignedUrlGenerationException,
+    S3BucketNotConfiguredException,
+)
+
 logger = logging.getLogger(__name__)
 
 
 # Pre-signed URL expiration time in seconds (5 minutes)
 PRESIGNED_URL_EXPIRES = 60 * 5
-
-
-class MediaFileNotFoundException(Exception):
-    """Raised when the requested media file cannot be found."""
-
-    pass
-
-
-class MediaAccessDeniedException(Exception):
-    """Raised when access to the media file is denied."""
-
-    pass
 
 
 class S3MediaProxyView(APIViewMixin, APIView):
@@ -95,7 +92,7 @@ class S3MediaProxyView(APIViewMixin, APIView):
                 {"error": "Access denied"},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error generating presigned URL for file: {file_id}")
             return Response(
                 {"error": "Internal server error"},
@@ -128,11 +125,11 @@ class S3MediaProxyView(APIViewMixin, APIView):
         #
         # For now, we allow all requests but log them for monitoring
         if not file_id:
-            raise MediaFileNotFoundException("Empty file_id provided")
+            raise EmptyFileIdException()
 
         # Basic validation: file_id should not be empty and should have reasonable length
         if len(file_id) > 1024:
-            raise MediaAccessDeniedException("Invalid file_id format")
+            raise InvalidFileIdFormatException()
 
     def _resolve_file_location(self, file_id: str) -> tuple:
         """
@@ -165,7 +162,7 @@ class S3MediaProxyView(APIViewMixin, APIView):
         # Case 3: Relative path - use default storage bucket
         bucket = getattr(settings, "AWS_STORAGE_BUCKET_NAME", None)
         if not bucket:
-            raise MediaFileNotFoundException("S3 bucket not configured")
+            raise S3BucketNotConfiguredException()
 
         # Remove leading slash if present
         key = file_id.lstrip("/")
@@ -205,4 +202,4 @@ class S3MediaProxyView(APIViewMixin, APIView):
 
         except Exception as e:
             logger.error(f"Failed to generate presigned URL for {bucket}/{key}: {str(e)}")
-            raise MediaFileNotFoundException(f"Unable to generate access URL: {str(e)}")
+            raise PresignedUrlGenerationException() from e
