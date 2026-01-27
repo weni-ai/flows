@@ -126,6 +126,7 @@ class InternalJWTAuthentication(BaseJWTAuthentication):
 
         return (AnonymousUser(), None)
 
+
 class RequiredJWTAuthentication(BaseJWTAuthentication):
     """
     Implementation that requires specific fields in the JWT payload.
