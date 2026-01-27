@@ -1,3 +1,7 @@
+3.54.0
+----------
+* feat: implementing parallel test running to decrease pipeline slow runtime
+
 3.53.1
 ----------
 * feat: Add contact_uuid and contact_urn in filter_template endpoint
