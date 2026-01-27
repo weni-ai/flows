@@ -2615,6 +2615,13 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
             filter_after = f"""
                     AND msg.created_on >= '{after}'"""
 
+        filter_contact = None
+        if params.get("contact"):
+            contact_uuid = serializer.validated_data.get("contact")
+            if contact_uuid:
+                filter_contact = f"""
+                    AND contact.uuid = '{contact_uuid}'"""
+
         sql = """SELECT
                     contact.id,
                     contact.uuid,
@@ -2646,6 +2653,9 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
 
             if after:
                 sql = sql + filter_after
+
+            if filter_contact:
+                sql = sql + filter_contact
 
             sql = sql + final_sql
             cursor.execute(sql, [template, org.id, int(page_size), int(offset)])
@@ -2689,6 +2699,11 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
                     "name": "template",
                     "required": False,
                     "help": "Only return contacts for this template, ex: template=template_test",
+                },
+                {
+                    "name": "contact",
+                    "required": False,
+                    "help": "A contact UUID to filter by, ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
                 },
                 {
                     "name": "before",
@@ -2758,10 +2773,16 @@ class FilterTemplatesEndpointNew(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
+        org = self.request.user.get_org()
 
         template = params.get("template")
         if template:
             queryset = queryset.filter(template=template)
+
+        # filter by contact (optional)
+        contact_uuid = params.get("contact")
+        if contact_uuid:
+            queryset = queryset.filter(contact__uuid=contact_uuid)
 
         return self.filter_before_after(queryset, "created_on")
 
@@ -2777,6 +2798,11 @@ class FilterTemplatesEndpointNew(ListAPIMixin, BaseAPIView):
                     "name": "template",
                     "required": False,
                     "help": "Only return contacts for this template, ex: template=template_test",
+                },
+                {
+                    "name": "contact",
+                    "required": False,
+                    "help": "A contact UUID to filter by, ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
                 },
                 {
                     "name": "before",

@@ -1217,6 +1217,7 @@ class ContactTemplateSerializer(ReadSerializer):
 
 class FilterTemplateSerializer(ReadSerializer):
     template = serializers.CharField()
+    contact = serializers.CharField(required=False)
     page_size = serializers.IntegerField(default=10)
     offset = serializers.IntegerField(default=0)
     before = serializers.CharField(required=False)
@@ -1244,15 +1245,16 @@ class FilterTemplateSerializer(ReadSerializer):
 
     class Meta:
         model = Msg
-        fields = ("template", "page_size", "offset", "before", "after")
+        fields = ("template", "contact", "page_size", "offset", "before", "after")
 
 
 class FilterTemplateSerializerNew(ReadSerializer):
     template = serializers.CharField(required=True)
+    contact = serializers.CharField(required=False)
 
     class Meta:
         model = Msg
-        fields = ("uuid", "contact_id", "template", "text", "created_on", "sent_on", "status")
+        fields = ("uuid", "contact_id", "template", "contact", "text", "created_on", "sent_on", "status")
 
 
 class FlowReadSerializer(ReadSerializer):
