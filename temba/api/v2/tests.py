@@ -31,6 +31,7 @@ from temba.api.v2.views import (
     EventsGroupByCountEndpoint,
     ExternalServicesEndpoint,
     FilterTemplatesEndpoint,
+    FilterTemplatesEndpointNew,
     FlowsLabelsEndpoint,
     ProductsEndpoint,
     TemplatesEndpoint,
@@ -6104,7 +6105,7 @@ class ContactsTemplatesEndpointTest(TembaTest):
 
 class FilterTemplatesEndpointTest(TembaTest):
     def test_filter_templates(self):
-        contact = self.create_contact(name="Martinelli", org=self.org, user=self.user)
+        contact = self.create_contact(name="Martinelli", org=self.org, user=self.user, phone="+250783835665")
 
         metadata = {
             "templating": {
@@ -6145,29 +6146,79 @@ class FilterTemplatesEndpointTest(TembaTest):
         url = reverse("api.v2.filter_templates") + ".json"
 
         # verify filter by template
-        response = self.client.get(url, data={"template": "template_test"})
+        response = self.client.get(url, data={"template": "template_test_2"})
 
         self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(1, len(data["results"]))
+        self.assertEqual(str(contact.uuid), data["results"][0]["uuid"])
+        self.assertEqual(contact.name, data["results"][0]["name"])
+        self.assertEqual(str(contact.get_urn().api_urn()), data["results"][0]["contact_urn"])
 
         # verify filter with page size
-        response = self.client.get(url, data={"template": "template_test", "page_size": "1"})
+        response = self.client.get(url, data={"template": "template_test_2", "page_size": "1"})
 
         self.assertEqual(response.status_code, 200)
 
         # verify filter by offset
-        response = self.client.get(url, data={"template": "template_test", "offset": "1"})
+        response = self.client.get(url, data={"template": "template_test_2", "offset": "1"})
 
         self.assertEqual(response.status_code, 200)
 
         # verify filter with before
-        response = self.client.get(url, data={"template": "template_test", "before": "2024-03-08"})
+        response = self.client.get(url, data={"template": "template_test_2", "before": "2024-03-08"})
 
         self.assertEqual(response.status_code, 200)
 
         # verify filter with after
-        response = self.client.get(url, data={"template": "template_test", "after": "2024-03-05"})
+        response = self.client.get(url, data={"template": "template_test_2", "after": "2024-03-05"})
 
         self.assertEqual(response.status_code, 200)
+
+
+class FilterTemplatesEndpointNewTest(TembaTest):
+    def test_filter_templates_new(self):
+        contact = self.create_contact(name="Aline", org=self.org, user=self.user, phone="+250783800000")
+
+        Msg.objects.create(
+            org=self.org,
+            direction="O",
+            contact=contact,
+            contact_urn=None,
+            text="Hello from template",
+            channel=self.channel,
+            topup_id=None,
+            status="S",
+            msg_type="",
+            attachments=None,
+            visibility="V",
+            external_id=None,
+            high_priority=None,
+            created_on=timezone.now(),
+            sent_on=timezone.now(),
+            broadcast=None,
+            metadata={},
+            next_attempt=None,
+            template="template_new_test",
+        )
+
+        view = FilterTemplatesEndpointNew
+        view.permission_classes = []
+
+        self.client.force_login(self.user)
+        url = reverse("api.v2.filter_templates_new") + ".json"
+
+        response = self.client.get(url, data={"template": "template_new_test"})
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertIn("results", data)
+        self.assertEqual(1, len(data["results"]))
+
+        result = data["results"][0]
+        self.assertEqual(str(contact.uuid), result["contact_uuid"])
+        self.assertEqual(str(contact.get_urn().api_urn()), result["contact_urn"])
+        self.assertEqual("template_new_test", result["template"])
 
 
 class WhatsappFlowsEndpointViewSetTest(TembaTest):

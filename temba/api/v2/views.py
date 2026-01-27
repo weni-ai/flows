@@ -2621,6 +2621,9 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
                     contact.id,
                     contact.uuid,
                     contact.name,
+                    contact_urn.scheme,
+                    contact_urn.path,
+                    contact_urn.display,
                     msg.metadata::json->'templating'->'template'->>'uuid',
                     msg.metadata::json->'templating'->'template'->>'name',
                     msg.text,
@@ -2631,6 +2634,13 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
                 FROM public.msgs_msg as msg
                 JOIN public.contacts_contact as contact
                     on msg.contact_id = contact.id
+                LEFT JOIN LATERAL (
+                    SELECT cu.scheme, cu.path, cu.display
+                    FROM public.contacts_contacturn as cu
+                    WHERE cu.contact_id = contact.id AND cu.org_id = contact.org_id
+                    ORDER BY cu.priority DESC, cu.id ASC
+                    LIMIT 1
+                ) as contact_urn on true
                 WHERE
                     msg.metadata::json->'templating'->'template'->>'name' = %s
                     AND msg.org_id = %s"""
@@ -2653,25 +2663,32 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
             cursor.execute(sql, [template, org.id, int(page_size), int(offset)])
 
             results = cursor.fetchall()
-            messages = list(
-                map(
-                    lambda message: {
+            messages = []
+            for message in results:
+                urn = None
+                if message[3]:
+                    if org.is_anon:
+                        urn = f"{message[3]}:{ContactURN.ANON_MASK}"
+                    else:
+                        urn = str(URN.from_parts(message[3], message[4], display=message[5]))
+
+                messages.append(
+                    {
                         "id": message[0],
                         "uuid": message[1],
                         "name": message[2],
+                        "contact_urn": urn,
                         "template": {
-                            "uuid": message[3],
-                            "name": message[4],
-                            "text": message[5],
-                            "created_on": message[6],
-                            "sent_on": message[7],
-                            "direction": message[8],
-                            "status": message[9],
+                            "uuid": message[6],
+                            "name": message[7],
+                            "text": message[8],
+                            "created_on": message[9],
+                            "sent_on": message[10],
+                            "direction": message[11],
+                            "status": message[12],
                         },
-                    },
-                    results,
+                    }
                 )
-            )
 
         response_data = {
             "results": messages,
@@ -2757,6 +2774,10 @@ class FilterTemplatesEndpointNew(ListAPIMixin, BaseAPIView):
     model = Msg
     serializer_class = FilterTemplateSerializerNew
     pagination_class = ContactsTemplateCursorPagination
+
+    def get_queryset(self):
+        # make sure serializer can access contact details efficiently
+        return super().get_queryset().select_related("contact")
 
     def filter_queryset(self, queryset):
         params = self.request.query_params

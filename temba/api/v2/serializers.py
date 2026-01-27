@@ -1250,10 +1250,33 @@ class FilterTemplateSerializer(ReadSerializer):
 
 class FilterTemplateSerializerNew(ReadSerializer):
     template = serializers.CharField(required=True)
+    contact_uuid = serializers.SerializerMethodField()
+    contact_urn = serializers.SerializerMethodField()
+
+    def get_contact_uuid(self, obj):
+        return str(obj.contact.uuid) if getattr(obj, "contact_id", None) else None
+
+    def get_contact_urn(self, obj):
+        contact = getattr(obj, "contact", None)
+        if not contact:
+            return None
+
+        urn = contact.get_urn()
+        return str(urn.api_urn()) if urn else None
 
     class Meta:
         model = Msg
-        fields = ("uuid", "contact_id", "template", "text", "created_on", "sent_on", "status")
+        fields = (
+            "uuid",
+            "contact_id",
+            "contact_uuid",
+            "contact_urn",
+            "template",
+            "text",
+            "created_on",
+            "sent_on",
+            "status",
+        )
 
 
 class FlowReadSerializer(ReadSerializer):
