@@ -1,3 +1,7 @@
+3.53.1
+----------
+* feat: Add contact_uuid and contact_urn in filter_template endpoint
+
 3.53.0
 ----------
 * feat: Endpoint to save msg without pass to mailroom
