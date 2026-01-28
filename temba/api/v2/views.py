@@ -3800,6 +3800,9 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
         Overridden paginator for Msg endpoint that switches from created_on to modified_on when looking
         at all incoming messages.
         """
+        page_size = 100
+        page_size_query_param = "limit"
+        max_page_size = 1000
 
         def get_ordering(self, request, queryset, view=None):
             if request.query_params.get("folder", "").lower() == "incoming":
