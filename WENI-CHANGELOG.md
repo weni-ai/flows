@@ -1,3 +1,8 @@
+3.55.0
+----------
+* feat: new events endpoint with pagination
+* feat: Add limit in messages.json endpoint
+
 3.54.1
 ----------
 * feat: Avoid null contact_urn in filter_template endpoint
