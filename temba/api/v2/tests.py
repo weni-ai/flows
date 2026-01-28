@@ -6052,6 +6052,23 @@ class FilterTemplateSerializerNewTest(TembaTest):
         dummy.contact = None
         self.assertIsNone(serializer.get_contact_urn(dummy))
 
+    def test_get_contact_urn_prefers_msg_contact_urn(self):
+        from temba.api.v2.serializers import FilterTemplateSerializerNew
+
+        serializer = FilterTemplateSerializerNew(context={"org": self.org})
+
+        contact = self.create_contact(name="MsgURN", org=self.org, user=self.user, phone="+250788000000")
+        msg_urn = contact.get_urn()
+
+        class Dummy:
+            pass
+
+        dummy = Dummy()
+        dummy.contact_urn = msg_urn
+        dummy.contact = None  # should still return based on msg.contact_urn
+
+        self.assertEqual(str(msg_urn.api_urn()), serializer.get_contact_urn(dummy))
+
 
 class FilterTemplatesEndpointNewTest(TembaTest):
     def test_filter_templates_new(self):
@@ -6097,6 +6114,52 @@ class FilterTemplatesEndpointNewTest(TembaTest):
         self.assertEqual(str(contact.uuid), result["contact_uuid"])
         self.assertEqual(str(contact.get_urn().api_urn()), result["contact_urn"])
         self.assertEqual("template_new_test", result["template"])
+
+    def test_filter_templates_new_uses_msg_contact_urn_when_contact_has_no_urns(self):
+        contact = self.create_contact(name="OldURN", org=self.org, user=self.user, phone="+250783811111")
+        old_urn = contact.get_urn()
+
+        # simulate contact URN being removed/detached later
+        old_urn.contact = None
+        old_urn.save(update_fields=["contact"])
+        if hasattr(contact, "_urns_cache"):
+            delattr(contact, "_urns_cache")
+
+        Msg.objects.create(
+            org=self.org,
+            direction="O",
+            contact=contact,
+            contact_urn=old_urn,
+            text="Hello from template",
+            channel=self.channel,
+            topup_id=None,
+            status="S",
+            msg_type="",
+            attachments=None,
+            visibility="V",
+            external_id=None,
+            high_priority=None,
+            created_on=timezone.now(),
+            sent_on=timezone.now(),
+            broadcast=None,
+            metadata={},
+            next_attempt=None,
+            template="template_new_test_2",
+        )
+
+        view = FilterTemplatesEndpointNew
+        view.permission_classes = []
+
+        self.client.force_login(self.user)
+        url = reverse("api.v2.filter_templates_new") + ".json"
+
+        with self.mockReadOnly():
+            response = self.client.get(url, data={"template": "template_new_test_2"})
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(1, len(data["results"]))
+        self.assertEqual(str(old_urn.api_urn()), data["results"][0]["contact_urn"])
 
 
 class WhatsappFlowsEndpointViewSetTest(TembaTest):

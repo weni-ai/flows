@@ -2775,7 +2775,7 @@ class FilterTemplatesEndpointNew(ListAPIMixin, BaseAPIView):
 
     def get_queryset(self):
         # make sure serializer can access contact details efficiently
-        return super().get_queryset().select_related("contact")
+        return super().get_queryset().select_related("contact", "contact_urn")
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
