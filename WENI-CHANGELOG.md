@@ -1,3 +1,7 @@
+3.54.1
+----------
+* feat: Avoid null contact_urn in filter_template endpoint
+
 3.54.0
 ----------
 * feat: implementing parallel test running to decrease pipeline slow runtime
