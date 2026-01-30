@@ -4,12 +4,10 @@ from .views import S3MediaProxyView
 
 urlpatterns = [
     # S3 media proxy endpoint
-    # file_id can be:
-    # - A URL-encoded S3 URL
-    # - A bucket:key format
-    # - A relative path in the default bucket
+    # object_key is the S3 object key (path + filename in the bucket)
+    # Example: /api/v2/internals/media/download/media/image.jpg/
     url(
-        r"^api/v2/internals/media/download/(?P<file_id>.+)/$",
+        r"^api/v2/internals/media/download/(?P<object_key>.+)/$",
         S3MediaProxyView.as_view(),
         name="internals.media_download",
     ),

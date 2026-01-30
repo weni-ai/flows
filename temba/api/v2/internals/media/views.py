@@ -42,132 +42,99 @@ class S3MediaProxyView(APIViewMixin, APIView):
     Endpoint that serves as a redirect proxy for private S3 files.
 
     This view:
-    1. Receives a file_id that identifies a file in S3
-    2. Validates that the requester has access to the file (placeholder for context validation)
+    1. Receives an object_key that identifies a file in S3
+    2. Validates the object_key format
     3. Generates a pre-signed URL with short expiration (5 minutes)
     4. Returns HTTP 302 redirect to the pre-signed URL
 
     This allows permanent URLs in chat history exports while keeping the S3 bucket private.
 
-    URL: GET /api/v2/internals/media/download/<file_id>/
+    URL: GET /api/v2/internals/media/download/<object_key>/
+
+    Example:
+        If the file path in S3 is "media/image.jpg", the request would be:
+        GET /api/v2/internals/media/download/media/image.jpg/
     """
 
-    authentication_classes = []  # Public endpoint - security via file_id obscurity + validation
+    authentication_classes = []  # Public endpoint - security via object_key obscurity + validation
     permission_classes = []
     renderer_classes = [JSONRenderer]
 
-    def get(self, request, file_id: str, *args, **kwargs):
+    def get(self, request, object_key: str, *args, **kwargs):
         """
         Handle GET request to download/redirect to S3 file.
 
         Args:
             request: The HTTP request
-            file_id: Unique identifier for the file (can be a full S3 key or an encoded identifier)
+            object_key: The S3 object key (path + filename in the bucket)
 
         Returns:
             HTTP 302 redirect to pre-signed S3 URL, or error response
         """
         try:
-            # Validate file access (placeholder for context validation)
-            self._validate_file_access(file_id, request)
+            # Validate object_key
+            self._validate_object_key(object_key)
 
-            # Translate file_id to S3 bucket and key
-            bucket, key = self._resolve_file_location(file_id)
+            # Get bucket from settings
+            bucket = self._get_bucket()
 
             # Generate pre-signed URL
-            presigned_url = self._generate_presigned_url(bucket, key)
+            presigned_url = self._generate_presigned_url(bucket, object_key)
 
             # Return 302 redirect to the pre-signed URL
             return HttpResponseRedirect(presigned_url)
 
         except MediaFileNotFoundException as e:
-            logger.warning(f"Media file not found: {file_id} - {str(e)}")
+            logger.warning(f"Media file not found: {object_key} - {str(e)}")
             return Response(
                 {"error": "File not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
         except MediaAccessDeniedException as e:
-            logger.warning(f"Media access denied: {file_id} - {str(e)}")
+            logger.warning(f"Media access denied: {object_key} - {str(e)}")
             return Response(
                 {"error": "Access denied"},
                 status=status.HTTP_403_FORBIDDEN,
             )
         except Exception:
-            logger.exception(f"Error generating presigned URL for file: {file_id}")
+            logger.exception(f"Error generating presigned URL for file: {object_key}")
             return Response(
                 {"error": "Internal server error"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    def _validate_file_access(self, file_id: str, request) -> None:
+    def _validate_object_key(self, object_key: str) -> None:
         """
-        Validate that the requester has access to the requested file.
-
-        This is a placeholder for future implementation where we verify:
-        - The file_id belongs to a valid archived chat context
-        - The requester has permission to access this context
-        - Any rate limiting or abuse prevention
+        Validate the S3 object key format.
 
         Args:
-            file_id: The file identifier
-            request: The HTTP request for extracting auth context if needed
+            object_key: The S3 object key to validate
 
         Raises:
-            MediaAccessDeniedException: If access should be denied
-            MediaFileNotFoundException: If the file context doesn't exist
+            EmptyFileIdException: If object_key is empty
+            InvalidFileIdFormatException: If object_key format is invalid
         """
-        # TODO: Implement context validation
-        # Example validations to consider:
-        # 1. Check if file_id matches a known pattern (e.g., org_id/archive_type/filename)
-        # 2. Validate that the referenced org/archive exists
-        # 3. Check if the request has valid auth token for the org
-        # 4. Rate limiting per IP/user
-        #
-        # For now, we allow all requests but log them for monitoring
-        if not file_id:
+        if not object_key:
             raise EmptyFileIdException()
 
-        # Basic validation: file_id should not be empty and should have reasonable length
-        if len(file_id) > 1024:
+        # Basic validation: object_key should have reasonable length
+        if len(object_key) > 1024:
             raise InvalidFileIdFormatException()
 
-    def _resolve_file_location(self, file_id: str) -> tuple:
+    def _get_bucket(self) -> str:
         """
-        Translate the file_id to an S3 bucket and object key.
-
-        The file_id can be:
-        1. A full S3 URL (https://bucket.s3.amazonaws.com/key)
-        2. A relative path that will be combined with the default bucket
-        3. A prefixed path (bucket:key format)
-
-        Args:
-            file_id: The file identifier
+        Get the S3 bucket name from settings.
 
         Returns:
-            Tuple of (bucket, key)
+            The S3 bucket name
 
         Raises:
-            MediaFileNotFoundException: If the file_id cannot be resolved
+            S3BucketNotConfiguredException: If bucket is not configured
         """
-        # Case 1: Full S3 URL
-        if file_id.startswith("http://") or file_id.startswith("https://"):
-            return s3.split_url(file_id)
-
-        # Case 2: bucket:key format
-        if ":" in file_id and not file_id.startswith("/"):
-            parts = file_id.split(":", 1)
-            if len(parts) == 2:
-                return parts[0], parts[1]
-
-        # Case 3: Relative path - use default storage bucket
         bucket = getattr(settings, "AWS_STORAGE_BUCKET_NAME", None)
         if not bucket:
             raise S3BucketNotConfiguredException()
-
-        # Remove leading slash if present
-        key = file_id.lstrip("/")
-
-        return bucket, key
+        return bucket
 
     def _generate_presigned_url(self, bucket: str, key: str) -> str:
         """
