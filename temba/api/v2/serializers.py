@@ -296,16 +296,88 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             raise serializers.ValidationError("Must provide either text, attachments, template or action_type")
         return value
 
+    def _has_whatsapp_urns(self, data):
+        """
+        Check if any of the provided URNs, contacts, or groups have WhatsApp URNs
+        Returns True if at least one WhatsApp URN is found, False otherwise
+        """
+        from temba.contacts.models import URN
+
+        # Check direct URNs
+        urns = data.get("urns", [])
+        if urns:
+            for urn in urns:
+                if isinstance(urn, str):
+                    if urn.startswith("whatsapp:"):
+                        return True
+                    # URN might be normalized, check scheme
+                    try:
+                        scheme, _, _, _ = URN.to_parts(urn)
+                        if scheme == URN.WHATSAPP_SCHEME:
+                            return True
+                    except (ValueError, AttributeError):
+                        pass
+
+        # Check contacts' URNs (contacts are already resolved by ContactField)
+        contacts = data.get("contacts", [])
+        if contacts:
+            for contact in contacts:
+                # ContactField returns Contact objects
+                if hasattr(contact, "get_urns"):
+                    try:
+                        for urn in contact.get_urns():
+                            if urn.scheme == URN.WHATSAPP_SCHEME:
+                                return True
+                    except Exception:
+                        pass
+                elif hasattr(contact, "urns"):
+                    try:
+                        # Use select_related to avoid N+1 queries
+                        for urn in contact.urns.all().select_related():
+                            if urn.scheme == URN.WHATSAPP_SCHEME:
+                                return True
+                    except Exception:
+                        pass
+
+        # Check groups' contacts' URNs (groups are already resolved by ContactGroupField)
+        groups = data.get("groups", [])
+        if groups:
+            for group in groups:
+                # ContactGroupField returns ContactGroup objects
+                try:
+                    # Get contacts in the group - limit to avoid loading too many
+                    group_contacts = group.contacts.filter(is_active=True)[:100]
+                    for contact in group_contacts:
+                        if hasattr(contact, "get_urns"):
+                            for urn in contact.get_urns():
+                                if urn.scheme == URN.WHATSAPP_SCHEME:
+                                    return True
+                        elif hasattr(contact, "urns"):
+                            for urn in contact.urns.all():
+                                if urn.scheme == URN.WHATSAPP_SCHEME:
+                                    return True
+                except Exception:
+                    pass
+
+        return False
+
     def validate(self, data):
         if not (data.get("urns") or data.get("contacts") or data.get("groups")):
             raise serializers.ValidationError("Must provide either urns, contacts or groups")
+
+        # Determine broadcast_type based on URNs
+        has_whatsapp = self._has_whatsapp_urns(data)
+        data["_broadcast_type"] = (
+            Broadcast.BROADCAST_TYPE_WHATSAPP if has_whatsapp else Broadcast.BROADCAST_TYPE_DEFAULT
+        )
 
         channel_data = data.get("channel", None)
         if channel_data:
             try:
                 channel = Channel.objects.get(uuid=channel_data)
                 data["channel"] = channel
-                if channel.channel_type != "WAC":
+                # Only require WAC channel if broadcast_type is WhatsApp
+                if data["_broadcast_type"] == Broadcast.BROADCAST_TYPE_WHATSAPP and channel.channel_type != "WAC":
                     raise serializers.ValidationError("Channel must be a WhatsApp Cloud channel")
             except Channel.DoesNotExist:
                 raise serializers.ValidationError("Channel not found")
@@ -400,22 +472,47 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         Create a new whatsapp broadcast to send out
         """
 
+        # Get the determined broadcast_type from validation
+        broadcast_type = self.validated_data.get("_broadcast_type", Broadcast.BROADCAST_TYPE_WHATSAPP)
+
+        # For DEFAULT broadcast type, we need to convert msg to text format
+        msg_data = self.validated_data.get("msg", {})
+        text = None
+        base_language = None
+
+        if broadcast_type == Broadcast.BROADCAST_TYPE_DEFAULT:
+            # Extract text from msg if available
+            org = self.context["org"]
+            base_language = org.flow_languages[0] if org.flow_languages else "base"
+            if msg_data.get("text"):
+                text = {base_language: msg_data["text"]}
+            else:
+                # If no text in msg, use empty text (mailroom will handle it)
+                text = {base_language: ""}
+
         # create the broadcast
-        broadcast = Broadcast.create(
-            self.context["org"],
-            self.context["user"],
-            groups=self.validated_data.get("groups", []),
-            contacts=self.validated_data.get("contacts", []),
-            urns=self.validated_data.get("urns", []),
-            template_state=Broadcast.TEMPLATE_STATE_UNEVALUATED,
-            msg=self.validated_data.get("msg", {}),
-            channel=self.validated_data.get("channel", None),
-            broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
-            queue=self.validated_data.get("queue", None),
-            name=self.validated_data.get("name", None),
-            template_id=self.validated_data.get("template_id", None),
-            is_bulk_send=True if self.validated_data.get("queue") == "template_batch" else False,
-        )
+        create_kwargs = {
+            "org": self.context["org"],
+            "user": self.context["user"],
+            "groups": self.validated_data.get("groups", []),
+            "contacts": self.validated_data.get("contacts", []),
+            "urns": self.validated_data.get("urns", []),
+            "template_state": Broadcast.TEMPLATE_STATE_UNEVALUATED,
+            "channel": self.validated_data.get("channel", None),
+            "broadcast_type": broadcast_type,
+            "queue": self.validated_data.get("queue", None),
+            "name": self.validated_data.get("name", None),
+            "template_id": self.validated_data.get("template_id", None),
+            "is_bulk_send": True if self.validated_data.get("queue") == "template_batch" else False,
+        }
+
+        if broadcast_type == Broadcast.BROADCAST_TYPE_DEFAULT:
+            create_kwargs["text"] = text
+            create_kwargs["base_language"] = base_language
+        else:
+            create_kwargs["msg"] = msg_data
+
+        broadcast = Broadcast.create(**create_kwargs)
         # create optional catch-all trigger (uncaught message) for provided flow and groups
         trigger_flow = self.validated_data.get("trigger_flow")
         if trigger_flow and self.validated_data.get("queue") == "template_batch":
@@ -1277,7 +1374,7 @@ class FlowReadSerializer(ReadSerializer):
         return self.FLOW_TYPES.get(obj.flow_type)
 
     def get_labels(self, obj):
-        return [{"uuid": l.uuid, "name": l.name} for l in obj.labels.all()]
+        return [{"uuid": label.uuid, "name": label.name} for label in obj.labels.all()]
 
     def get_runs(self, obj):
         stats = obj.get_run_stats()

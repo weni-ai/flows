@@ -243,6 +243,173 @@ class TestInternalWhatsappBroadcast(TembaTest):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json(), {"message": "Success"})
 
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_broadcast_type_whatsapp_with_whatsapp_urns(self):
+        """Test that broadcast_type is 'W' when WhatsApp URNs are provided directly"""
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            url = "/api/v2/internals/whatsapp_broadcasts"
+            body = {
+                "project": self.org.proj_uuid,
+                "urns": ["whatsapp:5561912345678"],
+                "msg": {"text": "Hello"},
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+            self.assertEqual(response.status_code, 200)
+            # Verify broadcast was created with broadcast_type='W'
+            broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
+            self.assertIsNotNone(broadcast)
+            self.assertEqual(broadcast.broadcast_type, Broadcast.BROADCAST_TYPE_WHATSAPP)
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_broadcast_type_default_with_non_whatsapp_urns(self):
+        """Test that broadcast_type is 'D' when non-WhatsApp URNs are provided"""
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            url = "/api/v2/internals/whatsapp_broadcasts"
+            body = {
+                "project": self.org.proj_uuid,
+                "urns": ["tel:+12025550149"],
+                "msg": {"text": "Hello"},
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+            self.assertEqual(response.status_code, 200)
+            # Verify broadcast was created with broadcast_type='D'
+            broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
+            self.assertIsNotNone(broadcast)
+            self.assertEqual(broadcast.broadcast_type, Broadcast.BROADCAST_TYPE_DEFAULT)
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_broadcast_type_whatsapp_with_whatsapp_contact(self):
+        """Test that broadcast_type is 'W' when contact has WhatsApp URN"""
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+            url = "/api/v2/internals/whatsapp_broadcasts"
+            body = {
+                "project": self.org.proj_uuid,
+                "contacts": [contact.uuid],
+                "msg": {"text": "Hello"},
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+            self.assertEqual(response.status_code, 200)
+            # Verify broadcast was created with broadcast_type='W'
+            broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
+            self.assertIsNotNone(broadcast)
+            self.assertEqual(broadcast.broadcast_type, Broadcast.BROADCAST_TYPE_WHATSAPP)
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_broadcast_type_default_with_non_whatsapp_contact(self):
+        """Test that broadcast_type is 'D' when contact has non-WhatsApp URN"""
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            contact = self.create_contact("Alice", urns=["tel:+12025550149"])
+            url = "/api/v2/internals/whatsapp_broadcasts"
+            body = {
+                "project": self.org.proj_uuid,
+                "contacts": [contact.uuid],
+                "msg": {"text": "Hello"},
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+            self.assertEqual(response.status_code, 200)
+            # Verify broadcast was created with broadcast_type='D'
+            broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
+            self.assertIsNotNone(broadcast)
+            self.assertEqual(broadcast.broadcast_type, Broadcast.BROADCAST_TYPE_DEFAULT)
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_broadcast_type_whatsapp_with_whatsapp_group(self):
+        """Test that broadcast_type is 'W' when group contains contacts with WhatsApp URNs"""
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+            group = self.create_group("WhatsApp Group", contacts=[contact])
+            url = "/api/v2/internals/whatsapp_broadcasts"
+            body = {
+                "project": self.org.proj_uuid,
+                "groups": [str(group.uuid)],
+                "msg": {"text": "Hello"},
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+            self.assertEqual(response.status_code, 200)
+            # Verify broadcast was created with broadcast_type='W'
+            broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
+            self.assertIsNotNone(broadcast)
+            self.assertEqual(broadcast.broadcast_type, Broadcast.BROADCAST_TYPE_WHATSAPP)
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_broadcast_type_default_with_non_whatsapp_group(self):
+        """Test that broadcast_type is 'D' when group contains contacts without WhatsApp URNs"""
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            contact = self.create_contact("Alice", urns=["tel:+12025550149"])
+            group = self.create_group("SMS Group", contacts=[contact])
+            url = "/api/v2/internals/whatsapp_broadcasts"
+            body = {
+                "project": self.org.proj_uuid,
+                "groups": [str(group.uuid)],
+                "msg": {"text": "Hello"},
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+            self.assertEqual(response.status_code, 200)
+            # Verify broadcast was created with broadcast_type='D'
+            broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
+            self.assertIsNotNone(broadcast)
+            self.assertEqual(broadcast.broadcast_type, Broadcast.BROADCAST_TYPE_DEFAULT)
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_broadcast_type_whatsapp_with_mixed_urns(self):
+        """Test that broadcast_type is 'W' when at least one WhatsApp URN is present"""
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            url = "/api/v2/internals/whatsapp_broadcasts"
+            body = {
+                "project": self.org.proj_uuid,
+                "urns": ["tel:+12025550149", "whatsapp:5561912345678"],
+                "msg": {"text": "Hello"},
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+            self.assertEqual(response.status_code, 200)
+            # Verify broadcast was created with broadcast_type='W' (at least one WhatsApp URN)
+            broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
+            self.assertIsNotNone(broadcast)
+            self.assertEqual(broadcast.broadcast_type, Broadcast.BROADCAST_TYPE_WHATSAPP)
+
 
 class TestInternalBroadcastsUploadMedia(TembaTest):
     def setUp(self):
