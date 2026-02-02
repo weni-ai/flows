@@ -1,10 +1,15 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+      - staging
+  pull_request:
 jobs:
   test:
-    name: Test
+    name: Test (${{ matrix.test_group }})
     env:
-      python-version: ${{ matrix.python-version }}
+      python-version: '3.11'
       postgis-version: '3.5'
       redis-version: '3.2.4'
       node-version: '10'
@@ -13,13 +18,27 @@ jobs:
       mailroom-version: '7.1.22'
       DJANGO_SETTINGS_MODULE: temba.settings_ci
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ['3.11.x']
         pg-version: ['15']
+        test_group:
+          - api
+          - channels
+          - core
+          - others
+        include:
+          - test_group: api
+            test_labels: temba.api
+          - test_group: channels
+            test_labels: temba.channels
+          - test_group: core
+            test_labels: temba.contacts temba.flows temba.orgs temba.msgs
+          - test_group: others
+            test_labels: ""  # dynamically detected - all apps not in other groups
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v1
+      uses: actions/checkout@v4
 
     - name: Install PostgreSQL and PostGIS
       uses: nyaruka/postgis-action@v2.1.0
@@ -37,7 +56,7 @@ jobs:
         sudo apt install -y --no-install-recommends libgdal-dev gettext
 
     - name: Install Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.python-version }}
 
@@ -46,6 +65,14 @@ jobs:
       with:
         version: 2.2.0
         virtualenvs-in-project: true
+
+    - name: Cache Poetry virtualenv
+      uses: actions/cache@v4
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ env.python-version }}-${{ hashFiles('poetry.lock') }}
+        restore-keys: |
+          venv-${{ runner.os }}-${{ env.python-version }}-
 
     - name: Install Redis
       uses: zhulik/redis-action@v1.0.0
@@ -58,28 +85,42 @@ jobs:
         elastic version: ${{ env.elastic-version }}
 
     - name: Install Node
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ env.node-version }}
 
-    - name: Initialize environment
+    - name: Cache npm dependencies
+      uses: actions/cache@v4
+      with:
+        path: node_modules
+        key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+        restore-keys: |
+          npm-${{ runner.os }}-
+
+    - name: Install Python dependencies
       run: |
         poetry add git+https://github.com/noumar/iso639.git
-        #poetry add -n --lock $(cat ${{ github.workspace }}/docker/pip-requires.txt)
         poetry install
+
+    - name: Install Node dependencies
+      run: |
         npm install
         sudo npm install -g less
+
+    - name: Initialize environment
+      run: |
         ln -s ${{ github.workspace }}/temba/settings.py.dev ${{ github.workspace }}/temba/settings.py
         poetry run python manage.py migrate
         # fetch and extract rp-indexer
-        wget https://github.com/weni-ai/rp-indexer/releases/download/${{ env.rpindexer-version }}/rp-indexer_${{ env.rpindexer-version }}_linux_amd64.tar.gz
+        wget -q https://github.com/weni-ai/rp-indexer/releases/download/${{ env.rpindexer-version }}/rp-indexer_${{ env.rpindexer-version }}_linux_amd64.tar.gz
         tar -xvf rp-indexer_${{ env.rpindexer-version }}_linux_amd64.tar.gz rp-indexer
         # fetch, extract and start mailroom
-        wget https://github.com/rapidpro/mailroom/releases/download/v${{ env.mailroom-version }}/mailroom_${{ env.mailroom-version }}_linux_amd64.tar.gz
+        wget -q https://github.com/rapidpro/mailroom/releases/download/v${{ env.mailroom-version }}/mailroom_${{ env.mailroom-version }}_linux_amd64.tar.gz
         tar -xvf mailroom_${{ env.mailroom-version }}_linux_amd64.tar.gz mailroom
         ./mailroom -db=postgres://temba:temba@localhost:5432/temba?sslmode=disable -redis=redis://localhost:6379/10 -log-level=info > mailroom.log &
 
     - name: Run pre-test checks
+      if: matrix.test_group == 'api'
       run: |
         # test that everything is well formatted, no missing migrations etc
         poetry run ./code_check.py --debug
@@ -89,18 +130,59 @@ jobs:
 
     - name: Run tests
       run: |
-        poetry run coverage run manage.py test --keepdb --noinput --verbosity=2
+        TEST_LABELS="${{ matrix.test_labels }}"
+        if [ -z "$TEST_LABELS" ]; then
+          # Dynamically discover apps not covered by other test groups
+          # Apps in other groups: api, channels, contacts, flows, orgs, msgs
+          EXCLUDED="api channels contacts flows orgs msgs"
+          
+          # List all directories in temba/, exclude __pycache__ and apps in other groups
+          for dir in temba/*/; do
+            app=$(basename "$dir")
+            if [[ "$app" != "__pycache__" ]] && [[ ! " $EXCLUDED " =~ " $app " ]]; then
+              TEST_LABELS="${TEST_LABELS}temba.$app "
+            fi
+          done
+          
+          echo "Dynamically detected test labels: $TEST_LABELS"
+          
+          # Fail if no labels detected (safety check)
+          if [ -z "$TEST_LABELS" ]; then
+            echo "ERROR: No test labels detected!"
+            exit 1
+          fi
+        fi
+        poetry run coverage run manage.py test --keepdb --noinput --verbosity=2 $TEST_LABELS
         poetry run coverage report -i
-        poetry run coverage report -i --rcfile .coveragerc_todo
-        poetry run coverage xml
+        poetry run coverage xml -o coverage-${{ matrix.test_group }}.xml
 
     - name: Mailroom log
       if: failure()
       run: cat mailroom.log
 
-    - name: Upload coverage
-      if: success()
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-${{ matrix.test_group }}
+        path: coverage-${{ matrix.test_group }}.xml
+
+  coverage:
+    name: Upload Coverage
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download coverage artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: coverage-*
+        merge-multiple: true
+
+    - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+        files: coverage-api.xml,coverage-channels.xml,coverage-core.xml,coverage-others.xml
         fail_ci_if_error: true
