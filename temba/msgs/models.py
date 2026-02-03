@@ -178,6 +178,9 @@ class Broadcast(models.Model):
             metadata = {Broadcast.METADATA_TEMPLATE_STATE: template_state}
             if quick_replies:
                 metadata[Broadcast.METADATA_QUICK_REPLIES] = quick_replies
+            # Preserve msg data (including catalog_message) in metadata for DEFAULT type as well
+            if msg:
+                metadata.update(msg)
 
         if broadcast_type == cls.BROADCAST_TYPE_WHATSAPP:
             metadata = msg

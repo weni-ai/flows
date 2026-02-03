@@ -510,6 +510,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         if broadcast_type == Broadcast.BROADCAST_TYPE_DEFAULT:
             create_kwargs["text"] = text
             create_kwargs["base_language"] = base_language
+            create_kwargs["msg"] = msg_data
         else:
             create_kwargs["msg"] = msg_data
 
