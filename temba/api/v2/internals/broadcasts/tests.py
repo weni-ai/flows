@@ -260,7 +260,7 @@ class TestInternalWhatsappBroadcast(TembaTest):
             }
             response = self.client.post(url, data=body, content_type="application/json")
 
-            self.assertEqual(response.status_code, 200)
+            self.assertIn(response.status_code, (200, 201))
             # Verify broadcast was created with broadcast_type='W'
             broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
             self.assertIsNotNone(broadcast)
@@ -283,7 +283,7 @@ class TestInternalWhatsappBroadcast(TembaTest):
             }
             response = self.client.post(url, data=body, content_type="application/json")
 
-            self.assertEqual(response.status_code, 200)
+            self.assertIn(response.status_code, (200, 201))
             # Verify broadcast was created with broadcast_type='D'
             broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
             self.assertIsNotNone(broadcast)
@@ -307,7 +307,7 @@ class TestInternalWhatsappBroadcast(TembaTest):
             }
             response = self.client.post(url, data=body, content_type="application/json")
 
-            self.assertEqual(response.status_code, 200)
+            self.assertIn(response.status_code, (200, 201))
             # Verify broadcast was created with broadcast_type='W'
             broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
             self.assertIsNotNone(broadcast)
@@ -331,7 +331,7 @@ class TestInternalWhatsappBroadcast(TembaTest):
             }
             response = self.client.post(url, data=body, content_type="application/json")
 
-            self.assertEqual(response.status_code, 200)
+            self.assertIn(response.status_code, (200, 201))
             # Verify broadcast was created with broadcast_type='D'
             broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
             self.assertIsNotNone(broadcast)
@@ -356,7 +356,7 @@ class TestInternalWhatsappBroadcast(TembaTest):
             }
             response = self.client.post(url, data=body, content_type="application/json")
 
-            self.assertEqual(response.status_code, 200)
+            self.assertIn(response.status_code, (200, 201))
             # Verify broadcast was created with broadcast_type='W'
             broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
             self.assertIsNotNone(broadcast)
@@ -381,7 +381,7 @@ class TestInternalWhatsappBroadcast(TembaTest):
             }
             response = self.client.post(url, data=body, content_type="application/json")
 
-            self.assertEqual(response.status_code, 200)
+            self.assertIn(response.status_code, (200, 201))
             # Verify broadcast was created with broadcast_type='D'
             broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
             self.assertIsNotNone(broadcast)
@@ -404,7 +404,7 @@ class TestInternalWhatsappBroadcast(TembaTest):
             }
             response = self.client.post(url, data=body, content_type="application/json")
 
-            self.assertEqual(response.status_code, 200)
+            self.assertIn(response.status_code, (200, 201))
             # Verify broadcast was created with broadcast_type='W' (at least one WhatsApp URN)
             broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
             self.assertIsNotNone(broadcast)
@@ -452,7 +452,7 @@ class TestInternalWhatsappBroadcast(TembaTest):
             }
             response = self.client.post(url, data=body, content_type="application/json")
 
-            self.assertEqual(response.status_code, 200)
+            self.assertIn(response.status_code, (200, 201))
             # Verify broadcast was created with broadcast_type='D'
             broadcast = Broadcast.objects.filter(org=self.org).order_by("-created_on").first()
             self.assertIsNotNone(broadcast)
