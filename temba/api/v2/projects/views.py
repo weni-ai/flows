@@ -179,16 +179,10 @@ class InternalProjectMessageCountView(ISO8601DateFilterQueryParamsMixin, APIView
 
         if project_uuid:
             # Return detailed results for specific project
-            results = list(
-                queryset.values("day", "count").order_by("day")
-            )
+            results = list(queryset.values("day", "count").order_by("day"))
         else:
             # Aggregate counts by day across all projects
-            results = list(
-                queryset.values("day")
-                .annotate(count=Sum("count"))
-                .order_by("day")
-            )
+            results = list(queryset.values("day").annotate(count=Sum("count")).order_by("day"))
 
         # Calculate total
         total = sum(r["count"] for r in results)

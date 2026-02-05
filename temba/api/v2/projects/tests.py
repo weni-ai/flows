@@ -325,18 +325,14 @@ class InternalProjectMessageCountViewTest(TembaTest):
         UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 3), count=30)
 
         # Filter by single day
-        resp = self.client.get(
-            f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-02&before=2026-01-02"
-        )
+        resp = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-02&before=2026-01-02")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(len(data["results"]), 1)
         self.assertEqual(data["total"], 20)
 
         # Filter by date range
-        resp = self.client.get(
-            f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-01&before=2026-01-03"
-        )
+        resp = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-01&before=2026-01-03")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(len(data["results"]), 3)
