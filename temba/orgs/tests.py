@@ -5082,23 +5082,52 @@ class UniqueContactCountTest(TembaTest):
         # No records should be created
         self.assertEqual(UniqueContactCount.objects.count(), 0)
 
+    @patch("sentry_sdk.capture_exception")
+    @patch("time.sleep")
     @patch("temba.orgs.tasks.Elasticsearch")
-    def test_update_unique_contact_counts_handles_es_error(self, mock_es_class):
-        """Test that ES errors for one org don't stop processing other orgs."""
+    def test_update_unique_contact_counts_retries_and_reports_to_sentry(self, mock_es_class, mock_sleep, mock_capture):
+        """Test that ES errors trigger retries and report to Sentry after exhausting retries."""
+        from temba.orgs.models import UniqueContactCount
+        from temba.orgs.tasks import ORG_MAX_RETRIES, update_unique_contact_counts
+
+        mock_es_instance = mock_es_class.return_value
+
+        # First org fails all retries, second org succeeds
+        # Need ORG_MAX_RETRIES failures for org1, then 1 success for org2
+        side_effects = [Exception("ES error")] * ORG_MAX_RETRIES + [{"count": 50}]
+        mock_es_instance.count.side_effect = side_effects
+
+        # Run the task (should continue after error and report to Sentry)
+        update_unique_contact_counts(target_date="2026-01-15")
+
+        # Sentry should have been called for the failed org
+        self.assertTrue(mock_capture.called)
+
+        # At least one record should be created (for org2)
+        records = UniqueContactCount.objects.filter(day="2026-01-15")
+        self.assertEqual(records.count(), 1)
+
+    @patch("time.sleep")
+    @patch("temba.orgs.tasks.Elasticsearch")
+    def test_update_unique_contact_counts_retries_on_transient_error(self, mock_es_class, mock_sleep):
+        """Test that transient errors are retried and succeed."""
         from temba.orgs.models import UniqueContactCount
         from temba.orgs.tasks import update_unique_contact_counts
 
         mock_es_instance = mock_es_class.return_value
 
-        # First call raises error, second call succeeds
-        mock_es_instance.count.side_effect = [Exception("ES error"), {"count": 50}]
+        # First call fails, second succeeds (within retry limit)
+        mock_es_instance.count.side_effect = [
+            Exception("Transient error"),
+            {"count": 42},
+            {"count": 50},  # for org2
+        ]
 
-        # Run the task (should continue after error)
         update_unique_contact_counts(target_date="2026-01-15")
 
-        # At least one record should be created (for org2)
+        # Both orgs should have records
         records = UniqueContactCount.objects.filter(day="2026-01-15")
-        self.assertEqual(records.count(), 1)
+        self.assertEqual(records.count(), 2)
 
     def test_unique_contact_count_model_str(self):
         """Test the string representation of UniqueContactCount."""

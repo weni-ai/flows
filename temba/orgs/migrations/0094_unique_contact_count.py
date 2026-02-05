@@ -11,13 +11,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterField(
-            model_name="org",
-            name="plan",
-            field=models.CharField(
-                default="infinity", help_text="What plan your organization is on", max_length=16, verbose_name="Plan"
-            ),
-        ),
         migrations.CreateModel(
             name="UniqueContactCount",
             fields=[
