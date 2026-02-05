@@ -1141,7 +1141,7 @@ CELERY_BEAT_SCHEDULE = {
     "trim-sync-events": {"task": "trim_sync_events_task", "schedule": crontab(hour=3, minute=0)},
     "trim-webhook-event": {"task": "trim_webhook_event_task", "schedule": crontab(hour=3, minute=0)},
     "update-org-activity": {"task": "update_org_activity_task", "schedule": crontab(hour=3, minute=5)},
-    "update-unique-contact-counts": {"task": "update_unique_contact_counts", "schedule": crontab(hour=5, minute=0)},
+    "update-unique-contact-counts": {"task": "update_unique_contact_counts", "schedule": crontab(hour=8, minute=0)},
     "refresh-teams-tokens": {"task": "refresh_teams_tokens", "schedule": timedelta(minutes=55)},
     "squash-flow-category-counts": {"task": "squash_flow_category_counts", "schedule": timedelta(seconds=60)},
 }
