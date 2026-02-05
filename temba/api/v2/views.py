@@ -1,6 +1,8 @@
 import itertools
+from datetime import timedelta
 from enum import Enum
 
+from django.utils import timezone
 from rest_framework import generics, status, views
 from rest_framework.pagination import CursorPagination
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -5536,3 +5538,79 @@ class EventsGroupByCountEndpoint(BaseAPIView):
                 {"name": "table", "required": False, "help": "Required when silver=true; silver table name"},
             ],
         }
+
+
+class EventsHealthCheckEndpoint(views.APIView):
+    """
+    Health check endpoint for get_events functionality.
+    Tests if the fetch_events_for_org service is working correctly.
+    Returns 200 if healthy, 500 if there's an error.
+    """
+
+    permission_classes = []  # No authentication required for health checks
+
+    def get(self, request, *args, **kwargs):
+        try:
+            from temba.api.v2.services.events import fetch_events_for_org
+            from temba.orgs.models import Org
+
+            # Try to get user from request if authenticated
+            user = getattr(request, "user", None)
+            org = None
+            
+            if user and hasattr(user, "is_authenticated") and user.is_authenticated:
+                try:
+                    org = user.get_org()
+                    if not org or not org.proj_uuid:
+                        # If user has no org, try to get any org with proj_uuid
+                        org = Org.objects.filter(proj_uuid__isnull=False, is_active=True).first()
+                        if org:
+                            user.set_org(org)
+                except Exception:
+                    # If get_org fails, try to get any org with proj_uuid
+                    org = Org.objects.filter(proj_uuid__isnull=False, is_active=True).first()
+                    if org:
+                        user.set_org(org)
+            
+            if not org:
+                # If no authenticated user or no org found, try to get any org with proj_uuid
+                org = Org.objects.filter(proj_uuid__isnull=False, is_active=True).first()
+                if not org:
+                    return Response(
+                        {"status": "error", "message": "No organization with project UUID found"},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
+                # Get a user from the org for the test
+                user = org.get_users().first()
+                if not user:
+                    return Response(
+                        {"status": "error", "message": "No user found in organization"},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
+                # Set the org for the user
+                user.set_org(org)
+
+            # Prepare minimal test parameters (last 24 hours, limit 1 for quick check)
+            date_end = timezone.now()
+            date_start = date_end - timedelta(hours=24)
+
+            # Call fetch_events_for_org with minimal parameters
+            processed_events = fetch_events_for_org(
+                user,
+                date_start=date_start,
+                date_end=date_end,
+                limit=1,
+            )
+
+            # If we got here without exception, the service is working
+            return Response(
+                {"status": "healthy", "message": "get_events service is operational"},
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            # Return 500 if there's any error
+            return Response(
+                {"status": "unhealthy", "message": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
