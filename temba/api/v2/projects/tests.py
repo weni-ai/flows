@@ -1,14 +1,12 @@
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date
 from functools import wraps
 from unittest.mock import patch
 
-import pytz
 from rest_framework.authentication import BasicAuthentication
 
 from django.test import SimpleTestCase, override_settings
 from django.urls import resolve, reverse
-from django.utils import timezone
 
 from temba.api.v2.internals.views import JWTAuthMockMixin
 from temba.api.v2.projects.views import (
@@ -18,6 +16,7 @@ from temba.api.v2.projects.views import (
     ProjectMessageCountView,
 )
 from temba.channels.models import ChannelCount
+from temba.orgs.models import UniqueContactCount
 from temba.tests import TembaTest
 
 GET_PROJECT_VIEW_PATH = "temba.api.v2.projects.views.GetProjectView"
@@ -281,72 +280,32 @@ class InternalProjectMessageCountViewTest(TembaTest):
         self.url = reverse("api.v2.internal_project_message_count")
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
-    def test_defaults_to_today_when_no_date_filters(self):
-        """When no date filters provided, defaults to today's data only."""
-        ch = self.create_channel("TG", "Channel", "ch", org=self.org)
-        today = timezone.now().date()
-        yesterday = today - timedelta(days=1)
-
-        # Create counts for today and yesterday
-        ChannelCount.objects.create(channel=ch, count_type=ChannelCount.INCOMING_MSG_TYPE, day=today, count=100)
-        ChannelCount.objects.create(channel=ch, count_type=ChannelCount.INCOMING_MSG_TYPE, day=yesterday, count=50)
-
-        # Without date filters, should only return today's data
-        resp = self.client.get(self.url)
-        self.assertEqual(resp.status_code, 200)
-
-        data = resp.json()
-        self.assertEqual(data["incoming_amount"], 100)  # Only today's count
-
-    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
     def test_returns_all_projects_when_no_project_uuid(self):
         """When no project_uuid is provided, returns counts for ALL projects."""
-        ch1 = self.create_channel("TG", "Channel 1", "ch1", org=self.org)
-        ch2 = self.create_channel("TG", "Channel 2", "ch2", org=self.org2)
-
         # Create counts for both orgs
-        ChannelCount.objects.create(
-            channel=ch1, count_type=ChannelCount.INCOMING_MSG_TYPE, day=date(2026, 1, 1), count=10
-        )
-        ChannelCount.objects.create(
-            channel=ch1, count_type=ChannelCount.OUTGOING_MSG_TYPE, day=date(2026, 1, 1), count=5
-        )
-        ChannelCount.objects.create(
-            channel=ch2, count_type=ChannelCount.INCOMING_MSG_TYPE, day=date(2026, 1, 1), count=20
-        )
-        ChannelCount.objects.create(
-            channel=ch2, count_type=ChannelCount.OUTGOING_MSG_TYPE, day=date(2026, 1, 1), count=15
-        )
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
+        UniqueContactCount.objects.create(org=self.org2, day=date(2026, 1, 1), count=20)
 
-        # Explicitly pass date filters to test aggregation across projects
         resp = self.client.get(f"{self.url}?after=2026-01-01&before=2026-01-01")
         self.assertEqual(resp.status_code, 200)
 
         data = resp.json()
-        self.assertEqual(data["incoming_amount"], 30)  # 10 + 20
-        self.assertEqual(data["outgoing_amount"], 20)  # 5 + 15
-        self.assertEqual(data["total_amount"], 50)  # 30 + 20
+        self.assertEqual(len(data["results"]), 2)
+        self.assertEqual(data["total"], 30)  # 10 + 20
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
     def test_filters_by_project_uuid(self):
         """When project_uuid is provided, returns counts only for that project."""
-        ch1 = self.create_channel("TG", "Channel 1", "ch1", org=self.org)
-        ch2 = self.create_channel("TG", "Channel 2", "ch2", org=self.org2)
-
-        ChannelCount.objects.create(
-            channel=ch1, count_type=ChannelCount.INCOMING_MSG_TYPE, day=date(2026, 1, 1), count=10
-        )
-        ChannelCount.objects.create(
-            channel=ch2, count_type=ChannelCount.INCOMING_MSG_TYPE, day=date(2026, 1, 1), count=999
-        )
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
+        UniqueContactCount.objects.create(org=self.org2, day=date(2026, 1, 1), count=999)
 
         resp = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-01&before=2026-01-01")
         self.assertEqual(resp.status_code, 200)
 
         data = resp.json()
-        self.assertEqual(data["incoming_amount"], 10)  # Only org1's count
-        self.assertEqual(data["outgoing_amount"], 0)
-        self.assertEqual(data["total_amount"], 10)
+        self.assertEqual(len(data["results"]), 1)
+        self.assertEqual(data["results"][0]["count"], 10)
+        self.assertEqual(data["total"], 10)
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
     def test_nonexistent_project_uuid_returns_404(self):
@@ -357,22 +316,23 @@ class InternalProjectMessageCountViewTest(TembaTest):
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
     def test_date_filters(self):
-        ch = self.create_channel("TG", "Channel", "ch", org=self.org)
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 2), count=20)
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 3), count=30)
 
-        ChannelCount.objects.create(
-            channel=ch, count_type=ChannelCount.INCOMING_MSG_TYPE, day=date(2026, 1, 1), count=10
-        )
-        ChannelCount.objects.create(
-            channel=ch, count_type=ChannelCount.INCOMING_MSG_TYPE, day=date(2026, 1, 2), count=20
-        )
-        ChannelCount.objects.create(
-            channel=ch, count_type=ChannelCount.INCOMING_MSG_TYPE, day=date(2026, 1, 3), count=30
-        )
-
-        # Filter by date range
+        # Filter by single day
         resp = self.client.get(f"{self.url}?after=2026-01-02&before=2026-01-02")
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["incoming_amount"], 20)  # Only Jan 2
+        data = resp.json()
+        self.assertEqual(len(data["results"]), 1)
+        self.assertEqual(data["total"], 20)
+
+        # Filter by date range
+        resp = self.client.get(f"{self.url}?after=2026-01-01&before=2026-01-03")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(len(data["results"]), 3)
+        self.assertEqual(data["total"], 60)  # 10 + 20 + 30
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
     def test_invalid_date_returns_400(self):
@@ -380,65 +340,56 @@ class InternalProjectMessageCountViewTest(TembaTest):
         self.assertEqual(resp.status_code, 400)
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
-    def test_unique_contacts_counts_distinct_contacts_in_period(self):
-        """
-        Unique contacts should count distinct contacts across the entire period,
-        not sum of daily unique contacts.
-        """
-        contact1 = self.create_contact("Contact 1", phone="+5511999990001")
-        contact2 = self.create_contact("Contact 2", phone="+5511999990002")
-        contact3 = self.create_contact("Contact 3", phone="+5511999990003")
-
-        # Contact 1 sends message on day 1
-        self.create_incoming_msg(contact1, "Hello", created_on=datetime(2026, 1, 1, 12, 0, tzinfo=pytz.UTC))
-
-        # Contact 1 and 2 send messages on day 2
-        self.create_incoming_msg(contact1, "Hello again", created_on=datetime(2026, 1, 2, 12, 0, tzinfo=pytz.UTC))
-        self.create_incoming_msg(contact2, "Hi", created_on=datetime(2026, 1, 2, 12, 0, tzinfo=pytz.UTC))
-
-        # Contact 3 sends message on day 3
-        self.create_incoming_msg(contact3, "Hey", created_on=datetime(2026, 1, 3, 12, 0, tzinfo=pytz.UTC))
-
-        # For the full period (day 1-3): unique contacts = 3 (not 1+2+1=4)
-        resp = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-01&before=2026-01-03")
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["unique_contacts"], 3)
-
-        # For day 1 only: unique contacts = 1
-        resp = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-01&before=2026-01-01")
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["unique_contacts"], 1)
-
-        # For day 2 only: unique contacts = 2
-        resp = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-02&before=2026-01-02")
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["unique_contacts"], 2)
-
-    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
-    def test_unique_contacts_only_counts_incoming_messages(self):
-        """Unique contacts should only count contacts that SENT messages (direction=I)."""
-        contact1 = self.create_contact("Contact 1", phone="+5511999990001")
-        contact2 = self.create_contact("Contact 2", phone="+5511999990002")
-
-        # Contact 1 sends a message (incoming)
-        self.create_incoming_msg(contact1, "Hello", created_on=datetime(2026, 1, 1, 12, 0, tzinfo=pytz.UTC))
-
-        # Contact 2 receives a message (outgoing) - should NOT be counted
-        self.create_outgoing_msg(contact2, "Hi there", created_on=datetime(2026, 1, 1, 12, 0, tzinfo=pytz.UTC))
-
-        resp = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-01&before=2026-01-01")
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["unique_contacts"], 1)  # Only contact1
-
-    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
-    def test_unique_contacts_across_all_projects(self):
-        """When no project_uuid, counts unique contacts across all projects."""
-        contact1 = self.create_contact("Contact 1", phone="+5511999990001", org=self.org)
-        contact2 = self.create_contact("Contact 2", phone="+5511999990002", org=self.org2)
-
-        self.create_incoming_msg(contact1, "Hello", created_on=datetime(2026, 1, 1, 12, 0, tzinfo=pytz.UTC))
-        self.create_incoming_msg(contact2, "Hi", created_on=datetime(2026, 1, 1, 12, 0, tzinfo=pytz.UTC))
-
+    def test_returns_empty_results_when_no_data(self):
+        """When no data exists for the period, returns empty results."""
         resp = self.client.get(f"{self.url}?after=2026-01-01&before=2026-01-01")
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["unique_contacts"], 2)  # Both contacts from different orgs
+        data = resp.json()
+        self.assertEqual(data["results"], [])
+        self.assertEqual(data["total"], 0)
+
+    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
+    def test_results_include_org_proj_uuid_day_and_count(self):
+        """Results should include org's proj_uuid, day, and count."""
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 15), count=42)
+
+        resp = self.client.get(f"{self.url}?after=2026-01-15&before=2026-01-15")
+        self.assertEqual(resp.status_code, 200)
+
+        data = resp.json()
+        self.assertEqual(len(data["results"]), 1)
+        result = data["results"][0]
+        self.assertEqual(result["org__proj_uuid"], str(self.org.proj_uuid))
+        self.assertEqual(result["day"], "2026-01-15")
+        self.assertEqual(result["count"], 42)
+
+    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
+    def test_results_ordered_by_day_and_org(self):
+        """Results should be ordered by day, then by org proj_uuid."""
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 2), count=20)
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
+        UniqueContactCount.objects.create(org=self.org2, day=date(2026, 1, 1), count=15)
+
+        resp = self.client.get(f"{self.url}?after=2026-01-01&before=2026-01-02")
+        self.assertEqual(resp.status_code, 200)
+
+        data = resp.json()
+        self.assertEqual(len(data["results"]), 3)
+        # First two results should be from day 1
+        self.assertEqual(data["results"][0]["day"], "2026-01-01")
+        self.assertEqual(data["results"][1]["day"], "2026-01-01")
+        # Last result should be from day 2
+        self.assertEqual(data["results"][2]["day"], "2026-01-02")
+
+    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
+    def test_no_date_filters_returns_all_data(self):
+        """When no date filters are provided, returns all available data."""
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 6, 15), count=50)
+
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+
+        data = resp.json()
+        self.assertEqual(len(data["results"]), 2)
+        self.assertEqual(data["total"], 60)

@@ -1,6 +1,10 @@
 import logging
 from datetime import timedelta
 
+from elasticsearch import Elasticsearch
+from elasticsearch.exceptions import ConnectionError, ConnectionTimeout, TransportError
+
+from django.conf import settings
 from django.utils import timezone
 
 from celery import shared_task
@@ -13,7 +17,7 @@ from temba.msgs.models import ExportMessagesTask
 from temba.msgs.tasks import export_messages_task
 from temba.utils.celery import nonoverlapping_task
 
-from .models import CreditAlert, Invitation, Org, OrgActivity, TopUpCredits
+from .models import CreditAlert, Invitation, Org, OrgActivity, TopUpCredits, UniqueContactCount
 
 
 @shared_task(track_started=True, name="send_invitation_email_task")
@@ -113,3 +117,102 @@ def delete_orgs_task():
             org.delete()
         except Exception:  # pragma: no cover
             logging.exception(f"exception while deleting {org.name}")
+
+
+logger = logging.getLogger(__name__)
+
+
+@shared_task(
+    bind=True,
+    name="update_unique_contact_counts",
+    autoretry_for=(ConnectionError, ConnectionTimeout, TransportError),
+    retry_backoff=60,
+    retry_backoff_max=3600,
+    max_retries=5,
+)
+def update_unique_contact_counts(self, target_date=None):
+    """
+    Fetches unique contact counts from Elasticsearch for all active orgs.
+
+    Runs daily at 5am UTC, fetching data for the previous day.
+    A contact is counted as "unique" for a day if their last_seen_on falls within that day.
+
+    Args:
+        target_date: Optional date string (YYYY-MM-DD) to fetch counts for.
+                    Defaults to yesterday (UTC).
+    """
+    if not settings.ELASTICSEARCH_URL:
+        logger.warning("ELASTICSEARCH_URL not configured, skipping unique contact counts update")
+        return
+
+    # Determine the target date (default to yesterday UTC)
+    if target_date:
+        from datetime import datetime
+
+        day = datetime.strptime(target_date, "%Y-%m-%d").date()
+    else:
+        now = timezone.now()
+        day = (now - timedelta(days=1)).date()
+
+    next_day = day + timedelta(days=1)
+
+    logger.info(f"Updating unique contact counts for {day}")
+
+    # Initialize Elasticsearch client
+    client = Elasticsearch(
+        settings.ELASTICSEARCH_URL,
+        timeout=int(settings.ELASTICSEARCH_TIMEOUT_REQUEST),
+    )
+
+    # Get all active orgs
+    orgs = Org.objects.filter(is_active=True).only("id", "name")
+    success_count = 0
+    error_count = 0
+
+    for org in orgs:
+        try:
+            # Query Elasticsearch for unique contacts count
+            response = client.count(
+                index="contacts",
+                body={
+                    "query": {
+                        "bool": {
+                            "filter": [
+                                {"term": {"org_id": org.id}},
+                                {
+                                    "range": {
+                                        "last_seen_on": {
+                                            "gte": f"{day}T00:00:00",
+                                            "lt": f"{next_day}T00:00:00",
+                                            "time_zone": "+00:00",
+                                        }
+                                    }
+                                },
+                            ]
+                        }
+                    }
+                },
+            )
+
+            count = response.get("count", 0)
+
+            # Update or create the count record
+            UniqueContactCount.objects.update_or_create(
+                org=org,
+                day=day,
+                defaults={"count": count},
+            )
+
+            success_count += 1
+
+        except (ConnectionError, ConnectionTimeout, TransportError):
+            # Let celery retry handle these
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching unique contact count for org {org.id} ({org.name}): {e}")
+            error_count += 1
+            continue
+
+    logger.info(
+        f"Unique contact counts update completed for {day}. " f"Success: {success_count}, Errors: {error_count}"
+    )

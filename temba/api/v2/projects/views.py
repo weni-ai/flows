@@ -1,6 +1,3 @@
-from datetime import datetime, time, timedelta
-
-import pytz
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -15,8 +12,7 @@ from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.mixins import ISO8601DateFilterQueryParamsMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel, ChannelCount
-from temba.msgs.models import Msg
-from temba.orgs.models import Org
+from temba.orgs.models import Org, UniqueContactCount
 
 
 class GetProjectView(APIViewMixin, APIView):
@@ -133,122 +129,70 @@ class ProjectMessageCountView(ISO8601DateFilterQueryParamsMixin, APIViewMixin, A
 
 class InternalProjectMessageCountView(ISO8601DateFilterQueryParamsMixin, APIViewMixin, APIView):
     """
-    Returns message counts (incoming/outgoing/total) and unique contacts for projects.
+    Returns unique contact counts for projects from pre-aggregated data.
 
     Uses InternalOIDCAuthentication for internal service-to-service calls.
+    Data is populated daily from Elasticsearch via the update_unique_contact_counts task.
 
     Query parameters:
     - project_uuid (optional): Filter by specific project. If not provided, returns
-      aggregated counts for ALL projects.
-    - after / start_date (optional): Filter messages from this date (inclusive).
-      Defaults to today if not provided.
-    - before / end_date (optional): Filter messages until this date (inclusive).
-      Defaults to today if not provided. When filtering up to today, uses current
-      time instead of end of day.
+      counts for ALL projects.
+    - after / start_date (optional): Filter from this date (inclusive).
+    - before / end_date (optional): Filter until this date (inclusive).
 
     Response:
-    - incoming_amount: Total incoming messages
-    - outgoing_amount: Total outgoing messages
-    - total_amount: Total messages (incoming + outgoing)
-    - unique_contacts: Unique contacts that sent messages (incoming) in the period
+    - results: List of daily counts with org project_uuid, day, and count
+    - total: Sum of all counts in the period
     """
 
     authentication_classes = [InternalOIDCAuthentication]
     permission_classes = [IsAuthenticated]
 
-    def _get_message_counts(self, project_uuid, after_date, before_date):
-        """
-        Get incoming/outgoing message counts from ChannelCount (pre-aggregated, fast).
-        """
-        queryset = ChannelCount.objects.filter(
-            count_type__in=[ChannelCount.INCOMING_MSG_TYPE, ChannelCount.OUTGOING_MSG_TYPE],
-        )
-
-        if project_uuid:
-            queryset = queryset.filter(channel__org__proj_uuid=project_uuid)
-
-        if after_date or before_date:
-            queryset = queryset.filter(day__isnull=False)
-        if after_date:
-            queryset = queryset.filter(day__gte=after_date)
-        if before_date:
-            queryset = queryset.filter(day__lte=before_date)
-
-        agg = queryset.aggregate(
-            incoming=Sum("count", filter=Q(count_type=ChannelCount.INCOMING_MSG_TYPE)),
-            outgoing=Sum("count", filter=Q(count_type=ChannelCount.OUTGOING_MSG_TYPE)),
-        )
-
-        incoming = agg.get("incoming") or 0
-        outgoing = agg.get("outgoing") or 0
-
-        return {
-            "incoming_amount": incoming,
-            "outgoing_amount": outgoing,
-            "total_amount": incoming + outgoing,
-        }
-
-    def _get_unique_contacts(self, project_uuid, after_date, before_date):
-        """
-        Get unique contacts that sent messages (incoming) in the period.
-
-        This requires a direct query on msgs_msg because unique contacts
-        cannot be pre-aggregated for arbitrary date ranges.
-        """
-        from django.utils import timezone
-
-        queryset = Msg.objects.filter(direction=Msg.DIRECTION_IN)
-
-        if project_uuid:
-            queryset = queryset.filter(org__proj_uuid=project_uuid)
-
-        if after_date:
-            start_datetime = datetime.combine(after_date, time.min, tzinfo=pytz.UTC)
-            queryset = queryset.filter(created_on__gte=start_datetime)
-
-        if before_date:
-            today = timezone.now().date()
-            if before_date >= today:
-                # If before_date is today or future, use current time
-                end_datetime = timezone.now()
-            else:
-                # Include the entire 'before_date' day (up to midnight of the next day)
-                end_datetime = datetime.combine(before_date + timedelta(days=1), time.min, tzinfo=pytz.UTC)
-            queryset = queryset.filter(created_on__lt=end_datetime)
-
-        unique_count = queryset.values("contact_id", "org_id").distinct().count()
-
-        return unique_count
-
-    def _get_default_date_range(self):
-        """
-        Returns the default date range (today) when no filters are provided.
-        """
-        from django.utils import timezone
-
-        today = timezone.now().date()
-        return today, today
-
     def get(self, request: Request):
         project_uuid = request.query_params.get("project_uuid")
 
+        # Validate project_uuid if provided
         if project_uuid:
             try:
                 Org.objects.only("id").get(proj_uuid=project_uuid)
             except (Org.DoesNotExist, django_exceptions.ValidationError, ValueError):
                 return Response(status=404, data={"error": "Project not found"})
 
+        # Parse date filters
         date_filters = self.get_date_range_from_request(request)
         if isinstance(date_filters, Response):
             return date_filters
         after_date, before_date = date_filters
 
-        # Default to today if no date filters provided
-        if after_date is None and before_date is None:
-            after_date, before_date = self._get_default_date_range()
+        # Build queryset
+        queryset = UniqueContactCount.objects.all()
 
-        counts = self._get_message_counts(project_uuid, after_date, before_date)
+        if project_uuid:
+            queryset = queryset.filter(org__proj_uuid=project_uuid)
 
-        counts["unique_contacts"] = self._get_unique_contacts(project_uuid, after_date, before_date)
+        if after_date:
+            queryset = queryset.filter(day__gte=after_date)
 
-        return Response(counts)
+        if before_date:
+            queryset = queryset.filter(day__lte=before_date)
+
+        # Get results with org's proj_uuid
+        results = list(
+            queryset.select_related("org")
+            .values(
+                "org__proj_uuid",
+                "day",
+                "count",
+            )
+            .order_by("day", "org__proj_uuid")
+        )
+
+        # Calculate total
+        total = sum(r["count"] for r in results)
+
+        return Response(
+            {
+                "results": results,
+                "total": total,
+            }
+        )

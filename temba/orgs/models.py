@@ -2665,3 +2665,26 @@ class OrgActivity(models.Model):
 
     class Meta:
         unique_together = ("org", "day")
+
+
+class UniqueContactCount(models.Model):
+    """
+    Tracks the count of unique contacts that sent messages (had activity) for an organization on a daily basis.
+    Data is fetched from Elasticsearch daily via the update_unique_contact_counts task.
+
+    A contact is considered "unique" for a day if their last_seen_on falls within that day (UTC).
+    """
+
+    org = models.ForeignKey("orgs.Org", related_name="unique_contact_counts", on_delete=models.CASCADE)
+    day = models.DateField()
+    count = models.IntegerField(default=0)
+
+    class Meta:
+        unique_together = ("org", "day")
+        indexes = [
+            models.Index(fields=["day"]),
+            models.Index(fields=["org", "day"]),
+        ]
+
+    def __str__(self):
+        return f"{self.org.name} - {self.day}: {self.count}"
