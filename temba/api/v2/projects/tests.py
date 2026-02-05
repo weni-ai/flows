@@ -280,9 +280,9 @@ class InternalProjectMessageCountViewTest(TembaTest):
         self.url = reverse("api.v2.internal_project_message_count")
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
-    def test_returns_all_projects_when_no_project_uuid(self):
-        """When no project_uuid is provided, returns counts for ALL projects."""
-        # Create counts for both orgs
+    def test_returns_aggregated_counts_when_no_project_uuid(self):
+        """When no project_uuid is provided, returns aggregated counts (sum) per day."""
+        # Create counts for both orgs on the same day
         UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
         UniqueContactCount.objects.create(org=self.org2, day=date(2026, 1, 1), count=20)
 
@@ -290,8 +290,11 @@ class InternalProjectMessageCountViewTest(TembaTest):
         self.assertEqual(resp.status_code, 200)
 
         data = resp.json()
-        self.assertEqual(len(data["results"]), 2)
-        self.assertEqual(data["total"], 30)  # 10 + 20
+        # Should return 1 aggregated result (sum of both orgs for that day)
+        self.assertEqual(len(data["results"]), 1)
+        self.assertEqual(data["results"][0]["day"], "2026-01-01")
+        self.assertEqual(data["results"][0]["count"], 30)  # 10 + 20
+        self.assertEqual(data["total"], 30)
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
     def test_filters_by_project_uuid(self):
@@ -315,20 +318,25 @@ class InternalProjectMessageCountViewTest(TembaTest):
         self.assertEqual(resp.json(), {"error": "Project not found"})
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
-    def test_date_filters(self):
+    def test_date_filters_with_project_uuid(self):
+        """Date filters work correctly for a specific project."""
         UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
         UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 2), count=20)
         UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 3), count=30)
 
         # Filter by single day
-        resp = self.client.get(f"{self.url}?after=2026-01-02&before=2026-01-02")
+        resp = self.client.get(
+            f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-02&before=2026-01-02"
+        )
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(len(data["results"]), 1)
         self.assertEqual(data["total"], 20)
 
         # Filter by date range
-        resp = self.client.get(f"{self.url}?after=2026-01-01&before=2026-01-03")
+        resp = self.client.get(
+            f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-01&before=2026-01-03"
+        )
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(len(data["results"]), 3)
@@ -349,23 +357,22 @@ class InternalProjectMessageCountViewTest(TembaTest):
         self.assertEqual(data["total"], 0)
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
-    def test_results_include_org_proj_uuid_day_and_count(self):
-        """Results should include org's proj_uuid, day, and count."""
+    def test_results_include_day_and_count_for_specific_project(self):
+        """Results for specific project should include day and count."""
         UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 15), count=42)
 
-        resp = self.client.get(f"{self.url}?after=2026-01-15&before=2026-01-15")
+        resp = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-15&before=2026-01-15")
         self.assertEqual(resp.status_code, 200)
 
         data = resp.json()
         self.assertEqual(len(data["results"]), 1)
         result = data["results"][0]
-        self.assertEqual(result["org__proj_uuid"], str(self.org.proj_uuid))
         self.assertEqual(result["day"], "2026-01-15")
         self.assertEqual(result["count"], 42)
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
-    def test_results_ordered_by_day_and_org(self):
-        """Results should be ordered by day, then by org proj_uuid."""
+    def test_aggregated_results_ordered_by_day(self):
+        """Results without project_uuid should be aggregated and ordered by day."""
         UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 2), count=20)
         UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
         UniqueContactCount.objects.create(org=self.org2, day=date(2026, 1, 1), count=15)
@@ -374,22 +381,28 @@ class InternalProjectMessageCountViewTest(TembaTest):
         self.assertEqual(resp.status_code, 200)
 
         data = resp.json()
-        self.assertEqual(len(data["results"]), 3)
-        # First two results should be from day 1
+        # Should return 2 aggregated results (one per day)
+        self.assertEqual(len(data["results"]), 2)
+        # First result: day 1 with aggregated count
         self.assertEqual(data["results"][0]["day"], "2026-01-01")
-        self.assertEqual(data["results"][1]["day"], "2026-01-01")
-        # Last result should be from day 2
-        self.assertEqual(data["results"][2]["day"], "2026-01-02")
+        self.assertEqual(data["results"][0]["count"], 25)  # 10 + 15
+        # Second result: day 2
+        self.assertEqual(data["results"][1]["day"], "2026-01-02")
+        self.assertEqual(data["results"][1]["count"], 20)
+        # Total
+        self.assertEqual(data["total"], 45)
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
-    def test_no_date_filters_returns_all_data(self):
-        """When no date filters are provided, returns all available data."""
+    def test_no_date_filters_returns_all_aggregated_data(self):
+        """When no date filters are provided, returns all available data aggregated by day."""
         UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
+        UniqueContactCount.objects.create(org=self.org2, day=date(2026, 1, 1), count=5)
         UniqueContactCount.objects.create(org=self.org, day=date(2026, 6, 15), count=50)
 
         resp = self.client.get(self.url)
         self.assertEqual(resp.status_code, 200)
 
         data = resp.json()
+        # Should have 2 results (2 distinct days), aggregated
         self.assertEqual(len(data["results"]), 2)
-        self.assertEqual(data["total"], 60)
+        self.assertEqual(data["total"], 65)  # 10 + 5 + 50
