@@ -136,12 +136,13 @@ class InternalProjectMessageCountView(ISO8601DateFilterQueryParamsMixin, APIView
 
     Query parameters:
     - project_uuid (optional): Filter by specific project. If not provided, returns
-      counts for ALL projects.
+      aggregated counts (sum) for ALL projects grouped by day.
     - after / start_date (optional): Filter from this date (inclusive).
     - before / end_date (optional): Filter until this date (inclusive).
 
     Response:
-    - results: List of daily counts with org project_uuid, day, and count
+    - results: List of daily counts. When project_uuid is provided, includes org__proj_uuid.
+               When not provided, returns aggregated sum per day across all projects.
     - total: Sum of all counts in the period
     """
 
@@ -176,16 +177,18 @@ class InternalProjectMessageCountView(ISO8601DateFilterQueryParamsMixin, APIView
         if before_date:
             queryset = queryset.filter(day__lte=before_date)
 
-        # Get results with org's proj_uuid
-        results = list(
-            queryset.select_related("org")
-            .values(
-                "org__proj_uuid",
-                "day",
-                "count",
+        if project_uuid:
+            # Return detailed results for specific project
+            results = list(
+                queryset.values("day", "count").order_by("day")
             )
-            .order_by("day", "org__proj_uuid")
-        )
+        else:
+            # Aggregate counts by day across all projects
+            results = list(
+                queryset.values("day")
+                .annotate(count=Sum("count"))
+                .order_by("day")
+            )
 
         # Calculate total
         total = sum(r["count"] for r in results)
