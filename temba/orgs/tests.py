@@ -5009,6 +5009,134 @@ class OrgActivityTest(TembaTest):
         self.assertEqual(1, activity.plan_active_contact_count)
 
 
+class UniqueContactCountTest(TembaTest):
+    @patch("temba.orgs.tasks.Elasticsearch")
+    def test_update_unique_contact_counts_task(self, mock_es_class):
+        """Test the update_unique_contact_counts task creates records from ES data."""
+        from temba.orgs.models import UniqueContactCount
+        from temba.orgs.tasks import update_unique_contact_counts
+
+        # Setup mock ES client
+        mock_es_instance = mock_es_class.return_value
+        mock_es_instance.count.return_value = {"count": 42}
+
+        # Run the task for a specific date
+        update_unique_contact_counts(target_date="2026-01-15")
+
+        # Verify ES was queried for each active org
+        self.assertTrue(mock_es_instance.count.called)
+
+        # Verify records were created
+        count_record = UniqueContactCount.objects.filter(org=self.org, day="2026-01-15").first()
+        self.assertIsNotNone(count_record)
+        self.assertEqual(count_record.count, 42)
+
+    @patch("temba.orgs.tasks.Elasticsearch")
+    def test_update_unique_contact_counts_defaults_to_yesterday(self, mock_es_class):
+        """Test that without target_date, the task fetches yesterday's data."""
+        from temba.orgs.models import UniqueContactCount
+        from temba.orgs.tasks import update_unique_contact_counts
+
+        mock_es_instance = mock_es_class.return_value
+        mock_es_instance.count.return_value = {"count": 10}
+
+        # Run the task without target_date
+        update_unique_contact_counts()
+
+        # Should create record for yesterday
+        yesterday = (timezone.now() - timedelta(days=1)).date()
+        count_record = UniqueContactCount.objects.filter(org=self.org, day=yesterday).first()
+        self.assertIsNotNone(count_record)
+
+    @patch("temba.orgs.tasks.Elasticsearch")
+    def test_update_unique_contact_counts_updates_existing(self, mock_es_class):
+        """Test that running the task again updates existing records."""
+        from temba.orgs.models import UniqueContactCount
+        from temba.orgs.tasks import update_unique_contact_counts
+
+        # Create existing record
+        UniqueContactCount.objects.create(org=self.org, day="2026-01-15", count=5)
+
+        mock_es_instance = mock_es_class.return_value
+        mock_es_instance.count.return_value = {"count": 99}
+
+        # Run the task
+        update_unique_contact_counts(target_date="2026-01-15")
+
+        # Verify record was updated (not duplicated)
+        count_records = UniqueContactCount.objects.filter(org=self.org, day="2026-01-15")
+        self.assertEqual(count_records.count(), 1)
+        self.assertEqual(count_records.first().count, 99)
+
+    @patch("temba.orgs.tasks.settings")
+    def test_update_unique_contact_counts_skips_if_no_es_url(self, mock_settings):
+        """Test that task does nothing if ELASTICSEARCH_URL is not configured."""
+        from temba.orgs.models import UniqueContactCount
+        from temba.orgs.tasks import update_unique_contact_counts
+
+        mock_settings.ELASTICSEARCH_URL = None
+
+        # Run the task
+        update_unique_contact_counts(target_date="2026-01-15")
+
+        # No records should be created
+        self.assertEqual(UniqueContactCount.objects.count(), 0)
+
+    @patch("sentry_sdk.capture_exception")
+    @patch("time.sleep")
+    @patch("temba.orgs.tasks.Elasticsearch")
+    def test_update_unique_contact_counts_retries_and_reports_to_sentry(self, mock_es_class, mock_sleep, mock_capture):
+        """Test that ES errors trigger retries and report to Sentry after exhausting retries."""
+        from temba.orgs.models import UniqueContactCount
+        from temba.orgs.tasks import ORG_MAX_RETRIES, update_unique_contact_counts
+
+        mock_es_instance = mock_es_class.return_value
+
+        # First org fails all retries, second org succeeds
+        # Need ORG_MAX_RETRIES failures for org1, then 1 success for org2
+        side_effects = [Exception("ES error")] * ORG_MAX_RETRIES + [{"count": 50}]
+        mock_es_instance.count.side_effect = side_effects
+
+        # Run the task (should continue after error and report to Sentry)
+        update_unique_contact_counts(target_date="2026-01-15")
+
+        # Sentry should have been called for the failed org
+        self.assertTrue(mock_capture.called)
+
+        # At least one record should be created (for org2)
+        records = UniqueContactCount.objects.filter(day="2026-01-15")
+        self.assertEqual(records.count(), 1)
+
+    @patch("time.sleep")
+    @patch("temba.orgs.tasks.Elasticsearch")
+    def test_update_unique_contact_counts_retries_on_transient_error(self, mock_es_class, mock_sleep):
+        """Test that transient errors are retried and succeed."""
+        from temba.orgs.models import UniqueContactCount
+        from temba.orgs.tasks import update_unique_contact_counts
+
+        mock_es_instance = mock_es_class.return_value
+
+        # First call fails, second succeeds (within retry limit)
+        mock_es_instance.count.side_effect = [
+            Exception("Transient error"),
+            {"count": 42},
+            {"count": 50},  # for org2
+        ]
+
+        update_unique_contact_counts(target_date="2026-01-15")
+
+        # Both orgs should have records
+        records = UniqueContactCount.objects.filter(day="2026-01-15")
+        self.assertEqual(records.count(), 2)
+
+    def test_unique_contact_count_model_str(self):
+        """Test the string representation of UniqueContactCount."""
+        from temba.orgs.models import UniqueContactCount
+
+        count = UniqueContactCount.objects.create(org=self.org, day="2026-01-15", count=100)
+        self.assertEqual(str(count), f"{self.org.name} - 2026-01-15: 100")
+
+
 class BackupTokenTest(TembaTest):
     def test_model(self):
         admin_tokens = BackupToken.generate_for_user(self.admin)
