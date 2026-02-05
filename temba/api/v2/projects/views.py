@@ -12,7 +12,7 @@ from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.mixins import ISO8601DateFilterQueryParamsMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel, ChannelCount
-from temba.orgs.models import Org
+from temba.orgs.models import Org, UniqueContactCount
 
 
 class GetProjectView(APIViewMixin, APIView):
@@ -125,3 +125,74 @@ class ProjectMessageCountView(ISO8601DateFilterQueryParamsMixin, APIViewMixin, A
 
         queryset = self._get_queryset(project_uuid, after_date, before_date)
         return Response(self._aggregate_counts(queryset))
+
+
+class InternalProjectMessageCountView(ISO8601DateFilterQueryParamsMixin, APIViewMixin, APIView):
+    """
+    Returns unique contact counts for projects from pre-aggregated data.
+
+    Uses InternalOIDCAuthentication for internal service-to-service calls.
+    Data is populated daily from Elasticsearch via the update_unique_contact_counts task.
+
+    Query parameters:
+    - project_uuid (optional): Filter by specific project. If not provided, returns
+      counts for ALL projects.
+    - after / start_date (optional): Filter from this date (inclusive).
+    - before / end_date (optional): Filter until this date (inclusive).
+
+    Response:
+    - results: List of daily counts with org project_uuid, day, and count
+    - total: Sum of all counts in the period
+    """
+
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request):
+        project_uuid = request.query_params.get("project_uuid")
+
+        # Validate project_uuid if provided
+        if project_uuid:
+            try:
+                Org.objects.only("id").get(proj_uuid=project_uuid)
+            except (Org.DoesNotExist, django_exceptions.ValidationError, ValueError):
+                return Response(status=404, data={"error": "Project not found"})
+
+        # Parse date filters
+        date_filters = self.get_date_range_from_request(request)
+        if isinstance(date_filters, Response):
+            return date_filters
+        after_date, before_date = date_filters
+
+        # Build queryset
+        queryset = UniqueContactCount.objects.all()
+
+        if project_uuid:
+            queryset = queryset.filter(org__proj_uuid=project_uuid)
+
+        if after_date:
+            queryset = queryset.filter(day__gte=after_date)
+
+        if before_date:
+            queryset = queryset.filter(day__lte=before_date)
+
+        # Get results with org's proj_uuid
+        results = list(
+            queryset.select_related("org")
+            .values(
+                "org__proj_uuid",
+                "day",
+                "count",
+            )
+            .order_by("day", "org__proj_uuid")
+        )
+
+        # Calculate total
+        total = sum(r["count"] for r in results)
+
+        return Response(
+            {
+                "results": results,
+                "total": total,
+            }
+        )

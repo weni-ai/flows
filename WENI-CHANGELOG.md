@@ -1,3 +1,20 @@
+3.55.0
+----------
+* feat: new events endpoint with pagination
+* feat: Add limit in messages.json endpoint
+
+3.54.1
+----------
+* feat: Avoid null contact_urn in filter_template endpoint
+
+3.54.0
+----------
+* feat: implementing parallel test running to decrease pipeline slow runtime
+
+3.53.1
+----------
+* feat: Add contact_uuid and contact_urn in filter_template endpoint
+
 3.53.0
 ----------
 * feat: Endpoint to save msg without pass to mailroom

@@ -1259,6 +1259,12 @@ class FilterTemplateSerializerNew(ReadSerializer):
         return str(obj.contact.uuid) if getattr(obj, "contact_id", None) else None
 
     def get_contact_urn(self, obj):
+        # Prefer the URN used on the message itself (historical & most accurate)
+        msg_urn = getattr(obj, "contact_urn", None)
+        if msg_urn:
+            return str(msg_urn.api_urn())
+
+        # Fallback to the contact's current highest priority URN
         contact = getattr(obj, "contact", None)
         if not contact:
             return None
