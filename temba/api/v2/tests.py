@@ -6714,6 +6714,118 @@ class EventsGroupByCountEndpointTest(APITest):
         self.assertEqual(response.json(), [{"key_int": 123, "key_bool": False, "key_none": None}])
 
 
+class EventsHealthCheckEndpointTest(APITest):
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_health_check_with_authenticated_user(self, mock_fetch_events_for_org):
+        """Test health check endpoint with authenticated user"""
+        url = reverse("api.v2.events_health")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_fetch_events_for_org.return_value = []
+
+        self.login(self.admin)
+
+        response = self.fetchJSON(url)
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "healthy")
+        self.assertEqual(data["message"], "get_events service is operational")
+
+        # Verify that fetch_events_for_org was called with correct parameters
+        mock_fetch_events_for_org.assert_called_once()
+        call_args, call_kwargs = mock_fetch_events_for_org.call_args
+        self.assertEqual(call_args[0], self.admin)
+        self.assertIn("date_start", call_kwargs)
+        self.assertIn("date_end", call_kwargs)
+        self.assertEqual(call_kwargs["limit"], 1)
+
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_health_check_without_authentication(self, mock_fetch_events_for_org):
+        """Test health check endpoint without authentication (should use any available org)"""
+        url = reverse("api.v2.events_health")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_fetch_events_for_org.return_value = []
+
+        # Don't login - test without authentication
+        response = self.fetchJSON(url)
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "healthy")
+        self.assertEqual(data["message"], "get_events service is operational")
+
+        # Verify that fetch_events_for_org was called
+        mock_fetch_events_for_org.assert_called_once()
+        call_args, call_kwargs = mock_fetch_events_for_org.call_args
+        # Should have been called with a user from the org
+        self.assertIsNotNone(call_args[0])
+        self.assertEqual(call_kwargs["limit"], 1)
+
+    def test_health_check_no_org_available(self):
+        """Test health check when no org with proj_uuid is available"""
+        url = reverse("api.v2.events_health")
+
+        # Remove proj_uuid from org
+        self.org.proj_uuid = None
+        self.org.save()
+
+        # Delete all orgs with proj_uuid (if any)
+        from temba.orgs.models import Org
+
+        Org.objects.filter(proj_uuid__isnull=False).update(proj_uuid=None)
+
+        response = self.fetchJSON(url)
+
+        self.assertEqual(response.status_code, 503)
+        data = response.json()
+        self.assertEqual(data["status"], "error")
+        self.assertIn("No organization with project UUID found", data["message"])
+
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_health_check_service_error(self, mock_fetch_events_for_org):
+        """Test health check when fetch_events_for_org raises an exception"""
+        url = reverse("api.v2.events_health")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        # Make fetch_events_for_org raise an exception
+        mock_fetch_events_for_org.side_effect = Exception("Service unavailable")
+
+        self.login(self.admin)
+
+        response = self.fetchJSON(url)
+
+        self.assertEqual(response.status_code, 500)
+        data = response.json()
+        self.assertEqual(data["status"], "unhealthy")
+        self.assertIn("Service unavailable", data["message"])
+
+    def test_health_check_org_without_users(self):
+        """Test health check when org exists but has no users"""
+        url = reverse("api.v2.events_health")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        from temba.orgs.models import OrgRole
+
+        for role in OrgRole:
+            getattr(self.org, role.m2m_name).clear()
+
+        from temba.orgs.models import Org
+
+        Org.objects.exclude(id=self.org.id).update(proj_uuid=None)
+
+        response = self.fetchJSON(url)
+
+        self.assertEqual(response.status_code, 503)
+        data = response.json()
+        self.assertEqual(data["status"], "error")
+        self.assertIn("No user found in organization", data["message"])
+
 class EventsServiceTest(APITest):
     @patch("temba.api.v2.services.events.dl_get_events")
     def test_fetch_events_for_org_parses_and_forwards(self, mock_dl_get_events):
