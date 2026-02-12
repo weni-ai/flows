@@ -11,10 +11,7 @@ base_kwargs = {
     "event_name": "weni_nexus_data",
     "key": "conversation_classification",
     "table": "conversation_classification",
-    "metadata": {
-        "key": "human_support",
-        "value": True,
-    },
+    "value": "unresolved",
 }
 
 headers = {"Authorization": "Token 263c4c885d1c84fe27136a6e6ec18d62171c5980"}
