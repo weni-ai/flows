@@ -105,7 +105,7 @@ class WhatsappBroadcastConsumerIntegrationTests(TembaTest):
         """Test that non-existent org raises error."""
         message = {
             "msg": {"text": "Hello"},
-            "project_uuid": "non-existent-uuid",
+            "project_uuid": "00000000-0000-0000-0000-000000000000",  # Valid UUID that doesn't exist
             "urns": ["whatsapp:5511999999999"],
         }
 
