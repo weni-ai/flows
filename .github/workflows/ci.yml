@@ -80,9 +80,10 @@ jobs:
         redis-version: ${{ env.redis-version }}
 
     - name: Install ElasticSearch
-      uses: getong/elasticsearch-action@master
+      uses: elastic/elastic-github-actions/elasticsearch@master
       with:
-        elasticsearch version: ${{ env.elastic-version }}
+        stack-version: ${{ env.elastic-version }}
+        security-enabled: false
 
     - name: Install Node
       uses: actions/setup-node@v4
