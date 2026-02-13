@@ -82,7 +82,7 @@ jobs:
     - name: Install ElasticSearch
       uses: getong/elasticsearch-action@master
       with:
-        elastic version: ${{ env.elastic-version }}
+        elasticsearch version: ${{ env.elastic-version }}
 
     - name: Install Node
       uses: actions/setup-node@v4
