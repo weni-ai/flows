@@ -75,9 +75,9 @@ jobs:
           venv-${{ runner.os }}-${{ env.python-version }}-
 
     - name: Install Redis
-      uses: zhulik/redis-action@v1.0.0
+      uses: supercharge/redis-github-action@1.8.1
       with:
-        redis version: ${{ env.redis-version }}
+        redis-version: ${{ env.redis-version }}
 
     - name: Install ElasticSearch
       uses: nyaruka/elasticsearch-action@master
