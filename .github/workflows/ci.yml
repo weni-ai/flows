@@ -80,7 +80,7 @@ jobs:
         redis-version: ${{ env.redis-version }}
 
     - name: Install ElasticSearch
-      uses: nyaruka/elasticsearch-action@master
+      uses: getong/elasticsearch-action@master
       with:
         elastic version: ${{ env.elastic-version }}
 
