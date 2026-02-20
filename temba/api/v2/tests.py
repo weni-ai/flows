@@ -6759,6 +6759,7 @@ class EventsHealthCheckEndpointTest(APITest):
         self.assertEqual(data["status"], "error")
         self.assertIn("Service unavailable", data["message"])
 
+
 class EventsServiceTest(APITest):
     @patch("temba.api.v2.services.events.dl_get_events")
     def test_fetch_events_for_org_parses_and_forwards(self, mock_dl_get_events):

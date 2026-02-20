@@ -3,7 +3,6 @@ import os
 from datetime import timedelta
 from enum import Enum
 
-from django.utils import timezone
 from rest_framework import generics, status, views
 from rest_framework.pagination import CursorPagination
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -11,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from smartmin.views import SmartFormView, SmartTemplateView
+from weni_datalake_sdk.clients.redshift.events import get_events as dl_get_events
 
 from django import forms
 from django.contrib.auth import authenticate, login
@@ -19,6 +19,7 @@ from django.db import connection
 from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 
@@ -114,7 +115,7 @@ from .serializers import (
 )
 from .wenibrain.views import BrainInfoEndpoint
 from .wenigpt.views import IntelligencesEndpoint
-from weni_datalake_sdk.clients.redshift.events import get_events as dl_get_events
+
 
 class RootView(views.APIView):
     """
