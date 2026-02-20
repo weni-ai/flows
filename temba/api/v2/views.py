@@ -1,4 +1,5 @@
 import itertools
+import os
 from datetime import timedelta
 from enum import Enum
 
@@ -113,7 +114,7 @@ from .serializers import (
 )
 from .wenibrain.views import BrainInfoEndpoint
 from .wenigpt.views import IntelligencesEndpoint
-
+from weni_datalake_sdk.clients.redshift.events import get_events as dl_get_events
 
 class RootView(views.APIView):
     """
@@ -5544,61 +5545,30 @@ class EventsHealthCheckEndpoint(views.APIView):
     """
     Health check endpoint for get_events functionality.
     Tests if the fetch_events_for_org service is working correctly.
-    Returns 200 if healthy, 500 if there's an error.
+    Uses a project_id from environment variable EVENTS_HEALTH_CHECK_PROJECT_UUID.
+    Returns 200 if healthy, 503 if there's an error.
     """
 
     permission_classes = []  # No authentication required for health checks
 
     def get(self, request, *args, **kwargs):
         try:
-            from temba.api.v2.services.events import fetch_events_for_org
-            from temba.orgs.models import Org
-
-            # Try to get user from request if authenticated
-            user = getattr(request, "user", None)
-            org = None
-            
-            if user and hasattr(user, "is_authenticated") and user.is_authenticated:
-                try:
-                    org = user.get_org()
-                    if not org or not org.proj_uuid:
-                        # If user has no org, try to get any org with proj_uuid
-                        org = Org.objects.filter(proj_uuid__isnull=False, is_active=True).first()
-                        if org:
-                            user.set_org(org)
-                except Exception:
-                    # If get_org fails, try to get any org with proj_uuid
-                    org = Org.objects.filter(proj_uuid__isnull=False, is_active=True).first()
-                    if org:
-                        user.set_org(org)
-            
-            if not org:
-                # If no authenticated user or no org found, try to get any org with proj_uuid
-                org = Org.objects.filter(proj_uuid__isnull=False, is_active=True).first()
-                if not org:
-                    return Response(
-                        {"status": "error", "message": "No organization with project UUID found"},
-                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    )
-                # Get a user from the org for the test
-                user = org.get_users().first()
-                if not user:
-                    return Response(
-                        {"status": "error", "message": "No user found in organization"},
-                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    )
-                # Set the org for the user
-                user.set_org(org)
+            # Get project_id from environment variable (assumed to be valid UUID string)
+            project_id = os.environ.get("EVENTS_HEALTH_CHECK_PROJECT_UUID")
 
             # Prepare minimal test parameters (last 24 hours, limit 1 for quick check)
             date_end = timezone.now()
             date_start = date_end - timedelta(hours=24)
 
-            # Call fetch_events_for_org with minimal parameters
-            processed_events = fetch_events_for_org(
-                user,
-                date_start=date_start,
-                date_end=date_end,
+            # Format dates as UTC ISO strings with Z suffix
+            date_start_str = date_start.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            date_end_str = date_end.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+            # Check if events are available for this project
+            dl_get_events(
+                project=project_id,
+                date_start=date_start_str,
+                date_end=date_end_str,
                 limit=1,
             )
 
@@ -5609,8 +5579,8 @@ class EventsHealthCheckEndpoint(views.APIView):
             )
 
         except Exception as e:
-            # Return 500 if there's any error
+            # Return 503 if there's any error
             return Response(
-                {"status": "unhealthy", "message": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                {"status": "error", "message": str(e)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
