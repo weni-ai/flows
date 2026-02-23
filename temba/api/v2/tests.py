@@ -6718,7 +6718,7 @@ class EventsHealthCheckEndpointTest(APITest):
     @patch("temba.api.v2.views.dl_get_events")
     def test_health_check_success(self, mock_dl_get_events):
         """Test successful health check"""
-        url = reverse("api.v2.events_health")
+        url = reverse("api.v2.events_healthcheck")
         project_id = "123e4567-e89b-12d3-a456-426614174000"
 
         mock_dl_get_events.return_value = []
@@ -6745,7 +6745,7 @@ class EventsHealthCheckEndpointTest(APITest):
     @patch("temba.api.v2.views.dl_get_events")
     def test_health_check_service_error(self, mock_dl_get_events):
         """Test health check when dl_get_events raises an exception"""
-        url = reverse("api.v2.events_health")
+        url = reverse("api.v2.events_healthcheck")
         project_id = "123e4567-e89b-12d3-a456-426614174000"
 
         # Make dl_get_events raise an exception
