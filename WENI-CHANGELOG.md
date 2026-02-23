@@ -1,3 +1,7 @@
+3.56.0
+----------
+* feat: creating view to count all messages and unique contact messages
+
 3.55.0
 ----------
 * feat: new events endpoint with pagination

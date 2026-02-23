@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from temba.channels.models import Channel
 from temba.contacts.models import URN, Contact, ContactURN
-from temba.event_driven.publisher.rabbitmq_publisher import RabbitmqPublisher
+from temba.event_driven.publisher.amazonmq_publisher import AmazonMQPublisher
 from temba.msgs.models import Label, Msg
 from temba.orgs.models import Org
 
@@ -166,6 +166,6 @@ def _publish_billing_msg_create(*, msg: Msg, template: Optional[str | dict] = No
             "status": msg.status,
         }
 
-        RabbitmqPublisher().send_message(body=payload, exchange="msgs.topic", routing_key="create")
+        AmazonMQPublisher().send_message(body=payload, exchange="msgs.topic", routing_key="create")
     except Exception as exc:  # pragma: no cover - best effort emit
         logging.getLogger(__name__).warning("Failed to publish billing msg create: %s", exc)
