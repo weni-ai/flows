@@ -6715,7 +6715,7 @@ class EventsGroupByCountEndpointTest(APITest):
 
 
 class EventsHealthCheckEndpointTest(APITest):
-    @patch("weni_datalake_sdk.clients.redshift.events.get_events")
+    @patch("temba.api.v2.views.dl_get_events")
     def test_health_check_success(self, mock_dl_get_events):
         """Test successful health check"""
         url = reverse("api.v2.events_health")
@@ -6723,7 +6723,7 @@ class EventsHealthCheckEndpointTest(APITest):
 
         mock_dl_get_events.return_value = []
 
-        with patch.dict("os.environ", {"EVENTS_HEALTH_CHECK_PROJECT_ID": project_id}):
+        with patch.dict("os.environ", {"EVENTS_HEALTH_CHECK_PROJECT_UUID": project_id}):
             response = self.fetchJSON(url)
 
         self.assertEqual(response.status_code, 200)
@@ -6742,7 +6742,7 @@ class EventsHealthCheckEndpointTest(APITest):
         self.assertTrue(call_kwargs["date_start"].endswith("Z"))
         self.assertTrue(call_kwargs["date_end"].endswith("Z"))
 
-    @patch("weni_datalake_sdk.clients.redshift.events.get_events")
+    @patch("temba.api.v2.views.dl_get_events")
     def test_health_check_service_error(self, mock_dl_get_events):
         """Test health check when dl_get_events raises an exception"""
         url = reverse("api.v2.events_health")
@@ -6751,7 +6751,7 @@ class EventsHealthCheckEndpointTest(APITest):
         # Make dl_get_events raise an exception
         mock_dl_get_events.side_effect = Exception("Service unavailable")
 
-        with patch.dict("os.environ", {"EVENTS_HEALTH_CHECK_PROJECT_ID": project_id}):
+        with patch.dict("os.environ", {"EVENTS_HEALTH_CHECK_PROJECT_UUID": project_id}):
             response = self.fetchJSON(url)
 
         self.assertEqual(response.status_code, 503)
