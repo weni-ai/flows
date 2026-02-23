@@ -159,6 +159,29 @@ class TestS3MediaProxyEndpoint(TembaTest):
         self.assertEqual(response.status_code, 404)
         self.assertIn("error", response.json())
 
+    @patch("temba.api.v2.internals.media.views.settings")
+    def test_get_invalid_object_key_returns_403(self, mock_settings):
+        """Test that an object_key exceeding max length returns 403."""
+        mock_settings.AWS_STORAGE_BUCKET_NAME = "test-bucket"
+
+        long_key = "a" * 2000
+        url = reverse("internals.media_download", kwargs={"object_key": long_key})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["error"], "Access denied")
+
+    @patch("temba.api.v2.internals.media.views.S3MediaProxyView._validate_object_key")
+    def test_get_unexpected_error_returns_500(self, mock_validate):
+        """Test that unexpected errors return 500."""
+        mock_validate.side_effect = RuntimeError("unexpected failure")
+
+        url = reverse("internals.media_download", kwargs={"object_key": "media/file.jpg"})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json()["error"], "Internal server error")
+
 
 class TestPresignedUrlExpiration(TestCase):
     """Test that the pre-signed URL expiration is correctly configured."""
