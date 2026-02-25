@@ -786,7 +786,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                         ]
                     }
                 ],
-                "interaction_type": "flow_msg | cta_url | location | order_details",
+                "interaction_type": "flow_msg | cta_url | location | order_details | carousel",
                 "flow_message": {
                     "flow_id": "1234567890",
                     "flow_data": {
@@ -824,8 +824,8 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                                 "parameters": {"id": "item-1", "title": "Option 1"}
                             },
                             {
-                                "sub_type": "quick_reply",
-                                "parameters": {"id": "item-2", "title": "Option 2"}
+                                "sub_type": "url",
+                                "parameters": {"display_text": "Visit", "url": "https://example.com"}
                             }
                         ]
                     }
@@ -922,7 +922,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                         ]
                     }
                 ],
-                "interaction_type": "flow_msg | cta_url | location | order_details",
+                "interaction_type": "flow_msg | cta_url | location | order_details | carousel",
                 "flow_message": {
                     "flow_id": "1234567890",
                     "flow_data": {
