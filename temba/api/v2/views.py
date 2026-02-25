@@ -814,6 +814,21 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "url": "https://weni.ai",
                     "display_text": "Go to Weni"
                 },
+                "carousel": [
+                    {
+                        "body": "Card body text",
+                        "buttons": [
+                            {
+                                "sub_type": "quick_reply",
+                                "parameters": {"id": "item-1", "title": "Option 1"}
+                            },
+                            {
+                                "sub_type": "quick_reply",
+                                "parameters": {"id": "item-2", "title": "Option 2"}
+                            }
+                        ]
+                    }
+                ],
                 "order_details": {
                     "reference_id": "unique-reference-id-123",
                     "payment_settings": {
@@ -935,6 +950,21 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "url": "https://weni.ai",
                     "display_text": "Go to Weni"
                 },
+                "carousel": [
+                    {
+                        "body": "Card body text",
+                        "buttons": [
+                            {
+                                "sub_type": "quick_reply",
+                                "parameters": {"id": "item-1", "title": "Option 1"}
+                            },
+                            {
+                                "sub_type": "url",
+                                "parameters": {"display_text": "Visit", "url": "https://example.com"}
+                            }
+                        ]
+                    }
+                ],
                 "order_details": {
                     "reference_id": "unique-reference-id-123",
                     "payment_settings": {
