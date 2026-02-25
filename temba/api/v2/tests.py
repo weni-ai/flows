@@ -1233,7 +1233,10 @@ class APITest(TembaTest):
             },
         )
 
-        self.assertEqual(response.json(), {"msg": ["Must provide either text, attachments, template or action_type"]})
+        self.assertEqual(
+            response.json(),
+            {"msg": ["Must provide either text, attachments, template, action_type or carousel"]},
+        )
 
         # send a msg with a defined channel
         response = self.postJSON(
@@ -1254,6 +1257,41 @@ class APITest(TembaTest):
 
         self.assertEqual(expected_metadata, broadcast.metadata)
         self.assertEqual(channel, broadcast.channel)
+
+        # send a msg with carousel only
+        carousel_msg = {
+            "carousel": [
+                {
+                    "body": "Hello body 1",
+                    "buttons": [
+                        {
+                            "sub_type": "url",
+                            "parameters": {"display_text": "Product-0", "url": "https://weni.ai"},
+                        }
+                    ],
+                },
+                {
+                    "body": "Hello body 2",
+                    "buttons": [
+                        {
+                            "sub_type": "url",
+                            "parameters": {"display_text": "Produto-1", "url": "https://weni.ai"},
+                        }
+                    ],
+                },
+            ]
+        }
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid],
+                "msg": carousel_msg,
+            },
+        )
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+        self.assertEqual(carousel_msg, broadcast.metadata)
 
         # send a msg with a non whatsapp cloud defined channel
         response = self.postJSON(
