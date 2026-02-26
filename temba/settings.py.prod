@@ -497,6 +497,13 @@ if USE_EDA:
     EDA_BROKER_PASSWORD = env("EDA_BROKER_PASSWORD", default="guest")
     EDA_WAIT_TIME_RETRY = env.int("EDA_WAIT_TIME_RETRY", default=5)
 
+    PIKA_EDA_BROKER_HOST = env("PIKA_EDA_BROKER_HOST", default="localhost")
+    PIKA_EDA_BROKER_PORT = env.int("PIKA_EDA_BROKER_PORT", default=5671)
+    PIKA_EDA_BROKER_USER = env("PIKA_EDA_BROKER_USER", default="guest")
+    PIKA_EDA_BROKER_PASSWORD = env("PIKA_EDA_BROKER_PASSWORD", default="guest")
+    PIKA_EDA_VIRTUAL_HOST = env("PIKA_EDA_VIRTUAL_HOST", default="/")
+    PIKA_EDA_SSL_ENABLED = env.bool("PIKA_EDA_SSL_ENABLED", default=True)
+
 BOTHUB_SYNC_INTENTS_URL = env("BOTHUB_SYNC_INTENTS_URL", default="https://nlp.bothub.it/info/")
 
 # Max group sum size allowed for manual flow broadcasts
