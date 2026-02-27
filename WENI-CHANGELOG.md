@@ -1,3 +1,7 @@
+3.57.1
+----------
+* fix: poetry lock
+
 3.57.0
 ----------
 * feat: Add support for carousel messages in WhatsApp broadcasts and update validation to include carousel in required fields
