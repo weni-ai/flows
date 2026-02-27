@@ -790,7 +790,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                         ]
                     }
                 ],
-                "interaction_type": "flow_msg | cta_url | location | order_details",
+                "interaction_type": "flow_msg | cta_url | location | order_details | carousel",
                 "flow_message": {
                     "flow_id": "1234567890",
                     "flow_data": {
@@ -819,6 +819,21 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "url": "https://weni.ai",
                     "display_text": "Go to Weni"
                 },
+                "carousel": [
+                    {
+                        "body": "Card body text",
+                        "buttons": [
+                            {
+                                "sub_type": "quick_reply",
+                                "parameters": {"id": "item-1", "title": "Option 1"}
+                            },
+                            {
+                                "sub_type": "url",
+                                "parameters": {"display_text": "Visit", "url": "https://example.com"}
+                            }
+                        ]
+                    }
+                ],
                 "order_details": {
                     "reference_id": "unique-reference-id-123",
                     "payment_settings": {
@@ -911,7 +926,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                         ]
                     }
                 ],
-                "interaction_type": "flow_msg | cta_url | location | order_details",
+                "interaction_type": "flow_msg | cta_url | location | order_details | carousel",
                 "flow_message": {
                     "flow_id": "1234567890",
                     "flow_data": {
@@ -940,6 +955,21 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "url": "https://weni.ai",
                     "display_text": "Go to Weni"
                 },
+                "carousel": [
+                    {
+                        "body": "Card body text",
+                        "buttons": [
+                            {
+                                "sub_type": "quick_reply",
+                                "parameters": {"id": "item-1", "title": "Option 1"}
+                            },
+                            {
+                                "sub_type": "url",
+                                "parameters": {"display_text": "Visit", "url": "https://example.com"}
+                            }
+                        ]
+                    }
+                ],
                 "order_details": {
                     "reference_id": "unique-reference-id-123",
                     "payment_settings": {
