@@ -79,6 +79,7 @@ django-permissions-policy = "^4.21.0"
 moto = "4.2.14"
 weni-datalake-sdk = "0.6.1"
 PyJWT = "^2.10.1"
+weni-eda = "0.1.2a1"
 
 [tool.poetry.dev-dependencies]
 black = "^22.3"
