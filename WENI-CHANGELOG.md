@@ -1,6 +1,7 @@
 3.57.0
 ----------
 * feat: Add support for carousel messages in WhatsApp broadcasts and update validation to include carousel in required fields
+* feat: amazon-mq-publisher
 
 3.56.0
 ----------
