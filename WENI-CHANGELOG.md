@@ -1,3 +1,8 @@
+3.57.3
+----------
+* fix: amazon mq publisher
+
+
 3.57.2
 ----------
 * feat: create health check events endpoint
