@@ -1,3 +1,7 @@
+3.57.2
+----------
+* feat: create health check events endpoint
+
 3.57.1
 ----------
 * fix: poetry lock
