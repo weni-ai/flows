@@ -1,4 +1,6 @@
 import itertools
+import os
+from datetime import timedelta
 from enum import Enum
 
 from rest_framework import generics, status, views
@@ -8,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from smartmin.views import SmartFormView, SmartTemplateView
+from weni_datalake_sdk.clients.redshift.events import get_events as dl_get_events
 
 from django import forms
 from django.contrib.auth import authenticate, login
@@ -16,6 +19,7 @@ from django.db import connection
 from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 
@@ -5566,3 +5570,48 @@ class EventsGroupByCountEndpoint(BaseAPIView):
                 {"name": "table", "required": False, "help": "Required when silver=true; silver table name"},
             ],
         }
+
+
+class EventsHealthCheckEndpoint(views.APIView):
+    """
+    Health check endpoint for get_events functionality.
+    Tests if the fetch_events_for_org service is working correctly.
+    Uses a project_id from environment variable EVENTS_HEALTH_CHECK_PROJECT_UUID.
+    Returns 200 if healthy, 503 if there's an error.
+    """
+
+    permission_classes = []  # No authentication required for health checks
+
+    def get(self, request, *args, **kwargs):
+        try:
+            # Get project_id from environment variable (assumed to be valid UUID string)
+            project_id = os.environ.get("EVENTS_HEALTH_CHECK_PROJECT_UUID")
+
+            # Prepare minimal test parameters (last 24 hours, limit 1 for quick check)
+            date_end = timezone.now()
+            date_start = date_end - timedelta(hours=24)
+
+            # Format dates as UTC ISO strings with Z suffix
+            date_start_str = date_start.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            date_end_str = date_end.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+            # Check if events are available for this project
+            dl_get_events(
+                project=project_id,
+                date_start=date_start_str,
+                date_end=date_end_str,
+                limit=1,
+            )
+
+            # If we got here without exception, the service is working
+            return Response(
+                {"status": "healthy", "message": "get_events service is operational"},
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            # Return 503 if there's any error
+            return Response(
+                {"status": "error", "message": str(e)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )

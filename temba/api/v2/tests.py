@@ -6752,6 +6752,52 @@ class EventsGroupByCountEndpointTest(APITest):
         self.assertEqual(response.json(), [{"key_int": 123, "key_bool": False, "key_none": None}])
 
 
+class EventsHealthCheckEndpointTest(APITest):
+    @patch("temba.api.v2.views.dl_get_events")
+    def test_health_check_success(self, mock_dl_get_events):
+        """Test successful health check"""
+        url = reverse("api.v2.events_healthcheck")
+        project_id = "123e4567-e89b-12d3-a456-426614174000"
+
+        mock_dl_get_events.return_value = []
+
+        with patch.dict("os.environ", {"EVENTS_HEALTH_CHECK_PROJECT_UUID": project_id}):
+            response = self.fetchJSON(url)
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "healthy")
+        self.assertEqual(data["message"], "get_events service is operational")
+
+        # Verify that dl_get_events was called with correct parameters
+        mock_dl_get_events.assert_called_once()
+        call_kwargs = mock_dl_get_events.call_args[1]
+        self.assertEqual(call_kwargs["project"], project_id)
+        self.assertIn("date_start", call_kwargs)
+        self.assertIn("date_end", call_kwargs)
+        self.assertEqual(call_kwargs["limit"], 1)
+        # Verify date format (should end with Z)
+        self.assertTrue(call_kwargs["date_start"].endswith("Z"))
+        self.assertTrue(call_kwargs["date_end"].endswith("Z"))
+
+    @patch("temba.api.v2.views.dl_get_events")
+    def test_health_check_service_error(self, mock_dl_get_events):
+        """Test health check when dl_get_events raises an exception"""
+        url = reverse("api.v2.events_healthcheck")
+        project_id = "123e4567-e89b-12d3-a456-426614174000"
+
+        # Make dl_get_events raise an exception
+        mock_dl_get_events.side_effect = Exception("Service unavailable")
+
+        with patch.dict("os.environ", {"EVENTS_HEALTH_CHECK_PROJECT_UUID": project_id}):
+            response = self.fetchJSON(url)
+
+        self.assertEqual(response.status_code, 503)
+        data = response.json()
+        self.assertEqual(data["status"], "error")
+        self.assertIn("Service unavailable", data["message"])
+
+
 class EventsServiceTest(APITest):
     @patch("temba.api.v2.services.events.dl_get_events")
     def test_fetch_events_for_org_parses_and_forwards(self, mock_dl_get_events):
