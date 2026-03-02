@@ -9,8 +9,14 @@ from django.test import SimpleTestCase, override_settings
 from django.urls import resolve, reverse
 
 from temba.api.v2.internals.views import JWTAuthMockMixin
-from temba.api.v2.projects.views import GetProjectView, ProjectLanguageView, ProjectMessageCountView
+from temba.api.v2.projects.views import (
+    GetProjectView,
+    InternalProjectMessageCountView,
+    ProjectLanguageView,
+    ProjectMessageCountView,
+)
 from temba.channels.models import ChannelCount
+from temba.orgs.models import UniqueContactCount
 from temba.tests import TembaTest
 
 GET_PROJECT_VIEW_PATH = "temba.api.v2.projects.views.GetProjectView"
@@ -94,6 +100,12 @@ class ProjectsUrlsTest(JWTAuthMockMixin, SimpleTestCase):
         self.assertEqual(url, "/projects/message_count")
         match = resolve(url)
         self.assertEqual(getattr(match.func, "view_class", None), ProjectMessageCountView)
+
+    def test_internal_project_message_count_url_resolves_to_internal_view(self):
+        url = reverse("internal_project_message_count")
+        self.assertEqual(url, "/projects/internal/message_count")
+        match = resolve(url)
+        self.assertEqual(getattr(match.func, "view_class", None), InternalProjectMessageCountView)
 
 
 class PatchedJWTAuthMixin(JWTAuthMockMixin):
@@ -250,3 +262,143 @@ class ProjectMessageCountViewTest(PatchedJWTAuthMixin, TembaTest):
         resp = self.client.get(self.url, **self.auth_headers)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json(), {"incoming_amount": 4, "outgoing_amount": 6, "total_amount": 10})
+
+
+INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH = "temba.api.v2.projects.views.InternalProjectMessageCountView"
+
+
+class InternalProjectMessageCountViewTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save(update_fields=("proj_uuid",))
+
+        self.org2.proj_uuid = uuid.uuid4()
+        self.org2.save(update_fields=("proj_uuid",))
+
+        self.url = reverse("api.v2.internal_project_message_count")
+
+    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
+    def test_returns_aggregated_counts_when_no_project_uuid(self):
+        """When no project_uuid is provided, returns aggregated counts (sum) per day."""
+        # Create counts for both orgs on the same day
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
+        UniqueContactCount.objects.create(org=self.org2, day=date(2026, 1, 1), count=20)
+
+        resp = self.client.get(f"{self.url}?after=2026-01-01&before=2026-01-01")
+        self.assertEqual(resp.status_code, 200)
+
+        data = resp.json()
+        # Should return 1 aggregated result (sum of both orgs for that day)
+        self.assertEqual(len(data["results"]), 1)
+        self.assertEqual(data["results"][0]["day"], "2026-01-01")
+        self.assertEqual(data["results"][0]["count"], 30)  # 10 + 20
+        self.assertEqual(data["total"], 30)
+
+    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
+    def test_filters_by_project_uuid(self):
+        """When project_uuid is provided, returns counts only for that project."""
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
+        UniqueContactCount.objects.create(org=self.org2, day=date(2026, 1, 1), count=999)
+
+        resp = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-01&before=2026-01-01")
+        self.assertEqual(resp.status_code, 200)
+
+        data = resp.json()
+        self.assertEqual(len(data["results"]), 1)
+        self.assertEqual(data["results"][0]["count"], 10)
+        self.assertEqual(data["total"], 10)
+
+    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
+    def test_nonexistent_project_uuid_returns_404(self):
+        random_uuid = uuid.uuid4()
+        resp = self.client.get(f"{self.url}?project_uuid={random_uuid}")
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {"error": "Project not found"})
+
+    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
+    def test_date_filters_with_project_uuid(self):
+        """Date filters work correctly for a specific project."""
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 2), count=20)
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 3), count=30)
+
+        # Filter by single day
+        resp = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-02&before=2026-01-02")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(len(data["results"]), 1)
+        self.assertEqual(data["total"], 20)
+
+        # Filter by date range
+        resp = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-01&before=2026-01-03")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(len(data["results"]), 3)
+        self.assertEqual(data["total"], 60)  # 10 + 20 + 30
+
+    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
+    def test_invalid_date_returns_400(self):
+        resp = self.client.get(f"{self.url}?after=invalid-date")
+        self.assertEqual(resp.status_code, 400)
+
+    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
+    def test_returns_empty_results_when_no_data(self):
+        """When no data exists for the period, returns empty results."""
+        resp = self.client.get(f"{self.url}?after=2026-01-01&before=2026-01-01")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["results"], [])
+        self.assertEqual(data["total"], 0)
+
+    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
+    def test_results_include_day_and_count_for_specific_project(self):
+        """Results for specific project should include day and count."""
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 15), count=42)
+
+        resp = self.client.get(f"{self.url}?project_uuid={self.org.proj_uuid}&after=2026-01-15&before=2026-01-15")
+        self.assertEqual(resp.status_code, 200)
+
+        data = resp.json()
+        self.assertEqual(len(data["results"]), 1)
+        result = data["results"][0]
+        self.assertEqual(result["day"], "2026-01-15")
+        self.assertEqual(result["count"], 42)
+
+    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
+    def test_aggregated_results_ordered_by_day(self):
+        """Results without project_uuid should be aggregated and ordered by day."""
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 2), count=20)
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
+        UniqueContactCount.objects.create(org=self.org2, day=date(2026, 1, 1), count=15)
+
+        resp = self.client.get(f"{self.url}?after=2026-01-01&before=2026-01-02")
+        self.assertEqual(resp.status_code, 200)
+
+        data = resp.json()
+        # Should return 2 aggregated results (one per day)
+        self.assertEqual(len(data["results"]), 2)
+        # First result: day 1 with aggregated count
+        self.assertEqual(data["results"][0]["day"], "2026-01-01")
+        self.assertEqual(data["results"][0]["count"], 25)  # 10 + 15
+        # Second result: day 2
+        self.assertEqual(data["results"][1]["day"], "2026-01-02")
+        self.assertEqual(data["results"][1]["count"], 20)
+        # Total
+        self.assertEqual(data["total"], 45)
+
+    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
+    def test_no_date_filters_returns_all_aggregated_data(self):
+        """When no date filters are provided, returns all available data aggregated by day."""
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
+        UniqueContactCount.objects.create(org=self.org2, day=date(2026, 1, 1), count=5)
+        UniqueContactCount.objects.create(org=self.org, day=date(2026, 6, 15), count=50)
+
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+
+        data = resp.json()
+        # Should have 2 results (2 distinct days), aggregated
+        self.assertEqual(len(data["results"]), 2)
+        self.assertEqual(data["total"], 65)  # 10 + 5 + 50

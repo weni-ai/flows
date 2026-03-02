@@ -442,7 +442,7 @@ class TestInternalMessages(TembaTest):
         response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
         self.assertEqual(response.status_code, 404)
 
-    @patch("temba.event_driven.publisher.rabbitmq_publisher.RabbitmqPublisher.send_message")
+    @patch("temba.api.v2.internals.msgs.services.AmazonMQPublisher.send_message")
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
     def test_stream_publishes_billing_outgoing(self, mock_publish, *_mocks):
@@ -466,7 +466,7 @@ class TestInternalMessages(TembaTest):
         self.assertEqual(body["text"], "bill me")
         self.assertEqual(body["template"], "template-uuid")
 
-    @patch("temba.event_driven.publisher.rabbitmq_publisher.RabbitmqPublisher.send_message")
+    @patch("temba.api.v2.internals.msgs.services.AmazonMQPublisher.send_message")
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
     def test_stream_publishes_billing_incoming(self, mock_publish, *_mocks):

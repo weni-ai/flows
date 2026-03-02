@@ -11,7 +11,6 @@ jobs:
     env:
       python-version: '3.11'
       postgis-version: '3.5'
-      redis-version: '3.2.4'
       node-version: '10'
       elastic-version: '7.10.1'
       rpindexer-version: '1.0.1'
@@ -36,6 +35,18 @@ jobs:
           - test_group: others
             test_labels: ""  # dynamically detected - all apps not in other groups
     runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -73,11 +84,6 @@ jobs:
         key: venv-${{ runner.os }}-${{ env.python-version }}-${{ hashFiles('poetry.lock') }}
         restore-keys: |
           venv-${{ runner.os }}-${{ env.python-version }}-
-
-    - name: Install Redis
-      uses: zhulik/redis-action@v1.0.0
-      with:
-        redis version: ${{ env.redis-version }}
 
     - name: Install ElasticSearch
       uses: nyaruka/elasticsearch-action@master
