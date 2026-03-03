@@ -1,7 +1,7 @@
 3.58.0
 ----------
 * feat: s3 proxy endpoint
-* fix: changing log level warning for pika
+* fix: changing log level warning for pika-eda lib
 
 
 3.57.3
