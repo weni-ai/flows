@@ -272,6 +272,7 @@ LOGGING = {
         "rapidpro": {"level": "WARNING", "handlers": ["elasticapm"], "propagate": False},
         "elasticapm.errors": {"level": "ERROR", "handlers": ["console"], "propagate": False},
         "pycountry": {"level": "ERROR", "handlers": ["console"], "propagate": False},
+        "pika": {"level": "CRITICAL", "handlers": ["console"], "propagate": False},
         "django.security.DisallowedHost": {"handlers": ["null"], "propagate": False},
         # OIDC
         "mozilla_django_oidc": {"level": "DEBUG", "handlers": ["console"], "propagate": False},
