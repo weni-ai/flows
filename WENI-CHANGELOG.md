@@ -1,3 +1,9 @@
+3.58.0
+----------
+* feat: s3 proxy endpoint
+* fix: changing log level warning for pika
+
+
 3.57.3
 ----------
 * fix: amazon mq publisher
