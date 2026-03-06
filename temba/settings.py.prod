@@ -506,6 +506,18 @@ if USE_EDA:
 
 BOTHUB_SYNC_INTENTS_URL = env("BOTHUB_SYNC_INTENTS_URL", default="https://nlp.bothub.it/info/")
 
+# SQS Consumer Configuration (for agent-toolkit broadcasts)
+USE_SQS_CONSUMER = env.bool("USE_SQS_CONSUMER", default=False)
+
+if USE_SQS_CONSUMER:
+    SQS_AWS_REGION = env("SQS_AWS_REGION", default="us-east-1")
+    SQS_BROADCAST_QUEUE_URL = env("SQS_BROADCAST_QUEUE_URL", default="")
+    # Number of parallel threads per worker (default: 10)
+    # Total throughput = num_workers * SQS_CONSUMER_THREADS * msgs/second
+    SQS_CONSUMER_THREADS = env.int("SQS_CONSUMER_THREADS", default=10)
+    # Max seconds to wait for a single message to be processed
+    SQS_CONSUMER_TASK_TIMEOUT = env.int("SQS_CONSUMER_TASK_TIMEOUT", default=120)
+
 # Max group sum size allowed for manual flow broadcasts
 MANUAL_FLOW_BROADCAST_MAX_GROUP_SUM_SIZE = env.int("MANUAL_FLOW_BROADCAST_MAX_GROUP_SUM_SIZE", default=0)
 
