@@ -52,8 +52,8 @@ class WhatsappBroadcastConsumer(SQSConsumer):
         Raises:
             SQSProcessingError: If the message is invalid or processing fails.
         """
-        logger.info(f"[WhatsappBroadcastConsumer] Processing message")
-        logger.debug(f"[WhatsappBroadcastConsumer] Message content: {message}")
+        logger.warning(f"[WhatsappBroadcastConsumer] Processing message: keys={list(message.keys())}")
+        logger.warning(f"[WhatsappBroadcastConsumer] urns={message.get('urns')}, project_uuid={message.get('project_uuid')}, channel={message.get('channel')}")
 
         # Extract required fields
         msg_payload = message.get("msg")
@@ -98,10 +98,12 @@ class WhatsappBroadcastConsumer(SQSConsumer):
         if message.get("name"):
             request_data["name"] = message["name"]
 
+        logger.warning(f"[WhatsappBroadcastConsumer] request_data for serializer: {request_data}")
+
         # Process with serializer
         self._create_broadcast(request_data, org, user)
 
-        logger.info(f"[WhatsappBroadcastConsumer] Broadcast created successfully for org={org.id}, " f"urns={urns}")
+        logger.warning(f"[WhatsappBroadcastConsumer] Broadcast created successfully for org={org.id}, urns={urns}")
 
     def _get_user(self, message: dict[str, Any], jwt_token: str | None) -> User:
         """
@@ -200,9 +202,9 @@ class WhatsappBroadcastConsumer(SQSConsumer):
             )
             raise SQSProcessingError(f"Broadcast validation failed: {errors}")
 
-        # Save the broadcast (this also triggers send_async)
+        logger.warning(f"[WhatsappBroadcastConsumer] Serializer valid, saving broadcast...")
         broadcast = serializer.save()
-        logger.info(f"[WhatsappBroadcastConsumer] Broadcast {broadcast.id} created and queued")
+        logger.warning(f"[WhatsappBroadcastConsumer] Broadcast {broadcast.id} created and queued")
 
     def on_error(self, message: dict[str, Any], error: Exception) -> None:
         """
