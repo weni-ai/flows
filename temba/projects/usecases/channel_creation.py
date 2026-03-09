@@ -21,4 +21,5 @@ def create_default_wwc_channel(project, user) -> Channel:
         config={"preview": True, "version": 2, "allowed_domains": settings.WENI_WEBCHAT_ALLOWED_DOMAINS},
     )
     publish_channel_event(channel, action="create")
+    print(f"Channel published: {channel.uuid}")
     return channel
