@@ -1,6 +1,7 @@
 from django.conf import settings
 
 from temba.channels.models import Channel
+from temba.projects.usecases.channel_publisher import publish_channel_event
 
 DEFAULT_WWC_CHANNEL_NAME = "Weni Web Chat - Preview"
 
@@ -10,7 +11,7 @@ def create_default_wwc_channel(project, user) -> Channel:
     if existing_channel and existing_channel.config.get("preview"):
         return existing_channel
 
-    return Channel.create(
+    channel = Channel.create(
         org=project.org,
         user=user,
         country=None,
@@ -19,3 +20,5 @@ def create_default_wwc_channel(project, user) -> Channel:
         address=str(project.project_uuid),
         config={"preview": True, "version": 2, "allowd_domains": [settings.WENI_WEBCHAT_ALLOWED_DOMAINS]},
     )
+    publish_channel_event(channel, action="create")
+    return channel
