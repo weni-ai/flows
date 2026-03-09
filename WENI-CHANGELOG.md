@@ -1,3 +1,16 @@
+3.58.1
+----------
+* feat: Update refresh teams token schedule time to 30 minutes
+
+3.58.0
+----------
+* feat: s3 proxy endpoint
+* fix: changing log level warning for pika-eda lib
+
+3.57.3
+----------
+* fix: amazon mq publisher
+
 3.57.2
 ----------
 * feat: create health check events endpoint
