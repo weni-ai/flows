@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 
 from temba.api.v2.internals.helpers import get_object_or_404
 from temba.channels.models import Channel
-from temba.contacts.models import ContactField, ContactURN
+from temba.contacts.models import Contact, ContactField, ContactURN
 from temba.orgs.models import Org
 
 User = get_user_model()
@@ -80,6 +80,36 @@ class InternalContactFieldsValuesSerializer(serializers.Serializer):
             contact.modify(user, mods)
 
         return instance
+
+
+class CleanContactFieldsSerializer(serializers.Serializer):
+    project_uuid = serializers.UUIDField(required=False)
+    project = serializers.UUIDField(required=False)
+    contact_uuid = serializers.UUIDField(required=False)
+    contact_urn = serializers.CharField(required=False, allow_blank=False)
+
+    def validate(self, data):
+        contact_uuid = data.get("contact_uuid")
+        contact_urn = data.get("contact_urn")
+        org = self.context["org"]
+
+        if not contact_uuid and not contact_urn:
+            raise serializers.ValidationError("Either contact_uuid or contact_urn is required")
+
+        if contact_uuid and contact_urn:
+            raise serializers.ValidationError("Provide only one of contact_uuid or contact_urn")
+
+        if contact_uuid:
+            contact = Contact.objects.filter(org=org, is_active=True, uuid=contact_uuid).first()
+            if not contact:
+                raise serializers.ValidationError({"contact_uuid": "Contact not found"})
+        else:
+            contact = Contact.from_urn(org, contact_urn)
+            if not contact:
+                raise serializers.ValidationError({"contact_urn": "Contact URN not found"})
+
+        data["contact"] = contact
+        return data
 
 
 class ContactWithMessageSerializer(serializers.Serializer):
