@@ -8,7 +8,12 @@ from weni.internal.authenticators import InternalOIDCAuthentication
 from django.conf import settings
 
 from temba.api.auth.jwt import RequiredJWTAuthentication
-from temba.api.v2.internals.channels.serializers import ChannelProjectSerializer
+from temba.api.v2.internals.channels.serializers import ChannelElevenLabsApiKeySerializer, ChannelProjectSerializer
+from temba.api.v2.internals.channels.usecases import (
+    ChannelNotFoundError,
+    ElevenLabsApiKeyNotFoundError,
+    GetElevenLabsApiKeyUseCase,
+)
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel
@@ -114,16 +119,15 @@ class ChannelElevenLabsApiKeyView(APIViewMixin, APIView):
 
     def get(self, request: Request):
         channel_uuid = getattr(request, "channel_uuid", None)
+        serializer = ChannelElevenLabsApiKeySerializer(data={"channel_uuid": channel_uuid})
+        serializer.is_valid(raise_exception=True)
 
-        if channel_uuid is None:
-            return Response(status=400, data={"error": "Channel UUID is required"})
+        usecase = GetElevenLabsApiKeyUseCase()
         try:
-            channel = Channel.objects.get(uuid=channel_uuid)
-        except Channel.DoesNotExist:
+            api_key = usecase.execute(serializer.validated_data["channel_uuid"])
+        except ChannelNotFoundError:
             return Response(status=404, data={"error": "Channel not found"})
-
-        api_key = channel.config.get("voice_mode", {}).get("elevenLabs", {}).get("apiKey", None)
-        if api_key is None:
+        except ElevenLabsApiKeyNotFoundError:
             return Response(status=404, data={"error": "ElevenLabs API key not found"})
 
         return Response({"api_key": api_key})
