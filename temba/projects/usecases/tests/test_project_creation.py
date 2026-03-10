@@ -12,9 +12,9 @@ from temba.tests.base import TembaTest
 
 
 class ProjectCreationUseCaseTest(TembaTest):
-    @patch("temba.projects.usecases.project_creation.ConnectInternalClient.update_project")
+    @patch("temba.projects.usecases.project_creation.ConnectInternalClient")
     @patch("temba.projects.usecases.channel_creation.publish_channel_event")
-    def test_create_project_creates_default_wwc_channel(self, mock_publish_channel_event, mock_update_project):
+    def test_create_project_creates_default_wwc_channel(self, mock_publish_channel_event, mock_connect_client):
         user_email = "new-project-admin@example.com"
         project_uuid = uuid.uuid4()
         project_dto = ProjectCreationDTO(
@@ -38,13 +38,13 @@ class ProjectCreationUseCaseTest(TembaTest):
         self.assertEqual(channel.name, DEFAULT_WWC_CHANNEL_NAME)
         self.assertEqual(channel.address, str(project.project_uuid))
         self.assertTrue(channel.config["preview"])
-        mock_update_project.assert_called_once_with(project)
+        mock_connect_client.return_value.update_project.assert_called_once_with(project)
         mock_publish_channel_event.assert_called_once_with(channel, action="create")
 
-    @patch("temba.projects.usecases.project_creation.ConnectInternalClient.update_project")
+    @patch("temba.projects.usecases.project_creation.ConnectInternalClient")
     @patch("temba.projects.usecases.channel_creation.publish_channel_event")
     def test_create_project_creates_new_wwc_channel_when_existing_lacks_preview(
-        self, mock_publish_channel_event, mock_update_project
+        self, mock_publish_channel_event, mock_connect_client
     ):
         project_uuid = uuid.uuid4()
         project = self.project.__class__.objects.create(
@@ -88,13 +88,13 @@ class ProjectCreationUseCaseTest(TembaTest):
         self.assertEqual(new_channel.name, DEFAULT_WWC_CHANNEL_NAME)
         self.assertEqual(new_channel.address, str(project.project_uuid))
         self.assertTrue(new_channel.config["preview"])
-        mock_update_project.assert_called_once()
+        mock_connect_client.return_value.update_project.assert_called_once()
         mock_publish_channel_event.assert_called_once_with(new_channel, action="create")
 
-    @patch("temba.projects.usecases.project_creation.ConnectInternalClient.update_project")
+    @patch("temba.projects.usecases.project_creation.ConnectInternalClient")
     @patch("temba.projects.usecases.channel_creation.publish_channel_event")
     def test_create_project_reuses_existing_wwc_channel_with_preview(
-        self, mock_publish_channel_event, mock_update_project
+        self, mock_publish_channel_event, mock_connect_client
     ):
         project_uuid = uuid.uuid4()
         project = self.project.__class__.objects.create(
@@ -133,5 +133,5 @@ class ProjectCreationUseCaseTest(TembaTest):
 
         self.assertEqual(Channel.objects.filter(org=project.org, channel_type="WWC").count(), 1)
         self.assertEqual(Channel.objects.get(org=project.org, channel_type="WWC"), existing_channel)
-        mock_update_project.assert_called_once()
+        mock_connect_client.return_value.update_project.assert_called_once()
         mock_publish_channel_event.assert_not_called()
