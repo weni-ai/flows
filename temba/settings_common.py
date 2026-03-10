@@ -1482,3 +1482,9 @@ try:
         JWT_PUBLIC_KEY = f.read()
 except FileNotFoundError:
     JWT_PUBLIC_KEY = None
+
+WENI_WEBCHAT_ALLOWED_DOMAINS = [
+    domain.strip()
+    for domain in os.environ.get("WENI_WEBCHAT_ALLOWED_DOMAINS", default="").split(",")
+    if domain.strip()
+]
