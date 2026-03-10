@@ -49,13 +49,13 @@ class TestS3MediaProxyView(TembaTest):
         self.assertEqual(buckets, ["primary-bucket"])
 
     @patch("temba.api.v2.internals.media.views.settings")
-    def test_get_buckets_with_additional(self, mock_settings):
+    def test_get_buckets_additional_come_before_primary(self, mock_settings):
         mock_settings.AWS_STORAGE_BUCKET_NAME = "primary-bucket"
         mock_settings.S3_MEDIA_BUCKETS = ["media-bucket", "attachments-bucket"]
 
         buckets = self.view._get_buckets()
 
-        self.assertEqual(buckets, ["primary-bucket", "media-bucket", "attachments-bucket"])
+        self.assertEqual(buckets, ["media-bucket", "attachments-bucket", "primary-bucket"])
 
     @patch("temba.api.v2.internals.media.views.settings")
     def test_get_buckets_deduplicates(self, mock_settings):

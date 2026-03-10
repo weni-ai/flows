@@ -50,8 +50,8 @@ class S3MediaProxyView(APIViewMixin, APIView):
     5. Returns HTTP 302 redirect to the pre-signed URL
 
     Buckets are resolved from settings in this order:
-    - AWS_STORAGE_BUCKET_NAME (primary bucket)
-    - S3_MEDIA_BUCKETS (additional buckets list)
+    - S3_MEDIA_BUCKETS (additional buckets list, checked first)
+    - AWS_STORAGE_BUCKET_NAME (primary bucket, checked last as fallback)
 
     URL: GET /api/v2/internals/media/download/<object_key>/
 
@@ -113,15 +113,14 @@ class S3MediaProxyView(APIViewMixin, APIView):
         seen = set()
         buckets = []
 
-        primary = getattr(settings, "AWS_STORAGE_BUCKET_NAME", None)
-        if primary:
-            seen.add(primary)
-            buckets.append(primary)
-
         for bucket in getattr(settings, "S3_MEDIA_BUCKETS", []):
             if bucket and bucket not in seen:
                 seen.add(bucket)
                 buckets.append(bucket)
+
+        primary = getattr(settings, "AWS_STORAGE_BUCKET_NAME", None)
+        if primary and primary not in seen:
+            buckets.append(primary)
 
         if not buckets:
             raise S3BucketNotConfiguredException()
