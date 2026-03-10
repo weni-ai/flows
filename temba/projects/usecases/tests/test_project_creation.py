@@ -93,7 +93,9 @@ class ProjectCreationUseCaseTest(TembaTest):
 
     @patch("temba.projects.usecases.project_creation.ConnectInternalClient.update_project")
     @patch("temba.projects.usecases.channel_creation.publish_channel_event")
-    def test_create_project_reuses_existing_wwc_channel_with_preview(self, mock_publish_channel_event, mock_update_project):
+    def test_create_project_reuses_existing_wwc_channel_with_preview(
+        self, mock_publish_channel_event, mock_update_project
+    ):
         project_uuid = uuid.uuid4()
         project = self.project.__class__.objects.create(
             project_uuid=project_uuid,
