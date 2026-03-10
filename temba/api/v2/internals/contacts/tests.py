@@ -750,6 +750,139 @@ class PatchedJWTAuthMixin(JWTAuthMockMixin):
         return result
 
 
+class CleanContactsFieldsViewTest(JWTAuthMockMixin, TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.url = "/api/v2/internals/clean_contacts_fields"
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save(update_fields=("proj_uuid",))
+        self.org2.proj_uuid = uuid.uuid4()
+        self.org2.save(update_fields=("proj_uuid",))
+        self.jwt_payload_patch = {"project_uuid": str(self.org.proj_uuid)}
+
+    def _mock_jwt_authenticate(self, request, *args, **kwargs):
+        result = super()._mock_jwt_authenticate(request, *args, **kwargs)
+        if getattr(self, "jwt_payload_patch", None):
+            request.jwt_payload.update(self.jwt_payload_patch)
+            request.project_uuid = request.jwt_payload.get("project_uuid")
+            request.channel_uuid = request.jwt_payload.get("channel_uuid")
+        return result
+
+    def _set_jwt_payload(self, **kwargs):
+        self.jwt_payload_patch = kwargs
+
+    def test_project_uuid_is_required(self):
+        response = self.client.post(self.url, data={}, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"error": "project_uuid is required"})
+
+    def test_requires_contact_identifier(self):
+        response = self.client.post(
+            self.url,
+            data={"project_uuid": str(self.org.proj_uuid)},
+            content_type="application/json",
+            **self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"non_field_errors": ["Either contact_uuid or contact_urn is required"]})
+
+    def test_rejects_project_uuid_different_from_token(self):
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
+
+        response = self.client.post(
+            self.url,
+            data={"project_uuid": str(self.org2.proj_uuid), "contact_uuid": str(uuid.uuid4())},
+            content_type="application/json",
+            **self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json(), {"error": "project_uuid does not match token"})
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    def test_cleans_contact_fields_by_contact_uuid(self, mr_mocks):
+        User.objects.create_user("super@user.com", "super@user.com")
+        contact = self.create_contact("UUID Contact", urns=["whatsapp:5511999999999"])
+        self.create_field("nickname", "Nickname")
+        self.create_field("team", "Team")
+        self.set_contact_field(contact, "nickname", "Felix")
+        self.set_contact_field(contact, "team", "A-Team")
+
+        response = self.client.post(
+            self.url,
+            data={"project_uuid": str(self.org.proj_uuid), "contact_uuid": str(contact.uuid)},
+            content_type="application/json",
+            **self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {"message": "Contact fields cleaned successfully", "cleared_fields_count": 2},
+        )
+
+        contact.refresh_from_db()
+        nickname_field = ContactField.get_by_key(self.org, "nickname")
+        team_field = ContactField.get_by_key(self.org, "team")
+        self.assertIsNone(contact.get_field_value(nickname_field))
+        self.assertIsNone(contact.get_field_value(team_field))
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    def test_cleans_contact_fields_by_contact_urn(self, mr_mocks):
+        User.objects.create_user("super@user.com", "super@user.com")
+        contact = self.create_contact("URN Contact", urns=["whatsapp:5511888888888"])
+        self.create_field("nickname", "Nickname")
+        self.set_contact_field(contact, "nickname", "Felix")
+
+        response = self.client.post(
+            self.url,
+            data={"project_uuid": str(self.org.proj_uuid), "contact_urn": "whatsapp:5511888888888"},
+            content_type="application/json",
+            **self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {"message": "Contact fields cleaned successfully", "cleared_fields_count": 1},
+        )
+
+        contact.refresh_from_db()
+        nickname_field = ContactField.get_by_key(self.org, "nickname")
+        self.assertIsNone(contact.get_field_value(nickname_field))
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="missing-internal@example.com")
+    def test_uses_jwt_email_as_actor_when_available(self, mr_mocks):
+        User.objects.create_user("jwt-user@example.com", "jwt-user@example.com")
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid), email="jwt-user@example.com")
+
+        contact = self.create_contact("JWT Contact", urns=["whatsapp:5511777777777"])
+        self.create_field("nickname", "Nickname")
+        self.set_contact_field(contact, "nickname", "Felix")
+
+        response = self.client.post(
+            self.url,
+            data={"project_uuid": str(self.org.proj_uuid), "contact_uuid": str(contact.uuid)},
+            content_type="application/json",
+            **self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {"message": "Contact fields cleaned successfully", "cleared_fields_count": 1},
+        )
+
+        contact.refresh_from_db()
+        nickname_field = ContactField.get_by_key(self.org, "nickname")
+        self.assertIsNone(contact.get_field_value(nickname_field))
+
+
 class UpdateContactFieldsViewJWTTest(PatchedJWTAuthMixin, TembaTest):
     jwt_patch_target = "temba.api.auth.jwt.OptionalJWTAuthentication.authenticate"
 
