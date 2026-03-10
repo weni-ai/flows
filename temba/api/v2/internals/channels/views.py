@@ -106,3 +106,24 @@ class ChannelAllowedDomainsView(APIViewMixin, APIView):
             response = allowedDomains
 
         return Response(response)
+
+
+class ChannelElevenLabsApiKeyView(APIViewMixin, APIView):
+    authentication_classes = [RequiredJWTAuthentication]
+    permission_classes = [HasValidJWT]
+
+    def get(self, request: Request):
+        channel_uuid = getattr(request, "channel_uuid", None)
+
+        if channel_uuid is None:
+            return Response(status=400, data={"error": "Channel UUID is required"})
+        try:
+            channel = Channel.objects.get(uuid=channel_uuid)
+        except Channel.DoesNotExist:
+            return Response(status=404, data={"error": "Channel not found"})
+
+        api_key = channel.config.get("voice_mode", {}).get("elevenLabs", {}).get("apiKey", None)
+        if api_key is None:
+            return Response(status=404, data={"error": "ElevenLabs API key not found"})
+
+        return Response({"api_key": api_key})
