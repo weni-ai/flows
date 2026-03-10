@@ -9,11 +9,7 @@ from django.conf import settings
 
 from temba.api.auth.jwt import RequiredJWTAuthentication
 from temba.api.v2.internals.channels.serializers import ChannelElevenLabsApiKeySerializer, ChannelProjectSerializer
-from temba.api.v2.internals.channels.usecases import (
-    ChannelNotFoundError,
-    ElevenLabsApiKeyNotFoundError,
-    GetElevenLabsApiKeyUseCase,
-)
+from temba.api.v2.internals.channels.usecases import GetElevenLabsApiKeyUseCase
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel
@@ -123,11 +119,6 @@ class ChannelElevenLabsApiKeyView(APIViewMixin, APIView):
         serializer.is_valid(raise_exception=True)
 
         usecase = GetElevenLabsApiKeyUseCase()
-        try:
-            api_key = usecase.execute(serializer.validated_data["channel_uuid"])
-        except ChannelNotFoundError:
-            return Response(status=404, data={"error": "Channel not found"})
-        except ElevenLabsApiKeyNotFoundError:
-            return Response(status=404, data={"error": "ElevenLabs API key not found"})
+        api_key = usecase.execute(serializer.validated_data["channel_uuid"])
 
         return Response({"api_key": api_key})

@@ -1,12 +1,17 @@
+from rest_framework import status
+from rest_framework.exceptions import APIException
+
 from temba.channels.models import Channel
 
 
-class ChannelNotFoundError(Exception):
-    pass
+class ChannelNotFoundError(APIException):
+    status_code = status.HTTP_404_NOT_FOUND
+    default_detail = "Channel not found"
 
 
-class ElevenLabsApiKeyNotFoundError(Exception):
-    pass
+class ElevenLabsApiKeyNotFoundError(APIException):
+    status_code = status.HTTP_404_NOT_FOUND
+    default_detail = "ElevenLabs API key not found"
 
 
 class GetElevenLabsApiKeyUseCase:
