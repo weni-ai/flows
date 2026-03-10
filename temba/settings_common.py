@@ -87,9 +87,6 @@ AWS_BUCKET_DOMAIN = AWS_STORAGE_BUCKET_NAME + ".s3.amazonaws.com"
 # bucket where archives files are stored
 ARCHIVE_BUCKET = "dl-temba-archives"
 
-# additional S3 buckets to search for media files (used by the S3 media proxy endpoint)
-S3_MEDIA_BUCKETS = []
-
 # -----------------------------------------------------------------------------------
 # On Unix systems, a value of None will cause Django to use the same
 # timezone as the operating system.
