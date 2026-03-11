@@ -9,8 +9,8 @@ from rest_framework.response import Response
 from django.db import transaction
 
 from temba.api.models import APIPermission, SSLPermission
-from temba.api.v2.permissions import HasValidJWT
 from temba.api.support import InvalidQueryError
+from temba.api.v2.permissions import HasValidJWT
 from temba.contacts.models import URN
 from temba.utils import str_to_bool
 from temba.utils.views import NonAtomicMixin
