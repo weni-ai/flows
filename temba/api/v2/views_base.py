@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from django.db import transaction
 
 from temba.api.models import APIPermission, SSLPermission
+from temba.api.v2.permissions import HasValidJWT
 from temba.api.support import InvalidQueryError
 from temba.contacts.models import URN
 from temba.utils import str_to_bool
@@ -22,7 +23,7 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
     Base class of all our API endpoints
     """
 
-    permission_classes = (SSLPermission, APIPermission)
+    permission_classes = (SSLPermission, HasValidJWT | APIPermission)
     throttle_scope = "v2"
     model = None
     model_manager = "objects"
