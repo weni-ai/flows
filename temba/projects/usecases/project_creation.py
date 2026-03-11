@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 from weni.internal.clients.connect import ConnectInternalClient
 from weni.internal.models import Project
@@ -23,7 +24,7 @@ class ProjectCreationDTO:
     template_type_uuid: str
     description: str
     brain_on: bool
-    language: str = None
+    language: Optional[str] = None
 
 
 class ProjectCreationUseCase:
