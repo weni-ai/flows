@@ -23,6 +23,7 @@ class ProjectCreationDTO:
     template_type_uuid: str
     description: str
     brain_on: bool
+    language: str = None
 
 
 class ProjectCreationUseCase:
@@ -33,22 +34,27 @@ class ProjectCreationUseCase:
         return User.objects.get_or_create(email=email, username=email)
 
     def get_or_create_project(self, project_dto: ProjectCreationDTO, user: User) -> tuple:
+        defaults = dict(
+            name=project_dto.name,
+            date_format=project_dto.date_format,
+            timezone=project_dto.timezone,
+            created_by=user,
+            modified_by=user,
+            plan="infinity",
+            brain_on=project_dto.brain_on,
+            config={
+                "is_template": project_dto.is_template,
+                "description": project_dto.description,
+                "verify_ninth_digit": True,
+            },
+        )
+
+        if project_dto.language:
+            defaults["language"] = project_dto.language
+
         return Project.objects.get_or_create(
             project_uuid=project_dto.uuid,
-            defaults=dict(
-                name=project_dto.name,
-                date_format=project_dto.date_format,
-                timezone=project_dto.timezone,
-                created_by=user,
-                modified_by=user,
-                plan="infinity",
-                brain_on=project_dto.brain_on,
-                config={
-                    "is_template": project_dto.is_template,
-                    "description": project_dto.description,
-                    "verify_ninth_digit": True,
-                },
-            ),
+            defaults=defaults,
         )
 
     def create_project(
