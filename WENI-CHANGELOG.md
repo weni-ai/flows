@@ -1,3 +1,7 @@
+3.60.0
+----------
+* fix: Propagates language to Flows on project creation via EDA
+
 3.59.0
 ----------
 * feat: Add ElevenLabs API key endpoint
