@@ -1,3 +1,9 @@
+3.59.0
+----------
+* feat: s3 bucket proxy to more than 1 bucket
+* feat: Update CI to avoid error
+
+
 3.58.1
 ----------
 * feat: Update refresh teams token schedule time to 30 minutes
