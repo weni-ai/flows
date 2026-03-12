@@ -17,7 +17,12 @@ from django.test import override_settings
 from django.utils import timezone
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
-from temba.api.v2.internals.contacts.services import ContactDownloadByStatusService, ContactImportDeduplicationService
+from temba.api.v2.internals.contacts.serializers import CleanContactFieldsSerializer
+from temba.api.v2.internals.contacts.services import (
+    CleanContactFieldsService,
+    ContactDownloadByStatusService,
+    ContactImportDeduplicationService,
+)
 from temba.api.v2.internals.helpers import get_object_or_404
 from temba.api.v2.internals.views import JWTAuthMockMixin
 from temba.api.v2.validators import LambdaURLValidator
@@ -788,6 +793,19 @@ class CleanContactsFieldsViewTest(JWTAuthMockMixin, TembaTest):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {"non_field_errors": ["Either contact_uuid or contact_urn is required"]})
 
+    def test_returns_project_not_found(self):
+        self._set_jwt_payload(project_uuid=None)
+
+        response = self.client.post(
+            self.url,
+            data={"project_uuid": str(uuid.uuid4()), "contact_uuid": str(uuid.uuid4())},
+            content_type="application/json",
+            **self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"error": "Project not found"})
+
     def test_rejects_project_uuid_different_from_token(self):
         self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
 
@@ -800,6 +818,34 @@ class CleanContactsFieldsViewTest(JWTAuthMockMixin, TembaTest):
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json(), {"error": "project_uuid does not match token"})
+
+    def test_rejects_both_contact_uuid_and_contact_urn(self):
+        contact = self.create_contact("Dual Identifier", urns=["whatsapp:5511666666666"])
+
+        response = self.client.post(
+            self.url,
+            data={
+                "project_uuid": str(self.org.proj_uuid),
+                "contact_uuid": str(contact.uuid),
+                "contact_urn": "whatsapp:5511666666666",
+            },
+            content_type="application/json",
+            **self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"non_field_errors": ["Provide only one of contact_uuid or contact_urn"]})
+
+    def test_returns_contact_uuid_not_found(self):
+        response = self.client.post(
+            self.url,
+            data={"project_uuid": str(self.org.proj_uuid), "contact_uuid": str(uuid.uuid4())},
+            content_type="application/json",
+            **self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"contact_uuid": ["Contact not found"]})
 
     @mock_mailroom
     @override_settings(INTERNAL_USER_EMAIL="super@user.com")
@@ -881,6 +927,53 @@ class CleanContactsFieldsViewTest(JWTAuthMockMixin, TembaTest):
         contact.refresh_from_db()
         nickname_field = ContactField.get_by_key(self.org, "nickname")
         self.assertIsNone(contact.get_field_value(nickname_field))
+
+
+class CleanContactFieldsSerializerTest(TembaTest):
+    def test_invalid_contact_urn_raises_validation_error(self):
+        serializer = CleanContactFieldsSerializer(
+            data={"contact_urn": "whatsapp:missing"},
+            context={"org": self.org},
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(serializer.errors, {"contact_urn": ["Contact URN not found"]})
+
+
+class CleanContactFieldsServiceTest(TembaTest):
+    def test_get_actor_falls_back_to_org_modified_by(self):
+        self.assertEqual(CleanContactFieldsService._get_actor(self.org), self.org.modified_by)
+
+    def test_get_actor_falls_back_to_org_created_by(self):
+        self.org.modified_by = None
+        self.assertEqual(CleanContactFieldsService._get_actor(self.org), self.org.created_by)
+
+    def test_clear_returns_zero_when_contact_has_no_fields(self):
+        contact = self.create_contact("No Fields", urns=["whatsapp:5511555555555"])
+
+        self.assertEqual(CleanContactFieldsService.clear(self.org, contact), 0)
+
+    def test_clear_returns_zero_when_contact_fields_cannot_be_resolved(self):
+        contact = self.create_contact("Unknown Fields", urns=["whatsapp:5511444444444"])
+        contact.fields = {str(uuid.uuid4()): {"text": "value"}}
+        contact.save(update_fields=("fields",))
+
+        self.assertEqual(CleanContactFieldsService.clear(self.org, contact), 0)
+
+    def test_clear_raises_when_no_actor_is_available(self):
+        contact = self.create_contact("No Actor", urns=["whatsapp:5511333333333"])
+        self.create_field("nickname", "Nickname")
+        self.set_contact_field(contact, "nickname", "Felix")
+
+        self.org.modified_by = None
+        self.org.created_by = None
+
+        with override_settings(INTERNAL_USER_EMAIL="missing-internal@example.com"):
+            with patch.object(CleanContactFieldsService, "_get_user_by_email", return_value=None):
+                with self.assertRaises(ValidationError) as ctx:
+                    CleanContactFieldsService.clear(self.org, contact)
+
+        self.assertEqual(str(ctx.exception), "['No user available to clear contact fields']")
 
 
 class UpdateContactFieldsViewJWTTest(PatchedJWTAuthMixin, TembaTest):
