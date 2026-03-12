@@ -22,6 +22,7 @@ class ProjectConsumer(EDAConsumer):
                 timezone=body.get("timezone"),
                 description=body.get("description"),
                 brain_on=body.get("brain_on", False),
+                language=body.get("language"),
             )
 
             flow_setup_handler = FlowSetupHandlerUseCase()
