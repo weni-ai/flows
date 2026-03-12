@@ -111,7 +111,7 @@ jobs:
     - name: Install Node dependencies
       run: |
         npm install
-        sudo npm install -g less
+        sudo npm install -g less@3.13.1
 
     - name: Initialize environment
       run: |

@@ -18,6 +18,7 @@ from temba.api.support import (
     APITokenAuthentication,
     InvalidQueryError,
 )
+from temba.api.v2.permissions import HasValidJWT
 from temba.contacts.models import URN
 from temba.utils import str_to_bool
 from temba.utils.views import NonAtomicMixin
@@ -30,7 +31,7 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
     Base class of all our API endpoints
     """
 
-    permission_classes = (SSLPermission, APIPermission)
+    permission_classes = (SSLPermission, HasValidJWT | APIPermission)
     authentication_classes = (
         OptionalJWTAuthentication,
         InternalOIDCAuthentication,
