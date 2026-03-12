@@ -8,7 +8,8 @@ from weni.internal.authenticators import InternalOIDCAuthentication
 from django.conf import settings
 
 from temba.api.auth.jwt import RequiredJWTAuthentication
-from temba.api.v2.internals.channels.serializers import ChannelProjectSerializer
+from temba.api.v2.internals.channels.serializers import ChannelElevenLabsApiKeySerializer, ChannelProjectSerializer
+from temba.api.v2.internals.channels.usecases import GetElevenLabsApiKeyUseCase
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel
@@ -106,3 +107,18 @@ class ChannelAllowedDomainsView(APIViewMixin, APIView):
             response = allowedDomains
 
         return Response(response)
+
+
+class ChannelElevenLabsApiKeyView(APIViewMixin, APIView):
+    authentication_classes = [RequiredJWTAuthentication]
+    permission_classes = [HasValidJWT]
+
+    def get(self, request: Request):
+        channel_uuid = getattr(request, "channel_uuid", None)
+        serializer = ChannelElevenLabsApiKeySerializer(data={"channel_uuid": channel_uuid})
+        serializer.is_valid(raise_exception=True)
+
+        usecase = GetElevenLabsApiKeyUseCase()
+        api_key = usecase.execute(serializer.validated_data["channel_uuid"])
+
+        return Response({"api_key": api_key})

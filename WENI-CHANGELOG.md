@@ -1,8 +1,15 @@
-3.59.0
+3.61.0
 ----------
 * feat: s3 bucket proxy to more than 1 bucket
 * feat: Update CI to avoid error
 
+3.60.0
+----------
+* fix: Propagates language to Flows on project creation via EDA
+
+3.59.0
+----------
+* feat: Add ElevenLabs API key endpoint
 
 3.58.1
 ----------
