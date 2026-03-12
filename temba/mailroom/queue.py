@@ -86,8 +86,38 @@ def queue_broadcast(broadcast):
     """
 
     if broadcast.broadcast_type == "D":
+        # ensure metadata is at least an empty dict before we try to access it
+        if not broadcast.metadata:
+            broadcast.metadata = {}
+
+        metadata = dict(broadcast.metadata)
+
+        queue = metadata.pop("queue", None)
+
+        catalog_message = metadata.pop("catalog_message", None)
+        header = metadata.pop("header", None)
+        footer = metadata.pop("footer", None)
+        attachments = metadata.pop("attachments", None)
+        quick_replies_metadata = metadata.pop("quick_replies", None)
+
+        # Build translations with text, attachments and quick_replies
+        translations = {}
+        for lang, text in broadcast.text.items():
+            translation = {"text": text}
+            if attachments:
+                translation["attachments"] = attachments
+            # Extract quick_replies for this specific language
+            if quick_replies_metadata:
+                lang_quick_replies = []
+                for qr_dict in quick_replies_metadata:
+                    if lang in qr_dict:
+                        lang_quick_replies.append(qr_dict[lang])
+                if lang_quick_replies:
+                    translation["quick_replies"] = lang_quick_replies
+            translations[lang] = translation
+
         task = {
-            "translations": {lang: {"text": text} for lang, text in broadcast.text.items()},
+            "translations": translations,
             "template_state": broadcast.get_template_state(),
             "base_language": broadcast.base_language,
             "urns": broadcast.raw_urns or [],
@@ -96,7 +126,16 @@ def queue_broadcast(broadcast):
             "broadcast_id": broadcast.id,
             "org_id": broadcast.org_id,
             "ticket_id": broadcast.ticket_id,
+            "queue": queue,
         }
+
+        # Add fields at root level (same for all languages)
+        if catalog_message:
+            task["catalog_message"] = catalog_message
+        if header:
+            task["header"] = header
+        if footer:
+            task["footer"] = footer
 
         _queue_batch_task(broadcast.org_id, BatchTask.SEND_BROADCAST, task, HIGH_PRIORITY)
 

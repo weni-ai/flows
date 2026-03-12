@@ -28,13 +28,14 @@ from django.db.transaction import on_commit as on_transaction_commit
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
-from temba.api.auth.jwt import BaseJWTAuthentication, OptionalJWTAuthentication
+from temba.api.auth.jwt import BaseJWTAuthentication, OptionalJWTAuthentication, RequiredJWTAuthentication
 from temba.api.v2.internals.contacts.serializers import (
+    CleanContactFieldsSerializer,
     ContactWithMessagesListSerializer,
     InternalContactFieldsValuesSerializer,
     InternalContactSerializer,
 )
-from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
+from temba.api.v2.internals.contacts.services import CleanContactFieldsService, ContactImportDeduplicationService
 from temba.api.v2.internals.helpers import get_object_or_404
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
@@ -812,3 +813,46 @@ class GroupsContactFieldsView(APIViewMixin, APIView):
 
         results = GroupContactFieldsService.get_fields_with_examples(org, groups_qs)
         return Response({"results": results})
+
+
+class CleanContactsFieldsView(APIViewMixin, APIView):
+    authentication_classes = [RequiredJWTAuthentication]
+    permission_classes = [HasValidJWT]
+
+    def post(self, request: Request):
+        project_uuid = request.data.get("project_uuid") or request.data.get("project")
+        token_project_uuid = getattr(request, "project_uuid", None)
+
+        if not project_uuid:
+            return Response({"error": "project_uuid is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if token_project_uuid and str(token_project_uuid) != str(project_uuid):
+            return Response({"error": "project_uuid does not match token"}, status=status.HTTP_403_FORBIDDEN)
+
+        org = self.get_org_from_request(
+            request,
+            query_keys=(),
+            body_keys=("project_uuid", "project"),
+            missing_status=status.HTTP_400_BAD_REQUEST,
+            missing_error="project_uuid is required",
+            not_found_status=status.HTTP_404_NOT_FOUND,
+            not_found_error="Project not found",
+        )
+        if isinstance(org, Response):
+            return org
+
+        serializer = CleanContactFieldsSerializer(data=request.data, context={"org": org})
+        serializer.is_valid(raise_exception=True)
+
+        cleared_fields_count = CleanContactFieldsService.clear(
+            org,
+            serializer.validated_data["contact"],
+            jwt_payload=getattr(request, "jwt_payload", None),
+        )
+        return Response(
+            {
+                "message": "Contact fields cleaned successfully",
+                "cleared_fields_count": cleared_fields_count,
+            },
+            status=status.HTTP_200_OK,
+        )

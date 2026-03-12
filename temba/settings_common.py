@@ -342,6 +342,7 @@ INSTALLED_APPS = (
     "temba.projects",
     "temba.event_driven",
     "temba.conversion_events",
+    "temba.sqs",
 )
 
 # the last installed app that uses smartmin permissions
@@ -1146,7 +1147,8 @@ CELERY_BEAT_SCHEDULE = {
     "trim-sync-events": {"task": "trim_sync_events_task", "schedule": crontab(hour=3, minute=0)},
     "trim-webhook-event": {"task": "trim_webhook_event_task", "schedule": crontab(hour=3, minute=0)},
     "update-org-activity": {"task": "update_org_activity_task", "schedule": crontab(hour=3, minute=5)},
-    "refresh-teams-tokens": {"task": "refresh_teams_tokens", "schedule": timedelta(minutes=55)},
+    "update-unique-contact-counts": {"task": "update_unique_contact_counts", "schedule": crontab(hour=8, minute=0)},
+    "refresh-teams-tokens": {"task": "refresh_teams_tokens", "schedule": timedelta(minutes=30)},
     "squash-flow-category-counts": {"task": "squash_flow_category_counts", "schedule": timedelta(seconds=60)},
 }
 
@@ -1489,3 +1491,11 @@ try:
         JWT_PUBLIC_KEY = f.read()
 except FileNotFoundError:
     JWT_PUBLIC_KEY = None
+
+# JWT secret key
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", default="")
+WENI_WEBCHAT_ALLOWED_DOMAINS = [
+    domain.strip()
+    for domain in os.environ.get("WENI_WEBCHAT_ALLOWED_DOMAINS", default="").split(",")
+    if domain.strip()
+]

@@ -34,9 +34,9 @@ class InternalMsgReadSerializer(ReadSerializer):
 
 class MsgStreamSerializer(serializers.Serializer):
     project_uuid = serializers.UUIDField()
-    direction = serializers.ChoiceField(choices=("in", "out", "I", "O"))
+    direction = serializers.ChoiceField(choices=("in", "out", "I", "O"), required=False, default="out")
     contact_uuid = serializers.UUIDField(required=False)
-    urn = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    urns = serializers.ListField(child=serializers.CharField(), required=False)
     channel_uuid = serializers.UUIDField(required=False)
     template = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -51,8 +51,8 @@ class MsgStreamSerializer(serializers.Serializer):
 
     def validate(self, data):
         # require at least one contact identifier
-        if not data.get("contact_uuid") and not data.get("urn"):
-            raise serializers.ValidationError("Must provide either contact_uuid or urn")
+        if not data.get("contact_uuid") and not data.get("urns"):
+            raise serializers.ValidationError("Must provide either contact_uuid or urns")
 
         # require some content
         if not (data.get("text") or data.get("message") or data.get("attachments") or data.get("msg")):

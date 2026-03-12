@@ -1,3 +1,4 @@
+from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated, ParseError
 from rest_framework.mixins import CreateModelMixin
 from rest_framework.permissions import IsAuthenticated
@@ -14,7 +15,7 @@ from django.contrib.auth import get_user_model
 from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
-from temba.api.v2.serializers import WhatsappBroadcastWriteSerializer
+from temba.api.v2.serializers import WhatsappBroadcastReadSerializer, WhatsappBroadcastWriteSerializer
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
 from temba.contacts.models import ContactGroup
 from temba.msgs.models import Broadcast, BroadcastStatistics
@@ -91,8 +92,11 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
         )
 
         if serializer.is_valid():
-            serializer.save()
-            return Response({"message": "Success"})
+            broadcast = serializer.save()
+            response_serializer = WhatsappBroadcastReadSerializer(
+                instance=broadcast, context={"request": request, "org": org, "user": user}
+            )
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=400)
 

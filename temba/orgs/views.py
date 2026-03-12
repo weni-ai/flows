@@ -3253,6 +3253,8 @@ class OrgCRUDL(SmartCRUDL):
                 # get any channel thats not a delegate
                 channels = Channel.objects.filter(org=org, is_active=True, parent=None).order_by("-role")
                 for channel in channels:
+                    if channel.config.get("preview") is True:
+                        continue
                     self.add_channel_section(formax, channel)
 
                 twilio_client = org.get_twilio_client()
@@ -3302,6 +3304,9 @@ class OrgCRUDL(SmartCRUDL):
 
             if self.has_org_perm("orgs.org_languages"):
                 formax.add_section("languages", reverse("orgs.org_languages"), icon="icon-language")
+
+            if self.has_org_perm("orgs.org_smtp_server"):
+                formax.add_section("email", reverse("orgs.org_smtp_server"), icon="icon-envelop")
 
             if self.has_org_perm("orgs.org_token"):
                 formax.add_section("token", reverse("orgs.org_token"), icon="icon-cloud-upload", nobutton=True)

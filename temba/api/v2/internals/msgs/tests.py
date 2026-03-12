@@ -311,7 +311,7 @@ class TestInternalMessages(TembaTest):
         }
         response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
         self.assertEqual(response.status_code, 201)
-        msg = Msg.objects.get(id=response.json()["id"])
+        msg = Msg.objects.get(id=response.json()["ids"][0])
         self.assertEqual(msg.direction, Msg.DIRECTION_IN)
         self.assertEqual(msg.status, Msg.STATUS_HANDLED)
 
@@ -327,7 +327,7 @@ class TestInternalMessages(TembaTest):
         }
         response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
         self.assertEqual(response.status_code, 201)
-        created = Msg.objects.get(id=response.json()["id"])
+        created = Msg.objects.get(id=response.json()["ids"][0])
         self.assertEqual(created.direction, Msg.DIRECTION_OUT)
         self.assertEqual(created.status, Msg.STATUS_SENT)
         self.assertIsNotNone(created.sent_on)
@@ -339,12 +339,12 @@ class TestInternalMessages(TembaTest):
         payload = {
             "project_uuid": str(self.org.proj_uuid),
             "direction": "in",
-            "urn": "tel:+250788000333",
+            "urns": ["tel:+250788000333"],
             "text": "ping",
         }
         response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
         self.assertEqual(response.status_code, 201)
-        msg = Msg.objects.get(id=response.json()["id"])
+        msg = Msg.objects.get(id=response.json()["ids"][0])
         self.assertEqual(msg.contact_id, contact.id)
         self.assertEqual(msg.direction, Msg.DIRECTION_IN)
 
@@ -362,7 +362,7 @@ class TestInternalMessages(TembaTest):
         }
         response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
         self.assertEqual(response.status_code, 201)
-        msg = Msg.objects.get(id=response.json()["id"])
+        msg = Msg.objects.get(id=response.json()["ids"][0])
         self.assertEqual(list(msg.labels.all()), [label])
 
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
@@ -423,7 +423,7 @@ class TestInternalMessages(TembaTest):
             "project_uuid": str(self.org.proj_uuid),
             "direction": "in",
             "contact_uuid": str(contact.uuid),
-            "urn": "invalid-urn",
+            "urns": ["invalid-urn"],
             "text": "hi",
         }
         response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
@@ -442,7 +442,7 @@ class TestInternalMessages(TembaTest):
         response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
         self.assertEqual(response.status_code, 404)
 
-    @patch("temba.event_driven.publisher.rabbitmq_publisher.RabbitmqPublisher.send_message")
+    @patch("temba.api.v2.internals.msgs.services.AmazonMQPublisher.send_message")
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
     def test_stream_publishes_billing_outgoing(self, mock_publish, *_mocks):
@@ -459,14 +459,14 @@ class TestInternalMessages(TembaTest):
         self.assertTrue(mock_publish.called)
         args, kwargs = mock_publish.call_args
         self.assertEqual(kwargs.get("exchange"), "msgs.topic")
-        self.assertEqual(kwargs.get("routing_key"), "billing;msgs-create")
+        self.assertEqual(kwargs.get("routing_key"), "create")
         self.assertIn("body", kwargs)
         body = kwargs["body"]
         self.assertEqual(body["direction"], "O")
         self.assertEqual(body["text"], "bill me")
         self.assertEqual(body["template"], "template-uuid")
 
-    @patch("temba.event_driven.publisher.rabbitmq_publisher.RabbitmqPublisher.send_message")
+    @patch("temba.api.v2.internals.msgs.services.AmazonMQPublisher.send_message")
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
     def test_stream_publishes_billing_incoming(self, mock_publish, *_mocks):
@@ -474,7 +474,7 @@ class TestInternalMessages(TembaTest):
         payload = {
             "project_uuid": str(self.org.proj_uuid),
             "direction": "I",
-            "urn": "telegram:844380532",
+            "urns": ["telegram:844380532"],
             "text": "hello",
         }
         response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")

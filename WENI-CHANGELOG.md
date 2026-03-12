@@ -1,3 +1,86 @@
+3.58.1
+----------
+* feat: Update refresh teams token schedule time to 30 minutes
+
+3.58.0
+----------
+* feat: s3 proxy endpoint
+* fix: changing log level warning for pika-eda lib
+
+3.57.3
+----------
+* fix: amazon mq publisher
+
+3.57.2
+----------
+* feat: create health check events endpoint
+
+3.57.1
+----------
+* fix: poetry lock
+
+3.57.0
+----------
+* feat: Add support for carousel messages in WhatsApp broadcasts and update validation to include carousel in required fields
+* feat: amazon-mq-publisher
+
+3.56.0
+----------
+* feat: creating view to count all messages and unique contact messages
+
+3.55.0
+----------
+* feat: new events endpoint with pagination
+* feat: Add limit in messages.json endpoint
+
+3.54.1
+----------
+* feat: Avoid null contact_urn in filter_template endpoint
+
+3.54.0
+----------
+* feat: implementing parallel test running to decrease pipeline slow runtime
+
+3.53.1
+----------
+* feat: Add contact_uuid and contact_urn in filter_template endpoint
+
+3.53.0
+----------
+* feat: Endpoint to save msg without pass to mailroom
+
+3.52.0
+----------
+* feat: msg count endpoint
+* feat: changing whatsapp broadcast internal response
+
+3.51.0
+----------
+* feat: Add is_carousel and carousel fields to WhatsappBroadcastWriteSerializer and update corresponding tests
+
+3.50.1
+----------
+* update: coverage-version
+
+3.50.0
+----------
+* feat: updating python and poetry
+* update: weni-rp-apps-2.10.8
+
+3.49.1
+----------
+* feat: Delay Hotjar tracking script execution until DOM is fully loaded
+* feat: smtp server config
+
+3.49.0
+----------
+* Add Marketing role and permissions to Org model and related functions
+
+3.48.0
+----------
+* Add project event consumer
+* Update OpenTicketSerializer to make conversation_started_on field optional
+
 3.47.4
 ----------
 * Feat/adding seconds on history logs

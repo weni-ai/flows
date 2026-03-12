@@ -292,8 +292,16 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     trigger_flow_uuid = serializers.UUIDField(required=False)
 
     def validate_msg(self, value):
-        if not (value.get("text") or value.get("attachments") or value.get("template") or value.get("action_type")):
-            raise serializers.ValidationError("Must provide either text, attachments, template or action_type")
+        if not (
+            value.get("text")
+            or value.get("attachments")
+            or value.get("template")
+            or value.get("action_type")
+            or value.get("carousel")
+        ):
+            raise serializers.ValidationError(
+                "Must provide either text, attachments, template, action_type or carousel"
+            )
         return value
 
     def validate(self, data):
@@ -305,8 +313,6 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             try:
                 channel = Channel.objects.get(uuid=channel_data)
                 data["channel"] = channel
-                if channel.channel_type != "WAC":
-                    raise serializers.ValidationError("Channel must be a WhatsApp Cloud channel")
             except Channel.DoesNotExist:
                 raise serializers.ValidationError("Channel not found")
 
@@ -379,6 +385,8 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 "variables": template_data.get("variables", []),
                 "locale": template_data.get("locale", None),
                 "category": template_data.get("category", None),
+                "is_carousel": template_data.get("is_carousel", False),
+                "carousel": template_data.get("carousel", []),
             }
             data["msg"]["template_id"] = template_id
 
@@ -399,22 +407,26 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         Create a new whatsapp broadcast to send out
         """
 
+        msg_data = self.validated_data.get("msg", {})
+
         # create the broadcast
-        broadcast = Broadcast.create(
-            self.context["org"],
-            self.context["user"],
-            groups=self.validated_data.get("groups", []),
-            contacts=self.validated_data.get("contacts", []),
-            urns=self.validated_data.get("urns", []),
-            template_state=Broadcast.TEMPLATE_STATE_UNEVALUATED,
-            msg=self.validated_data.get("msg", {}),
-            channel=self.validated_data.get("channel", None),
-            broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
-            queue=self.validated_data.get("queue", None),
-            name=self.validated_data.get("name", None),
-            template_id=self.validated_data.get("template_id", None),
-            is_bulk_send=True if self.validated_data.get("queue") == "template_batch" else False,
-        )
+        create_kwargs = {
+            "org": self.context["org"],
+            "user": self.context["user"],
+            "groups": self.validated_data.get("groups", []),
+            "contacts": self.validated_data.get("contacts", []),
+            "urns": self.validated_data.get("urns", []),
+            "template_state": Broadcast.TEMPLATE_STATE_UNEVALUATED,
+            "channel": self.validated_data.get("channel", None),
+            "broadcast_type": Broadcast.BROADCAST_TYPE_WHATSAPP,
+            "queue": self.validated_data.get("queue", None),
+            "name": self.validated_data.get("name", None),
+            "template_id": self.validated_data.get("template_id", None),
+            "is_bulk_send": True if self.validated_data.get("queue") == "template_batch" else False,
+            "msg": msg_data,
+        }
+
+        broadcast = Broadcast.create(**create_kwargs)
         # create optional catch-all trigger (uncaught message) for provided flow and groups
         trigger_flow = self.validated_data.get("trigger_flow")
         if trigger_flow and self.validated_data.get("queue") == "template_batch":
@@ -1248,10 +1260,39 @@ class FilterTemplateSerializer(ReadSerializer):
 
 class FilterTemplateSerializerNew(ReadSerializer):
     template = serializers.CharField(required=True)
+    contact_uuid = serializers.SerializerMethodField()
+    contact_urn = serializers.SerializerMethodField()
+
+    def get_contact_uuid(self, obj):
+        return str(obj.contact.uuid) if getattr(obj, "contact_id", None) else None
+
+    def get_contact_urn(self, obj):
+        # Prefer the URN used on the message itself (historical & most accurate)
+        msg_urn = getattr(obj, "contact_urn", None)
+        if msg_urn:
+            return str(msg_urn.api_urn())
+
+        # Fallback to the contact's current highest priority URN
+        contact = getattr(obj, "contact", None)
+        if not contact:
+            return None
+
+        urn = contact.get_urn()
+        return str(urn.api_urn()) if urn else None
 
     class Meta:
         model = Msg
-        fields = ("uuid", "contact_id", "template", "text", "created_on", "sent_on", "status")
+        fields = (
+            "uuid",
+            "contact_id",
+            "contact_uuid",
+            "contact_urn",
+            "template",
+            "text",
+            "created_on",
+            "sent_on",
+            "status",
+        )
 
 
 class FlowReadSerializer(ReadSerializer):
@@ -1276,7 +1317,7 @@ class FlowReadSerializer(ReadSerializer):
         return self.FLOW_TYPES.get(obj.flow_type)
 
     def get_labels(self, obj):
-        return [{"uuid": l.uuid, "name": l.name} for l in obj.labels.all()]
+        return [{"uuid": label.uuid, "name": label.name} for label in obj.labels.all()]
 
     def get_runs(self, obj):
         stats = obj.get_run_stats()
