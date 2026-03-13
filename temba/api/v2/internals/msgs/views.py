@@ -232,9 +232,9 @@ class InternalFirstContactsView(APIViewMixin, APIView):
                 direction=Msg.DIRECTION_IN,
             )
             .exclude(status__in=[Msg.STATUS_FAILED, Msg.STATUS_ERRORED])
-            .values(contact_urn=F("contact_urn__identity"))
+            .values(contact_urn_identity=F("contact_urn__identity"))
             .annotate(first_created_on=Min("created_on"))
-            .order_by("contact_urn")
+            .order_by("contact_urn_identity")
         )
 
         paginator = FirstContactsPagination()

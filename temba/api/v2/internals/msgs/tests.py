@@ -534,7 +534,7 @@ class TestInternalFirstContacts(TembaTest):
             self.assertEqual(response.status_code, 200)
             results = response.json()["results"]
             self.assertEqual(len(results), 1)
-            self.assertIn("contact_urn", results[0])
+            self.assertIn("contact_urn_identity", results[0])
             self.assertIn("first_created_on", results[0])
 
     @_patch_first_contacts_auth
