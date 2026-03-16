@@ -1,4 +1,6 @@
 import itertools
+import os
+from datetime import timedelta
 from enum import Enum
 from types import SimpleNamespace
 
@@ -9,6 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from smartmin.views import SmartFormView, SmartTemplateView
+from weni_datalake_sdk.clients.redshift.events import get_events as dl_get_events
 
 from django import forms
 from django.contrib.auth import authenticate, login
@@ -17,6 +20,7 @@ from django.db import connection
 from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 
@@ -29,6 +33,7 @@ from temba.api.v2.views_base import (
     ContactsTemplateCursorPagination,
     CreatedOnCursorPagination,
     DateJoinedCursorPagination,
+    DefaultLimitOffsetPagination,
     DeleteAPIMixin,
     ListAPIMixin,
     ModifiedOnCursorPagination,
@@ -785,7 +790,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                         ]
                     }
                 ],
-                "interaction_type": "flow_msg | cta_url | location | order_details",
+                "interaction_type": "flow_msg | cta_url | location | order_details | carousel",
                 "flow_message": {
                     "flow_id": "1234567890",
                     "flow_data": {
@@ -814,6 +819,21 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "url": "https://weni.ai",
                     "display_text": "Go to Weni"
                 },
+                "carousel": [
+                    {
+                        "body": "Card body text",
+                        "buttons": [
+                            {
+                                "sub_type": "quick_reply",
+                                "parameters": {"id": "item-1", "title": "Option 1"}
+                            },
+                            {
+                                "sub_type": "url",
+                                "parameters": {"display_text": "Visit", "url": "https://example.com"}
+                            }
+                        ]
+                    }
+                ],
                 "order_details": {
                     "reference_id": "unique-reference-id-123",
                     "payment_settings": {
@@ -906,7 +926,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                         ]
                     }
                 ],
-                "interaction_type": "flow_msg | cta_url | location | order_details",
+                "interaction_type": "flow_msg | cta_url | location | order_details | carousel",
                 "flow_message": {
                     "flow_id": "1234567890",
                     "flow_data": {
@@ -935,6 +955,21 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "url": "https://weni.ai",
                     "display_text": "Go to Weni"
                 },
+                "carousel": [
+                    {
+                        "body": "Card body text",
+                        "buttons": [
+                            {
+                                "sub_type": "quick_reply",
+                                "parameters": {"id": "item-1", "title": "Option 1"}
+                            },
+                            {
+                                "sub_type": "url",
+                                "parameters": {"display_text": "Visit", "url": "https://example.com"}
+                            }
+                        ]
+                    }
+                ],
                 "order_details": {
                     "reference_id": "unique-reference-id-123",
                     "payment_settings": {
@@ -2620,6 +2655,9 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
                     contact.id,
                     contact.uuid,
                     contact.name,
+                    contact_urn.scheme,
+                    contact_urn.path,
+                    contact_urn.display,
                     msg.metadata::json->'templating'->'template'->>'uuid',
                     msg.metadata::json->'templating'->'template'->>'name',
                     msg.text,
@@ -2630,6 +2668,13 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
                 FROM public.msgs_msg as msg
                 JOIN public.contacts_contact as contact
                     on msg.contact_id = contact.id
+                LEFT JOIN LATERAL (
+                    SELECT cu.scheme, cu.path, cu.display
+                    FROM public.contacts_contacturn as cu
+                    WHERE cu.contact_id = contact.id AND cu.org_id = contact.org_id
+                    ORDER BY cu.priority DESC, cu.id ASC
+                    LIMIT 1
+                ) as contact_urn on true
                 WHERE
                     msg.metadata::json->'templating'->'template'->>'name' = %s
                     AND msg.org_id = %s"""
@@ -2652,25 +2697,32 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
             cursor.execute(sql, [template, org.id, int(page_size), int(offset)])
 
             results = cursor.fetchall()
-            messages = list(
-                map(
-                    lambda message: {
+            messages = []
+            for message in results:
+                urn = None
+                if message[3]:
+                    if org.is_anon:
+                        urn = f"{message[3]}:{ContactURN.ANON_MASK}"
+                    else:
+                        urn = str(URN.from_parts(message[3], message[4], display=message[5]))
+
+                messages.append(
+                    {
                         "id": message[0],
                         "uuid": message[1],
                         "name": message[2],
+                        "contact_urn": urn,
                         "template": {
-                            "uuid": message[3],
-                            "name": message[4],
-                            "text": message[5],
-                            "created_on": message[6],
-                            "sent_on": message[7],
-                            "direction": message[8],
-                            "status": message[9],
+                            "uuid": message[6],
+                            "name": message[7],
+                            "text": message[8],
+                            "created_on": message[9],
+                            "sent_on": message[10],
+                            "direction": message[11],
+                            "status": message[12],
                         },
-                    },
-                    results,
+                    }
                 )
-            )
 
         response_data = {
             "results": messages,
@@ -2756,6 +2808,10 @@ class FilterTemplatesEndpointNew(ListAPIMixin, BaseAPIView):
     model = Msg
     serializer_class = FilterTemplateSerializerNew
     pagination_class = ContactsTemplateCursorPagination
+
+    def get_queryset(self):
+        # make sure serializer can access contact details efficiently
+        return super().get_queryset().select_related("contact", "contact_urn")
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
@@ -3780,6 +3836,10 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
         Overridden paginator for Msg endpoint that switches from created_on to modified_on when looking
         at all incoming messages.
         """
+
+        page_size = 100
+        page_size_query_param = "limit"
+        max_page_size = 1000
 
         def get_ordering(self, request, queryset, view=None):
             if request.query_params.get("folder", "").lower() == "incoming":
@@ -5414,6 +5474,63 @@ class EventsEndpoint(BaseAPIView):
         }
 
 
+class EventsV2Endpoint(BaseAPIView):
+    permission = "orgs.org_api"
+
+    def get(self, request, *args, **kwargs):
+        serializer = EventFilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        pagination = DefaultLimitOffsetPagination()
+        limit = pagination.get_limit(request)
+        offset = pagination.get_offset(request)
+        filters = dict(serializer.validated_data)
+        if limit is not None:
+            filters["limit"] = limit
+        if offset is not None:
+            filters["offset"] = offset
+
+        try:
+            from temba.api.v2.services.events import fetch_events_for_org
+
+            processed_events = fetch_events_for_org(request.user, **filters)
+
+            return Response(processed_events)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Datalake Events (v2)",
+            "url": reverse("api.v2.events_v2"),
+            "slug": "events-list-v2",
+            "params": [
+                {
+                    "name": "date_start",
+                    "required": True,
+                    "help": "The start date for the filter, ex: 2025-06-03T00:00:00Z",
+                },
+                {
+                    "name": "date_end",
+                    "required": True,
+                    "help": "The end date for the filter, ex: 2025-06-20T23:59:59Z",
+                },
+                {"name": "key", "required": False, "help": "A key to filter by"},
+                {"name": "contact_urn", "required": False, "help": "A contact URN to filter by"},
+                {"name": "value_type", "required": False, "help": "A value_type to filter by"},
+                {"name": "value", "required": False, "help": "A value to filter by"},
+                {"name": "metadata", "required": False, "help": "A metadata to filter by"},
+                {"name": "event_name", "required": False, "help": "An event_name to filter by"},
+                {"name": "silver", "required": False, "help": "If true, also include data from silver"},
+                {"name": "table", "required": False, "help": "Required when silver=true; silver table name"},
+                {"name": "limit", "required": False, "help": "The number of events to return, default is 10"},
+                {"name": "offset", "required": False, "help": "The offset to return, default is 0"},
+            ],
+        }
+
+
 class EventsGroupByCountEndpoint(BaseAPIView):
     permission = "orgs.org_api"
 
@@ -5464,3 +5581,48 @@ class EventsGroupByCountEndpoint(BaseAPIView):
                 {"name": "table", "required": False, "help": "Required when silver=true; silver table name"},
             ],
         }
+
+
+class EventsHealthCheckEndpoint(views.APIView):
+    """
+    Health check endpoint for get_events functionality.
+    Tests if the fetch_events_for_org service is working correctly.
+    Uses a project_id from environment variable EVENTS_HEALTH_CHECK_PROJECT_UUID.
+    Returns 200 if healthy, 503 if there's an error.
+    """
+
+    permission_classes = []  # No authentication required for health checks
+
+    def get(self, request, *args, **kwargs):
+        try:
+            # Get project_id from environment variable (assumed to be valid UUID string)
+            project_id = os.environ.get("EVENTS_HEALTH_CHECK_PROJECT_UUID")
+
+            # Prepare minimal test parameters (last 24 hours, limit 1 for quick check)
+            date_end = timezone.now()
+            date_start = date_end - timedelta(hours=24)
+
+            # Format dates as UTC ISO strings with Z suffix
+            date_start_str = date_start.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            date_end_str = date_end.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+            # Check if events are available for this project
+            dl_get_events(
+                project=project_id,
+                date_start=date_start_str,
+                date_end=date_end_str,
+                limit=1,
+            )
+
+            # If we got here without exception, the service is working
+            return Response(
+                {"status": "healthy", "message": "get_events service is operational"},
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            # Return 503 if there's any error
+            return Response(
+                {"status": "error", "message": str(e)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )

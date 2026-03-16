@@ -5,7 +5,12 @@ from django.urls import include, path
 
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
 from temba.api.v2.flows.views import InternalFlowsAPIView
-from temba.api.v2.projects.views import GetProjectView, ProjectLanguageView
+from temba.api.v2.projects.views import (
+    GetProjectView,
+    InternalProjectMessageCountView,
+    ProjectLanguageView,
+    ProjectMessageCountView,
+)
 from temba.api.v2.templates.views import TemplateByIdEndpoint, TemplatesTranslationsEndpoint
 
 from .billing.views import BillingPricingEndpoint
@@ -29,6 +34,8 @@ from .views import (
     DefinitionsEndpoint,
     EventsEndpoint,
     EventsGroupByCountEndpoint,
+    EventsHealthCheckEndpoint,
+    EventsV2Endpoint,
     ExplorerView,
     ExternalServicesEndpoint,
     FieldsEndpoint,
@@ -85,7 +92,9 @@ urlpatterns = [
     url(r"^contact_templates_new$", ContactsTemplatesEndpointNew.as_view(), name="api.v2.contact_templates_new"),
     url(r"^contacts_elastic$", ContactsElasticSearchEndpoint.as_view(), name="api.v2.contacts_elastic"),
     url(r"^events$", EventsEndpoint.as_view(), name="api.v2.events"),
+    url(r"^events_v2$", EventsV2Endpoint.as_view(), name="api.v2.events_v2"),
     url(r"^events_group_by$", EventsGroupByCountEndpoint.as_view(), name="api.v2.events_group_by"),
+    url(r"^events_healthcheck$", EventsHealthCheckEndpoint.as_view(), name="api.v2.events_healthcheck"),
     url(r"^filter_templates$", FilterTemplatesEndpoint.as_view(), name="api.v2.filter_templates"),
     url(r"^filter_templates_new$", FilterTemplatesEndpointNew.as_view(), name="api.v2.filter_templates_new"),
     url(r"^internal_flows$", InternalFlowsAPIView.as_view(), name="api.v2.internal_flows"),
@@ -126,6 +135,12 @@ urlpatterns = [
     url(r"^whatsapp_flows$", WhatsappFlowsEndpoint.as_view(), name="api.v2.whatsapp_flows"),
     url(r"^projects$", GetProjectView.as_view(), name="api.v2.projects"),
     url(r"^projects/project_language", ProjectLanguageView.as_view(), name="api.v2.project_language"),
+    url(r"^projects/message_count$", ProjectMessageCountView.as_view(), name="api.v2.project_message_count"),
+    url(
+        r"^projects/internal/message_count$",
+        InternalProjectMessageCountView.as_view(),
+        name="api.v2.internal_project_message_count",
+    ),
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns, allowed=["json", "api"])

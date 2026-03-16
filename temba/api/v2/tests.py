@@ -31,6 +31,7 @@ from temba.api.v2.views import (
     EventsGroupByCountEndpoint,
     ExternalServicesEndpoint,
     FilterTemplatesEndpoint,
+    FilterTemplatesEndpointNew,
     FlowsLabelsEndpoint,
     ProductsEndpoint,
     TemplatesEndpoint,
@@ -1231,7 +1232,10 @@ class APITest(TembaTest):
             },
         )
 
-        self.assertEqual(response.json(), {"msg": ["Must provide either text, attachments, template or action_type"]})
+        self.assertEqual(
+            response.json(),
+            {"msg": ["Must provide either text, attachments, template, action_type or carousel"]},
+        )
 
         # send a msg with a defined channel
         response = self.postJSON(
@@ -1252,6 +1256,41 @@ class APITest(TembaTest):
 
         self.assertEqual(expected_metadata, broadcast.metadata)
         self.assertEqual(channel, broadcast.channel)
+
+        # send a msg with carousel only
+        carousel_msg = {
+            "carousel": [
+                {
+                    "body": "Hello body 1",
+                    "buttons": [
+                        {
+                            "sub_type": "url",
+                            "parameters": {"display_text": "Product-0", "url": "https://weni.ai"},
+                        }
+                    ],
+                },
+                {
+                    "body": "Hello body 2",
+                    "buttons": [
+                        {
+                            "sub_type": "url",
+                            "parameters": {"display_text": "Produto-1", "url": "https://weni.ai"},
+                        }
+                    ],
+                },
+            ]
+        }
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid],
+                "msg": carousel_msg,
+            },
+        )
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+        self.assertEqual(carousel_msg, broadcast.metadata)
 
         # send a msg with a non whatsapp cloud defined channel
         response = self.postJSON(
@@ -6103,7 +6142,7 @@ class ContactsTemplatesEndpointTest(TembaTest):
 
 class FilterTemplatesEndpointTest(TembaTest):
     def test_filter_templates(self):
-        contact = self.create_contact(name="Martinelli", org=self.org, user=self.user)
+        contact = self.create_contact(name="Martinelli", org=self.org, user=self.user, phone="+250783835665")
 
         metadata = {
             "templating": {
@@ -6144,29 +6183,208 @@ class FilterTemplatesEndpointTest(TembaTest):
         url = reverse("api.v2.filter_templates") + ".json"
 
         # verify filter by template
-        response = self.client.get(url, data={"template": "template_test"})
+        response = self.client.get(url, data={"template": "template_test_2"})
 
         self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(1, len(data["results"]))
+        self.assertEqual(str(contact.uuid), data["results"][0]["uuid"])
+        self.assertEqual(contact.name, data["results"][0]["name"])
+        self.assertEqual(str(contact.get_urn().api_urn()), data["results"][0]["contact_urn"])
 
         # verify filter with page size
-        response = self.client.get(url, data={"template": "template_test", "page_size": "1"})
+        response = self.client.get(url, data={"template": "template_test_2", "page_size": "1"})
 
         self.assertEqual(response.status_code, 200)
 
         # verify filter by offset
-        response = self.client.get(url, data={"template": "template_test", "offset": "1"})
+        response = self.client.get(url, data={"template": "template_test_2", "offset": "1"})
 
         self.assertEqual(response.status_code, 200)
 
         # verify filter with before
-        response = self.client.get(url, data={"template": "template_test", "before": "2024-03-08"})
+        response = self.client.get(url, data={"template": "template_test_2", "before": "2024-03-08"})
 
         self.assertEqual(response.status_code, 200)
 
         # verify filter with after
-        response = self.client.get(url, data={"template": "template_test", "after": "2024-03-05"})
+        response = self.client.get(url, data={"template": "template_test_2", "after": "2024-03-05"})
 
         self.assertEqual(response.status_code, 200)
+
+    def test_filter_templates_anon_masks_contact_urn(self):
+        contact = self.create_contact(name="Anon", org=self.org, user=self.user, phone="+250783835666")
+
+        metadata = {
+            "templating": {
+                "template": {"uuid": "44019537-9afe-4898-9626-a5c724d169gh", "name": "template_test_2"},
+                "language": "eng",
+                "country": "USA",
+                "variables": ["321"],
+                "namespace": "",
+            },
+            "text_language": "eng-US",
+        }
+
+        Msg.objects.create(
+            org=self.org,
+            direction="O",
+            contact=contact,
+            contact_urn=None,
+            text="Hello",
+            channel=self.channel,
+            topup_id=None,
+            status="S",
+            msg_type="",
+            attachments=None,
+            visibility="V",
+            external_id=None,
+            high_priority=None,
+            created_on=timezone.now(),
+            sent_on=timezone.now(),
+            broadcast=None,
+            metadata=metadata,
+            next_attempt=None,
+        )
+
+        view = FilterTemplatesEndpoint
+        view.permission_classes = []
+
+        self.client.force_login(self.user)
+        url = reverse("api.v2.filter_templates") + ".json"
+
+        with AnonymousOrg(self.org):
+            response = self.client.get(url, data={"template": "template_test_2"})
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(1, len(data["results"]))
+        self.assertEqual(f"tel:{ContactURN.ANON_MASK}", data["results"][0]["contact_urn"])
+
+
+class FilterTemplateSerializerNewTest(TembaTest):
+    def test_get_contact_urn_returns_none_without_contact(self):
+        from temba.api.v2.serializers import FilterTemplateSerializerNew
+
+        serializer = FilterTemplateSerializerNew(context={"org": self.org})
+
+        class Dummy:
+            pass
+
+        self.assertIsNone(serializer.get_contact_urn(Dummy()))
+
+        dummy = Dummy()
+        dummy.contact = None
+        self.assertIsNone(serializer.get_contact_urn(dummy))
+
+    def test_get_contact_urn_prefers_msg_contact_urn(self):
+        from temba.api.v2.serializers import FilterTemplateSerializerNew
+
+        serializer = FilterTemplateSerializerNew(context={"org": self.org})
+
+        contact = self.create_contact(name="MsgURN", org=self.org, user=self.user, phone="+250788000000")
+        msg_urn = contact.get_urn()
+
+        class Dummy:
+            pass
+
+        dummy = Dummy()
+        dummy.contact_urn = msg_urn
+        dummy.contact = None  # should still return based on msg.contact_urn
+
+        self.assertEqual(str(msg_urn.api_urn()), serializer.get_contact_urn(dummy))
+
+
+class FilterTemplatesEndpointNewTest(TembaTest):
+    def test_filter_templates_new(self):
+        contact = self.create_contact(name="Aline", org=self.org, user=self.user, phone="+250783800000")
+
+        Msg.objects.create(
+            org=self.org,
+            direction="O",
+            contact=contact,
+            contact_urn=None,
+            text="Hello from template",
+            channel=self.channel,
+            topup_id=None,
+            status="S",
+            msg_type="",
+            attachments=None,
+            visibility="V",
+            external_id=None,
+            high_priority=None,
+            created_on=timezone.now(),
+            sent_on=timezone.now(),
+            broadcast=None,
+            metadata={},
+            next_attempt=None,
+            template="template_new_test",
+        )
+
+        view = FilterTemplatesEndpointNew
+        view.permission_classes = []
+
+        self.client.force_login(self.user)
+        url = reverse("api.v2.filter_templates_new") + ".json"
+
+        with self.mockReadOnly():
+            response = self.client.get(url, data={"template": "template_new_test"})
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertIn("results", data)
+        self.assertEqual(1, len(data["results"]))
+
+        result = data["results"][0]
+        self.assertEqual(str(contact.uuid), result["contact_uuid"])
+        self.assertEqual(str(contact.get_urn().api_urn()), result["contact_urn"])
+        self.assertEqual("template_new_test", result["template"])
+
+    def test_filter_templates_new_uses_msg_contact_urn_when_contact_has_no_urns(self):
+        contact = self.create_contact(name="OldURN", org=self.org, user=self.user, phone="+250783811111")
+        old_urn = contact.get_urn()
+
+        # simulate contact URN being removed/detached later
+        old_urn.contact = None
+        old_urn.save(update_fields=["contact"])
+        if hasattr(contact, "_urns_cache"):
+            delattr(contact, "_urns_cache")
+
+        Msg.objects.create(
+            org=self.org,
+            direction="O",
+            contact=contact,
+            contact_urn=old_urn,
+            text="Hello from template",
+            channel=self.channel,
+            topup_id=None,
+            status="S",
+            msg_type="",
+            attachments=None,
+            visibility="V",
+            external_id=None,
+            high_priority=None,
+            created_on=timezone.now(),
+            sent_on=timezone.now(),
+            broadcast=None,
+            metadata={},
+            next_attempt=None,
+            template="template_new_test_2",
+        )
+
+        view = FilterTemplatesEndpointNew
+        view.permission_classes = []
+
+        self.client.force_login(self.user)
+        url = reverse("api.v2.filter_templates_new") + ".json"
+
+        with self.mockReadOnly():
+            response = self.client.get(url, data={"template": "template_new_test_2"})
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(1, len(data["results"]))
+        self.assertEqual(str(old_urn.api_urn()), data["results"][0]["contact_urn"])
 
 
 class WhatsappFlowsEndpointViewSetTest(TembaTest):
@@ -6399,6 +6617,200 @@ class EventsEndpointTest(APITest):
         self.assertEqual(call_kwargs["date_end"], "2025-10-08T23:59:59Z")
 
 
+class EventsV2EndpointTest(APITest):
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_v2_defaults_limit_offset(self, mock_fetch_events_for_org):
+        url = reverse("api.v2.events_v2")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_fetch_events_for_org.return_value = [{"event": "test"}]
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"event": "test"}])
+
+        mock_fetch_events_for_org.assert_called_once()
+        _, call_kwargs = mock_fetch_events_for_org.call_args
+        self.assertEqual(call_kwargs["limit"], 10)
+        self.assertEqual(call_kwargs["offset"], 0)
+
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_v2_respects_limit_offset(self, mock_fetch_events_for_org):
+        url = reverse("api.v2.events_v2")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_fetch_events_for_org.return_value = [{"event": "test"}]
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}&limit=25&offset=5"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"event": "test"}])
+
+        mock_fetch_events_for_org.assert_called_once()
+        _, call_kwargs = mock_fetch_events_for_org.call_args
+        self.assertEqual(call_kwargs["limit"], 25)
+        self.assertEqual(call_kwargs["offset"], 5)
+
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_v2_requires_table_when_silver_true(self, mock_fetch_events_for_org):
+        url = reverse("api.v2.events_v2")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}&silver=true"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 400)
+        mock_fetch_events_for_org.assert_not_called()
+
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_v2_passes_silver_and_table(self, mock_fetch_events_for_org):
+        url = reverse("api.v2.events_v2")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_fetch_events_for_org.return_value = []
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}&silver=true&table=my_table"
+
+        response = self.fetchJSON(url, query)
+        self.assertEqual(response.status_code, 200)
+
+        mock_fetch_events_for_org.assert_called_once()
+        _, call_kwargs = mock_fetch_events_for_org.call_args
+        self.assertTrue(call_kwargs["silver"])
+        self.assertEqual(call_kwargs["table"], "my_table")
+
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_events_v2_json_payload_parsing(self, mock_dl_get_events):
+        url = reverse("api.v2.events_v2")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_dl_get_events.return_value = [{"payload": '{"key": "value"}'}]
+
+        self.login(self.admin)
+
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}"
+
+        response = self.fetchJSON(url, query)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"payload": {"key": "value"}}])
+
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_events_v2_invalid_json_payload(self, mock_dl_get_events):
+        url = reverse("api.v2.events_v2")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_dl_get_events.return_value = [{"payload": '{"key": "value"invalid}'}]
+
+        self.login(self.admin)
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}"
+
+        response = self.fetchJSON(url, query)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"payload": '{"key": "value"invalid}'}])
+
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_v2_get_events_exception(self, mock_fetch_events_for_org):
+        url = reverse("api.v2.events_v2")
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        error_message = "Something went wrong"
+        mock_fetch_events_for_org.side_effect = Exception(error_message)
+
+        self.login(self.admin)
+        start_date = "2024-01-01T00:00:00Z"
+        end_date = "2024-01-31T23:59:59Z"
+        query = f"date_start={start_date}&date_end={end_date}"
+
+        response = self.fetchJSON(url, query)
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {"error": error_message})
+
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_events_v2_non_json_string_in_payload(self, mock_dl_get_events):
+        self.login(self.admin)
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_dl_get_events.return_value = [{"key": "non-json-string"}]
+
+        url = reverse("api.v2.events_v2")
+        query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"key": "non-json-string"}])
+
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_events_v2_payload_with_other_types(self, mock_dl_get_events):
+        self.login(self.admin)
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_dl_get_events.return_value = [{"key_int": 123, "key_bool": False, "key_none": None}]
+
+        url = reverse("api.v2.events_v2")
+        query = "date_start=2025-06-03T00:00:00Z&date_end=2025-06-20T23:59:59Z"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"key_int": 123, "key_bool": False, "key_none": None}])
+
+    @patch("temba.api.v2.services.events.dl_get_events")
+    def test_events_v2_datetime_conversion_to_utc(self, mock_dl_get_events):
+        self.login(self.admin)
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save()
+
+        mock_dl_get_events.return_value = []
+
+        url = reverse("api.v2.events_v2")
+        query = "date_start=2025-10-08T00:00:00Z&date_end=2025-10-08T23:59:59Z"
+
+        response = self.fetchJSON(url, query)
+
+        self.assertEqual(response.status_code, 200)
+
+        mock_dl_get_events.assert_called_once()
+        call_kwargs = mock_dl_get_events.call_args[1]
+        self.assertEqual(call_kwargs["date_start"], "2025-10-08T00:00:00Z")
+        self.assertEqual(call_kwargs["date_end"], "2025-10-08T23:59:59Z")
+
+
 class EventsGroupByCountEndpointTest(APITest):
     @patch("temba.api.v2.services.events.fetch_event_counts_for_org")
     def test_events_group_by_count_endpoint(self, mock_fetch_event_counts_for_org):
@@ -6525,6 +6937,52 @@ class EventsGroupByCountEndpointTest(APITest):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [{"key_int": 123, "key_bool": False, "key_none": None}])
+
+
+class EventsHealthCheckEndpointTest(APITest):
+    @patch("temba.api.v2.views.dl_get_events")
+    def test_health_check_success(self, mock_dl_get_events):
+        """Test successful health check"""
+        url = reverse("api.v2.events_healthcheck")
+        project_id = "123e4567-e89b-12d3-a456-426614174000"
+
+        mock_dl_get_events.return_value = []
+
+        with patch.dict("os.environ", {"EVENTS_HEALTH_CHECK_PROJECT_UUID": project_id}):
+            response = self.fetchJSON(url)
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "healthy")
+        self.assertEqual(data["message"], "get_events service is operational")
+
+        # Verify that dl_get_events was called with correct parameters
+        mock_dl_get_events.assert_called_once()
+        call_kwargs = mock_dl_get_events.call_args[1]
+        self.assertEqual(call_kwargs["project"], project_id)
+        self.assertIn("date_start", call_kwargs)
+        self.assertIn("date_end", call_kwargs)
+        self.assertEqual(call_kwargs["limit"], 1)
+        # Verify date format (should end with Z)
+        self.assertTrue(call_kwargs["date_start"].endswith("Z"))
+        self.assertTrue(call_kwargs["date_end"].endswith("Z"))
+
+    @patch("temba.api.v2.views.dl_get_events")
+    def test_health_check_service_error(self, mock_dl_get_events):
+        """Test health check when dl_get_events raises an exception"""
+        url = reverse("api.v2.events_healthcheck")
+        project_id = "123e4567-e89b-12d3-a456-426614174000"
+
+        # Make dl_get_events raise an exception
+        mock_dl_get_events.side_effect = Exception("Service unavailable")
+
+        with patch.dict("os.environ", {"EVENTS_HEALTH_CHECK_PROJECT_UUID": project_id}):
+            response = self.fetchJSON(url)
+
+        self.assertEqual(response.status_code, 503)
+        data = response.json()
+        self.assertEqual(data["status"], "error")
+        self.assertIn("Service unavailable", data["message"])
 
 
 class EventsServiceTest(APITest):

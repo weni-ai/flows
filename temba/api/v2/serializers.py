@@ -292,8 +292,16 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     trigger_flow_uuid = serializers.UUIDField(required=False)
 
     def validate_msg(self, value):
-        if not (value.get("text") or value.get("attachments") or value.get("template") or value.get("action_type")):
-            raise serializers.ValidationError("Must provide either text, attachments, template or action_type")
+        if not (
+            value.get("text")
+            or value.get("attachments")
+            or value.get("template")
+            or value.get("action_type")
+            or value.get("carousel")
+        ):
+            raise serializers.ValidationError(
+                "Must provide either text, attachments, template, action_type or carousel"
+            )
         return value
 
     def validate(self, data):
@@ -1249,10 +1257,39 @@ class FilterTemplateSerializer(ReadSerializer):
 
 class FilterTemplateSerializerNew(ReadSerializer):
     template = serializers.CharField(required=True)
+    contact_uuid = serializers.SerializerMethodField()
+    contact_urn = serializers.SerializerMethodField()
+
+    def get_contact_uuid(self, obj):
+        return str(obj.contact.uuid) if getattr(obj, "contact_id", None) else None
+
+    def get_contact_urn(self, obj):
+        # Prefer the URN used on the message itself (historical & most accurate)
+        msg_urn = getattr(obj, "contact_urn", None)
+        if msg_urn:
+            return str(msg_urn.api_urn())
+
+        # Fallback to the contact's current highest priority URN
+        contact = getattr(obj, "contact", None)
+        if not contact:
+            return None
+
+        urn = contact.get_urn()
+        return str(urn.api_urn()) if urn else None
 
     class Meta:
         model = Msg
-        fields = ("uuid", "contact_id", "template", "text", "created_on", "sent_on", "status")
+        fields = (
+            "uuid",
+            "contact_id",
+            "contact_uuid",
+            "contact_urn",
+            "template",
+            "text",
+            "created_on",
+            "sent_on",
+            "status",
+        )
 
 
 class FlowReadSerializer(ReadSerializer):
