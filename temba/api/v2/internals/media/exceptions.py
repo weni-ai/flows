@@ -43,3 +43,9 @@ class PresignedUrlGenerationException(MediaFileNotFoundException):
     """Raised when pre-signed URL generation fails."""
 
     message = "Unable to generate access URL"
+
+
+class FileNotFoundInAnyBucketException(MediaFileNotFoundException):
+    """Raised when the file is not found in any of the configured S3 buckets."""
+
+    message = "File not found in any configured bucket"

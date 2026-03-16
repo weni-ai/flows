@@ -194,6 +194,8 @@ S3_NETWORK_RETRY_COUNT = env.int("S3_NETWORK_RETRY_COUNT", default=5)
 
 COURIER_S3_ENDPOINT = env("COURIER_S3_ENDPOINT")
 
+S3_MEDIA_BUCKETS = env.list("S3_MEDIA_BUCKETS", default=[])
+
 # CELERY
 # ------------------------------------------------------------------------------
 CELERY_TIMEZONE = env("CELERY_TIMEZONE", default="UTC")
