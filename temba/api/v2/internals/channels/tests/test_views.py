@@ -143,7 +143,7 @@ class ChannelElevenLabsApiKeyViewTest(PatchedJWTAuthMixin, TembaTest):
         response = self.client.get(self.url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"channel_uuid": ["This field is required."]})
+        self.assertEqual(response.json(), {"channel_uuid": ["This field may not be null."]})
 
     def test_request_with_nonexistent_channel_uuid(self):
         self._set_jwt_payload(channel_uuid=str(uuid.uuid4()))
