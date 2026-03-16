@@ -53,7 +53,9 @@ class WhatsappBroadcastConsumer(SQSConsumer):
             SQSProcessingError: If the message is invalid or processing fails.
         """
         logger.warning(f"[WhatsappBroadcastConsumer] Processing message: keys={list(message.keys())}")
-        logger.warning(f"[WhatsappBroadcastConsumer] urns={message.get('urns')}, project_uuid={message.get('project_uuid')}, channel={message.get('channel')}")
+        logger.warning(
+            f"[WhatsappBroadcastConsumer] urns={message.get('urns')}, project_uuid={message.get('project_uuid')}, channel={message.get('channel')}"
+        )
 
         # Extract required fields
         msg_payload = message.get("msg")
