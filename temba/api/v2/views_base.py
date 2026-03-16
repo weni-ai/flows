@@ -7,12 +7,15 @@ from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
 
+from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.models import APIPermission, SSLPermission
 from temba.api.support import InvalidQueryError
+from temba.api.v2.permissions import HasValidJWT
 from temba.contacts.models import URN
 from temba.utils import str_to_bool
 from temba.utils.views import NonAtomicMixin
@@ -25,7 +28,7 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
     Base class of all our API endpoints
     """
 
-    permission_classes = (SSLPermission, APIPermission)
+    permission_classes = (SSLPermission, HasValidJWT | APIPermission)
     authentication_classes = (OptionalJWTAuthentication,) + tuple(api_settings.DEFAULT_AUTHENTICATION_CLASSES)
     throttle_scope = "v2"
     model = None
@@ -34,7 +37,71 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
 
     def perform_authentication(self, request):
         super().perform_authentication(request)
-        self.set_org_from_request(request)
+
+        if getattr(request, "jwt_payload", None):
+            self._resolve_jwt_user(request)
+        else:
+            self.set_org_from_request(request)
+
+    def _resolve_jwt_user(self, request):
+        """
+        When authenticated via JWT, resolve the org from project_uuid/channel_uuid
+        and replace AnonymousUser with a real user (INTERNAL_USER_EMAIL fallback to org.created_by)
+        so that write operations (POST/PUT/DELETE) work correctly.
+        """
+        from temba.channels.models import Channel
+        from temba.orgs.models import Org
+
+        project_uuid = (
+            getattr(request, "project_uuid", None)
+            or request.query_params.get("project_uuid")
+            or request.query_params.get("project")
+        )
+        channel_uuid = (
+            getattr(request, "channel_uuid", None)
+            or request.query_params.get("channel_uuid")
+            or request.query_params.get("channel")
+        )
+
+        if not project_uuid and not channel_uuid:
+            return
+
+        org = None
+        if project_uuid:
+            try:
+                org = Org.objects.filter(proj_uuid=project_uuid).first()
+            except ValidationError:
+                org = None
+            if not org:
+                raise InvalidQueryError("Invalid project")
+        else:
+            try:
+                channel = Channel.objects.select_related("org").filter(uuid=channel_uuid).first()
+            except ValidationError:
+                channel = None
+            if not channel:
+                raise InvalidQueryError("Invalid channel")
+            org = channel.org
+
+        request._org = org
+
+        # Resolve a real user for JWT-authenticated requests
+        User = get_user_model()
+        user = None
+
+        internal_email = getattr(settings, "INTERNAL_USER_EMAIL", "")
+        if internal_email:
+            try:
+                user = User.objects.get(email=internal_email)
+            except User.DoesNotExist:
+                user = None
+
+        if not user:
+            user = getattr(org, "created_by", None) or getattr(org, "modified_by", None)
+
+        if user:
+            user.set_org(org)
+            request.user = user
 
     def set_org_from_request(self, request):
         org = getattr(request, "_org", None)
