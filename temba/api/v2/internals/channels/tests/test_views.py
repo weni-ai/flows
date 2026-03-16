@@ -143,14 +143,14 @@ class ChannelElevenLabsApiKeyViewTest(PatchedJWTAuthMixin, TembaTest):
         response = self.client.get(self.url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"channel_uuid": ["This field is required."]})
+        self.assertEqual(response.json(), {"channel_uuid": ["This field may not be null."]})
 
     def test_request_with_nonexistent_channel_uuid(self):
         self._set_jwt_payload(channel_uuid=str(uuid.uuid4()))
         response = self.client.get(self.url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json(), {"detail": "Channel not found"})
+        self.assertEqual(response.json(), {"detail": "Not found."})
 
     def test_request_channel_without_voice_mode_config(self):
         channel = self.create_channel("TG", "Test Channel", "test")
@@ -159,7 +159,7 @@ class ChannelElevenLabsApiKeyViewTest(PatchedJWTAuthMixin, TembaTest):
         response = self.client.get(self.url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json(), {"detail": "ElevenLabs API key not found"})
+        self.assertEqual(response.json(), {"detail": "Not found."})
 
     def test_request_channel_with_partial_voice_mode_config(self):
         channel = self.create_channel("TG", "Test Channel", "test", config={"voice_mode": {"otherProvider": {}}})
@@ -168,7 +168,7 @@ class ChannelElevenLabsApiKeyViewTest(PatchedJWTAuthMixin, TembaTest):
         response = self.client.get(self.url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json(), {"detail": "ElevenLabs API key not found"})
+        self.assertEqual(response.json(), {"detail": "Not found."})
 
     def test_request_channel_with_elevenlabs_but_no_api_key(self):
         channel = self.create_channel("TG", "Test Channel", "test", config={"voice_mode": {"elevenLabs": {}}})
@@ -177,7 +177,7 @@ class ChannelElevenLabsApiKeyViewTest(PatchedJWTAuthMixin, TembaTest):
         response = self.client.get(self.url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json(), {"detail": "ElevenLabs API key not found"})
+        self.assertEqual(response.json(), {"detail": "Not found."})
 
     def test_request_channel_with_valid_elevenlabs_api_key(self):
         channel = self.create_channel(
