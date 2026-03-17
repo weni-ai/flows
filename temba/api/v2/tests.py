@@ -23,7 +23,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
-from temba.api.models import APIToken, Resthook, WebHookEvent
+from temba.api.models import APIPermission, APIToken, Resthook, WebHookEvent
 from temba.api.support import InvalidQueryError
 from temba.api.v2.views import (
     ContactsTemplatesEndpoint,
@@ -662,6 +662,182 @@ class APITest(TembaTest):
         with AnonymousOrg(self.org):
             with self.assertRaises(InvalidQueryError):
                 view.normalize_urn("tel:+250788123123")
+
+    def test_resolve_jwt_user_with_project_uuid_and_internal_email(self):
+        """_resolve_jwt_user resolves org via project_uuid and user via INTERNAL_USER_EMAIL."""
+        internal_user = User.objects.create_user("internal@system.local", "internal@system.local")
+
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"project_uuid": str(self.org.proj_uuid)}
+        request.project_uuid = str(self.org.proj_uuid)
+        view.request = request
+
+        with override_settings(INTERNAL_USER_EMAIL="internal@system.local"):
+            view._resolve_jwt_user(request)
+
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user, internal_user)
+        self.assertEqual(request.user.get_org(), self.org)
+
+    def test_resolve_jwt_user_fallback_to_org_created_by(self):
+        """_resolve_jwt_user falls back to org.created_by when INTERNAL_USER_EMAIL is not configured."""
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"project_uuid": str(self.org.proj_uuid)}
+        request.project_uuid = str(self.org.proj_uuid)
+        view.request = request
+
+        with override_settings(INTERNAL_USER_EMAIL=""):
+            view._resolve_jwt_user(request)
+
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user, self.org.created_by)
+        self.assertEqual(request.user.get_org(), self.org)
+
+    def test_resolve_jwt_user_fallback_when_internal_email_not_found(self):
+        """_resolve_jwt_user falls back to org.created_by when INTERNAL_USER_EMAIL user does not exist."""
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"project_uuid": str(self.org.proj_uuid)}
+        request.project_uuid = str(self.org.proj_uuid)
+        view.request = request
+
+        with override_settings(INTERNAL_USER_EMAIL="nonexistent@system.local"):
+            view._resolve_jwt_user(request)
+
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user, self.org.created_by)
+
+    def test_resolve_jwt_user_with_channel_uuid(self):
+        """_resolve_jwt_user resolves org via channel_uuid."""
+        channel = self.create_channel("TT", "JWT Channel", "99999")
+
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"channel_uuid": str(channel.uuid)}
+        request.channel_uuid = str(channel.uuid)
+        view.request = request
+
+        with override_settings(INTERNAL_USER_EMAIL=""):
+            view._resolve_jwt_user(request)
+
+        self.assertEqual(request._org, channel.org)
+        self.assertFalse(request.user.is_anonymous)
+
+    def test_resolve_jwt_user_no_project_no_channel_returns_early(self):
+        """_resolve_jwt_user returns early when neither project_uuid nor channel_uuid is present."""
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"some": "data"}
+        view.request = request
+
+        view._resolve_jwt_user(request)
+
+        self.assertFalse(hasattr(request, "_org"))
+        self.assertTrue(request.user.is_anonymous)
+
+    def test_resolve_jwt_user_invalid_project_raises(self):
+        """_resolve_jwt_user raises InvalidQueryError for invalid project_uuid."""
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"project_uuid": str(uuid.uuid4())}
+        request.project_uuid = str(uuid.uuid4())
+        view.request = request
+
+        with self.assertRaises(InvalidQueryError):
+            view._resolve_jwt_user(request)
+
+    def test_resolve_jwt_user_invalid_channel_raises(self):
+        """_resolve_jwt_user raises InvalidQueryError for invalid channel_uuid."""
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"channel_uuid": str(uuid.uuid4())}
+        request.channel_uuid = str(uuid.uuid4())
+        view.request = request
+
+        with self.assertRaises(InvalidQueryError):
+            view._resolve_jwt_user(request)
+
+    def test_perform_authentication_routes_jwt_to_resolve_jwt_user(self):
+        """perform_authentication calls _resolve_jwt_user when jwt_payload is present."""
+        internal_user = User.objects.create_user("jwt-internal@test.local", "jwt-internal@test.local")
+
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"project_uuid": str(self.org.proj_uuid)}
+        request.project_uuid = str(self.org.proj_uuid)
+        view.request = request
+
+        with override_settings(INTERNAL_USER_EMAIL="jwt-internal@test.local"):
+            view.perform_authentication(request)
+
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user, internal_user)
+
+    def test_perform_authentication_routes_non_jwt_to_set_org(self):
+        """perform_authentication calls set_org_from_request when jwt_payload is absent."""
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json", data={"project": str(self.org.proj_uuid)})
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = SimpleNamespace(set_org=Mock(), is_anonymous=False)
+        view.request = request
+
+        view.perform_authentication(request)
+
+        self.assertEqual(request._org, self.org)
+        request.user.set_org.assert_called_once_with(self.org)
+
+    def test_permission_classes_allow_jwt_without_api_token(self):
+        """HasValidJWT | APIPermission allows access with valid JWT even without API token."""
+        from temba.api.v2.permissions import HasValidJWT as HasValidJWTPermission
+
+        combined_permission_class = HasValidJWTPermission | APIPermission
+        permission = combined_permission_class()
+
+        # Simulated request with jwt_payload (should pass HasValidJWT)
+        jwt_request = SimpleNamespace(jwt_payload={"project_uuid": str(self.org.proj_uuid)})
+        mock_view = SimpleNamespace(permission=None)
+        self.assertTrue(permission.has_permission(jwt_request, mock_view))
+
+        # Simulated request without jwt_payload and anonymous user (should fail both)
+        no_jwt_request = SimpleNamespace(jwt_payload=None, user=AnonymousUser(), auth=None)
+        mock_view_with_perm = SimpleNamespace(permission="contacts.contact_api")
+        self.assertFalse(permission.has_permission(no_jwt_request, mock_view_with_perm))
 
     @patch("temba.api.v2.services.events.fetch_events_for_org")
     def test_events_endpoint_uses_org_without_user(self, mock_fetch_events):

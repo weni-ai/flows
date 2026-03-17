@@ -168,14 +168,15 @@ class TestS3MediaProxyEndpoint(TembaTest):
 
     @patch("temba.api.v2.internals.media.views.s3")
     @patch("temba.api.v2.internals.media.views.settings")
-    def test_get_redirect_found_in_second_bucket(self, mock_settings, mock_s3):
+    def test_get_redirect_found_in_fallback_bucket(self, mock_settings, mock_s3):
+        """File not in S3_MEDIA_BUCKETS but found in AWS_STORAGE_BUCKET_NAME (fallback)."""
         mock_settings.AWS_STORAGE_BUCKET_NAME = "primary-bucket"
         mock_settings.S3_MEDIA_BUCKETS = ["media-bucket"]
 
         mock_client = MagicMock()
         not_found = ClientError({"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject")
         mock_client.head_object.side_effect = [not_found, {}]
-        presigned_url = "https://media-bucket.s3.amazonaws.com/presigned?signature=xyz"
+        presigned_url = "https://primary-bucket.s3.amazonaws.com/presigned?signature=xyz"
         mock_client.generate_presigned_url.return_value = presigned_url
         mock_s3.client.return_value = mock_client
 
@@ -186,7 +187,7 @@ class TestS3MediaProxyEndpoint(TembaTest):
         self.assertEqual(response.url, presigned_url)
         mock_client.generate_presigned_url.assert_called_once_with(
             "get_object",
-            Params={"Bucket": "media-bucket", "Key": "attachments/file.pdf"},
+            Params={"Bucket": "primary-bucket", "Key": "attachments/file.pdf"},
             ExpiresIn=PRESIGNED_URL_EXPIRES,
         )
 

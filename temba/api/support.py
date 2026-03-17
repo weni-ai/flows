@@ -7,7 +7,7 @@ from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.throttling import ScopedRateThrottle
 
 from django.conf import settings
-from django.http import HttpResponseServerError
+from django.http import Http404, HttpResponseServerError
 
 from .models import APIToken
 
@@ -154,10 +154,11 @@ def temba_exception_handler(exc, context):
 
     response = exception_handler(exc, context)
 
-    # Normalize DRF 404s to the legacy payload expected by our test suite and clients.
+    # Normalize Django Http404s to the legacy payload expected by our test suite and clients.
     # Some code paths raise Http404 with a model-specific message (e.g. "No Foo matches the given query."),
     # which DRF surfaces as the NotFound detail. Historically we standardize this to "Not found.".
-    if response is not None and getattr(response, "status_code", None) == 404:
+    # Only applies to Django's Http404; custom APIException subclasses keep their own detail.
+    if response is not None and isinstance(exc, Http404):
         data = getattr(response, "data", None)
         if isinstance(data, dict) and "detail" in data:
             data["detail"] = "Not found."
