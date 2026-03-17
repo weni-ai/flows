@@ -52,15 +52,8 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
         else:
             self.set_org_from_request(request)
 
-    def _resolve_jwt_user(self, request):
-        """
-        When authenticated via JWT, resolve the org from project_uuid/channel_uuid
-        and replace AnonymousUser with a real user (INTERNAL_USER_EMAIL fallback to org.created_by)
-        so that write operations (POST/PUT/DELETE) work correctly.
-        """
-        from temba.channels.models import Channel
-        from temba.orgs.models import Org
-
+    def _extract_uuid_params(self, request):
+        """Extracts project_uuid and channel_uuid from request attributes and query params."""
         project_uuid = (
             getattr(request, "project_uuid", None)
             or request.query_params.get("project_uuid")
@@ -71,11 +64,13 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
             or request.query_params.get("channel_uuid")
             or request.query_params.get("channel")
         )
+        return project_uuid, channel_uuid
 
-        if not project_uuid and not channel_uuid:
-            return
+    def _resolve_org_from_params(self, project_uuid, channel_uuid):
+        """Resolves an Org from project_uuid or channel_uuid, raising on failure."""
+        from temba.channels.models import Channel
+        from temba.orgs.models import Org
 
-        org = None
         if project_uuid:
             try:
                 org = Org.objects.filter(proj_uuid=project_uuid).first()
@@ -83,31 +78,42 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
                 org = None
             if not org:
                 raise InvalidQueryError("Invalid project")
-        else:
-            try:
-                channel = Channel.objects.select_related("org").filter(uuid=channel_uuid).first()
-            except ValidationError:
-                channel = None
-            if not channel:
-                raise InvalidQueryError("Invalid channel")
-            org = channel.org
+            return org
 
-        request._org = org
+        try:
+            channel = Channel.objects.select_related("org").filter(uuid=channel_uuid).first()
+        except ValidationError:
+            channel = None
+        if not channel:
+            raise InvalidQueryError("Invalid channel")
+        return channel.org
 
-        # Resolve a real user for JWT-authenticated requests
+    def _resolve_internal_user(self, org):
+        """Resolves the internal user for JWT requests, falling back to org owner."""
         User = get_user_model()
-        user = None
-
         internal_email = getattr(settings, "INTERNAL_USER_EMAIL", "")
         if internal_email:
             try:
-                user = User.objects.get(email=internal_email)
+                return User.objects.get(email=internal_email)
             except User.DoesNotExist:
-                user = None
+                pass
 
-        if not user:
-            user = getattr(org, "created_by", None) or getattr(org, "modified_by", None)
+        return getattr(org, "created_by", None) or getattr(org, "modified_by", None)
 
+    def _resolve_jwt_user(self, request):
+        """
+        When authenticated via JWT, resolve the org from project_uuid/channel_uuid
+        and replace AnonymousUser with a real user (INTERNAL_USER_EMAIL fallback to org.created_by)
+        so that write operations (POST/PUT/DELETE) work correctly.
+        """
+        project_uuid, channel_uuid = self._extract_uuid_params(request)
+        if not project_uuid and not channel_uuid:
+            return
+
+        org = self._resolve_org_from_params(project_uuid, channel_uuid)
+        request._org = org
+
+        user = self._resolve_internal_user(org)
         if user:
             user.set_org(org)
             request.user = user
@@ -121,39 +127,11 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
             request._org = org
             return
 
-        project_uuid = (
-            getattr(request, "project_uuid", None)
-            or request.query_params.get("project_uuid")
-            or request.query_params.get("project")
-        )
-        channel_uuid = (
-            getattr(request, "channel_uuid", None)
-            or request.query_params.get("channel_uuid")
-            or request.query_params.get("channel")
-        )
-
+        project_uuid, channel_uuid = self._extract_uuid_params(request)
         if not project_uuid and not channel_uuid:
             return
 
-        from temba.channels.models import Channel
-        from temba.orgs.models import Org
-
-        if project_uuid:
-            try:
-                org = Org.objects.filter(proj_uuid=project_uuid).first()
-            except ValidationError:
-                org = None
-            if not org:
-                raise InvalidQueryError("Invalid project")
-        else:
-            try:
-                channel = Channel.objects.select_related("org").filter(uuid=channel_uuid).first()
-            except ValidationError:
-                channel = None
-            if not channel:
-                raise InvalidQueryError("Invalid channel")
-            org = channel.org
-
+        org = self._resolve_org_from_params(project_uuid, channel_uuid)
         request._org = org
 
         if hasattr(request.user, "set_org"):
