@@ -5,7 +5,7 @@ import iso8601
 from rest_framework import generics, mixins, status
 from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
-from rest_framework.settings import api_settings
+from weni.internal.authenticators import InternalOIDCAuthentication
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -14,7 +14,12 @@ from django.db import transaction
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.models import APIPermission, SSLPermission
-from temba.api.support import InvalidQueryError
+from temba.api.support import (
+    APIBasicAuthentication,
+    APISessionAuthentication,
+    APITokenAuthentication,
+    InvalidQueryError,
+)
 from temba.api.v2.permissions import HasValidJWT
 from temba.contacts.models import URN
 from temba.utils import str_to_bool
@@ -29,7 +34,13 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
     """
 
     permission_classes = (SSLPermission, HasValidJWT | APIPermission)
-    authentication_classes = (OptionalJWTAuthentication,) + tuple(api_settings.DEFAULT_AUTHENTICATION_CLASSES)
+    authentication_classes = (
+        OptionalJWTAuthentication,
+        InternalOIDCAuthentication,
+        APISessionAuthentication,
+        APITokenAuthentication,
+        APIBasicAuthentication,
+    )
     throttle_scope = "v2"
     model = None
     model_manager = "objects"
