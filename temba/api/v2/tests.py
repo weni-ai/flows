@@ -826,7 +826,8 @@ class APITest(TembaTest):
         """HasValidJWT | APIPermission allows access with valid JWT even without API token."""
         from temba.api.v2.permissions import HasValidJWT as HasValidJWTPermission
 
-        permission = HasValidJWTPermission() | APIPermission()
+        combined_permission_class = HasValidJWTPermission | APIPermission
+        permission = combined_permission_class()
 
         # Simulated request with jwt_payload (should pass HasValidJWT)
         jwt_request = SimpleNamespace(jwt_payload={"project_uuid": str(self.org.proj_uuid)})
