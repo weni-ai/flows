@@ -6,10 +6,14 @@ from rest_framework import generics, mixins, status
 from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
 
+from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import transaction
 
+from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.models import APIPermission, SSLPermission
 from temba.api.support import InvalidQueryError
+from temba.api.v2.permissions import HasValidJWT
 from temba.contacts.models import URN
 from temba.utils import str_to_bool
 from temba.utils.views import NonAtomicMixin
@@ -22,11 +26,44 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
     Base class of all our API endpoints
     """
 
-    permission_classes = (SSLPermission, APIPermission)
+    permission_classes = (SSLPermission, HasValidJWT | APIPermission)
     throttle_scope = "v2"
     model = None
     model_manager = "objects"
     lookup_params = {"uuid": "uuid"}
+
+    def get_authenticators(self):
+        """Prepend OptionalJWTAuthentication so JWT is tried before the default authenticators."""
+        return [OptionalJWTAuthentication()] + super().get_authenticators()
+
+    def perform_authentication(self, request):
+        super().perform_authentication(request)
+
+        if not getattr(request, "jwt_payload", None):
+            return
+
+        from temba.orgs.models import Org
+
+        project_uuid = getattr(request, "project_uuid", None)
+        if not project_uuid:
+            return
+
+        org = Org.objects.filter(proj_uuid=project_uuid).first()
+        if not org:
+            return
+
+        User = get_user_model()
+        internal_email = getattr(settings, "INTERNAL_USER_EMAIL", "")
+        if not internal_email:
+            return
+
+        try:
+            user = User.objects.get(email=internal_email)
+        except User.DoesNotExist:
+            return
+
+        user.set_org(org)
+        request.user = user
 
     def options(self, request, *args, **kwargs):
         """
