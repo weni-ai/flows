@@ -28,6 +28,7 @@ from temba.api.models import APIPermission, APIToken, Resthook, WebHookEvent
 from temba.api.support import InvalidQueryError
 from temba.api.v2.views import (
     ContactsTemplatesEndpoint,
+    ContactsTemplatesEndpointNew,
     EventsEndpoint,
     EventsGroupByCountEndpoint,
     ExternalServicesEndpoint,
@@ -6342,6 +6343,78 @@ class ContactsTemplatesEndpointTest(TembaTest):
         response = self.client.get(url, data={"contact": contact1.uuid})
 
         self.assertEqual(response.status_code, 200)
+
+
+class ContactsTemplatesEndpointNewTest(TembaTest):
+    def _create_contact_with_template_msg(self, name, template_name="template_test", is_active=True):
+        """Helper to create a contact with a template message."""
+        contact = self.create_contact(name=name, org=self.org, user=self.user)
+        if not is_active:
+            contact.is_active = False
+            contact.save(update_fields=["is_active"])
+
+        metadata = {
+            "templating": {
+                "template": {"uuid": "44019537-9afe-4898-9626-a5c724d169ef", "name": template_name},
+                "language": "por",
+                "country": "PT",
+                "variables": ["123"],
+                "namespace": "",
+            },
+            "text_language": "pt-BR",
+        }
+        Msg.objects.create(
+            org=self.org,
+            direction="O",
+            contact=contact,
+            contact_urn=None,
+            text="Hello",
+            channel=self.channel,
+            topup_id=None,
+            status="S",
+            msg_type="",
+            attachments=None,
+            visibility="V",
+            external_id=None,
+            high_priority=None,
+            created_on=timezone.now(),
+            sent_on=timezone.now(),
+            broadcast=None,
+            metadata=metadata,
+            next_attempt=None,
+            template=template_name,
+        )
+        return contact
+
+    def test_get_queryset_returns_active_contacts_for_org(self):
+        """get_queryset returns only active contacts belonging to the org."""
+        contact_active = self._create_contact_with_template_msg("Active")
+        self._create_contact_with_template_msg("Inactive", is_active=False)
+
+        ContactsTemplatesEndpointNew.permission_classes = []
+        self.client.force_login(self.user)
+        url = reverse("api.v2.contact_templates_new") + ".json"
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        result_uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(contact_active.uuid), result_uuids)
+
+    def test_filter_queryset_by_contact(self):
+        """filter_queryset filters by contact UUID when param is provided."""
+        contact1 = self._create_contact_with_template_msg("Contact1")
+        self._create_contact_with_template_msg("Contact2")
+
+        ContactsTemplatesEndpointNew.permission_classes = []
+        self.client.force_login(self.user)
+        url = reverse("api.v2.contact_templates_new") + ".json"
+
+        response = self.client.get(url, data={"contact": str(contact1.uuid)})
+        self.assertEqual(response.status_code, 200)
+
+        result_uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertEqual(result_uuids, [str(contact1.uuid)])
 
 
 class FilterTemplatesEndpointTest(TembaTest):
