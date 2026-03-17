@@ -90,12 +90,12 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
 
     def _resolve_internal_user(self, org):
         """Resolves the internal user for JWT requests, falling back to org owner."""
-        User = get_user_model()
+        user_model = get_user_model()
         internal_email = getattr(settings, "INTERNAL_USER_EMAIL", "")
         if internal_email:
             try:
-                return User.objects.get(email=internal_email)
-            except User.DoesNotExist:
+                return user_model.objects.get(email=internal_email)
+            except user_model.DoesNotExist:
                 pass
 
         return getattr(org, "created_by", None) or getattr(org, "modified_by", None)
