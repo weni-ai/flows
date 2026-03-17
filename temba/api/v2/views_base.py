@@ -5,7 +5,6 @@ import iso8601
 from rest_framework import generics, mixins, status
 from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
-from weni.internal.authenticators import InternalOIDCAuthentication
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -36,7 +35,6 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
     permission_classes = (SSLPermission, HasValidJWT | APIPermission)
     authentication_classes = (
         OptionalJWTAuthentication,
-        InternalOIDCAuthentication,
         APISessionAuthentication,
         APITokenAuthentication,
         APIBasicAuthentication,
