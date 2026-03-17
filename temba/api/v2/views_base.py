@@ -6,10 +6,20 @@ from rest_framework import generics, mixins, status
 from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
 
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import transaction
 
+from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.models import APIPermission, SSLPermission
-from temba.api.support import InvalidQueryError
+from temba.api.support import (
+    APIBasicAuthentication,
+    APISessionAuthentication,
+    APITokenAuthentication,
+    InvalidQueryError,
+)
+from temba.api.v2.permissions import HasValidJWT
 from temba.contacts.models import URN
 from temba.utils import str_to_bool
 from temba.utils.views import NonAtomicMixin
@@ -22,11 +32,128 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
     Base class of all our API endpoints
     """
 
-    permission_classes = (SSLPermission, APIPermission)
+    permission_classes = (SSLPermission, HasValidJWT | APIPermission)
+    authentication_classes = (
+        OptionalJWTAuthentication,
+        APISessionAuthentication,
+        APITokenAuthentication,
+        APIBasicAuthentication,
+    )
     throttle_scope = "v2"
     model = None
     model_manager = "objects"
     lookup_params = {"uuid": "uuid"}
+
+    def perform_authentication(self, request):
+        super().perform_authentication(request)
+
+        if getattr(request, "jwt_payload", None):
+            self._resolve_jwt_user(request)
+        else:
+            self.set_org_from_request(request)
+
+    def _extract_uuid_params(self, request):
+        """Extracts project_uuid and channel_uuid from request attributes and query params."""
+        project_uuid = (
+            getattr(request, "project_uuid", None)
+            or request.query_params.get("project_uuid")
+            or request.query_params.get("project")
+        )
+        channel_uuid = (
+            getattr(request, "channel_uuid", None)
+            or request.query_params.get("channel_uuid")
+            or request.query_params.get("channel")
+        )
+        return project_uuid, channel_uuid
+
+    def _resolve_org_from_params(self, project_uuid, channel_uuid):
+        """Resolves an Org from project_uuid or channel_uuid, raising on failure."""
+        from temba.channels.models import Channel
+        from temba.orgs.models import Org
+
+        if project_uuid:
+            try:
+                org = Org.objects.filter(proj_uuid=project_uuid).first()
+            except ValidationError:
+                org = None
+            if not org:
+                raise InvalidQueryError("Invalid project")
+            return org
+
+        try:
+            channel = Channel.objects.select_related("org").filter(uuid=channel_uuid).first()
+        except ValidationError:
+            channel = None
+        if not channel:
+            raise InvalidQueryError("Invalid channel")
+        return channel.org
+
+    def _resolve_internal_user(self, org):
+        """Resolves the internal user for JWT requests, falling back to org owner."""
+        user_model = get_user_model()
+        internal_email = getattr(settings, "INTERNAL_USER_EMAIL", "")
+        if internal_email:
+            try:
+                return user_model.objects.get(email=internal_email)
+            except user_model.DoesNotExist:
+                pass
+
+        return getattr(org, "created_by", None) or getattr(org, "modified_by", None)
+
+    def _resolve_jwt_user(self, request):
+        """
+        When authenticated via JWT, resolve the org from project_uuid/channel_uuid
+        and replace AnonymousUser with a real user (INTERNAL_USER_EMAIL fallback to org.created_by)
+        so that write operations (POST/PUT/DELETE) work correctly.
+        """
+        project_uuid, channel_uuid = self._extract_uuid_params(request)
+        if not project_uuid and not channel_uuid:
+            return
+
+        org = self._resolve_org_from_params(project_uuid, channel_uuid)
+        request._org = org
+
+        user = self._resolve_internal_user(org)
+        if user:
+            user.set_org(org)
+            request.user = user
+
+    def set_org_from_request(self, request):
+        org = getattr(request, "_org", None)
+        if not org and hasattr(request.user, "get_org"):
+            org = request.user.get_org()
+
+        if org:
+            request._org = org
+            return
+
+        project_uuid, channel_uuid = self._extract_uuid_params(request)
+        if not project_uuid and not channel_uuid:
+            return
+
+        org = self._resolve_org_from_params(project_uuid, channel_uuid)
+        request._org = org
+
+        if hasattr(request.user, "set_org"):
+            request.user.set_org(org)
+        else:
+            try:
+                request.user.get_org = lambda: org
+            except Exception:
+                pass
+
+    def get_org(self):
+        org = getattr(self.request, "_org", None)
+        if org:
+            return org
+
+        if hasattr(self.request.user, "get_org"):
+            org = self.request.user.get_org()
+            if org:
+                self.request._org = org
+            return org
+
+        return None
 
     def options(self, request, *args, **kwargs):
         """
@@ -36,7 +163,9 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
         return self.http_method_not_allowed(request, *args, **kwargs)
 
     def derive_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
+        if not org:
+            raise InvalidQueryError("Organization not found")
         return getattr(self.model, self.model_manager).filter(org=org)
 
     def get_queryset(self):
@@ -91,12 +220,15 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["org"] = self.request.user.get_org()
+        context["org"] = self.get_org()
         context["user"] = self.request.user
         return context
 
     def normalize_urn(self, value):
-        org = self.request.user.get_org()
+        org = self.get_org()
+
+        if not org:
+            raise InvalidQueryError("Organization not found")
 
         if org.is_anon:
             raise InvalidQueryError("URN lookups not allowed for anonymous organizations")
