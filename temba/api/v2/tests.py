@@ -17,6 +17,7 @@ from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, Group, User
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.db import connection
 from django.test import Client, override_settings
 from django.urls import reverse
@@ -786,6 +787,33 @@ class APITest(TembaTest):
 
         with self.assertRaises(InvalidQueryError):
             view._resolve_jwt_user(request)
+
+    def test_resolve_org_from_params_channel_validation_error(self):
+        """_resolve_org_from_params catches ValidationError when channel uuid causes DB validation failure."""
+        view = BaseAPIView()
+        view.format_kwarg = None
+
+        with patch("temba.channels.models.Channel.objects") as mock_qs:
+            mock_qs.select_related.return_value.filter.return_value.first.side_effect = ValidationError("invalid uuid")
+            with self.assertRaises(InvalidQueryError):
+                view._resolve_org_from_params(None, "bad-channel-uuid")
+
+    def test_set_org_from_request_user_rejects_attribute_assignment(self):
+        """set_org_from_request handles user objects that reject attribute assignment."""
+
+        class FrozenUser:
+            __slots__ = ()
+
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json", data={"project": str(self.org.proj_uuid)})
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = FrozenUser()
+        view.request = request
+
+        view.set_org_from_request(request)
+        self.assertEqual(request._org, self.org)
 
     def test_perform_authentication_routes_jwt_to_resolve_jwt_user(self):
         """perform_authentication calls _resolve_jwt_user when jwt_payload is present."""
