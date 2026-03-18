@@ -116,6 +116,7 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
         user = self._resolve_internal_user(org)
         if user:
             user.set_org(org)
+            user.using_token = True
             request.user = user
 
     def set_org_from_request(self, request):
