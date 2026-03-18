@@ -685,6 +685,7 @@ class APITest(TembaTest):
         self.assertEqual(request._org, self.org)
         self.assertEqual(request.user, internal_user)
         self.assertEqual(request.user.get_org(), self.org)
+        self.assertTrue(request.user.using_token)
 
     def test_resolve_jwt_user_fallback_to_org_created_by(self):
         """_resolve_jwt_user falls back to org.created_by when INTERNAL_USER_EMAIL is not configured."""
