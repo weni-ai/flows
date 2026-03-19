@@ -46,6 +46,7 @@ class TestProjectEventConsumer(TembaTest):
             "name": "Updated Org Name",
             "description": "Updated description",
             "language": "pt-br",
+            "timezone": "America/Sao_Paulo",
         }
         message = self._create_mock_message(body)
 
@@ -59,6 +60,7 @@ class TestProjectEventConsumer(TembaTest):
         self.assertEqual(reloaded_org.name, "Updated Org Name")
         self.assertEqual(reloaded_org.config["description"], "Updated description")
         self.assertEqual(reloaded_org.language, "pt-br")
+        self.assertEqual(reloaded_org.timezone, pytz.timezone("America/Sao_Paulo"))
 
     def test_consume_delete_action_successfully(self):
         """Test consuming a delete action message"""

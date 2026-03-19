@@ -74,6 +74,22 @@ class TestUpdateProjectConfig(TembaTest):
         self.assertEqual(reloaded_org.config["description"], "Old description")
         self.assertEqual(updated_org, reloaded_org)
 
+    def test_update_timezone_only(self):
+        """Test updating only the timezone field"""
+        updated_org = update_project_config(
+            project_uuid=self.project_uuid,
+            user_email=self.user.email,
+            timezone_location="America/Sao_Paulo",
+        )
+
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+
+        self.assertEqual(reloaded_org.timezone, pytz.timezone("America/Sao_Paulo"))
+        self.assertEqual(reloaded_org.name, "Test Org")
+        self.assertEqual(reloaded_org.language, "en-us")
+        self.assertEqual(reloaded_org.config["description"], "Old description")
+        self.assertEqual(updated_org, reloaded_org)
+
     def test_update_all_fields(self):
         """Test updating all fields at once"""
         updated_org = update_project_config(
@@ -82,6 +98,7 @@ class TestUpdateProjectConfig(TembaTest):
             name="Completely New Name",
             description="Completely new description",
             language="es",
+            timezone_location="America/Sao_Paulo",
         )
 
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
@@ -89,6 +106,7 @@ class TestUpdateProjectConfig(TembaTest):
         self.assertEqual(reloaded_org.name, "Completely New Name")
         self.assertEqual(reloaded_org.config["description"], "Completely new description")
         self.assertEqual(reloaded_org.language, "es")
+        self.assertEqual(reloaded_org.timezone, pytz.timezone("America/Sao_Paulo"))
         self.assertEqual(updated_org, reloaded_org)
 
     def test_update_without_user_email(self):
