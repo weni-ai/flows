@@ -592,8 +592,7 @@ class TestInternalFirstContacts(TembaTest):
             self.assertEqual(len(captured), 1)
             sql = str(captured[0].query)
             self.assertIn("NOT", sql)
-            self.assertIn("'F'", sql)
-            self.assertIn("'E'", sql)
+            self.assertRegex(sql, r'"msgs_msg"\."status" IN \(F, E\)|"msgs_msg"\."status" IN \(E, F\)')
 
     @_patch_first_contacts_auth
     def test_first_contacts_filters_by_channel(self):
