@@ -90,6 +90,7 @@ class ProjectEventConsumer(EDAConsumer):
                     name=body.get("name"),
                     description=body.get("description"),
                     language=body.get("language"),
+                    timezone_location=body.get("timezone"),
                 )
 
                 if org:
