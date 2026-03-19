@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import urlencode
 
+from temba.api.v2.internals.msgs.views import FirstContactsPagination
 from temba.channels.models import Channel
 from temba.msgs.models import Msg
 from temba.tests.base import TembaTest
@@ -514,14 +515,14 @@ class TestInternalFirstContacts(TembaTest):
     def _url(self, **params):
         base = reverse("internal_first_contacts")
         defaults = {
-            "project_uuid": self.org.proj_uuid,
-            "channel_uuid": self.channel.uuid,
+            "project_uuid": str(self.org.proj_uuid),
+            "channel_uuid": str(self.channel.uuid),
             "after": "2026-01-01T00:00:00Z",
             "before": "2026-12-31T23:59:59Z",
         }
-        defaults.update(params)
-        qs = "&".join(f"{k}={v}" for k, v in defaults.items())
-        return f"{base}?{qs}"
+        defaults.update({k: v if isinstance(v, str) else str(v) for k, v in params.items()})
+        # urlencode so e.g. timezone.now().isoformat() '+' is not decoded as space in query strings
+        return f"{base}?{urlencode(defaults)}"
 
     @_patch_first_contacts_auth
     def test_first_contacts_success(self):
@@ -568,17 +569,31 @@ class TestInternalFirstContacts(TembaTest):
             self.assertEqual(len(results), 0)
 
     @_patch_first_contacts_auth
-    def test_first_contacts_excludes_failed_errored(self):
+    def test_first_contacts_queryset_excludes_failed_errored_statuses(self):
+        """
+        Incoming messages with F/E cannot be inserted (temba_msg_on_change); assert the API queryset
+        still applies .exclude for those statuses (defense in depth / legacy rows).
+        """
+        captured = []
+        _real_paginate = FirstContactsPagination.paginate_queryset
+
+        def track_paginate(paginator, queryset, request, view=None):
+            captured.append(queryset)
+            return _real_paginate(paginator, queryset, request, view=view)
+
         with patch("rest_framework.request.Request.user", self.mock_user):
             contact = self.create_contact("Alice", urns=["tel:+250788000001"])
-            self.create_incoming_msg(contact=contact, text="Failed", status=Msg.STATUS_FAILED, channel=self.channel)
-            self.create_incoming_msg(contact=contact, text="Errored", status=Msg.STATUS_ERRORED, channel=self.channel)
+            self.create_incoming_msg(contact=contact, text="Hello", status="H", channel=self.channel)
 
-            response = self.client.get(self._url())
+            with patch.object(FirstContactsPagination, "paginate_queryset", track_paginate):
+                response = self.client.get(self._url())
 
             self.assertEqual(response.status_code, 200)
-            results = response.json()["results"]
-            self.assertEqual(len(results), 0)
+            self.assertEqual(len(captured), 1)
+            sql = str(captured[0].query)
+            self.assertIn("NOT", sql)
+            self.assertIn("'F'", sql)
+            self.assertIn("'E'", sql)
 
     @_patch_first_contacts_auth
     def test_first_contacts_filters_by_channel(self):
