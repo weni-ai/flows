@@ -1,3 +1,16 @@
+3.64.0
+----------
+* feat: Adding internal endpoint that returns the first incoming message per distinct contact URN for a given channel and time range
+* feat: Adding timezone on Org (Project) update via EDA
+
+3.63.0
+----------
+* feat: Adding attribute validation for JWT users
+
+3.62.0
+----------
+* feat: Adding optional jwt auth on v2 endpoints
+
 3.61.0
 ----------
 * feat: s3 bucket proxy to more than 1 bucket
