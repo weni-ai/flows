@@ -738,6 +738,35 @@ class UpdateContactFieldsViewTest(TembaTest):
         nickname_field = ContactField.get_by_key(contact.org, "nickname")
         self.assertEqual(contact.get_field_display(nickname_field), "Felix")
 
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_fallback_creates_segment_and_orderform_when_missing(self, mr_mocks, mock_protected_resource):
+        contact = self.create_contact("Person", urns=["twitterid:99999"])
+        self.assertFalse(ContactField.user_fields.filter(org=self.org, key="segment").exists())
+        self.assertFalse(ContactField.user_fields.filter(org=self.org, key="orderform").exists())
+
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/update_contacts_fields"
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "twitterid:99999",
+            "contact_fields": {"segment": "seg-a", "orderform": "form-b"},
+        }
+
+        response = self.client.patch(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(ContactField.user_fields.filter(org=self.org, key="segment").exists())
+        self.assertTrue(ContactField.user_fields.filter(org=self.org, key="orderform").exists())
+
+        contact.refresh_from_db()
+        segment_f = ContactField.get_by_key(self.org, "segment")
+        orderform_f = ContactField.get_by_key(self.org, "orderform")
+        self.assertEqual(contact.get_field_display(segment_f), "seg-a")
+        self.assertEqual(contact.get_field_display(orderform_f), "form-b")
+
 
 class PatchedJWTAuthMixin(JWTAuthMockMixin):
     def _mock_jwt_authenticate(self, request, *args, **kwargs):
@@ -1631,27 +1660,21 @@ class ContactsImportUploadViewTest(TembaTest):
 
 class ContactImportDeduplicationServiceTest(TembaTest):
     def test_process_empty_file_raises(self):
-        from temba.api.v2.internals.contacts.services import (
-            ContactImportDeduplicationService,
-        )
+        from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
 
         upload = SimpleUploadedFile("import.csv", b"", content_type="text/csv")
         with self.assertRaises(ValidationError):
             ContactImportDeduplicationService.process(self.org, upload, upload.name)
 
     def test_process_empty_header_raises(self):
-        from temba.api.v2.internals.contacts.services import (
-            ContactImportDeduplicationService,
-        )
+        from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
 
         upload = SimpleUploadedFile("import.csv", b"Name,,URN:whatsapp\n", content_type="text/csv")
         with self.assertRaises(ValidationError):
             ContactImportDeduplicationService.process(self.org, upload, upload.name)
 
     def test_process_header_only_no_records_raises(self):
-        from temba.api.v2.internals.contacts.services import (
-            ContactImportDeduplicationService,
-        )
+        from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
 
         # headers present but no data rows should raise
         csv = ("UUID,URN:whatsapp,Name\n").encode("utf-8")
@@ -1662,9 +1685,7 @@ class ContactImportDeduplicationServiceTest(TembaTest):
 
     @override_settings(AWS_STORAGE_BUCKET_NAME=None)
     def test_process_duplicates_and_bucket_not_configured(self):
-        from temba.api.v2.internals.contacts.services import (
-            ContactImportDeduplicationService,
-        )
+        from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
 
         # duplicate URN in second row
         csv = ("URN:whatsapp,Name\n" "123,Alice\n" "123,Bob\n").encode("utf-8")
@@ -1684,9 +1705,7 @@ class ContactImportDeduplicationServiceTest(TembaTest):
         self.assertEqual(dup_error, "AWS bucket not configured")
 
     def test_process_path_suffix_error_falls_back_to_csv(self):
-        from temba.api.v2.internals.contacts.services import (
-            ContactImportDeduplicationService,
-        )
+        from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
 
         csv = ("URN:whatsapp\n" "123\n").encode("utf-8")
         upload = SimpleUploadedFile("weirdname", csv, content_type="text/plain")
@@ -1711,9 +1730,7 @@ class ContactImportDeduplicationServiceTest(TembaTest):
 class ContactImportDeduplicationServiceS3Test(TembaTest):
     def test_upload_to_s3_no_client(self):
         # Force _get_s3_client to return None
-        from temba.api.v2.internals.contacts.services import (
-            ContactImportDeduplicationService,
-        )
+        from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
 
         with patch(
             "temba.api.v2.internals.contacts.services.ContactImportDeduplicationService._get_s3_client",
@@ -1728,9 +1745,7 @@ class ContactImportDeduplicationServiceS3Test(TembaTest):
 
 class ContactImportDeduplicationServiceUUIDTest(TembaTest):
     def test_process_tracks_seen_uuids(self):
-        from temba.api.v2.internals.contacts.services import (
-            ContactImportDeduplicationService,
-        )
+        from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
 
         # Build CSV with explicit UUID column and two unique rows
         csv = (
@@ -1752,9 +1767,7 @@ class ContactImportDeduplicationServiceUUIDTest(TembaTest):
         self.assertEqual(dup_count, 0)
 
     def test_process_marks_duplicate_uuid_as_duplicate(self):
-        from temba.api.v2.internals.contacts.services import (
-            ContactImportDeduplicationService,
-        )
+        from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
 
         # same UUID on two rows -> second one should be treated as duplicate
         csv = (
@@ -1776,9 +1789,7 @@ class ContactImportDeduplicationServiceUUIDTest(TembaTest):
 
 class ContactImportDeduplicationServiceMaxRecordsTest(TembaTest):
     def test_process_raises_when_exceed_max_records(self):
-        from temba.api.v2.internals.contacts.services import (
-            ContactImportDeduplicationService,
-        )
+        from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
         from temba.contacts.models import ContactImport as ContactImportModel
 
         old_max = ContactImportModel.MAX_RECORDS
@@ -1982,7 +1993,7 @@ class ContactsImportConfirmViewPostTest(TembaTest):
     @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
     def test_post_existing_group(self):
         from temba.api.v2.internals.contacts.views import ContactImportCRUDL
-        from temba.contacts.models import ContactImport, ContactGroup
+        from temba.contacts.models import ContactGroup, ContactImport
 
         contact_import = self.create_contact_import("media/test_imports/simple.xlsx")
         contact_import.mappings = [{"header": "Name", "mapping": {"type": "attribute", "name": "name"}}]
@@ -2177,6 +2188,7 @@ class ContactsImportConfirmViewEdgeCasesTest(TembaTest):
     def test_get_without_import_id_returns_400_direct(self):
         # call the view directly without URL kwargs to exercise the explicit 400 branch
         from rest_framework.test import APIRequestFactory
+
         from temba.api.v2.internals.contacts.views import ContactsImportConfirmView
 
         factory = APIRequestFactory()
@@ -2188,6 +2200,7 @@ class ContactsImportConfirmViewEdgeCasesTest(TembaTest):
     @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
     def test_post_missing_project_uuid_returns_400_direct(self):
         from rest_framework.test import APIRequestFactory
+
         from temba.api.v2.internals.contacts.views import ContactsImportConfirmView
 
         # use a valid import id but omit project_uuid in body
@@ -2206,6 +2219,7 @@ class ContactsImportConfirmViewEdgeCasesTest(TembaTest):
     @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
     def test_post_missing_import_id_returns_400_direct(self):
         from rest_framework.test import APIRequestFactory
+
         from temba.api.v2.internals.contacts.views import ContactsImportConfirmView
 
         factory = APIRequestFactory()

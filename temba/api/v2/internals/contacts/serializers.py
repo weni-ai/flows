@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import serializers
 
 from django.conf import settings
@@ -9,6 +11,42 @@ from temba.contacts.models import ContactField, ContactURN
 from temba.orgs.models import Org
 
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
+
+# Keys that update_contacts_fields may auto-create as text user fields when missing (org under field limit).
+FALLBACK_AUTO_CREATE_CONTACT_FIELD_KEYS = frozenset({"segment", "orderform"})
+FALLBACK_AUTO_CREATE_CONTACT_FIELD_LABELS = {
+    "segment": "segment",
+    "orderform": "orderform",
+}
+
+
+def _resolve_contact_field_for_update(org, user, raw_key):
+    """
+    Resolve a ContactField for PATCH update_contacts_fields. Unknown keys are ignored unless they are
+    segment or orderform: then we create a text field if missing and the org is under its field limit.
+    """
+    canonical = raw_key.lower()
+    field = ContactField.all_fields.filter(org=org, key=raw_key).first()
+    if field:
+        return field
+    if canonical != raw_key:
+        field = ContactField.all_fields.filter(org=org, key=canonical).first()
+        if field:
+            return field
+    if canonical not in FALLBACK_AUTO_CREATE_CONTACT_FIELD_KEYS:
+        return None
+    limit = org.get_limit(Org.LIMIT_FIELDS)
+    if ContactField.user_fields.count_active_for_org(org=org) >= limit:
+        logger.warning(
+            "Skipping auto-create of contact field %r for org %s: field limit reached",
+            canonical,
+            org.id,
+        )
+        return None
+    label = FALLBACK_AUTO_CREATE_CONTACT_FIELD_LABELS[canonical]
+    return ContactField.get_or_create(org, user, canonical, label=label, value_type=ContactField.TYPE_TEXT)
 
 
 class InternalContactSerializer(serializers.Serializer):
@@ -69,7 +107,7 @@ class InternalContactFieldsValuesSerializer(serializers.Serializer):
 
         fields_to_update = {}
         for key, value in contact_fields.items():
-            contact_field = ContactField.all_fields.filter(key=key, org=org).first()
+            contact_field = _resolve_contact_field_for_update(org, user, key)
             if contact_field:
                 fields_to_update[contact_field] = value
 
