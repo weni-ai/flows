@@ -889,6 +889,28 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                             "value": 500
                         }
                     }
+                },
+                "catalog_message": {
+                    "products": [
+                        {
+                            "product": "Example Product Name",
+                            "product_retailer_ids": [
+                                "01#store01",
+                                "02#store02"
+                            ],
+                            "product_retailer_info": [
+                                {
+                                    "name": "Product Variant A",
+                                    "price": "29.90",
+                                    "retailer_id": "1001#store01",
+                                    "seller_id": "1",
+                                    "description": "Description for variant A",
+                                    "image": "https://example.com/product-a.jpg",
+                                    "product_url": "https://example.com/product-a"
+                                }
+                            ]
+                        }
+                    ]
                 }
             }
         }
@@ -1025,6 +1047,28 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                             "value": 500
                         }
                     }
+                },
+                "catalog_message": {
+                    "products": [
+                        {
+                            "product": "Example Product Name",
+                            "product_retailer_ids": [
+                                "01#store01",
+                                "02#store02"
+                            ],
+                            "product_retailer_info": [
+                                {
+                                    "name": "Product Variant A",
+                                    "price": "29.90",
+                                    "retailer_id": "1001#store01",
+                                    "seller_id": "1",
+                                    "description": "Description for variant A",
+                                    "image": "https://example.com/product-a.jpg",
+                                    "product_url": "https://example.com/product-a"
+                                }
+                            ]
+                        }
+                    ]
                 }
             }
         }
