@@ -741,6 +741,55 @@ class UpdateContactFieldsViewTest(TembaTest):
     @mock_mailroom
     @override_settings(INTERNAL_USER_EMAIL="super@user.com")
     @patch.object(LambdaURLValidator, "protected_resource")
+    def test_update_custom_field_with_case_insensitive_key(self, mr_mocks, mock_protected_resource):
+        contact = self.create_contact("Case Test", urns=["twitterid:77777"])
+        self.create_field("nickname", "Apelido")
+
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/update_contacts_fields"
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "twitterid:77777",
+            "contact_fields": {"Nickname": "CaseOk"},
+        }
+
+        response = self.client.patch(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Contact fields updated successfully"})
+
+        contact.refresh_from_db()
+        nickname_field = ContactField.get_by_key(contact.org, "nickname")
+        self.assertEqual(contact.get_field_display(nickname_field), "CaseOk")
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_unknown_field_key_is_silently_ignored(self, mr_mocks, mock_protected_resource):
+        contact = self.create_contact("Ignore Test", urns=["twitterid:66666"])
+
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/update_contacts_fields"
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "twitterid:66666",
+            "contact_fields": {"nonexistent_field": "should be ignored", "name": "Updated"},
+        }
+
+        response = self.client.patch(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Contact fields updated successfully"})
+
+        contact.refresh_from_db()
+        self.assertEqual(contact.name, "Updated")
+        self.assertIsNone(ContactField.get_by_key(self.org, "nonexistent_field"))
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    @patch.object(LambdaURLValidator, "protected_resource")
     def test_fallback_creates_segment_and_orderform_when_missing(self, mr_mocks, mock_protected_resource):
         contact = self.create_contact("Person", urns=["twitterid:99999"])
         self.assertFalse(ContactField.user_fields.filter(org=self.org, key="segment").exists())
