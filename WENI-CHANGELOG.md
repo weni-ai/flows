@@ -1,3 +1,7 @@
+3.65.1
+----------
+* fix: Add WWC in WhatsappBroadcast write serializer
+
 3.65.0
 ----------
 * feat: add catalog message structure to WhatsappBroadcastsEndpoint
