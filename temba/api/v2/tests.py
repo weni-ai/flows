@@ -1498,6 +1498,58 @@ class APITest(TembaTest):
         broadcast = Broadcast.objects.get(id=response.json()["id"])
         self.assertEqual(carousel_msg, broadcast.metadata)
 
+        # send a msg with direct_send and ttl_seconds
+        msg_with_options = {
+            "text": "Urgent message",
+            "direct_send": True,
+            "ttl_seconds": 3600,
+        }
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid],
+                "msg": msg_with_options,
+            },
+        )
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+        self.assertEqual(msg_with_options, broadcast.metadata)
+
+        # direct_send must be boolean
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid],
+                "msg": {"text": "Test", "direct_send": "true"},
+            },
+        )
+        self.assertResponseError(response, "msg", "direct_send must be a boolean")
+
+        # ttl_seconds must be integer and non-negative
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid],
+                "msg": {"text": "Test", "ttl_seconds": "3600"},
+            },
+        )
+        self.assertResponseError(response, "msg", "ttl_seconds must be an integer")
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid],
+                "msg": {"text": "Test", "ttl_seconds": -1},
+            },
+        )
+        self.assertResponseError(response, "msg", "ttl_seconds must be a non-negative integer")
+
         # send a msg with a non whatsapp cloud defined channel
         response = self.postJSON(
             url,
