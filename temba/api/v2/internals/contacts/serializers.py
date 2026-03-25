@@ -1,7 +1,7 @@
 import logging
 
-from sentry_sdk import capture_message
 from rest_framework import serializers
+from sentry_sdk import capture_message
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
