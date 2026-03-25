@@ -775,7 +775,7 @@ class UpdateContactFieldsViewTest(TembaTest):
         When active user field count >= org limit, segment/orderform must not be auto-created
         (and contact.modify runs only if there are other mods).
         """
-        contact = self.create_contact("LimitTest", urns=["twitterid:88888"])
+
         self.assertFalse(ContactField.user_fields.filter(org=self.org, key="segment").exists())
         self.assertFalse(ContactField.user_fields.filter(org=self.org, key="orderform").exists())
 
