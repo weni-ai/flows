@@ -321,7 +321,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 channel = Channel.objects.get(uuid=channel_data)
                 data["channel"] = channel
                 if channel.channel_type not in ["WAC", "WWC"]:
-                    raise serializers.ValidationError("Invalid channel type")
+                    raise serializers.ValidationError("Channel must be a WhatsApp Cloud channel")
             except Channel.DoesNotExist:
                 raise serializers.ValidationError("Channel not found")
 
