@@ -1482,3 +1482,6 @@ try:
         JWT_PUBLIC_KEY = f.read()
 except FileNotFoundError:
     JWT_PUBLIC_KEY = None
+
+# JWT secret key
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", default="")
