@@ -1,3 +1,13 @@
+3.65.1
+----------
+* fix: Add WWC in WhatsappBroadcast write serializer
+
+3.65.0
+----------
+* feat: add catalog message structure to WhatsappBroadcastsEndpoint
+* feat: add validation for direct_send and ttl_seconds in WhatsappBroadcastWriteSerializer
+* feat: implement fallback logic for auto-creating contact fields during updates
+
 3.64.0
 ----------
 * feat: Adding internal endpoint that returns the first incoming message per distinct contact URN for a given channel and time range

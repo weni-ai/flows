@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-import logging
 from typing import Iterable, Optional, Sequence
-
-import pytz
 
 from django.utils import timezone
 
 from temba.channels.models import Channel
 from temba.contacts.models import URN, Contact, ContactURN
-from temba.event_driven.publisher.amazonmq_publisher import AmazonMQPublisher
 from temba.msgs.models import Label, Msg
 from temba.orgs.models import Org
 
@@ -137,35 +133,4 @@ def create_message_db_only(
         if label_objs:
             msg.labels.add(*label_objs)
 
-    _publish_billing_msg_create(msg=msg, template=template)
-
     return msg
-
-
-def _publish_billing_msg_create(*, msg: Msg, template: Optional[str | dict] = None) -> None:
-    """
-    Publishes a message creation event to the billing queue.
-    Non-blocking: failures are logged and ignored.
-    """
-    try:
-        contact_urn_identity = msg.contact_urn.identity if msg.contact_urn_id else None
-        channel_uuid = str(msg.channel.uuid) if msg.channel_id else None
-        channel_type = msg.channel.channel_type if msg.channel_id else None
-        occurred_on = (msg.sent_on or msg.created_on or timezone.now()).astimezone(pytz.UTC)
-        message_date = occurred_on.replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-        payload = {
-            "contact_urn": contact_urn_identity,
-            "contact_uuid": str(msg.contact.uuid) if msg.contact_id else None,
-            "channel_uuid": channel_uuid,
-            "message_date": message_date,
-            "direction": msg.direction,  # "I" or "O"
-            "channel_type": channel_type,
-            "text": msg.text or "",
-            "template": template,
-            "status": msg.status,
-        }
-
-        AmazonMQPublisher().send_message(body=payload, exchange="msgs.topic", routing_key="create")
-    except Exception as exc:  # pragma: no cover - best effort emit
-        logging.getLogger(__name__).warning("Failed to publish billing msg create: %s", exc)

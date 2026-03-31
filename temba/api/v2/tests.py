@@ -1565,7 +1565,7 @@ class APITest(TembaTest):
             },
         )
 
-        self.assertResponseError(response, "non_field_errors", "Channel must be a WhatsApp Cloud channel")
+        self.assertResponseError(response, "non_field_errors", "Invalid channel type")
 
         # send a msg with a non existing channel
         response = self.postJSON(
