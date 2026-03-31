@@ -21,12 +21,13 @@ from django.contrib.auth import get_user_model
 from django.core import exceptions as django_exceptions
 from django.core.exceptions import ValidationError
 from django.core.files import File
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Sum, Value
 from django.db.models.functions import Coalesce
 from django.db.transaction import on_commit as on_transaction_commit
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
+from django.utils.decorators import method_decorator
 
 from temba.api.auth.jwt import BaseJWTAuthentication, OptionalJWTAuthentication, RequiredJWTAuthentication
 from temba.api.v2.internals.contacts.serializers import (
@@ -167,7 +168,13 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
             return request.data.get("user_email") or getattr(request.user, "email", None)
 
 
+@method_decorator(transaction.non_atomic_requests, name="dispatch")
 class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
+    """
+    Runs outside ATOMIC_REQUESTS so ContactField rows created in the same request (e.g. segment/orderform
+    fallback) are committed before mailroom's contact_modify reads the DB.
+    """
+
     authentication_classes = [OptionalJWTAuthentication]
     renderer_classes = [JSONRenderer]
 

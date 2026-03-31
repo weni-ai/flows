@@ -302,6 +302,13 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             raise serializers.ValidationError(
                 "Must provide either text, attachments, template, action_type or carousel"
             )
+        if "direct_send" in value and not isinstance(value["direct_send"], bool):
+            raise serializers.ValidationError("direct_send must be a boolean")
+        if "ttl_seconds" in value:
+            if not isinstance(value["ttl_seconds"], int):
+                raise serializers.ValidationError("ttl_seconds must be an integer")
+            if value["ttl_seconds"] < 0:
+                raise serializers.ValidationError("ttl_seconds must be a non-negative integer")
         return value
 
     def validate(self, data):
@@ -313,8 +320,8 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             try:
                 channel = Channel.objects.get(uuid=channel_data)
                 data["channel"] = channel
-                if channel.channel_type != "WAC":
-                    raise serializers.ValidationError("Channel must be a WhatsApp Cloud channel")
+                if channel.channel_type not in ["WAC", "WWC"]:
+                    raise serializers.ValidationError("Invalid channel type")
             except Channel.DoesNotExist:
                 raise serializers.ValidationError("Channel not found")
 

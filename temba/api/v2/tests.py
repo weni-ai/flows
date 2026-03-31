@@ -4,26 +4,33 @@ import uuid
 from collections import OrderedDict
 from datetime import datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from urllib.parse import quote_plus
 
 import iso8601
 import pytz
 from rest_framework import serializers
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APIRequestFactory
 
 from django.conf import settings
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import AnonymousUser, Group, User
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.db import connection
 from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from temba.api.models import APIToken, Resthook, WebHookEvent
+from temba.api.auth.jwt import OptionalJWTAuthentication
+from temba.api.models import APIPermission, APIToken, Resthook, WebHookEvent
+from temba.api.support import InvalidQueryError
 from temba.api.v2.views import (
     ContactsTemplatesEndpoint,
+    ContactsTemplatesEndpointNew,
+    EventsEndpoint,
+    EventsGroupByCountEndpoint,
     ExternalServicesEndpoint,
     FilterTemplatesEndpoint,
     FilterTemplatesEndpointNew,
@@ -32,6 +39,7 @@ from temba.api.v2.views import (
     TemplatesEndpoint,
     WhatsappFlowsEndpoint,
 )
+from temba.api.v2.views_base import BaseAPIView
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
@@ -63,7 +71,13 @@ from temba.wpp_flows.models import WhatsappFlow
 from temba.wpp_products.models import Catalog, Product
 
 from . import fields
-from .serializers import ExternalServicesReadSerializer, ProductReadSerializer, format_datetime, normalize_extra
+from .serializers import (
+    ContactReadSerializer,
+    ExternalServicesReadSerializer,
+    ProductReadSerializer,
+    format_datetime,
+    normalize_extra,
+)
 
 NUM_BASE_REQUEST_QUERIES = 6  # number of db queries required for any API request
 
@@ -486,6 +500,26 @@ class APITest(TembaTest):
         response = request_by_basic_auth(contacts_url, self.admin.username, token2.key)
         self.assertResponseError(response, None, "Invalid token or email", status_code=403)
 
+    @override_settings(JWT_PUBLIC_KEY="fake-public-key")
+    @patch("temba.api.auth.jwt.jwt.decode")
+    def test_optional_jwt_auth_sets_payload(self, mock_decode):
+        factory = APIRequestFactory()
+        request = factory.get("/api/v2/fields.json", HTTP_AUTHORIZATION="Bearer good.token")
+        payload = {"project_uuid": "proj-123", "channel_uuid": "chan-456", "role": "viewer"}
+        mock_decode.return_value = payload
+
+        auth = OptionalJWTAuthentication()
+        result = auth.authenticate(request)
+
+        self.assertIsNotNone(result)
+        user, token = result
+        self.assertIsInstance(user, AnonymousUser)
+        self.assertIsNone(token)
+        self.assertEqual(request.jwt_payload, payload)
+        self.assertEqual(request.project_uuid, "proj-123")
+        self.assertEqual(request.channel_uuid, "chan-456")
+        self.assertTrue(mock_decode.called)
+
     @override_settings(SECURE_PROXY_SSL_HEADER=("HTTP_X_FORWARDED_HTTPS", "https"))
     def test_root(self):
         url = reverse("api.v2")
@@ -519,6 +553,365 @@ class APITest(TembaTest):
         response = self.fetchJSON(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["runs"], "https://testserver:80/api/v2/runs")  # endpoints are listed
+
+    def test_base_api_view_org_resolution(self):
+        class DummyView(BaseAPIView):
+            model = Contact
+            serializer_class = ContactReadSerializer
+            authentication_classes = ()
+
+        def make_request(query=None, user=None):
+            factory = APIRequestFactory()
+            django_request = factory.get("/api/v2/contacts.json", data=query or {})
+            view = DummyView()
+            view.format_kwarg = None
+            request = view.initialize_request(django_request)
+            request.user = user or SimpleNamespace()
+            view.request = request
+            return view, request
+
+        # set org from project uuid (query param)
+        view, request = make_request(query={"project": str(self.org.proj_uuid)})
+        view.set_org_from_request(request)
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user.get_org(), self.org)
+
+        # set org from channel uuid (query param)
+        channel = self.create_channel("TT", "Test Channel", "11111")
+        view, request = make_request(query={"channel": str(channel.uuid)})
+        view.set_org_from_request(request)
+        self.assertEqual(request._org, channel.org)
+
+        # invalid channel uuid raises
+        view, request = make_request(query={"channel": "not-a-uuid"})
+        with self.assertRaises(InvalidQueryError):
+            view.set_org_from_request(request)
+
+        # invalid channel (valid UUID but not found) raises
+        view, request = make_request(query={"channel": str(uuid.uuid4())})
+        with self.assertRaises(InvalidQueryError):
+            view.set_org_from_request(request)
+
+        # user with set_org gets it called
+        user_with_set_org = SimpleNamespace(set_org=Mock())
+        view, request = make_request(query={"project": str(self.org.proj_uuid)}, user=user_with_set_org)
+        view.set_org_from_request(request)
+        user_with_set_org.set_org.assert_called_once_with(self.org)
+
+        # user without set_org gets get_org attached
+        view, request = make_request(query={"project": str(self.org.proj_uuid)}, user=SimpleNamespace())
+        view.set_org_from_request(request)
+        self.assertTrue(hasattr(request.user, "get_org"))
+        self.assertEqual(request.user.get_org(), self.org)
+
+        # user is None is handled safely
+        view, request = make_request(query={"project": str(self.org.proj_uuid)}, user=None)
+        view.set_org_from_request(request)
+        self.assertEqual(request._org, self.org)
+
+        # invalid project uuid raises
+        view, request = make_request(query={"project": "not-a-project"})
+        with self.assertRaises(InvalidQueryError):
+            view.set_org_from_request(request)
+
+        # perform_authentication uses set_org_from_request
+        view, request = make_request(query={"project": str(self.org.proj_uuid)})
+        view.perform_authentication(request)
+        self.assertEqual(request._org, self.org)
+
+        # get_org prefers request._org and caches user org when possible
+        view, request = make_request(user=SimpleNamespace(get_org=lambda: self.org2))
+        request._org = self.org
+        self.assertEqual(view.get_org(), self.org)
+
+        view, request = make_request(user=SimpleNamespace(get_org=lambda: self.org))
+        self.assertEqual(view.get_org(), self.org)
+        self.assertEqual(request._org, self.org)
+
+        view, request = make_request()
+        self.assertIsNone(view.get_org())
+
+        # derive_queryset filters by org and errors without org
+        contact1 = self.create_contact("Org1", org=self.org)
+        self.create_contact("Org2", org=self.org2)
+        view, request = make_request()
+        request._org = self.org
+        qs = view.derive_queryset()
+        self.assertIn(contact1, qs)
+        self.assertTrue(all(c.org_id == self.org.id for c in qs))
+
+        view, request = make_request()
+        with self.assertRaises(InvalidQueryError):
+            view.derive_queryset()
+
+        # get_serializer_context uses resolved org
+        view, request = make_request()
+        request._org = self.org
+        context = view.get_serializer_context()
+        self.assertEqual(context["org"], self.org)
+
+        # normalize_urn requires org and rejects anonymous org
+        view, request = make_request()
+        with self.assertRaises(InvalidQueryError):
+            view.normalize_urn("tel:+250788123123")
+
+        view, request = make_request()
+        request._org = self.org
+        self.assertTrue(view.normalize_urn("tel:+250788123123").startswith("tel:"))
+
+        view, request = make_request()
+        request._org = self.org
+        with AnonymousOrg(self.org):
+            with self.assertRaises(InvalidQueryError):
+                view.normalize_urn("tel:+250788123123")
+
+    def test_resolve_jwt_user_with_project_uuid_and_internal_email(self):
+        """_resolve_jwt_user resolves org via project_uuid and user via INTERNAL_USER_EMAIL."""
+        internal_user = User.objects.create_user("internal@system.local", "internal@system.local")
+
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"project_uuid": str(self.org.proj_uuid)}
+        request.project_uuid = str(self.org.proj_uuid)
+        view.request = request
+
+        with override_settings(INTERNAL_USER_EMAIL="internal@system.local"):
+            view._resolve_jwt_user(request)
+
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user, internal_user)
+        self.assertEqual(request.user.get_org(), self.org)
+        self.assertTrue(request.user.using_token)
+
+    def test_resolve_jwt_user_fallback_to_org_created_by(self):
+        """_resolve_jwt_user falls back to org.created_by when INTERNAL_USER_EMAIL is not configured."""
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"project_uuid": str(self.org.proj_uuid)}
+        request.project_uuid = str(self.org.proj_uuid)
+        view.request = request
+
+        with override_settings(INTERNAL_USER_EMAIL=""):
+            view._resolve_jwt_user(request)
+
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user, self.org.created_by)
+        self.assertEqual(request.user.get_org(), self.org)
+
+    def test_resolve_jwt_user_fallback_when_internal_email_not_found(self):
+        """_resolve_jwt_user falls back to org.created_by when INTERNAL_USER_EMAIL user does not exist."""
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"project_uuid": str(self.org.proj_uuid)}
+        request.project_uuid = str(self.org.proj_uuid)
+        view.request = request
+
+        with override_settings(INTERNAL_USER_EMAIL="nonexistent@system.local"):
+            view._resolve_jwt_user(request)
+
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user, self.org.created_by)
+
+    def test_resolve_jwt_user_with_channel_uuid(self):
+        """_resolve_jwt_user resolves org via channel_uuid."""
+        channel = self.create_channel("TT", "JWT Channel", "99999")
+
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"channel_uuid": str(channel.uuid)}
+        request.channel_uuid = str(channel.uuid)
+        view.request = request
+
+        with override_settings(INTERNAL_USER_EMAIL=""):
+            view._resolve_jwt_user(request)
+
+        self.assertEqual(request._org, channel.org)
+        self.assertFalse(request.user.is_anonymous)
+
+    def test_resolve_jwt_user_no_project_no_channel_returns_early(self):
+        """_resolve_jwt_user returns early when neither project_uuid nor channel_uuid is present."""
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"some": "data"}
+        view.request = request
+
+        view._resolve_jwt_user(request)
+
+        self.assertFalse(hasattr(request, "_org"))
+        self.assertTrue(request.user.is_anonymous)
+
+    def test_resolve_jwt_user_invalid_project_raises(self):
+        """_resolve_jwt_user raises InvalidQueryError for invalid project_uuid."""
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"project_uuid": str(uuid.uuid4())}
+        request.project_uuid = str(uuid.uuid4())
+        view.request = request
+
+        with self.assertRaises(InvalidQueryError):
+            view._resolve_jwt_user(request)
+
+    def test_resolve_jwt_user_invalid_channel_raises(self):
+        """_resolve_jwt_user raises InvalidQueryError for invalid channel_uuid."""
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"channel_uuid": str(uuid.uuid4())}
+        request.channel_uuid = str(uuid.uuid4())
+        view.request = request
+
+        with self.assertRaises(InvalidQueryError):
+            view._resolve_jwt_user(request)
+
+    def test_resolve_org_from_params_channel_validation_error(self):
+        """_resolve_org_from_params catches ValidationError when channel uuid causes DB validation failure."""
+        view = BaseAPIView()
+        view.format_kwarg = None
+
+        with patch("temba.channels.models.Channel.objects") as mock_qs:
+            mock_qs.select_related.return_value.filter.return_value.first.side_effect = ValidationError("invalid uuid")
+            with self.assertRaises(InvalidQueryError):
+                view._resolve_org_from_params(None, "bad-channel-uuid")
+
+    def test_set_org_from_request_user_rejects_attribute_assignment(self):
+        """set_org_from_request handles user objects that reject attribute assignment."""
+
+        class FrozenUser:
+            __slots__ = ()
+
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json", data={"project": str(self.org.proj_uuid)})
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = FrozenUser()
+        view.request = request
+
+        view.set_org_from_request(request)
+        self.assertEqual(request._org, self.org)
+
+    def test_perform_authentication_routes_jwt_to_resolve_jwt_user(self):
+        """perform_authentication calls _resolve_jwt_user when jwt_payload is present."""
+        internal_user = User.objects.create_user("jwt-internal@test.local", "jwt-internal@test.local")
+
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"project_uuid": str(self.org.proj_uuid)}
+        request.project_uuid = str(self.org.proj_uuid)
+        view.request = request
+
+        with override_settings(INTERNAL_USER_EMAIL="jwt-internal@test.local"):
+            view.perform_authentication(request)
+
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user, internal_user)
+
+    def test_perform_authentication_routes_non_jwt_to_set_org(self):
+        """perform_authentication calls set_org_from_request when jwt_payload is absent."""
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json", data={"project": str(self.org.proj_uuid)})
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = SimpleNamespace(set_org=Mock(), is_anonymous=False)
+        view.request = request
+
+        view.perform_authentication(request)
+
+        self.assertEqual(request._org, self.org)
+        request.user.set_org.assert_called_once_with(self.org)
+
+    def test_permission_classes_allow_jwt_without_api_token(self):
+        """HasValidJWT | APIPermission allows access with valid JWT even without API token."""
+        from temba.api.v2.permissions import HasValidJWT as HasValidJWTPermission
+
+        combined_permission_class = HasValidJWTPermission | APIPermission
+        permission = combined_permission_class()
+
+        # Simulated request with jwt_payload (should pass HasValidJWT)
+        jwt_request = SimpleNamespace(jwt_payload={"project_uuid": str(self.org.proj_uuid)})
+        mock_view = SimpleNamespace(permission=None)
+        self.assertTrue(permission.has_permission(jwt_request, mock_view))
+
+        # Simulated request without jwt_payload and anonymous user (should fail both)
+        no_jwt_request = SimpleNamespace(jwt_payload=None, user=AnonymousUser(), auth=None)
+        mock_view_with_perm = SimpleNamespace(permission="contacts.contact_api")
+        self.assertFalse(permission.has_permission(no_jwt_request, mock_view_with_perm))
+
+    @patch("temba.api.v2.services.events.fetch_events_for_org")
+    def test_events_endpoint_uses_org_without_user(self, mock_fetch_events):
+        mock_fetch_events.return_value = [{"event": "ok"}]
+        factory = APIRequestFactory()
+        django_request = factory.get(
+            "/api/v2/events.json",
+            data={"date_start": "2025-01-01T00:00:00Z", "date_end": "2025-01-02T00:00:00Z"},
+        )
+        view = EventsEndpoint()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = None
+        request._org = self.org
+        view.request = request
+
+        response = view.get(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, [{"event": "ok"}])
+        called_user = mock_fetch_events.call_args[0][0]
+        self.assertEqual(called_user.get_org(), self.org)
+
+    @patch("temba.api.v2.services.events.fetch_event_counts_for_org")
+    def test_events_group_by_endpoint_uses_org_without_user(self, mock_fetch_counts):
+        mock_fetch_counts.return_value = [{"count": 1}]
+        factory = APIRequestFactory()
+        django_request = factory.get(
+            "/api/v2/events_group_by.json",
+            data={"date_start": "2025-01-01T00:00:00Z", "date_end": "2025-01-02T00:00:00Z"},
+        )
+        view = EventsGroupByCountEndpoint()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = None
+        request._org = self.org
+        view.request = request
+
+        response = view.get(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, [{"count": 1}])
+        called_user = mock_fetch_counts.call_args[0][0]
+        self.assertEqual(called_user.get_org(), self.org)
 
     def test_explorer(self):
         url = reverse("api.v2.explorer")
@@ -1105,6 +1498,58 @@ class APITest(TembaTest):
         broadcast = Broadcast.objects.get(id=response.json()["id"])
         self.assertEqual(carousel_msg, broadcast.metadata)
 
+        # send a msg with direct_send and ttl_seconds
+        msg_with_options = {
+            "text": "Urgent message",
+            "direct_send": True,
+            "ttl_seconds": 3600,
+        }
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid],
+                "msg": msg_with_options,
+            },
+        )
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+        self.assertEqual(msg_with_options, broadcast.metadata)
+
+        # direct_send must be boolean
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid],
+                "msg": {"text": "Test", "direct_send": "true"},
+            },
+        )
+        self.assertResponseError(response, "msg", "direct_send must be a boolean")
+
+        # ttl_seconds must be integer and non-negative
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid],
+                "msg": {"text": "Test", "ttl_seconds": "3600"},
+            },
+        )
+        self.assertResponseError(response, "msg", "ttl_seconds must be an integer")
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid],
+                "msg": {"text": "Test", "ttl_seconds": -1},
+            },
+        )
+        self.assertResponseError(response, "msg", "ttl_seconds must be a non-negative integer")
+
         # send a msg with a non whatsapp cloud defined channel
         response = self.postJSON(
             url,
@@ -1119,7 +1564,7 @@ class APITest(TembaTest):
             },
         )
 
-        self.assertResponseError(response, "non_field_errors", "Channel must be a WhatsApp Cloud channel")
+        self.assertResponseError(response, "non_field_errors", "Invalid channel type")
 
         # send a msg with a non existing channel
         response = self.postJSON(
@@ -5951,6 +6396,78 @@ class ContactsTemplatesEndpointTest(TembaTest):
         response = self.client.get(url, data={"contact": contact1.uuid})
 
         self.assertEqual(response.status_code, 200)
+
+
+class ContactsTemplatesEndpointNewTest(TembaTest):
+    def _create_contact_with_template_msg(self, name, template_name="template_test", is_active=True):
+        """Helper to create a contact with a template message."""
+        contact = self.create_contact(name=name, org=self.org, user=self.user)
+        if not is_active:
+            contact.is_active = False
+            contact.save(update_fields=["is_active"])
+
+        metadata = {
+            "templating": {
+                "template": {"uuid": "44019537-9afe-4898-9626-a5c724d169ef", "name": template_name},
+                "language": "por",
+                "country": "PT",
+                "variables": ["123"],
+                "namespace": "",
+            },
+            "text_language": "pt-BR",
+        }
+        Msg.objects.create(
+            org=self.org,
+            direction="O",
+            contact=contact,
+            contact_urn=None,
+            text="Hello",
+            channel=self.channel,
+            topup_id=None,
+            status="S",
+            msg_type="",
+            attachments=None,
+            visibility="V",
+            external_id=None,
+            high_priority=None,
+            created_on=timezone.now(),
+            sent_on=timezone.now(),
+            broadcast=None,
+            metadata=metadata,
+            next_attempt=None,
+            template=template_name,
+        )
+        return contact
+
+    def test_get_queryset_returns_active_contacts_for_org(self):
+        """get_queryset returns only active contacts belonging to the org."""
+        contact_active = self._create_contact_with_template_msg("Active")
+        self._create_contact_with_template_msg("Inactive", is_active=False)
+
+        ContactsTemplatesEndpointNew.permission_classes = []
+        self.client.force_login(self.user)
+        url = reverse("api.v2.contact_templates_new") + ".json"
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        result_uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(contact_active.uuid), result_uuids)
+
+    def test_filter_queryset_by_contact(self):
+        """filter_queryset filters by contact UUID when param is provided."""
+        contact1 = self._create_contact_with_template_msg("Contact1")
+        self._create_contact_with_template_msg("Contact2")
+
+        ContactsTemplatesEndpointNew.permission_classes = []
+        self.client.force_login(self.user)
+        url = reverse("api.v2.contact_templates_new") + ".json"
+
+        response = self.client.get(url, data={"contact": str(contact1.uuid)})
+        self.assertEqual(response.status_code, 200)
+
+        result_uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertEqual(result_uuids, [str(contact1.uuid)])
 
 
 class FilterTemplatesEndpointTest(TembaTest):

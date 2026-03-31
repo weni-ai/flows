@@ -1,3 +1,5 @@
+import pytz
+
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
@@ -20,6 +22,7 @@ def update_project_config(
     name: str = None,
     description: str = None,
     language: str = None,
+    timezone_location: str = None,
 ) -> Org:
     """
     Update project (Org) configuration.
@@ -30,6 +33,7 @@ def update_project_config(
         name: New name for the project
         description: New description for the project
         language: New language for the project
+        timezone_location: Timezone location string (e.g. "America/Sao_Paulo")
 
     Returns:
         The updated Org object
@@ -50,6 +54,10 @@ def update_project_config(
     if language is not None and language != org.language:
         org.language = language
         fields_to_update.append("language")
+
+    if timezone_location is not None:
+        org.timezone = pytz.timezone(timezone_location)
+        fields_to_update.append("timezone")
 
     if user_email:
         user, _ = get_or_create_user_by_email(user_email)
