@@ -10,6 +10,7 @@ the S3 bucket 100% private.
 
 import logging
 
+from botocore.exceptions import ClientError
 from rest_framework import status
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
@@ -23,10 +24,10 @@ from temba.utils import s3
 
 from .exceptions import (
     EmptyFileIdException,
+    FileNotFoundInAnyBucketException,
     InvalidFileIdFormatException,
     MediaAccessDeniedException,
     MediaFileNotFoundException,
-    PresignedUrlGenerationException,
     S3BucketNotConfiguredException,
 )
 
@@ -44,44 +45,33 @@ class S3MediaProxyView(APIViewMixin, APIView):
     This view:
     1. Receives an object_key that identifies a file in S3
     2. Validates the object_key format
-    3. Generates a pre-signed URL with short expiration (5 minutes)
-    4. Returns HTTP 302 redirect to the pre-signed URL
+    3. Searches for the file across all configured S3 buckets
+    4. Generates a pre-signed URL with short expiration (5 minutes)
+    5. Returns HTTP 302 redirect to the pre-signed URL
 
-    This allows permanent URLs in chat history exports while keeping the S3 bucket private.
+    Buckets are resolved from settings in this order:
+    - S3_MEDIA_BUCKETS (additional buckets list, checked first)
+    - AWS_STORAGE_BUCKET_NAME (primary bucket, checked last as fallback)
 
     URL: GET /api/v2/internals/media/download/<object_key>/
 
     Example:
         If the file path in S3 is "media/image.jpg", the request would be:
-        GET /api/v2/internals/media/download/media/image.jpg/
+        GET /api/v2/internals/media/download/media/image.jpg
     """
 
-    authentication_classes = []  # Public endpoint - security via object_key obscurity + validation
+    authentication_classes = []
     permission_classes = []
     renderer_classes = [JSONRenderer]
 
     def get(self, request, object_key: str, *args, **kwargs):
-        """
-        Handle GET request to download/redirect to S3 file.
-
-        Args:
-            request: The HTTP request
-            object_key: The S3 object key (path + filename in the bucket)
-
-        Returns:
-            HTTP 302 redirect to pre-signed S3 URL, or error response
-        """
         try:
-            # Validate object_key
             self._validate_object_key(object_key)
 
-            # Get bucket from settings
-            bucket = self._get_bucket()
+            buckets = self._get_buckets()
 
-            # Generate pre-signed URL
-            presigned_url = self._generate_presigned_url(bucket, object_key)
+            presigned_url = self._find_and_generate_presigned_url(buckets, object_key)
 
-            # Return 302 redirect to the pre-signed URL
             return HttpResponseRedirect(presigned_url)
 
         except MediaFileNotFoundException as e:
@@ -104,69 +94,73 @@ class S3MediaProxyView(APIViewMixin, APIView):
             )
 
     def _validate_object_key(self, object_key: str) -> None:
-        """
-        Validate the S3 object key format.
-
-        Args:
-            object_key: The S3 object key to validate
-
-        Raises:
-            EmptyFileIdException: If object_key is empty
-            InvalidFileIdFormatException: If object_key format is invalid
-        """
         if not object_key:
             raise EmptyFileIdException()
 
-        # Basic validation: object_key should have reasonable length
         if len(object_key) > 1024:
             raise InvalidFileIdFormatException()
 
-    def _get_bucket(self) -> str:
+    def _get_buckets(self) -> list:
         """
-        Get the S3 bucket name from settings.
+        Collect all configured S3 bucket names, deduplicating while preserving order.
 
         Returns:
-            The S3 bucket name
+            List of unique bucket names
 
         Raises:
-            S3BucketNotConfiguredException: If bucket is not configured
+            S3BucketNotConfiguredException: If no buckets are configured at all
         """
-        bucket = getattr(settings, "AWS_STORAGE_BUCKET_NAME", None)
-        if not bucket:
-            raise S3BucketNotConfiguredException()
-        return bucket
+        seen = set()
+        buckets = []
 
-    def _generate_presigned_url(self, bucket: str, key: str) -> str:
+        for bucket in getattr(settings, "S3_MEDIA_BUCKETS", []):
+            if bucket and bucket not in seen:
+                seen.add(bucket)
+                buckets.append(bucket)
+
+        primary = getattr(settings, "AWS_STORAGE_BUCKET_NAME", None)
+        if primary and primary not in seen:
+            buckets.append(primary)
+
+        if not buckets:
+            raise S3BucketNotConfiguredException()
+
+        return buckets
+
+    def _find_and_generate_presigned_url(self, buckets: list, key: str) -> str:
         """
-        Generate a pre-signed URL for the S3 object.
+        Try each bucket in order; return a pre-signed URL from the first one
+        that contains the object.
 
         Args:
-            bucket: S3 bucket name
+            buckets: Ordered list of bucket names to search
             key: S3 object key
 
         Returns:
             Pre-signed URL string
 
         Raises:
-            MediaFileNotFoundException: If the object doesn't exist or URL generation fails
+            FileNotFoundInAnyBucketException: If the file is not found in any bucket
         """
-        try:
-            s3_client = s3.client()
+        s3_client = s3.client()
 
-            # Generate pre-signed URL with content disposition for download
-            s3_params = {
-                "Bucket": bucket,
-                "Key": key,
-            }
+        for bucket in buckets:
+            try:
+                s3_client.head_object(Bucket=bucket, Key=key)
+            except ClientError as e:
+                error_code = e.response.get("Error", {}).get("Code", "")
+                if error_code in ("404", "NoSuchKey"):
+                    continue
+                logger.warning(f"Error checking {bucket}/{key}: {error_code}")
+                continue
+            except Exception:
+                logger.warning(f"Unexpected error checking {bucket}/{key}", exc_info=True)
+                continue
 
-            presigned_url = s3_client.generate_presigned_url(
+            return s3_client.generate_presigned_url(
                 "get_object",
-                Params=s3_params,
+                Params={"Bucket": bucket, "Key": key},
                 ExpiresIn=PRESIGNED_URL_EXPIRES,
             )
 
-            return presigned_url
-
-        except Exception as e:
-            logger.error(f"Failed to generate presigned URL for {bucket}/{key}: {str(e)}")
-            raise PresignedUrlGenerationException() from e
+        raise FileNotFoundInAnyBucketException()
