@@ -3253,6 +3253,8 @@ class OrgCRUDL(SmartCRUDL):
                 # get any channel thats not a delegate
                 channels = Channel.objects.filter(org=org, is_active=True, parent=None).order_by("-role")
                 for channel in channels:
+                    if channel.config.get("preview") is True:
+                        continue
                     self.add_channel_section(formax, channel)
 
                 twilio_client = org.get_twilio_client()

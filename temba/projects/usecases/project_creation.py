@@ -7,6 +7,7 @@ from weni.internal.models import Project
 from django.contrib.auth import get_user_model
 
 from temba.projects.usecases.authorizations_creation import create_authorizations
+from temba.projects.usecases.channel_creation import create_default_wwc_channel
 from temba.projects.usecases.globals_creation import create_globals
 
 from .interfaces import TemplateTypeIntegrationInterface
@@ -34,7 +35,7 @@ class ProjectCreationUseCase:
     def get_or_create_user_by_email(self, email: str) -> tuple:  # pragma: no cover
         return User.objects.get_or_create(email=email, username=email)
 
-    def get_or_create_project(self, project_dto: ProjectCreationDTO, user: User) -> tuple:
+    def get_or_create_project(self, project_dto: ProjectCreationDTO, user) -> tuple:
         defaults = dict(
             name=project_dto.name,
             date_format=project_dto.date_format,
@@ -67,6 +68,7 @@ class ProjectCreationUseCase:
         project.administrators.add(user)
         project.initialize(sample_flows=False)
         project.save()
+        create_default_wwc_channel(project, user)
 
         if extra_fields:
             create_globals(extra_fields, project, user)
