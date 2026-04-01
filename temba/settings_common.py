@@ -1499,3 +1499,5 @@ WENI_WEBCHAT_ALLOWED_DOMAINS = [
     for domain in os.environ.get("WENI_WEBCHAT_ALLOWED_DOMAINS", default="").split(",")
     if domain.strip()
 ]
+
+SOCKET_BASE_URL = os.environ.get("SOCKET_BASE_URL", default="")
