@@ -5,16 +5,19 @@ import pyexcel
 from xlsxlite.writer import XLSXBook
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.temp import NamedTemporaryFile
 from django.utils import timezone as dj_timezone
 from django.utils.text import slugify
 
-from temba.contacts.models import Contact, ContactImport
+from temba.contacts.models import Contact, ContactField, ContactImport
 from temba.msgs.models import Msg
 from temba.utils.export import TableExporter
 from temba.utils.text import decode_stream
 from temba.utils.uuid import uuid4
+
+User = get_user_model()
 
 
 class ContactImportDeduplicationService:
@@ -255,3 +258,47 @@ class ContactDownloadByStatusService:
             raise ValidationError("Invalid status")
         msgs = Msg.objects.filter(broadcast_id=broadcast_id, status=msg_status)
         return list(msgs.values_list("contact_id", flat=True).distinct())
+
+
+class CleanContactFieldsService:
+    @staticmethod
+    def _get_user_by_email(email):
+        if not email:
+            return None
+
+        return User.objects.filter(email=email).order_by("id").first()
+
+    @staticmethod
+    def _get_actor(org, jwt_payload=None):
+        if jwt_payload:
+            jwt_email = jwt_payload.get("email") or jwt_payload.get("user_email")
+            actor = CleanContactFieldsService._get_user_by_email(jwt_email)
+            if actor:
+                return actor
+
+        internal_email = getattr(settings, "INTERNAL_USER_EMAIL", "")
+        actor = CleanContactFieldsService._get_user_by_email(internal_email)
+        if actor:
+            return actor
+
+        return getattr(org, "modified_by", None) or getattr(org, "created_by", None)
+
+    @classmethod
+    def clear(cls, org, contact, jwt_payload=None):
+        field_uuids = list((contact.fields or {}).keys())
+        if not field_uuids:
+            return 0
+
+        contact_fields = list(ContactField.all_fields.filter(org=org, uuid__in=field_uuids))
+        if not contact_fields:
+            return 0
+
+        actor = cls._get_actor(org, jwt_payload=jwt_payload)
+        if not actor:
+            raise ValidationError("No user available to clear contact fields")
+
+        mods = contact.update_fields({field: "" for field in contact_fields})
+        if mods:
+            contact.modify(actor, mods)
+
+        return len(contact_fields)
