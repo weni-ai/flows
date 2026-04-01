@@ -1,3 +1,9 @@
+3.70.0
+----------
+* refactor: remove billing stream publication method
+* feat: Endpoint to clear contacts fields
+* feat: Create WWC channel after project creation
+
 3.65.1
 ----------
 * fix: Add WWC in WhatsappBroadcast write serializer
