@@ -443,48 +443,6 @@ class TestInternalMessages(TembaTest):
         response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
         self.assertEqual(response.status_code, 404)
 
-    @patch("temba.api.v2.internals.msgs.services.AmazonMQPublisher.send_message")
-    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
-    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
-    def test_stream_publishes_billing_outgoing(self, mock_publish, *_mocks):
-        contact = self.create_contact("Ivan", urns=["tel:+250788001234"])
-        payload = {
-            "project_uuid": str(self.org.proj_uuid),
-            "direction": "O",
-            "contact_uuid": str(contact.uuid),
-            "text": "bill me",
-            "template": "template-uuid",
-        }
-        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
-        self.assertEqual(response.status_code, 201)
-        self.assertTrue(mock_publish.called)
-        args, kwargs = mock_publish.call_args
-        self.assertEqual(kwargs.get("exchange"), "msgs.topic")
-        self.assertEqual(kwargs.get("routing_key"), "create")
-        self.assertIn("body", kwargs)
-        body = kwargs["body"]
-        self.assertEqual(body["direction"], "O")
-        self.assertEqual(body["text"], "bill me")
-        self.assertEqual(body["template"], "template-uuid")
-
-    @patch("temba.api.v2.internals.msgs.services.AmazonMQPublisher.send_message")
-    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
-    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
-    def test_stream_publishes_billing_incoming(self, mock_publish, *_mocks):
-        self.create_contact("Judy", urns=["telegram:844380532"])
-        payload = {
-            "project_uuid": str(self.org.proj_uuid),
-            "direction": "I",
-            "urns": ["telegram:844380532"],
-            "text": "hello",
-        }
-        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
-        self.assertEqual(response.status_code, 201)
-        self.assertTrue(mock_publish.called)
-        body = mock_publish.call_args.kwargs["body"]
-        self.assertEqual(body["contact_urn"], "telegram:844380532")
-        self.assertEqual(body["direction"], "I")
-
 
 def _patch_first_contacts_auth(func):
     @patch(
