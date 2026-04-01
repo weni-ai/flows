@@ -18,7 +18,12 @@ def create_default_wwc_channel(project, user) -> Channel:
         channel_type="WWC",
         name=DEFAULT_WWC_CHANNEL_NAME,
         address=str(project.project_uuid),
-        config={"preview": True, "version": 2, "allowed_domains": settings.WENI_WEBCHAT_ALLOWED_DOMAINS},
+        config={
+            "preview": True,
+            "version": 2,
+            "allowed_domains": settings.WENI_WEBCHAT_ALLOWED_DOMAINS,
+            "base_url": settings.SOCKET_BASE_URL,
+        },
     )
     publish_channel_event(channel, action="create")
     return channel
