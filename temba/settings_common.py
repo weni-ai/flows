@@ -1483,6 +1483,8 @@ try:
 except FileNotFoundError:
     JWT_PUBLIC_KEY = None
 
+WENI_VOICE_TOKEN = os.environ.get("WENI_VOICE_TOKEN", default="")
+
 WENI_WEBCHAT_ALLOWED_DOMAINS = [
     domain.strip()
     for domain in os.environ.get("WENI_WEBCHAT_ALLOWED_DOMAINS", default="").split(",")
