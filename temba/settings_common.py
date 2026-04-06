@@ -1494,6 +1494,9 @@ except FileNotFoundError:
 
 # JWT secret key
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", default="")
+
+WENI_VOICE_TOKEN = os.environ.get("WENI_VOICE_TOKEN", default="")
+
 WENI_WEBCHAT_ALLOWED_DOMAINS = [
     domain.strip()
     for domain in os.environ.get("WENI_WEBCHAT_ALLOWED_DOMAINS", default="").split(",")
