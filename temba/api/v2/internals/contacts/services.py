@@ -262,21 +262,24 @@ class ContactDownloadByStatusService:
 
 class CleanContactFieldsService:
     @staticmethod
+    def _get_user_by_email(email):
+        if not email:
+            return None
+
+        return User.objects.filter(email=email).order_by("id").first()
+
+    @staticmethod
     def _get_actor(org, jwt_payload=None):
         if jwt_payload:
             jwt_email = jwt_payload.get("email") or jwt_payload.get("user_email")
-            if jwt_email:
-                try:
-                    return User.objects.get(email=jwt_email)
-                except User.DoesNotExist:
-                    pass
+            actor = CleanContactFieldsService._get_user_by_email(jwt_email)
+            if actor:
+                return actor
 
         internal_email = getattr(settings, "INTERNAL_USER_EMAIL", "")
-        if internal_email:
-            try:
-                return User.objects.get(email=internal_email)
-            except User.DoesNotExist:
-                pass
+        actor = CleanContactFieldsService._get_user_by_email(internal_email)
+        if actor:
+            return actor
 
         return getattr(org, "modified_by", None) or getattr(org, "created_by", None)
 
