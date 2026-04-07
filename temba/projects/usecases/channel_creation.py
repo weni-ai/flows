@@ -23,6 +23,10 @@ def create_default_wwc_channel(project, user) -> Channel:
             "version": 2,
             "allowed_domains": settings.WENI_WEBCHAT_ALLOWED_DOMAINS,
             "base_url": settings.SOCKET_BASE_URL,
+            "voice_mode": {
+                "enabled": True,
+                "elevenLabs": {"apiKey": settings.WENI_VOICE_TOKEN, "voiceId": settings.WENI_ELEVENLABS_VOICE_ID},
+            },
         },
     )
     publish_channel_event(channel, action="create")
