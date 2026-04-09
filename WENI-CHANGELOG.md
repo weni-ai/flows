@@ -1,3 +1,7 @@
+3.70.1
+----------
+* feat: Add voice_mode key on preview channel creation
+
 3.70.0
 ----------
 * refactor: remove billing stream publication method

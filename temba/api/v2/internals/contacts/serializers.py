@@ -29,11 +29,11 @@ def _resolve_contact_field_for_update(org, user, raw_key):
     segment or orderform: then we create a text field if missing and the org is under its field limit.
     """
     canonical = raw_key.lower()
-    field = org.contactfields.filter(key=raw_key).first()
+    field = ContactField.user_fields.active_for_org(org=org).filter(key=raw_key).first()
     if field:
         return field
     if canonical != raw_key:
-        field = org.contactfields.filter(key=canonical).first()
+        field = ContactField.user_fields.active_for_org(org=org).filter(key=canonical).first()
         if field:
             return field
     if canonical not in FALLBACK_AUTO_CREATE_CONTACT_FIELD_KEYS:

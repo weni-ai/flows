@@ -826,6 +826,45 @@ class UpdateContactFieldsViewTest(TembaTest):
     @mock_mailroom
     @override_settings(INTERNAL_USER_EMAIL="super@user.com")
     @patch.object(LambdaURLValidator, "protected_resource")
+    def test_fallback_recreates_segment_and_orderform_when_inactive(self, mr_mocks, mock_protected_resource):
+        """
+        When segment/orderform fields exist but are inactive (is_active=False), the lookup must
+        skip them and auto-create new active fields so mailroom can resolve the asset.
+        """
+        contact = self.create_contact("Inactive Test", urns=["twitterid:77777"])
+
+        seg_field = ContactField.get_or_create(self.org, self.admin, "segment", label="segment")
+        of_field = ContactField.get_or_create(self.org, self.admin, "orderform", label="orderform")
+        seg_field.release(self.admin)
+        of_field.release(self.admin)
+
+        self.assertFalse(ContactField.user_fields.active_for_org(org=self.org).filter(key="segment").exists())
+        self.assertFalse(ContactField.user_fields.active_for_org(org=self.org).filter(key="orderform").exists())
+
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/update_contacts_fields"
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "twitterid:77777",
+            "contact_fields": {"segment": "seg-new", "orderform": "form-new"},
+        }
+
+        response = self.client.patch(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(ContactField.user_fields.active_for_org(org=self.org).filter(key="segment").exists())
+        self.assertTrue(ContactField.user_fields.active_for_org(org=self.org).filter(key="orderform").exists())
+
+        contact.refresh_from_db()
+        segment_f = ContactField.get_by_key(self.org, "segment")
+        orderform_f = ContactField.get_by_key(self.org, "orderform")
+        self.assertEqual(contact.get_field_display(segment_f), "seg-new")
+        self.assertEqual(contact.get_field_display(orderform_f), "form-new")
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    @patch.object(LambdaURLValidator, "protected_resource")
     def test_fallback_skips_auto_create_when_org_at_field_limit(self, mr_mocks, mock_protected_resource):
         """
         When active user field count >= org limit, segment/orderform must not be auto-created
