@@ -28,55 +28,55 @@ class TestUpdateProjectType(TembaTest):
         )
         self.project_uuid = str(self.test_org.proj_uuid)
 
-    def test_set_is_multi_agent_true(self):
-        """Test setting is_multi_agent to True"""
+    def test_set_is_multi_agents_true(self):
+        """Test setting is_multi_agents to True"""
         updated_org = update_project_type(
             project_uuid=self.project_uuid,
-            is_multi_agent=True,
+            is_multi_agents=True,
             user_email=self.user.email,
         )
 
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
 
         self.assertIsNotNone(updated_org)
-        self.assertTrue(reloaded_org.config["is_multi_agent"])
+        self.assertTrue(reloaded_org.config["is_multi_agents"])
         self.assertEqual(updated_org, reloaded_org)
         self.assertEqual(reloaded_org.modified_by, self.user)
 
-    def test_set_is_multi_agent_false(self):
-        """Test setting is_multi_agent to False"""
-        self.test_org.config["is_multi_agent"] = True
+    def test_set_is_multi_agents_false(self):
+        """Test setting is_multi_agents to False"""
+        self.test_org.config["is_multi_agents"] = True
         self.test_org.save()
 
         updated_org = update_project_type(
             project_uuid=self.project_uuid,
-            is_multi_agent=False,
+            is_multi_agents=False,
             user_email=self.user.email,
         )
 
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
 
         self.assertIsNotNone(updated_org)
-        self.assertFalse(reloaded_org.config["is_multi_agent"])
+        self.assertFalse(reloaded_org.config["is_multi_agents"])
         self.assertEqual(updated_org, reloaded_org)
         self.assertEqual(reloaded_org.modified_by, self.user)
 
-    def test_set_is_multi_agent_preserves_other_config_keys(self):
-        """Test that setting is_multi_agent does not remove other config keys"""
+    def test_set_is_multi_agents_preserves_other_config_keys(self):
+        """Test that setting is_multi_agents does not remove other config keys"""
         updated_org = update_project_type(
             project_uuid=self.project_uuid,
-            is_multi_agent=True,
+            is_multi_agents=True,
             user_email=self.user.email,
         )
 
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
 
         self.assertIsNotNone(updated_org)
-        self.assertTrue(reloaded_org.config["is_multi_agent"])
+        self.assertTrue(reloaded_org.config["is_multi_agents"])
         self.assertEqual(reloaded_org.config["description"], "Test description")
 
-    def test_set_is_multi_agent_when_config_is_none(self):
-        """Test setting is_multi_agent when org config is None"""
+    def test_set_is_multi_agents_when_config_is_none(self):
+        """Test setting is_multi_agents when org config is None"""
         org_without_config = Org.objects.create(
             name="Org Without Config",
             timezone=pytz.timezone("Africa/Kigali"),
@@ -91,7 +91,7 @@ class TestUpdateProjectType(TembaTest):
 
         updated_org = update_project_type(
             project_uuid=org_uuid,
-            is_multi_agent=True,
+            is_multi_agents=True,
             user_email=self.user.email,
         )
 
@@ -99,25 +99,25 @@ class TestUpdateProjectType(TembaTest):
 
         self.assertIsNotNone(updated_org)
         self.assertIsNotNone(reloaded_org.config)
-        self.assertTrue(reloaded_org.config["is_multi_agent"])
+        self.assertTrue(reloaded_org.config["is_multi_agents"])
 
     def test_same_value_does_not_update_modified_on(self):
-        """Test that setting is_multi_agent to the same value skips the database update"""
-        self.test_org.config["is_multi_agent"] = True
+        """Test that setting is_multi_agents to the same value skips the database update"""
+        self.test_org.config["is_multi_agents"] = True
         self.test_org.save()
 
         original_modified_on = self.test_org.modified_on
 
         updated_org = update_project_type(
             project_uuid=self.project_uuid,
-            is_multi_agent=True,
+            is_multi_agents=True,
             user_email=self.user.email,
         )
 
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
 
         self.assertIsNotNone(updated_org)
-        self.assertTrue(reloaded_org.config["is_multi_agent"])
+        self.assertTrue(reloaded_org.config["is_multi_agents"])
         self.assertEqual(reloaded_org.modified_on, original_modified_on)
 
     def test_update_with_new_user_email(self):
@@ -126,7 +126,7 @@ class TestUpdateProjectType(TembaTest):
 
         updated_org = update_project_type(
             project_uuid=self.project_uuid,
-            is_multi_agent=True,
+            is_multi_agents=True,
             user_email=new_user_email,
         )
 
@@ -136,7 +136,7 @@ class TestUpdateProjectType(TembaTest):
         self.assertIsNotNone(updated_org)
         self.assertEqual(new_user.username, new_user_email)
         self.assertEqual(reloaded_org.modified_by, new_user)
-        self.assertTrue(reloaded_org.config["is_multi_agent"])
+        self.assertTrue(reloaded_org.config["is_multi_agents"])
 
     def test_nonexistent_project_returns_none(self):
         """Test that updating a non-existent project returns None"""
@@ -144,7 +144,7 @@ class TestUpdateProjectType(TembaTest):
 
         result = update_project_type(
             project_uuid=fake_uuid,
-            is_multi_agent=True,
+            is_multi_agents=True,
             user_email=self.user.email,
         )
 

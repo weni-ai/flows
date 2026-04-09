@@ -18,13 +18,13 @@ def get_or_create_user_by_email(email: str) -> tuple:  # pragma: no cover
     return User.objects.get_or_create(email=email, defaults={"username": email})
 
 
-def update_project_type(project_uuid: str, is_multi_agent: bool, user_email: str) -> Optional[Org]:
+def update_project_type(project_uuid: str, is_multi_agents: bool, user_email: str) -> Optional[Org]:
     """
-    Update the project (Org) type by setting the is_multi_agent flag in its config.
+    Update the project (Org) type by setting the is_multi_agents flag in its config.
 
     Args:
         project_uuid: UUID of the project (stored in Org.proj_uuid)
-        is_multi_agent: Whether the project is a multi-agent project
+        is_multi_agents: Whether the project is a multi-agent project
         user_email: Email of the user performing the update
 
     Returns:
@@ -39,13 +39,13 @@ def update_project_type(project_uuid: str, is_multi_agent: bool, user_email: str
     if org.config is None:
         org.config = {}
 
-    if org.config.get("is_multi_agent") == is_multi_agent:
+    if org.config.get("is_multi_agents") == is_multi_agents:
         logger.info(
-            f"Project '{org.name}' ({project_uuid}) already has is_multi_agent={is_multi_agent}, no update needed"
+            f"Project '{org.name}' ({project_uuid}) already has is_multi_agents={is_multi_agents}, no update needed"
         )
         return org
 
-    org.config["is_multi_agent"] = is_multi_agent
+    org.config["is_multi_agents"] = is_multi_agents
 
     user, _ = get_or_create_user_by_email(user_email)
     org.modified_by = user
@@ -53,6 +53,6 @@ def update_project_type(project_uuid: str, is_multi_agent: bool, user_email: str
 
     org.save(update_fields=["config", "modified_by", "modified_on"])
 
-    logger.info(f"Project '{org.name}' ({project_uuid}) is_multi_agent set to {is_multi_agent} by {user_email}")
+    logger.info(f"Project '{org.name}' ({project_uuid}) is_multi_agents set to {is_multi_agents} by {user_email}")
 
     return org

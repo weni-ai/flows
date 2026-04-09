@@ -133,12 +133,12 @@ class ProjectEventConsumer(EDAConsumer):
                 is_multi_agents = bool(body.get("is_multi_agents"))
                 org = update_project_type(
                     project_uuid=project_uuid,
-                    is_multi_agent=is_multi_agents,
+                    is_multi_agents=is_multi_agents,
                     user_email=user_email,
-                )
+                ),
                 
                 if org:
-                    print(f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid}) is_multi_agent to {is_multi_agents}")
+                    print(f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid}) is_multi_agents to {is_multi_agents}")
                 else:
                     print(f"[ProjectEventConsumer] - Project {project_uuid} not found for project type update")
             else:
