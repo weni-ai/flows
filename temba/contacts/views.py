@@ -1747,9 +1747,11 @@ class ContactFieldForm(forms.ModelForm):
         label = self.cleaned_data["label"]
 
         if not ContactField.is_valid_label(label):
-            raise forms.ValidationError(_("Can only contain letters, numbers and hypens."))
+            raise forms.ValidationError(_("Can only contain letters, numbers, hyphens and underscores."))
 
-        if not ContactField.is_valid_key(ContactField.make_key(label)):
+        key = ContactField.make_key(label)
+
+        if not ContactField.is_valid_key(key):
             raise forms.ValidationError(_("Can't be a reserved word."))
 
         conflict = ContactField.user_fields.active_for_org(org=self.org).filter(label__iexact=label.lower())
@@ -1758,6 +1760,13 @@ class ContactFieldForm(forms.ModelForm):
 
         if conflict.exists():
             raise forms.ValidationError(_("Must be unique."))
+
+        conflict_key = ContactField.user_fields.active_for_org(org=self.org).filter(key=key)
+        if self.instance:
+            conflict_key = conflict_key.exclude(id=self.instance.id)
+
+        if conflict_key.exists():
+            raise forms.ValidationError(_("A field with the same generated key already exists."))
 
         return label
 

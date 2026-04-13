@@ -3808,6 +3808,7 @@ class ContactFieldTest(TembaTest):
         self.assertEqual("first_name", ContactField.make_key("First Name"))
         self.assertEqual("second_name", ContactField.make_key("Second   Name  "))
         self.assertEqual("caf", ContactField.make_key("café"))
+        self.assertEqual("first_name", ContactField.make_key("First_Name"))
         self.assertEqual(
             "323_ffsn_slfs_ksflskfs_fk_anfaddgas",
             ContactField.make_key("  ^%$# %$$ $##323 ffsn slfs ksflskfs!!!! fk$%%%$$$anfaDDGAS ))))))))) "),
@@ -3830,8 +3831,10 @@ class ContactFieldTest(TembaTest):
     def test_is_valid_label(self):
         self.assertTrue(ContactField.is_valid_label("Age"))
         self.assertTrue(ContactField.is_valid_label("Age Now 2"))
-        self.assertFalse(ContactField.is_valid_label("Age_Now"))  # can't have punctuation
+        self.assertTrue(ContactField.is_valid_label("Age_Now"))
+        self.assertTrue(ContactField.is_valid_label("first_name"))
         self.assertFalse(ContactField.is_valid_label("âge"))  # a-z only
+        self.assertFalse(ContactField.is_valid_label("Age!"))  # can't have punctuation
 
     @mock_mailroom
     def test_contact_export(self, mr_mocks):
@@ -4672,7 +4675,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"label": "???", "value_type": "T", "show_in_table": True},
-            form_errors={"label": "Can only contain letters, numbers and hypens."},
+            form_errors={"label": "Can only contain letters, numbers, hyphens and underscores."},
         )
 
         # try to submit with something that would be an invalid key
@@ -4746,7 +4749,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertUpdateSubmit(
             update_url,
             {"label": "???", "value_type": "N", "show_in_table": True},
-            form_errors={"label": "Can only contain letters, numbers and hypens."},
+            form_errors={"label": "Can only contain letters, numbers, hyphens and underscores."},
             object_unchanged=self.age,
         )
 

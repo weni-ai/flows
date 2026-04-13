@@ -3617,7 +3617,7 @@ class APITest(TembaTest):
 
         # try again with some invalid values
         response = self.postJSON(url, None, {"label": "!@#$%", "value_type": "video"})
-        self.assertResponseError(response, "label", "Can only contain letters, numbers and hypens.")
+        self.assertResponseError(response, "label", "Can only contain letters, numbers, hyphens and underscores.")
         self.assertResponseError(response, "value_type", '"video" is not a valid choice.')
 
         # try again with a label that would generate an invalid key
@@ -3627,6 +3627,12 @@ class APITest(TembaTest):
         # try again with a label that's already taken
         response = self.postJSON(url, None, {"label": "nick name", "value_type": "text"})
         self.assertResponseError(response, "label", "This field must be unique.")
+
+        # try with a label containing underscores that conflicts with existing key
+        response = self.postJSON(url, None, {"label": "nick_name", "value_type": "text"})
+        self.assertResponseError(
+            response, "label", 'Generated key "nick_name" conflicts with an existing contact field.'
+        )
 
         # create a new field
         response = self.postJSON(url, None, {"label": "Age", "value_type": "numeric"})
