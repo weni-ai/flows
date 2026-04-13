@@ -149,6 +149,9 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
             )
 
         email = self._get_request_email(request)
+        if not email:
+            return Response({"error": "User email not provided"}, status=status.HTTP_400_BAD_REQUEST)
+
         user = get_object_or_404(User, field_error_name="user", email=email)
 
         serializer = ContactFieldWriteSerializer(
@@ -163,9 +166,15 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
     def _get_request_email(self, request):
         payload = getattr(request, "jwt_payload", None)
         if payload:
-            return payload.get("email") or payload.get("user_email") or request.data.get("user_email")
+            email = payload.get("email") or payload.get("user_email") or request.data.get("user_email")
         else:
-            return request.data.get("user_email") or getattr(request.user, "email", None)
+            email = request.data.get("user_email") or getattr(request.user, "email", None)
+
+        if email:
+            return email
+
+        internal_email = getattr(settings, "INTERNAL_USER_EMAIL", "")
+        return internal_email or None
 
 
 @method_decorator(transaction.non_atomic_requests, name="dispatch")
