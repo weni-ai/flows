@@ -1363,6 +1363,47 @@ class InternalContactFieldsEndpointTest(TembaTest):
 
     @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
     @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
+    @override_settings(INTERNAL_USER_EMAIL="internal-contact-fields@example.com")
+    def test_success_fallback_internal_user_when_no_actor_email(self):
+        User.objects.create_user("internal-contact-fields@example.com", "internal-contact-fields@example.com")
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = None
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            url = "/api/v2/internals/contacts_fields"
+            body = {
+                "project": self.org.proj_uuid,
+                "label": "Internal Actor Field",
+                "value_type": "text",
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"label": "Internal Actor Field", "value_type": "T"})
+
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
+    @override_settings(INTERNAL_USER_EMAIL="")
+    def test_user_email_not_provided_when_internal_unconfigured(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = None
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            url = "/api/v2/internals/contacts_fields"
+            body = {
+                "project": self.org.proj_uuid,
+                "label": "Nick Name",
+                "value_type": "text",
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"error": "User email not provided"})
+
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_channel_not_found(self):
         from uuid import uuid4
 
@@ -1447,6 +1488,24 @@ class InternalContactFieldsEndpointJWTTest(PatchedJWTAuthMixin, TembaTest):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json(), {"channel": "channel not found"})
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid), email=self.user.email)
+
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [OptionalJWTAuthentication])
+    @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
+    @override_settings(INTERNAL_USER_EMAIL="jwt-internal-fallback@example.com")
+    def test_jwt_without_email_uses_internal_user(self):
+        User.objects.create_user("jwt-internal-fallback@example.com", "jwt-internal-fallback@example.com")
+        self._set_jwt_payload(project_uuid=str(self.org.proj_uuid))
+
+        body = {
+            "label": "From Internal JWT",
+            "value_type": "text",
+        }
+
+        response = self.client.post(self.url, data=body, content_type="application/json", **self.auth_headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"label": "From Internal JWT", "value_type": "T"})
         self._set_jwt_payload(project_uuid=str(self.org.proj_uuid), email=self.user.email)
 
 
