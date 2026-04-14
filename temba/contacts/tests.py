@@ -3809,6 +3809,7 @@ class ContactFieldTest(TembaTest):
         self.assertEqual("second_name", ContactField.make_key("Second   Name  "))
         self.assertEqual("caf", ContactField.make_key("café"))
         self.assertEqual("first_name", ContactField.make_key("First_Name"))
+        self.assertEqual("first_name", ContactField.make_key("First-Name"))
         self.assertEqual(
             "323_ffsn_slfs_ksflskfs_fk_anfaddgas",
             ContactField.make_key("  ^%$# %$$ $##323 ffsn slfs ksflskfs!!!! fk$%%%$$$anfaDDGAS ))))))))) "),
@@ -3833,8 +3834,12 @@ class ContactFieldTest(TembaTest):
         self.assertTrue(ContactField.is_valid_label("Age Now 2"))
         self.assertTrue(ContactField.is_valid_label("Age_Now"))
         self.assertTrue(ContactField.is_valid_label("first_name"))
+        self.assertTrue(ContactField.is_valid_label("Age_Now-2 test"))
+        self.assertTrue(ContactField.is_valid_label("a_b-c d"))
         self.assertFalse(ContactField.is_valid_label("âge"))  # a-z only
         self.assertFalse(ContactField.is_valid_label("Age!"))  # can't have punctuation
+        self.assertFalse(ContactField.is_valid_label("field@name"))  # no special chars
+        self.assertFalse(ContactField.is_valid_label(""))  # empty
 
     @mock_mailroom
     def test_contact_export(self, mr_mocks):
@@ -4644,6 +4649,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.age = ContactField.get_or_create(self.org, self.admin, "age", "Age", value_type="N", show_in_table=True)
         self.gender = ContactField.get_or_create(self.org, self.admin, "gender", "Gender", value_type="T")
         self.state = ContactField.get_or_create(self.org, self.admin, "state", "State", value_type="S")
+        self.nick_name = ContactField.get_or_create(self.org, self.admin, "nick_name", "Nick Name", value_type="T")
 
         self.deleted = ContactField.get_or_create(self.org, self.admin, "foo", "Foo")
         self.deleted.is_active = False
@@ -4690,6 +4696,23 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
             create_url,
             {"label": "AGE", "value_type": "N", "show_in_table": True},
             form_errors={"label": "Must be unique."},
+        )
+
+        # try to submit with underscore label that conflicts with existing key
+        self.assertCreateSubmit(
+            create_url,
+            {"label": "age_in_years", "value_type": "N", "show_in_table": True},
+            new_obj_query=ContactField.user_fields.filter(
+                org=self.org, label="age_in_years", value_type="N", show_in_table=True
+            ),
+            success_status=200,
+        )
+
+        # try to submit with a different label that generates a conflicting key
+        self.assertCreateSubmit(
+            create_url,
+            {"label": "age-in-years", "value_type": "N", "show_in_table": True},
+            form_errors={"label": "A field with the same generated key already exists."},
         )
 
         # submit with valid data
@@ -4761,6 +4784,22 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
             object_unchanged=self.age,
         )
 
+        # try to submit with a label that generates a key conflicting with another field's key
+        self.assertUpdateSubmit(
+            update_url,
+            {"label": "nick_name", "value_type": "N", "show_in_table": True},
+            form_errors={"label": "A field with the same generated key already exists."},
+            object_unchanged=self.age,
+        )
+
+        # update with underscore label should work when key doesn't conflict
+        self.assertUpdateSubmit(
+            update_url, {"label": "age_value", "value_type": "N", "show_in_table": True}, success_status=200
+        )
+
+        self.age.refresh_from_db()
+        self.assertEqual("age_value", self.age.label)
+
         # submit with different name and type
         self.assertUpdateSubmit(
             update_url, {"label": "Age In Years", "value_type": "T", "show_in_table": False}, success_status=200
@@ -4784,9 +4823,12 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         list_url = reverse("contacts.contactfield_list")
 
         response = self.assertListFetch(
-            list_url, allow_viewers=False, allow_editors=True, context_objects=[self.age, self.gender, self.state]
+            list_url,
+            allow_viewers=False,
+            allow_editors=True,
+            context_objects=[self.age, self.gender, self.nick_name, self.state],
         )
-        self.assertEqual(3, response.context["total_count"])
+        self.assertEqual(4, response.context["total_count"])
         self.assertEqual(250, response.context["total_limit"])
         self.assertNotContains(response, "You have reached the limit")
         self.assertNotContains(response, "You are approaching the limit")
