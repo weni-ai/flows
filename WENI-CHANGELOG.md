@@ -1,3 +1,11 @@
+3.70.3
+----------
+* feat: Add overpass to missing user_email in InternalContactFieldsEndpoint
+
+3.70.2
+----------
+* fix: Update contact field resolution to skip inactive fields and auto-create new active fields
+
 3.70.1
 ----------
 * feat: Add voice_mode key on preview channel creation
