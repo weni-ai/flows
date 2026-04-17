@@ -15,7 +15,7 @@ class EventAction(StrEnum):
     DELETED = "deleted"
     UPDATED = "updated"
     STATUS_UPDATED = "status_updated"
-    PROJECT_TYPE_UPDATED = "project_type_updated"
+    PROJECT_TYPE_UPDATED = "project_type_update"
 
 
 class ProjectStatus(StrEnum):
@@ -66,15 +66,21 @@ class ProjectEventConsumer(EDAConsumer):
                 raise ValueError(f"Missing required field: {field}")
 
         action = body.get("action")
-        if action not in EventAction:
-            raise ValueError(f"Invalid action: {action}. Must be one of {list(EventAction)}")
+        try:
+            EventAction(action)
+        except ValueError:
+            allowed = ", ".join(e.value for e in EventAction)
+            raise ValueError(f"Invalid action: {action}. Must be one of: {allowed}") from None
 
         if action == EventAction.STATUS_UPDATED:
             status = body.get("status")
             if not status:
                 raise ValueError("Missing required field 'status' for status_updated action")
-            if status not in ProjectStatus:
-                raise ValueError(f"Invalid status: {status}. Must be one of {list(ProjectStatus)}")
+            try:
+                ProjectStatus(status)
+            except ValueError:
+                allowed = ", ".join(e.value for e in ProjectStatus)
+                raise ValueError(f"Invalid status: {status}. Must be one of: {allowed}") from None
 
     def _process_event(self, project_uuid: str, user_email: str, action: str, body: dict):
         """
@@ -135,7 +141,7 @@ class ProjectEventConsumer(EDAConsumer):
                     project_uuid=project_uuid,
                     is_multi_agents=is_multi_agents,
                     user_email=user_email,
-                ),
+                )
                 
                 if org:
                     print(f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid}) is_multi_agents to {is_multi_agents}")

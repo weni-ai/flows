@@ -124,6 +124,23 @@ class TestProjectEventConsumer(TembaTest):
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
         self.assertTrue(reloaded_org.is_active)
 
+    def test_consume_project_type_update_action_successfully(self):
+        """Test consuming a project_type_update action message"""
+        body = {
+            "project_uuid": self.project_uuid,
+            "user_email": self.user.email,
+            "action": "project_type_update",
+            "is_multi_agents": True,
+        }
+        message = self._create_mock_message(body)
+
+        self.consumer.consume(message)
+
+        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
+
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertTrue(reloaded_org.config.get("is_multi_agents"))
+
     def test_consume_status_updated_to_in_test(self):
         """Test consuming a status_updated action to IN_TEST"""
         self.test_org.is_active = False
@@ -332,7 +349,7 @@ class TestProjectEventConsumer(TembaTest):
 
     def test_validate_message_with_all_valid_actions(self):
         """Test _validate_message with all valid actions"""
-        valid_actions = ["deleted", "updated", "status_updated"]
+        valid_actions = ["deleted", "updated", "status_updated", "project_type_update"]
 
         for action in valid_actions:
             body = {
