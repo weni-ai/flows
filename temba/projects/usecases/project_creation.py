@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from weni.internal.clients.connect import ConnectInternalClient
 from weni.internal.models import Project
 
 from django.contrib.auth import get_user_model
@@ -64,7 +63,6 @@ class ProjectCreationUseCase:
     ) -> None:
         user, _ = self.get_or_create_user_by_email(user_email)  # pragma: no cover
         project, _ = self.get_or_create_project(project_dto, user)
-        ConnectInternalClient().update_project(project)
         project.administrators.add(user)
         project.initialize(sample_flows=False)
         project.save()
