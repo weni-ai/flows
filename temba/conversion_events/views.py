@@ -215,7 +215,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
         event_time = int(datetime.now().timestamp())
 
         # Map event types for Meta
-        event_name_map = {"lead": "LeadSubmitted", "purchase": "Purchase"}
+        event_name_map = {"lead": "LeadSubmitted", "purchase": "Purchase", "abandoned_cart": "AbandonedCart"}
 
         # Payload following the specified format for Meta
         meta_event = {
@@ -229,8 +229,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             },
         }
 
-        # Add value and currency only for purchase events
-        if event_type == "purchase":
+        if event_type in ("purchase", "abandoned_cart"):
             value = original_payload.get("value")
             currency = original_payload.get("currency", "BRL")  # Default to BRL if not provided
             if value:
