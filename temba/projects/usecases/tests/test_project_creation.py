@@ -38,7 +38,7 @@ class ProjectCreationUseCaseTest(TembaTest):
         self.assertEqual(channel.name, DEFAULT_WWC_CHANNEL_NAME)
         self.assertEqual(channel.address, str(project.project_uuid))
         self.assertTrue(channel.config["preview"])
-        self.assertFalse(project.config.get("is_multi_agent"))
+        self.assertFalse(project.config.get("is_multi_agents"))
         mock_connect_client.return_value.update_project.assert_called_once_with(project)
         mock_publish_channel_event.assert_called_once_with(channel, action="create")
 
@@ -161,4 +161,4 @@ class ProjectCreationUseCaseTest(TembaTest):
         use_case.create_project(project_dto, user_email, extra_fields={}, authorizations=[])
 
         project = self.project.__class__.objects.get(project_uuid=project_uuid)
-        self.assertTrue(project.config.get("is_multi_agent"))
+        self.assertTrue(project.config.get("is_multi_agents"))
