@@ -49,7 +49,7 @@ class ProjectCreationUseCase:
                 "is_template": project_dto.is_template,
                 "description": project_dto.description,
                 "verify_ninth_digit": True,
-                "is_multi_agent": project_dto.inline_agent_switch,
+                "is_multi_agents": project_dto.inline_agent_switch,
             },
         )
 
