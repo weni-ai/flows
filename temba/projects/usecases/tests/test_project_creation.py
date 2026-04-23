@@ -38,6 +38,7 @@ class ProjectCreationUseCaseTest(TembaTest):
         self.assertEqual(channel.name, DEFAULT_WWC_CHANNEL_NAME)
         self.assertEqual(channel.address, str(project.project_uuid))
         self.assertTrue(channel.config["preview"])
+        self.assertFalse(project.config.get("is_multi_agents"))
         mock_connect_client.return_value.update_project.assert_called_once_with(project)
         mock_publish_channel_event.assert_called_once_with(channel, action="create")
 
@@ -135,3 +136,29 @@ class ProjectCreationUseCaseTest(TembaTest):
         self.assertEqual(Channel.objects.get(org=project.org, channel_type="WWC"), existing_channel)
         mock_connect_client.return_value.update_project.assert_called_once()
         mock_publish_channel_event.assert_not_called()
+
+    @patch("temba.projects.usecases.project_creation.ConnectInternalClient")
+    @patch("temba.projects.usecases.channel_creation.publish_channel_event")
+    def test_create_project_sets_is_multi_agent_when_inline_agent_switch_true(
+        self, mock_publish_channel_event, mock_connect_client
+    ):
+        user_email = "multi-agent-admin@example.com"
+        project_uuid = uuid.uuid4()
+        project_dto = ProjectCreationDTO(
+            uuid=str(project_uuid),
+            name="Projeto multi-agente",
+            is_template=False,
+            date_format="D",
+            timezone=pytz.timezone("Africa/Kigali"),
+            template_type_uuid="",
+            description="Teste",
+            brain_on=False,
+            inline_agent_switch=True,
+        )
+
+        use_case = ProjectCreationUseCase(template_type_integration=Mock())
+
+        use_case.create_project(project_dto, user_email, extra_fields={}, authorizations=[])
+
+        project = self.project.__class__.objects.get(project_uuid=project_uuid)
+        self.assertTrue(project.config.get("is_multi_agents"))

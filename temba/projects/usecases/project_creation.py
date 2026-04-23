@@ -26,6 +26,7 @@ class ProjectCreationDTO:
     description: str
     brain_on: bool
     language: Optional[str] = None
+    inline_agent_switch: bool = False
 
 
 class ProjectCreationUseCase:
@@ -48,6 +49,7 @@ class ProjectCreationUseCase:
                 "is_template": project_dto.is_template,
                 "description": project_dto.description,
                 "verify_ninth_digit": True,
+                "is_multi_agents": project_dto.inline_agent_switch,
             },
         )
 
