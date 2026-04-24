@@ -23,6 +23,7 @@ class ProjectConsumer(EDAConsumer):
                 description=body.get("description"),
                 brain_on=body.get("brain_on", False),
                 language=body.get("language"),
+                inline_agent_switch=body.get("inline_agent_switch", True),
             )
 
             flow_setup_handler = FlowSetupHandlerUseCase()
