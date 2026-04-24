@@ -1,3 +1,8 @@
+3.70.4
+----------
+* feat: Add consumer action to update project type (is_multy_agents | True or False)
+* feat: Update project creation consumer to set org config is_multi_agents | True or False from inline_agent_switch field from body event
+
 3.70.3
 ----------
 * feat: Add overpass to missing user_email in InternalContactFieldsEndpoint
