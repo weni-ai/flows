@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 import amqp
 from sentry_sdk import capture_exception
 
@@ -5,7 +7,21 @@ from temba.event_driven.consumers import EDAConsumer
 from temba.event_driven.parsers.json_parser import JSONParser
 from temba.projects.usecases.project_delete import delete_project
 from temba.projects.usecases.project_status_update import update_project_status
+from temba.projects.usecases.project_type_update import update_project_type
 from temba.projects.usecases.project_update import update_project_config
+
+
+class EventAction(StrEnum):
+    DELETED = "deleted"
+    UPDATED = "updated"
+    STATUS_UPDATED = "status_updated"
+    PROJECT_TYPE_UPDATED = "project_type_update"
+
+
+class ProjectStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    IN_TEST = "IN_TEST"
+    INACTIVE = "INACTIVE"
 
 
 class ProjectEventConsumer(EDAConsumer):
@@ -50,16 +66,21 @@ class ProjectEventConsumer(EDAConsumer):
                 raise ValueError(f"Missing required field: {field}")
 
         action = body.get("action")
-        if action not in ["deleted", "updated", "status_updated"]:
-            raise ValueError(f"Invalid action: {action}. Must be 'deleted', 'updated', or 'status_updated'")
+        try:
+            EventAction(action)
+        except ValueError:
+            allowed = ", ".join(e.value for e in EventAction)
+            raise ValueError(f"Invalid action: {action}. Must be one of: {allowed}") from None
 
-        # Validate status field for status_updated action
-        if action == "status_updated":
+        if action == EventAction.STATUS_UPDATED:
             status = body.get("status")
             if not status:
                 raise ValueError("Missing required field 'status' for status_updated action")
-            if status not in ["ACTIVE", "IN_TEST", "INACTIVE"]:
-                raise ValueError(f"Invalid status: {status}. Must be 'ACTIVE', 'IN_TEST', or 'INACTIVE'")
+            try:
+                ProjectStatus(status)
+            except ValueError:
+                allowed = ", ".join(e.value for e in ProjectStatus)
+                raise ValueError(f"Invalid status: {status}. Must be one of: {allowed}") from None
 
     def _process_event(self, project_uuid: str, user_email: str, action: str, body: dict):
         """
@@ -72,7 +93,7 @@ class ProjectEventConsumer(EDAConsumer):
             body: Full message body
         """
         try:
-            if action == "deleted":
+            if action == EventAction.DELETED:
                 org = delete_project(
                     project_uuid=project_uuid,
                     user_email=user_email,
@@ -83,7 +104,7 @@ class ProjectEventConsumer(EDAConsumer):
                 else:
                     print(f"[ProjectEventConsumer] - Project {project_uuid} not found for deletion")
 
-            elif action == "updated":
+            elif action == EventAction.UPDATED:
                 org = update_project_config(
                     project_uuid=project_uuid,
                     user_email=user_email,
@@ -98,7 +119,7 @@ class ProjectEventConsumer(EDAConsumer):
                 else:
                     print(f"[ProjectEventConsumer] - Project {project_uuid} not found for update")
 
-            elif action == "status_updated":
+            elif action == EventAction.STATUS_UPDATED:
                 status = body.get("status")
                 org = update_project_status(
                     project_uuid=project_uuid,
@@ -114,6 +135,20 @@ class ProjectEventConsumer(EDAConsumer):
                 else:
                     print(f"[ProjectEventConsumer] - Project {project_uuid} not found for status update")
 
+            elif action == EventAction.PROJECT_TYPE_UPDATED:
+                is_multi_agents = bool(body.get("is_multi_agents"))
+                org = update_project_type(
+                    project_uuid=project_uuid,
+                    is_multi_agents=is_multi_agents,
+                    user_email=user_email,
+                )
+
+                if org:
+                    print(
+                        f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid}) is_multi_agents to {is_multi_agents}"
+                    )
+                else:
+                    print(f"[ProjectEventConsumer] - Project {project_uuid} not found for project type update")
             else:
                 raise ValueError(f"Unknown action: {action}")
 

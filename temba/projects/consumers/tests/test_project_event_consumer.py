@@ -62,6 +62,25 @@ class TestProjectEventConsumer(TembaTest):
         self.assertEqual(reloaded_org.language, "pt-br")
         self.assertEqual(reloaded_org.timezone, pytz.timezone("America/Sao_Paulo"))
 
+    def test_consume_update_action_when_usecase_returns_none_acknowledges(self):
+        """update_project_config may return None; consumer acks and logs not found."""
+        body = {
+            "project_uuid": self.project_uuid,
+            "user_email": self.user.email,
+            "action": "updated",
+            "name": "Any Name",
+        }
+        message = self._create_mock_message(body)
+
+        with patch(
+            "temba.projects.consumers.project_event_consumer.update_project_config",
+            return_value=None,
+        ):
+            self.consumer.consume(message)
+
+        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
+        message.channel.basic_reject.assert_not_called()
+
     def test_consume_delete_action_successfully(self):
         """Test consuming a delete action message"""
         body = {
@@ -123,6 +142,42 @@ class TestProjectEventConsumer(TembaTest):
 
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
         self.assertTrue(reloaded_org.is_active)
+
+    def test_consume_project_type_update_action_successfully(self):
+        """Test consuming a project_type_update action message"""
+        body = {
+            "project_uuid": self.project_uuid,
+            "user_email": self.user.email,
+            "action": "project_type_update",
+            "is_multi_agents": True,
+        }
+        message = self._create_mock_message(body)
+
+        self.consumer.consume(message)
+
+        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
+
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertTrue(reloaded_org.config.get("is_multi_agents"))
+
+    def test_consume_project_type_update_when_usecase_returns_none_acknowledges(self):
+        """update_project_type may return None; consumer acks and logs not found."""
+        body = {
+            "project_uuid": self.project_uuid,
+            "user_email": self.user.email,
+            "action": "project_type_update",
+            "is_multi_agents": True,
+        }
+        message = self._create_mock_message(body)
+
+        with patch(
+            "temba.projects.consumers.project_event_consumer.update_project_type",
+            return_value=None,
+        ):
+            self.consumer.consume(message)
+
+        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
+        message.channel.basic_reject.assert_not_called()
 
     def test_consume_status_updated_to_in_test(self):
         """Test consuming a status_updated action to IN_TEST"""
@@ -332,7 +387,7 @@ class TestProjectEventConsumer(TembaTest):
 
     def test_validate_message_with_all_valid_actions(self):
         """Test _validate_message with all valid actions"""
-        valid_actions = ["deleted", "updated", "status_updated"]
+        valid_actions = ["deleted", "updated", "status_updated", "project_type_update"]
 
         for action in valid_actions:
             body = {
@@ -367,6 +422,20 @@ class TestProjectEventConsumer(TembaTest):
                 self.consumer._validate_message(body)
             except ValueError:
                 self.fail(f"_validate_message raised ValueError for valid status: {status}")
+
+    def test_process_event_unknown_action_raises_value_error(self):
+        """Unhandled action string hits the final else (not reachable via consume + _validate_message)."""
+        body = {
+            "project_uuid": self.project_uuid,
+            "user_email": self.user.email,
+        }
+        with self.assertRaisesRegex(ValueError, "Unknown action: future_action"):
+            self.consumer._process_event(
+                self.project_uuid,
+                self.user.email,
+                "future_action",
+                body,
+            )
 
     def test_process_event_with_exception_in_usecase_rejects_message(self):
         """Test that exceptions in usecases are properly handled"""
