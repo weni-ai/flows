@@ -1,3 +1,9 @@
+3.71.0
+----------
+* Allow use underscore in label contact field name
+* Update weni-rp-apps version to 2.10.9
+* Add token deactivation in user permission deletion
+
 3.70.4
 ----------
 * feat: Add consumer action to update project type (is_multy_agents | True or False)
