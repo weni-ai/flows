@@ -4,8 +4,11 @@ import pytz
 from weni.internal.models import Project
 
 from django.conf import settings
+from django.contrib.auth.models import Group
 
+from temba.api.models import APIToken
 from temba.projects.usecases.permission_update import (
+    _release_user_api_tokens,
     create_user_permission,
     get_name_permisssions,
     get_or_create_user_by_email,
@@ -108,3 +111,113 @@ class PermissionUpdateTestCase(TembaTest):
         self.project.refresh_from_db()
         self.assertFalse(self.project.viewers.filter(pk=user.pk).exists())
         self.assertTrue(self.project.marketing.filter(pk=user.pk).exists())
+
+    def test_update_permission_delete_action_releases_user_api_tokens(self):
+        """Delete action should deactivate the user's API tokens for that project's org"""
+        user, _ = get_or_create_user_by_email("admin-with-token@example.com")
+        self.project.administrators.add(user)
+        self.project.save()
+
+        token = APIToken.get_or_create(self.project, user, Group.objects.get(name="Administrators"))
+        self.assertTrue(token.is_active)
+
+        update_permission(
+            project_uuid=self.project.project_uuid,
+            action="delete",
+            user_email="admin-with-token@example.com",
+            role=3,
+        )
+
+        token.refresh_from_db()
+        self.assertFalse(token.is_active)
+
+    def test_update_permission_delete_action_keeps_other_users_tokens_active(self):
+        """Delete must not affect tokens of other users in the same org"""
+        deleted_user, _ = get_or_create_user_by_email("deleted-admin@example.com")
+        kept_user, _ = get_or_create_user_by_email("kept-admin@example.com")
+        self.project.administrators.add(deleted_user, kept_user)
+        self.project.save()
+
+        deleted_token = APIToken.get_or_create(self.project, deleted_user, Group.objects.get(name="Administrators"))
+        kept_token = APIToken.get_or_create(self.project, kept_user, Group.objects.get(name="Administrators"))
+
+        update_permission(
+            project_uuid=self.project.project_uuid,
+            action="delete",
+            user_email="deleted-admin@example.com",
+            role=3,
+        )
+
+        deleted_token.refresh_from_db()
+        kept_token.refresh_from_db()
+        self.assertFalse(deleted_token.is_active)
+        self.assertTrue(kept_token.is_active)
+
+    def test_update_permission_delete_action_keeps_tokens_for_other_orgs(self):
+        """Delete should only release tokens scoped to the project being changed"""
+        user, _ = get_or_create_user_by_email("multi-org-admin@example.com")
+
+        self.project.administrators.add(user)
+        self.project.save()
+        self.org2.administrators.add(user)
+
+        project_token = APIToken.get_or_create(self.project, user, Group.objects.get(name="Administrators"))
+        other_org_token = APIToken.get_or_create(self.org2, user, Group.objects.get(name="Administrators"))
+
+        update_permission(
+            project_uuid=self.project.project_uuid,
+            action="delete",
+            user_email="multi-org-admin@example.com",
+            role=3,
+        )
+
+        project_token.refresh_from_db()
+        other_org_token.refresh_from_db()
+        self.assertFalse(project_token.is_active)
+        self.assertTrue(other_org_token.is_active)
+
+    def test_update_permission_delete_action_when_user_has_no_token(self):
+        """Delete should run cleanly when there is no API token to release"""
+        user, _ = get_or_create_user_by_email("tokenless-admin@example.com")
+        self.project.administrators.add(user)
+        self.project.save()
+
+        update_permission(
+            project_uuid=self.project.project_uuid,
+            action="delete",
+            user_email="tokenless-admin@example.com",
+            role=3,
+        )
+
+        self.assertFalse(self.project.administrators.filter(pk=user.pk).exists())
+        self.assertFalse(APIToken.objects.filter(org=self.project, user=user).exists())
+
+    def test_release_user_api_tokens_deactivates_all_active_tokens(self):
+        """Deactivates every active token of the user in that org and returns the count"""
+        user, _ = get_or_create_user_by_email("multi-token-user@example.com")
+        self.project.administrators.add(user)
+        self.project.save()
+
+        APIToken.get_or_create(self.project, user, Group.objects.get(name="Administrators"))
+        APIToken.get_or_create(self.project, user, Group.objects.get(name="Editors"))
+
+        released = _release_user_api_tokens(self.project, user)
+
+        self.assertEqual(released, 2)
+        self.assertEqual(
+            APIToken.objects.filter(org=self.project, user=user, is_active=True).count(),
+            0,
+        )
+
+    def test_release_user_api_tokens_ignores_already_inactive_tokens(self):
+        """Already deactivated tokens should not be touched again (idempotent)"""
+        user, _ = get_or_create_user_by_email("inactive-token-user@example.com")
+        self.project.administrators.add(user)
+        self.project.save()
+
+        token = APIToken.get_or_create(self.project, user, Group.objects.get(name="Administrators"))
+        token.release()
+
+        released = _release_user_api_tokens(self.project, user)
+
+        self.assertEqual(released, 0)
