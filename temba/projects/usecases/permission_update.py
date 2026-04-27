@@ -4,6 +4,8 @@ from weni.internal.models import Project
 from django.contrib.auth.models import User
 from django.utils import timezone
 
+from temba.api.models import APIToken
+
 
 def get_or_create_user_by_email(email: str) -> tuple:  # pragma: no cover
     return User.objects.get_or_create(email=email, username=email)
@@ -51,6 +53,7 @@ def update_permission(project_uuid: Project, action: str, user_email: str, role:
     if action == "delete":
         _validate_permission(project, get_name_permisssions(role))
         _remove_user_permission(project, user, get_name_permisssions(role))
+        _release_user_api_tokens(project, user)
 
     project.modified_by = user
     project.modified_on = timezone.now()
@@ -91,3 +94,18 @@ def _get_permissions(project: Project) -> dict:  # pragma: no cover
         "agent": project.agents,
         "marketing": project.marketing,
     }
+
+
+def _release_user_api_tokens(project: Project, user: User) -> int:
+    """
+    Deactivates all of the user's active API tokens in the project's org.
+    Returns the number of tokens released.
+    """
+    tokens = APIToken.objects.filter(org=project, user=user, is_active=True)
+
+    released = 0
+    for token in tokens:
+        token.release()
+        released += 1
+
+    return released
