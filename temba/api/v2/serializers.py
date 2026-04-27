@@ -961,11 +961,18 @@ class ContactFieldWriteSerializer(WriteSerializer):
 
     def validate_label(self, value):
         if not ContactField.is_valid_label(value):
-            raise serializers.ValidationError("Can only contain letters, numbers and hypens.")
+            raise serializers.ValidationError("Can only contain letters, numbers, hyphens and underscores.")
 
         key = ContactField.make_key(value)
         if not ContactField.is_valid_key(key):
             raise serializers.ValidationError('Generated key "%s" is invalid or a reserved name.' % key)
+
+        org = self.context["org"]
+        conflicting_fields = ContactField.user_fields.active_for_org(org=org).filter(key=key)
+        if self.instance:
+            conflicting_fields = conflicting_fields.exclude(id=self.instance.id)
+        if conflicting_fields.exists():
+            raise serializers.ValidationError('Generated key "%s" conflicts with an existing contact field.' % key)
 
         return value
 

@@ -505,7 +505,7 @@ class ContactField(SmartModel, DependencyMixin):
     @classmethod
     def is_valid_label(cls, label):
         label = label.strip()
-        return regex.match(r"^[A-Za-z0-9\- ]+$", label, regex.V0) and len(label) <= cls.MAX_LABEL_LEN
+        return regex.match(r"^[A-Za-z0-9\-_ ]+$", label, regex.V0) and len(label) <= cls.MAX_LABEL_LEN
 
     @classmethod
     def get_or_create(cls, org, user, key, label=None, show_in_table=None, value_type=None, priority=None):
