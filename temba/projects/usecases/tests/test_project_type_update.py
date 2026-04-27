@@ -1,4 +1,5 @@
 import uuid
+from unittest.mock import MagicMock, patch
 
 import pytz
 
@@ -76,7 +77,7 @@ class TestUpdateProjectType(TembaTest):
         self.assertEqual(reloaded_org.config["description"], "Test description")
 
     def test_set_is_multi_agents_when_config_is_none(self):
-        """Test setting is_multi_agents when org config is None"""
+        """Persisted NULL config is loaded as {} by JSONAsTextField; update still sets is_multi_agents."""
         org_without_config = Org.objects.create(
             name="Org Without Config",
             timezone=pytz.timezone("Africa/Kigali"),
@@ -100,6 +101,23 @@ class TestUpdateProjectType(TembaTest):
         self.assertIsNotNone(updated_org)
         self.assertIsNotNone(reloaded_org.config)
         self.assertTrue(reloaded_org.config["is_multi_agents"])
+
+    def test_initializes_config_dict_when_config_attribute_is_none(self):
+        """Guards org.config is None (ORM normally deserializes NULL to {} via JSONAsTextField)."""
+        org = MagicMock()
+        org.config = None
+        org.name = "In-memory org"
+
+        with patch.object(Org.objects, "get", return_value=org):
+            result = update_project_type(
+                project_uuid=str(uuid.uuid4()),
+                is_multi_agents=True,
+                user_email=self.user.email,
+            )
+
+        self.assertIs(result, org)
+        self.assertEqual(org.config, {"is_multi_agents": True})
+        org.save.assert_called_once_with(update_fields=["config", "modified_by", "modified_on"])
 
     def test_same_value_does_not_update_modified_on(self):
         """Test that setting is_multi_agents to the same value skips the database update"""

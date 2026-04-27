@@ -77,6 +77,6 @@ class TestProjectConsumer(TembaTest):
         ProjectConsumer().consume(message)
 
         project_dto = mock_use_case.create_project.call_args[0][0]
-        self.assertFalse(project_dto.inline_agent_switch)
+        self.assertTrue(project_dto.inline_agent_switch)
         self.assertFalse(project_dto.brain_on)
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
