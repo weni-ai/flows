@@ -18,11 +18,14 @@ class ClientTest(TembaTest):
         client = Client("acme")
 
         with patch("requests.post") as mock_post:
-            mock_post.return_value = MockResponse(200, '{"access_token": "987654321"}')
+            mock_post.return_value = MockResponse(
+                200, '{"access_token": "987654321", "refresh_token": "refresh123"}'
+            )
 
-            token = client.get_oauth_token("123-abc", "sesame", "mycode", "http://backhere.com")
+            access_token, refresh_token = client.get_oauth_token("123-abc", "sesame", "mycode", "http://backhere.com")
 
-            self.assertEqual("987654321", token)
+            self.assertEqual("987654321", access_token)
+            self.assertEqual("refresh123", refresh_token)
             mock_post.assert_called_once_with(
                 "https://acme.zendesk.com/oauth/tokens",
                 json={
@@ -39,6 +42,34 @@ class ClientTest(TembaTest):
 
             with self.assertRaises(ClientError):
                 client.get_oauth_token("123-abc", "sesame", "mycode", "http://backhere.com")
+
+    def test_refresh_oauth_token(self):
+        client = Client("acme")
+
+        with patch("requests.post") as mock_post:
+            mock_post.return_value = MockResponse(
+                200, '{"access_token": "new_access_token", "refresh_token": "new_refresh_token"}'
+            )
+
+            access_token, refresh_token = client.refresh_oauth_token("123-abc", "sesame", "refresh123")
+
+            self.assertEqual("new_access_token", access_token)
+            self.assertEqual("new_refresh_token", refresh_token)
+            mock_post.assert_called_once_with(
+                "https://acme.zendesk.com/oauth/tokens",
+                json={
+                    "grant_type": "refresh_token",
+                    "refresh_token": "refresh123",
+                    "client_id": "123-abc",
+                    "client_secret": "sesame",
+                    "scope": "read write",
+                },
+            )
+
+            mock_post.return_value = MockResponse(400, "problem")
+
+            with self.assertRaises(ClientError):
+                client.refresh_oauth_token("123-abc", "sesame", "refresh123")
 
 
 class ZendeskTypeTest(TembaTest):
@@ -100,14 +131,22 @@ class ZendeskTypeTest(TembaTest):
 
             # but if it succeeds...
             mock_get_oauth_token.side_effect = None
-            mock_get_oauth_token.return_value = "236272"
+            mock_get_oauth_token.return_value = ("236272", "refresh_abc")
 
             # ticketer will be created and user should be redirected to the configure page
             response = self.client.get(connect_url + "?code=please&state=temba")
 
             ticketer = Ticketer.objects.filter(ticketer_type="zendesk", is_active=True).order_by("id").last()
             self.assertEqual("temba", ticketer.name)
-            self.assertEqual({"oauth_token": "236272", "secret": "RAND346", "subdomain": "temba"}, ticketer.config)
+            self.assertEqual(
+                {
+                    "oauth_token": "236272",
+                    "refresh_token": "refresh_abc",
+                    "secret": "RAND346",
+                    "subdomain": "temba",
+                },
+                ticketer.config,
+            )
             self.assertRedirect(response, reverse("tickets.types.zendesk.configure", args=[ticketer.uuid]))
 
     def test_configure(self):
