@@ -613,8 +613,8 @@ class BroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     A `POST` allows you to create and send new broadcasts, with the following JSON data:
 
       * **text** - the text of the message to send (string, limited to 640 characters)
-      * **urns** - the URNs of contacts to send to (array of up to 100 strings, optional)
-      * **contacts** - the UUIDs of contacts to send to (array of up to 100 strings, optional)
+      * **urns** - the URNs of contacts to send to (array of up to 1000 strings, optional)
+      * **contacts** - the UUIDs of contacts to send to (array of up to 1000 strings, optional)
       * **groups** - the UUIDs of contact groups to send to (array of up to 100 strings, optional)
 
     Example:
@@ -751,8 +751,8 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
 
     A `POST` allows you to create and send new broadcasts, with the following JSON data:
 
-      * **urns** - the URNs of contacts to send to (array of up to 100 strings, optional)
-      * **contacts** - the UUIDs of contacts to send to (array of up to 100 strings, optional)
+      * **urns** - the URNs of contacts to send to (array of up to 1000 strings, optional)
+      * **contacts** - the UUIDs of contacts to send to (array of up to 1000 strings, optional)
       * **groups** - the UUIDs of contact groups to send to (array of up to 100 strings, optional)
       * **msg** - the template, text and attachments that will be send to contacts
 

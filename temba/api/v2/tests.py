@@ -240,6 +240,11 @@ class APITest(TembaTest):
         self.assertEqual(field.to_internal_value([1, 2, 3]), [1, 2, 3])
         self.assertRaises(serializers.ValidationError, field.to_internal_value, list(range(101)))  # too long
 
+        # custom max_items raises only above the configured limit
+        field = fields.LimitedListField(child=serializers.IntegerField(), source="test", max_items=1000)
+        self.assertEqual(len(field.to_internal_value(list(range(1000)))), 1000)
+        self.assertRaises(serializers.ValidationError, field.to_internal_value, list(range(1001)))
+
         field = fields.CampaignField(source="test")
         field._context = {"org": self.org}
 
@@ -1246,6 +1251,20 @@ class APITest(TembaTest):
         broadcast = Broadcast.objects.get(id=response.json()["id"])
         self.assertEqual({"base": "You are @fields.age"}, broadcast.text)
 
+        # urns accept up to 1000 items per request (see BroadcastWriteSerializer)
+        response = self.postJSON(
+            url,
+            None,
+            {"text": "Bulk", "urns": [f"twitter:user{i}" for i in range(1001)]},
+        )
+        self.assertResponseError(response, "urns", "This field can only contain up to 1000 items.")
+
+        # groups limit is unchanged at 100
+        response = self.postJSON(
+            url, None, {"text": "Bulk", "groups": [str(uuid.uuid4()) for _ in range(101)]}
+        )
+        self.assertResponseError(response, "groups", "This field can only contain up to 100 items.")
+
         # try sending as a flagged org
         self.org.flag()
         response = self.postJSON(url, None, {"text": "Hello", "urns": ["twitter:franky"]})
@@ -1739,6 +1758,23 @@ class APITest(TembaTest):
             },
         )
         self.assertResponseError(response, "non_field_errors", "Template with name Away not found.")
+
+        # urns and contacts accept up to 1000 items per request (see WhatsappBroadcastWriteSerializer)
+        many_urns = [f"whatsapp:556199{str(i).zfill(7)}" for i in range(1000)]
+        response = self.postJSON(url, None, {"urns": many_urns, "msg": {"text": "Bulk"}})
+        self.assertEqual(response.status_code, 201)
+
+        # one more than the limit gets rejected with the new threshold
+        response = self.postJSON(
+            url, None, {"urns": many_urns + ["whatsapp:5561999999999"], "msg": {"text": "Bulk"}}
+        )
+        self.assertResponseError(response, "urns", "This field can only contain up to 1000 items.")
+
+        # groups limit is unchanged at 100
+        response = self.postJSON(
+            url, None, {"groups": [str(uuid.uuid4()) for _ in range(101)], "msg": {"text": "Bulk"}}
+        )
+        self.assertResponseError(response, "groups", "This field can only contain up to 100 items.")
 
     def test_archives(self):
         url = reverse("api.v2.archives")
