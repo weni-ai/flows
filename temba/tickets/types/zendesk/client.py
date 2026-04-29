@@ -25,4 +25,22 @@ class Client:
         if response.status_code != 200:
             raise ClientError(response)
 
-        return response.json().get("access_token")
+        data = response.json()
+        return data.get("access_token"), data.get("refresh_token")
+
+    def refresh_oauth_token(self, client_id, client_secret, refresh_token):
+        response = requests.post(
+            f"https://{self.subdomain}.zendesk.com/oauth/tokens",
+            json={
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "scope": "read write",
+            },
+        )
+        if response.status_code != 200:
+            raise ClientError(response)
+
+        data = response.json()
+        return data.get("access_token"), data.get("refresh_token")

@@ -973,10 +973,10 @@ class ContactFieldWriteSerializer(WriteSerializer):
             raise serializers.ValidationError('Generated key "%s" is invalid or a reserved name.' % key)
 
         org = self.context["org"]
-        existing = ContactField.user_fields.active_for_org(org=org).filter(key=key)
+        conflicting_fields = ContactField.user_fields.active_for_org(org=org).filter(key=key)
         if self.instance:
-            existing = existing.exclude(id=self.instance.id)
-        if existing.exists():
+            conflicting_fields = conflicting_fields.exclude(id=self.instance.id)
+        if conflicting_fields.exists():
             raise serializers.ValidationError('Generated key "%s" conflicts with an existing contact field.' % key)
 
         return value

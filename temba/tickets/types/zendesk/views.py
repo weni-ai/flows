@@ -92,7 +92,7 @@ class ConnectView(BaseConnectView):
         subdomain = request.GET["state"]
         client = Client(subdomain)
         try:
-            access_token = client.get_oauth_token(
+            access_token, refresh_token = client.get_oauth_token(
                 settings.ZENDESK_CLIENT_ID, settings.ZENDESK_CLIENT_SECRET, code, self.get_absolute_url()
             )
         except ClientError:
@@ -104,6 +104,8 @@ class ConnectView(BaseConnectView):
             ZendeskType.CONFIG_OAUTH_TOKEN: access_token,
             ZendeskType.CONFIG_SECRET: random_string(32),
         }
+        if refresh_token:
+            config[ZendeskType.CONFIG_REFRESH_TOKEN] = refresh_token
 
         self.object = Ticketer.create(
             org=self.org,
