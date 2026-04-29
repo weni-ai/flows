@@ -1260,9 +1260,7 @@ class APITest(TembaTest):
         self.assertResponseError(response, "urns", "This field can only contain up to 1000 items.")
 
         # groups limit is unchanged at 100
-        response = self.postJSON(
-            url, None, {"text": "Bulk", "groups": [str(uuid.uuid4()) for _ in range(101)]}
-        )
+        response = self.postJSON(url, None, {"text": "Bulk", "groups": [str(uuid.uuid4()) for _ in range(101)]})
         self.assertResponseError(response, "groups", "This field can only contain up to 100 items.")
 
         # try sending as a flagged org
@@ -1765,9 +1763,7 @@ class APITest(TembaTest):
         self.assertEqual(response.status_code, 201)
 
         # one more than the limit gets rejected with the new threshold
-        response = self.postJSON(
-            url, None, {"urns": many_urns + ["whatsapp:5561999999999"], "msg": {"text": "Bulk"}}
-        )
+        response = self.postJSON(url, None, {"urns": many_urns + ["whatsapp:5561999999999"], "msg": {"text": "Bulk"}})
         self.assertResponseError(response, "urns", "This field can only contain up to 1000 items.")
 
         # groups limit is unchanged at 100
