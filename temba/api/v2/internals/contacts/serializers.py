@@ -16,17 +16,18 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 # Keys that update_contacts_fields may auto-create as text user fields when missing (org under field limit).
-FALLBACK_AUTO_CREATE_CONTACT_FIELD_KEYS = frozenset({"segment", "orderform"})
+FALLBACK_AUTO_CREATE_CONTACT_FIELD_KEYS = frozenset({"segment", "orderform", "email"})
 FALLBACK_AUTO_CREATE_CONTACT_FIELD_LABELS = {
     "segment": "segment",
     "orderform": "orderform",
+    "email": "email",
 }
 
 
 def _resolve_contact_field_for_update(org, user, raw_key):
     """
     Resolve a ContactField for PATCH update_contacts_fields. Unknown keys are ignored unless they are
-    segment or orderform: then we create a text field if missing and the org is under its field limit.
+    segment, orderform or email: then we create a text field if missing and the org is under its field limit.
     """
     canonical = raw_key.lower()
     field = ContactField.user_fields.active_for_org(org=org).filter(key=raw_key).first()
