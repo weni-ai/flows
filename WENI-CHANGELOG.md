@@ -1,3 +1,7 @@
+3.71.1
+----------
+* Increase batch lenght in WhatsAppbroadcast API
+
 3.71.0
 ----------
 * Allow use underscore in label contact field name

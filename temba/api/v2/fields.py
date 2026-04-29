@@ -80,11 +80,16 @@ class TranslatableField(serializers.Field):
 
 class LimitedListField(serializers.ListField):
     """
-    A list field which can be only be written to with a limited number of items
+    A list field which can be only be written to with a limited number of items.
+    The maximum number of items can be customized per-field via the `max_items` kwarg.
     """
 
+    def __init__(self, *args, max_items=DEFAULT_MAX_LIST_ITEMS, **kwargs):
+        self.max_items = max_items
+        super().__init__(*args, **kwargs)
+
     def to_internal_value(self, data):
-        validate_size(data, DEFAULT_MAX_LIST_ITEMS)
+        validate_size(data, self.max_items)
 
         return super().to_internal_value(data)
 
@@ -130,20 +135,27 @@ class TembaModelField(serializers.RelatedField):
     require_exists = True
 
     class LimitedSizeList(serializers.ManyRelatedField):
+        def __init__(self, *args, max_items=DEFAULT_MAX_LIST_ITEMS, **kwargs):
+            self.max_items = max_items
+            super().__init__(*args, **kwargs)
+
         def run_validation(self, data=serializers.empty):
-            validate_size(data, DEFAULT_MAX_LIST_ITEMS)
+            validate_size(data, self.max_items)
 
             return super().run_validation(data)
 
     @classmethod
     def many_init(cls, *args, **kwargs):
         """
-        Overridden to provide a custom ManyRelated which limits number of items
+        Overridden to provide a custom ManyRelated which limits number of items.
+        The per-field `max_items` kwarg overrides the default size limit.
         """
+        max_items = kwargs.pop("max_items", DEFAULT_MAX_LIST_ITEMS)
         list_kwargs = {"child_relation": cls(*args, **kwargs)}
         for key in kwargs.keys():
             if key in relations.MANY_RELATION_KWARGS:
                 list_kwargs[key] = kwargs[key]
+        list_kwargs["max_items"] = max_items
         return TembaModelField.LimitedSizeList(**list_kwargs)
 
     def get_queryset(self):
