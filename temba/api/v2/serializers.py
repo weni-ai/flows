@@ -212,8 +212,10 @@ class BroadcastReadSerializer(ReadSerializer):
 
 class BroadcastWriteSerializer(WriteSerializer):
     text = fields.TranslatableField(required=True, max_length=Msg.MAX_TEXT_LEN)
-    urns = fields.URNListField(required=False)
-    contacts = fields.ContactField(many=True, required=False)
+    # Recipient lists allow up to 1000 items to support bulk sends without
+    # forcing clients to paginate small batches.
+    urns = fields.URNListField(required=False, max_items=1000)
+    contacts = fields.ContactField(many=True, required=False, max_items=1000)
     groups = fields.ContactGroupField(many=True, required=False)
     ticket = fields.TicketField(required=False)
 
@@ -281,8 +283,10 @@ class WhatsappBroadcastReadSerializer(ReadSerializer):
 
 
 class WhatsappBroadcastWriteSerializer(WriteSerializer):
-    urns = fields.URNListField(required=False)
-    contacts = fields.ContactField(many=True, required=False)
+    # WhatsApp broadcasts allow larger recipient lists than the default API limit
+    # to support bulk sends without forcing clients to paginate small batches.
+    urns = fields.URNListField(required=False, max_items=1000)
+    contacts = fields.ContactField(many=True, required=False, max_items=1000)
     groups = fields.ContactGroupField(many=True, required=False)
     msg = serializers.DictField(required=True)
     channel = serializers.UUIDField(required=False)

@@ -826,6 +826,31 @@ class UpdateContactFieldsViewTest(TembaTest):
     @mock_mailroom
     @override_settings(INTERNAL_USER_EMAIL="super@user.com")
     @patch.object(LambdaURLValidator, "protected_resource")
+    def test_fallback_creates_email_when_missing(self, mr_mocks, mock_protected_resource):
+        contact = self.create_contact("Email Test", urns=["twitterid:55555"])
+        self.assertFalse(ContactField.user_fields.filter(org=self.org, key="email").exists())
+
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/update_contacts_fields"
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "twitterid:55555",
+            "contact_fields": {"email": "user@example.com"},
+        }
+
+        response = self.client.patch(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(ContactField.user_fields.filter(org=self.org, key="email").exists())
+
+        contact.refresh_from_db()
+        email_f = ContactField.get_by_key(self.org, "email")
+        self.assertEqual(contact.get_field_display(email_f), "user@example.com")
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    @patch.object(LambdaURLValidator, "protected_resource")
     def test_fallback_recreates_segment_and_orderform_when_inactive(self, mr_mocks, mock_protected_resource):
         """
         When segment/orderform fields exist but are inactive (is_active=False), the lookup must
