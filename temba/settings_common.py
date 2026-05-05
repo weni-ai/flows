@@ -42,6 +42,18 @@ if TESTING:
     PASSWORD_HASHERS = ("django.contrib.auth.hashers.MD5PasswordHasher",)
     DEBUG = False
 
+# TraceForest: log wall time (and optional call tree) for internal WhatsApp broadcast views.
+# Enable only in local/staging when investigating latency. See ``traceforest_whatsapp_broadcast``.
+WHATSAPP_BROADCAST_TRACEFOREST = os.environ.get("WHATSAPP_BROADCAST_TRACEFOREST", "").lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+WHATSAPP_BROADCAST_TRACEFOREST_VERBOSE = os.environ.get(
+    "WHATSAPP_BROADCAST_TRACEFOREST_VERBOSE", ""
+).lower() in ("1", "true", "yes", "on")
+
 ADMINS = (("RapidPro", "code@yourdomain.io"),)
 MANAGERS = ADMINS
 

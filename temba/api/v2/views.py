@@ -645,6 +645,12 @@ class BroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     pagination_class = CreatedOnCursorPagination
     throttle_scope = "v2.broadcasts"
 
+    def post(self, request, *args, **kwargs):
+        from temba.api.v2.internals.broadcasts.profiling import traceforest_whatsapp_broadcast
+
+        with traceforest_whatsapp_broadcast("api_v2_broadcasts_endpoint_post"):
+            return super().post(request, *args, **kwargs)
+
     def filter_queryset(self, queryset):
         org = self.get_org()
 

@@ -13,6 +13,11 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
+from temba.api.tasks import whatsapp_broadcast_deferred_task
+from temba.api.v2.internals.broadcasts.context import (
+    celery_json_safe_broadcast_payload,
+    resolve_org_and_user_internal_whatsapp,
+)
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.api.v2.serializers import WhatsappBroadcastReadSerializer, WhatsappBroadcastWriteSerializer
@@ -22,6 +27,7 @@ from temba.msgs.models import Broadcast, BroadcastStatistics
 from temba.msgs.services import count_duplicate_contacts_across_groups, count_unique_contacts_in_groups
 from temba.orgs.models import Org
 
+from .profiling import traceforest_whatsapp_broadcast
 from .serializers import BroadcastSerializer, BroadcastWithStatisticsSerializer, UserAndProjectSerializer
 from .services import upload_broadcast_media
 
@@ -63,42 +69,56 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
     permission_classes = [(IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)) | HasValidJWT]
 
     def post(self, request, *args, **kwargs):
-        project_uuid = request.data.get("project") or getattr(request, "project_uuid", None)
+        with traceforest_whatsapp_broadcast("internal_whatsapp_broadcast_sync"):
+            data = dict(request.data)
+            try:
+                org, user = resolve_org_and_user_internal_whatsapp(drf_request=request, data=data)
+            except ValueError as e:
+                msg = str(e)
+                if msg == "Project not found":
+                    return Response({"error": msg}, status=404)
+                return Response({"error": msg}, status=401)
 
-        if not project_uuid:
-            return Response({"error": "Project not provided"}, status=401)
-
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-            # When authenticated via JWT, prefer email from token; otherwise use request.user
-            if getattr(request, "jwt_payload", None):
-                email = (
-                    request.jwt_payload.get("email")
-                    or request.jwt_payload.get("user_email")
-                    or request.data.get("user_email")
-                )
-            else:
-                email = getattr(request.user, "email", None)
-
-            if not email:
-                return Response({"error": "User email not provided"}, status=401)
-
-            user, _ = User.objects.get_or_create(email=email)
-        except Org.DoesNotExist:
-            return Response({"error": "Project not found"}, status=404)
-
-        serializer = WhatsappBroadcastWriteSerializer(
-            data=request.data, context={"request": request, "org": org, "user": user}
-        )
-
-        if serializer.is_valid():
-            broadcast = serializer.save()
-            response_serializer = WhatsappBroadcastReadSerializer(
-                instance=broadcast, context={"request": request, "org": org, "user": user}
+            serializer = WhatsappBroadcastWriteSerializer(
+                data=request.data, context={"request": request, "org": org, "user": user}
             )
-            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
-        return Response(serializer.errors, status=400)
+            if serializer.is_valid():
+                broadcast = serializer.save()
+                response_serializer = WhatsappBroadcastReadSerializer(
+                    instance=broadcast, context={"request": request, "org": org, "user": user}
+                )
+                return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+            return Response(serializer.errors, status=400)
+
+
+class InternalWhatsappBroadcastsDeferredEndpoint(APIViewMixin, APIView):
+    """
+    Accepts the same payload as InternalWhatsappBroadcastsEndpoint but enqueues work to Celery.
+
+    Returns 202 with task_id immediately. Full validation happens in the worker; HTTP clients do not receive
+    business validation failures synchronously when the Celery serializer path is configured for JSON payloads.
+    """
+
+    authentication_classes = [OptionalJWTAuthentication, InternalOIDCAuthentication]
+    permission_classes = [(IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)) | HasValidJWT]
+
+    def post(self, request, *args, **kwargs):
+        with traceforest_whatsapp_broadcast("internal_whatsapp_broadcast_async"):
+            data = dict(request.data)
+            try:
+                org, user = resolve_org_and_user_internal_whatsapp(drf_request=request, data=data)
+            except ValueError as e:
+                msg = str(e)
+                if msg == "Project not found":
+                    return Response({"error": msg}, status=404)
+                return Response({"error": msg}, status=401)
+
+            payload = celery_json_safe_broadcast_payload(dict(request.data))
+            async_result = whatsapp_broadcast_deferred_task.delay(org.pk, user.pk, payload)
+
+            return Response({"status": "accepted", "task_id": async_result.id}, status=status.HTTP_202_ACCEPTED)
 
 
 class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
