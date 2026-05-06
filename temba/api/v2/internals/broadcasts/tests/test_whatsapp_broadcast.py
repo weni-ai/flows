@@ -310,6 +310,48 @@ class TestInternalWhatsappBroadcast(TembaTest):
             self.assertEqual(broadcast.metadata["template_state"], "unevaluated")
 
 
+class TestInternalWhatsappBroadcastDeferred(TembaTest):
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsDeferredEndpoint.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsDeferredEndpoint.permission_classes",
+        [],
+    )
+    @patch("temba.api.v2.internals.broadcasts.views.whatsapp_broadcast_deferred_task.delay")
+    def test_returns_202_with_task_id(self, mock_delay):
+        mock_async = MagicMock()
+        mock_async.id = "celery-job-id"
+        mock_delay.return_value = mock_async
+
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            contact = self.create_contact("AsyncContact", urns=["whatsapp:5561912345699"])
+
+            url = "/api/v2/internals/whatsapp_broadcasts/async"
+            body = {
+                "project": self.org.proj_uuid,
+                "contacts": [contact.uuid],
+                "msg": {"text": "Deferred broadcast @contact"},
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(
+            response.json(),
+            {"status": "accepted", "task_id": "celery-job-id"},
+        )
+        mock_delay.assert_called_once()
+        call_kw = mock_delay.call_args.args
+        self.assertEqual(len(call_kw), 3)
+        self.assertEqual(call_kw[0], self.org.pk)
+        self.assertIn("contacts", call_kw[2])
+
+
 class TestInternalBroadcastsUploadMedia(TembaTest):
     def setUp(self):
         super().setUp()
