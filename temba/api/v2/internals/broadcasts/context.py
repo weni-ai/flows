@@ -42,12 +42,12 @@ def resolve_org_and_user_internal_whatsapp(*, drf_request, data):
             or data.get("user_email")
         )
     else:
-        email = getattr(getattr(drf_request, "user", None), "email", None)
+        email = data.get("user_email") or getattr(getattr(drf_request, "user", None), "email", None)
 
     if not email:
         raise ValueError("User email not provided")
 
     user, _ = User.objects.get_or_create(email=email)
 
-    # Ensure serializers that read request.org see the resolved org where applicable.
     setattr(drf_request, "_org", org)
+    return org, user
