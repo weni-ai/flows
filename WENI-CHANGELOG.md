@@ -1,3 +1,7 @@
+3.71.2
+----------
+* feat: Add email field to fallback auto-creation in contact updates
+
 3.71.1
 ----------
 * Increase batch lenght in WhatsAppbroadcast API
