@@ -20,7 +20,7 @@ from temba.mailroom.client import ContactSpec, MailroomClient, MailroomException
 from temba.mailroom.modifiers import Modifier
 from temba.orgs.models import Org
 from temba.tests.dates import parse_datetime
-from temba.tickets.models import Ticket, TicketEvent, Topic
+from temba.tickets.models import Ticket, TicketEvent, Ticketer, Topic
 from temba.utils import format_number, get_anonymous_user, json
 from temba.utils.cache import incrby_existing
 
@@ -229,6 +229,16 @@ class TestClient(MailroomClient):
                 topic=topic,
                 created_by_id=user_id,
             )
+
+        return {"changed_ids": [t.id for t in tickets]}
+
+    @_client_method
+    def ticket_change_ticketer(self, org_id, user_id, ticket_ids, ticketer_id):
+        now = timezone.now()
+        ticketer = Ticketer.objects.get(id=ticketer_id)
+        tickets = Ticket.objects.filter(org_id=org_id, id__in=ticket_ids)
+        # external_id belongs to the old ticketer's external system, so clear it on transfer
+        tickets.update(ticketer=ticketer, external_id=None, modified_on=now, last_activity_on=now)
 
         return {"changed_ids": [t.id for t in tickets]}
 

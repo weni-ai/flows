@@ -5730,6 +5730,12 @@ class APITest(TembaTest):
         response = self.postJSON(url, None, {"tickets": [str(ticket1.uuid)], "action": "change_topic"})
         self.assertResponseError(response, "non_field_errors", 'For action "change_topic" you must specify the topic')
 
+        # try to change ticketer without specifying ticketer
+        response = self.postJSON(url, None, {"tickets": [str(ticket1.uuid)], "action": "change_ticketer"})
+        self.assertResponseError(
+            response, "non_field_errors", 'For action "change_ticketer" you must specify the ticketer'
+        )
+
         # assign valid tickets to a user
         response = self.postJSON(
             url,
@@ -5775,6 +5781,39 @@ class APITest(TembaTest):
         self.assertEqual(response.status_code, 204)
         self.assertEqual(sales, ticket1.topic)
         self.assertEqual(sales, ticket2.topic)
+
+        # change ticketer of tickets — works even when the original ticketer was released
+        zendesk_org1 = Ticketer.create(self.org, self.admin, ZendeskType.slug, "Zendesk Sales", {})
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "tickets": [str(ticket1.uuid), str(ticket2.uuid)],
+                "action": "change_ticketer",
+                "ticketer": str(zendesk_org1.uuid),
+            },
+        )
+        ticket1.refresh_from_db()
+        ticket2.refresh_from_db()
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(zendesk_org1, ticket1.ticketer)
+        self.assertEqual(zendesk_org1, ticket2.ticketer)
+
+        # changing to an inactive ticketer is rejected by the field lookup itself
+        zendesk_org1.is_active = False
+        zendesk_org1.save(update_fields=("is_active",))
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "tickets": [str(ticket1.uuid)],
+                "action": "change_ticketer",
+                "ticketer": str(zendesk_org1.uuid),
+            },
+        )
+        self.assertResponseError(response, "ticketer", f"No such object: {zendesk_org1.uuid}")
+        zendesk_org1.is_active = True
+        zendesk_org1.save(update_fields=("is_active",))
 
         # close tickets
         response = self.postJSON(url, None, {"tickets": [str(ticket1.uuid), str(ticket2.uuid)], "action": "close"})
