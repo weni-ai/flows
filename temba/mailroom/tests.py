@@ -360,6 +360,18 @@ class MailroomClientTest(TembaTest):
                 json={"org_id": 1, "user_id": 12, "ticket_ids": [123, 345], "topic_id": 67},
             )
 
+    def test_ticket_change_ticketer(self):
+        with patch("requests.post") as mock_post:
+            mock_post.return_value = MockResponse(200, '{"changed_ids": [123]}')
+            response = get_client().ticket_change_ticketer(1, 12, [123, 345], 89)
+
+            self.assertEqual({"changed_ids": [123]}, response)
+            mock_post.assert_called_once_with(
+                "http://localhost:8090/mr/ticket/change_ticketer",
+                headers={"User-Agent": "Temba"},
+                json={"org_id": 1, "user_id": 12, "ticket_ids": [123, 345], "ticketer_id": 89},
+            )
+
     def test_ticket_close(self):
         with patch("requests.post") as mock_post:
             mock_post.return_value = MockResponse(200, '{"changed_ids": [123]}')
