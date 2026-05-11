@@ -53,10 +53,23 @@ def extract_idempotency_key(request) -> str | None:
 
 def compute_body_hash(request) -> str:
     """
-    Hashes the raw request body so we can detect when the same key is reused
-    with a different payload.
+    Hashes the parsed request payload so we can detect when the same key is
+    reused with a different body.
+
+    We hash ``request.data`` (already parsed by DRF) rather than
+    ``request.body`` because the raw stream is consumed the first time any
+    code touches ``request.data``, which happens earlier in this view to
+    resolve ``project_uuid``. Reading ``request.body`` after that raises
+    ``RawPostDataException``.
+
+    JSON keys are sorted so semantically identical payloads with different
+    key ordering hash to the same value.
     """
-    return hashlib.sha256(request.body or b"").hexdigest()
+    try:
+        payload = json.dumps(request.data, sort_keys=True)
+    except (TypeError, ValueError):
+        payload = repr(request.data)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def idempotency_lookup(project_uuid, key: str, body_hash: str) -> tuple[str, dict | None]:
