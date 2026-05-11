@@ -1,4 +1,3 @@
-from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated, ParseError
 from rest_framework.mixins import CreateModelMixin
 from rest_framework.permissions import IsAuthenticated
@@ -10,12 +9,10 @@ from weni.internal.permissions import CanCommunicateInternally
 from weni.internal.views import InternalGenericViewSet
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
-from temba.api.v2.serializers import WhatsappBroadcastReadSerializer, WhatsappBroadcastWriteSerializer
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
 from temba.contacts.models import ContactGroup
 from temba.msgs.models import Broadcast, BroadcastStatistics
@@ -24,8 +21,7 @@ from temba.orgs.models import Org
 
 from .serializers import BroadcastSerializer, BroadcastWithStatisticsSerializer, UserAndProjectSerializer
 from .services import upload_broadcast_media
-
-User = get_user_model()
+from .usecases import CreateWhatsappBroadcastUseCase
 
 
 class BroadcastsViewSet(CreateModelMixin, InternalGenericViewSet):
@@ -68,37 +64,7 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
         if not project_uuid:
             return Response({"error": "Project not provided"}, status=401)
 
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-            # When authenticated via JWT, prefer email from token; otherwise use request.user
-            if getattr(request, "jwt_payload", None):
-                email = (
-                    request.jwt_payload.get("email")
-                    or request.jwt_payload.get("user_email")
-                    or request.data.get("user_email")
-                )
-            else:
-                email = getattr(request.user, "email", None)
-
-            if not email:
-                return Response({"error": "User email not provided"}, status=401)
-
-            user, _ = User.objects.get_or_create(email=email)
-        except Org.DoesNotExist:
-            return Response({"error": "Project not found"}, status=404)
-
-        serializer = WhatsappBroadcastWriteSerializer(
-            data=request.data, context={"request": request, "org": org, "user": user}
-        )
-
-        if serializer.is_valid():
-            broadcast = serializer.save()
-            response_serializer = WhatsappBroadcastReadSerializer(
-                instance=broadcast, context={"request": request, "org": org, "user": user}
-            )
-            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=400)
+        return CreateWhatsappBroadcastUseCase().execute(request, project_uuid)
 
 
 class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
