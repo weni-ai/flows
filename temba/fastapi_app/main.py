@@ -20,7 +20,7 @@ from temba.api.v2.serializers import (
     WhatsappBroadcastWriteSerializer,
 )
 
-app = FastAPI(title="Temba WhatsApp broadcasts (prototype)", version="0")
+app = FastAPI(title="Temba WhatsApp broadcasts (prototype)", version="0", root_path="/fastapi")
 
 
 @app.get("/health")
