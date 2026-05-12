@@ -8,10 +8,12 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.temp import NamedTemporaryFile
+from django.db.models import Prefetch
 from django.utils import timezone as dj_timezone
 from django.utils.text import slugify
 
-from temba.contacts.models import Contact, ContactField, ContactImport
+from temba.contacts.models import Contact, ContactField, ContactGroup, ContactImport
+from temba.contacts.search import search_contacts
 from temba.msgs.models import Msg
 from temba.utils.export import TableExporter
 from temba.utils.text import decode_stream
@@ -258,6 +260,56 @@ class ContactDownloadByStatusService:
             raise ValidationError("Invalid status")
         msgs = Msg.objects.filter(broadcast_id=broadcast_id, status=msg_status)
         return list(msgs.values_list("contact_id", flat=True).distinct())
+
+
+class ContactSearchService:
+    """
+    Search contacts via mailroom using the Contact Search query language
+    (e.g. `nickname = "Macklemore"`, `age > 18 AND city = "SP"`).
+
+    Mailroom delegates the actual query to Elasticsearch and returns a page
+    of contact ids, which we then hydrate from the readonly database.
+    """
+
+    @staticmethod
+    def _resolve_group(org, group_ref):
+        if not group_ref:
+            return None
+        return ContactGroup.user_groups.filter(org=org, is_active=True, uuid=group_ref).first()
+
+    @staticmethod
+    def _hydrate_contacts(org, contact_ids):
+        if not contact_ids:
+            return []
+
+        contacts = (
+            Contact.objects.filter(org=org, id__in=contact_ids, is_active=True)
+            .prefetch_related(
+                Prefetch(
+                    "all_groups",
+                    queryset=ContactGroup.user_groups.only("uuid", "name").order_by("pk"),
+                    to_attr="prefetched_user_groups",
+                ),
+            )
+            .using("readonly")
+        )
+
+        contact_by_id = {c.id: c for c in contacts}
+        ordered = [contact_by_id[c_id] for c_id in contact_ids if c_id in contact_by_id]
+
+        Contact.bulk_urn_cache_initialize(ordered, using="readonly")
+        return ordered
+
+    @classmethod
+    def search(cls, org, query, *, group_uuid=None, sort=None, offset=0):
+        """
+        Returns a tuple (contacts, total, offset, parsed_query). Raises SearchException
+        from mailroom on invalid queries (caller should convert to HTTP 400).
+        """
+        group = cls._resolve_group(org, group_uuid)
+        results = search_contacts(org, query, group=group, sort=sort, offset=offset)
+        contacts = cls._hydrate_contacts(org, results.contact_ids)
+        return contacts, results.total, offset, results.query
 
 
 class CleanContactFieldsService:
