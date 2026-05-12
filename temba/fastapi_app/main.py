@@ -20,17 +20,17 @@ from temba.api.v2.serializers import (
     WhatsappBroadcastWriteSerializer,
 )
 
-root_app = FastAPI(title="Temba WhatsApp broadcasts (prototype)", version="0")
-app = APIRouter(prefix="/fastapi")
+app = FastAPI(title="Temba WhatsApp broadcasts (prototype)", version="0")
+app_fastapi = APIRouter(prefix="/fastapi")
 
-@root_app.get("/")
 @app.get("/")
 @app.get("/health")
+@app_fastapi.get("/")
+@app_fastapi.get("/health")
 def health():
     return {"status": "ok"}
 
-
-@app.post("/internal/whatsapp_broadcasts")
+@app_fastapi.post("/internal/whatsapp_broadcasts")
 def post_internal_whatsapp_broadcast(
     body: dict = Body(...),
     authorization: Annotated[Optional[str], Header()] = None,
@@ -79,4 +79,4 @@ def post_internal_whatsapp_broadcast(
 
     return JSONResponse(content=serializer.errors, status_code=http_status.HTTP_400_BAD_REQUEST)
 
-root_app.include_router(app)
+app.include_router(app_fastapi)
