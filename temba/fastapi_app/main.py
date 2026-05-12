@@ -8,7 +8,7 @@ import django
 
 django.setup()
 
-from fastapi import Body, FastAPI, Header, HTTPException, status as http_status
+from fastapi import Body, APIRouter, FastAPI, Header, HTTPException, status as http_status
 from fastapi.responses import JSONResponse
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
@@ -20,10 +20,11 @@ from temba.api.v2.serializers import (
     WhatsappBroadcastWriteSerializer,
 )
 
-root_app = FastAPI(title="App Root", version="0")
-app = FastAPI(title="Temba WhatsApp broadcasts (prototype)", version="0")
+root_app = FastAPI(title="Temba WhatsApp broadcasts (prototype)", version="0")
+app = APIRouter(prefix="/fastapi")
 
 @root_app.get("/")
+@app.get("/")
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -78,4 +79,4 @@ def post_internal_whatsapp_broadcast(
 
     return JSONResponse(content=serializer.errors, status_code=http_status.HTTP_400_BAD_REQUEST)
 
-root_app.mount("/fastapi", app)
+root_app.include_router(app)
