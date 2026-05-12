@@ -100,67 +100,70 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
                         status=status.HTTP_409_CONFLICT,
                     )
 
-            try:
-                try:
-                    org, user = resolve_org_and_user_internal_whatsapp(drf_request=request, data=data)
-                except ValueError as e:
-                    if idem_key:
-                        idempotency_release(project_uuid, idem_key)
-                    msg = str(e)
-                    if msg == "Project not found":
-                        return Response({"error": msg}, status=404)
-                    return Response({"error": msg}, status=401)
+        idem_key = extract_idempotency_key(request)
+        body_hash = compute_body_hash(request) if idem_key else None
 
-                serializer = WhatsappBroadcastWriteSerializer(
-                    data=request.data, context={"request": request, "org": org, "user": user}
+        if idem_key:
+            lookup_state, cached = idempotency_lookup(project_uuid, idem_key, body_hash)
+            if lookup_state == LOOKUP_HIT:
+                return Response(cached["body"], status=cached["status"])
+            if lookup_state == LOOKUP_CONFLICT:
+                return Response(
+                    {"error": "Idempotency-Key reused with different body"},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if lookup_state == LOOKUP_INFLIGHT:
+                return Response(
+                    {"error": "Request with this Idempotency-Key is already being processed"},
+                    status=status.HTTP_409_CONFLICT,
                 )
 
-                if serializer.is_valid():
-                    broadcast = serializer.save()
-                    response_serializer = WhatsappBroadcastReadSerializer(
-                        instance=broadcast, context={"request": request, "org": org, "user": user}
-                    )
-                    if idem_key:
-                        idempotency_store_success(
-                            project_uuid, idem_key, body_hash, status.HTTP_201_CREATED, response_serializer.data
-                        )
-                    return Response(response_serializer.data, status=status.HTTP_201_CREATED)
-
-                if idem_key:
-                    idempotency_release(project_uuid, idem_key)
-                return Response(serializer.errors, status=400)
-            except Exception:
-                if idem_key:
-                    idempotency_release(project_uuid, idem_key)
-                raise
-
-
-class InternalWhatsappBroadcastsDeferredEndpoint(APIViewMixin, APIView):
-    """
-    Accepts the same payload as InternalWhatsappBroadcastsEndpoint but enqueues work to Celery.
-
-    Returns 202 with task_id immediately. Full validation happens in the worker; HTTP clients do not receive
-    business validation failures synchronously when the Celery serializer path is configured for JSON payloads.
-    """
-
-    authentication_classes = [OptionalJWTAuthentication, InternalOIDCAuthentication]
-    permission_classes = [(IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)) | HasValidJWT]
-
-    def post(self, request, *args, **kwargs):
-        with traceforest_whatsapp_broadcast("internal_whatsapp_broadcast_async"):
-            data = dict(request.data)
+        try:
             try:
-                org, user = resolve_org_and_user_internal_whatsapp(drf_request=request, data=data)
-            except ValueError as e:
-                msg = str(e)
-                if msg == "Project not found":
-                    return Response({"error": msg}, status=404)
-                return Response({"error": msg}, status=401)
+                org = Org.objects.get(proj_uuid=project_uuid)
+                # When authenticated via JWT, prefer email from token; otherwise use request.user
+                if getattr(request, "jwt_payload", None):
+                    email = (
+                        request.jwt_payload.get("email")
+                        or request.jwt_payload.get("user_email")
+                        or request.data.get("user_email")
+                    )
+                else:
+                    email = getattr(request.user, "email", None)
 
-            payload = celery_json_safe_broadcast_payload(dict(request.data))
-            async_result = whatsapp_broadcast_deferred_task.delay(org.pk, user.pk, payload)
+                if not email:
+                    if idem_key:
+                        idempotency_release(project_uuid, idem_key)
+                    return Response({"error": "User email not provided"}, status=401)
 
-            return Response({"status": "accepted", "task_id": async_result.id}, status=status.HTTP_202_ACCEPTED)
+                user, _ = User.objects.get_or_create(email=email)
+            except Org.DoesNotExist:
+                if idem_key:
+                    idempotency_release(project_uuid, idem_key)
+                return Response({"error": "Project not found"}, status=404)
+
+            serializer = WhatsappBroadcastWriteSerializer(
+                data=request.data, context={"request": request, "org": org, "user": user}
+            )
+
+            if serializer.is_valid():
+                broadcast = serializer.save()
+                response_serializer = WhatsappBroadcastReadSerializer(
+                    instance=broadcast, context={"request": request, "org": org, "user": user}
+                )
+                if idem_key:
+                    idempotency_store_success(
+                        project_uuid, idem_key, body_hash, status.HTTP_201_CREATED, response_serializer.data
+                    )
+                return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+            if idem_key:
+                idempotency_release(project_uuid, idem_key)
+            return Response(serializer.errors, status=400)
+        except Exception:
+            if idem_key:
+                idempotency_release(project_uuid, idem_key)
+            raise
 
 
 class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
