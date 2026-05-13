@@ -4884,6 +4884,10 @@ class TicketersEndpoint(ListAPIMixin, BaseAPIView):
         if uuid:
             queryset = queryset.filter(uuid=uuid)
 
+        sector_uuid = params.get("sector_uuid")
+        if sector_uuid:
+            queryset = queryset.filter(config__sector_uuid=sector_uuid)
+
         return self.filter_before_after(queryset, "created_on")
 
     @classmethod
