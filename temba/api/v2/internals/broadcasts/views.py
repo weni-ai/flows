@@ -166,6 +166,34 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
             raise
 
 
+class InternalWhatsappBroadcastsDeferredEndpoint(APIViewMixin, APIView):
+    """
+    Accepts the same payload as InternalWhatsappBroadcastsEndpoint but enqueues work to Celery.
+
+    Returns 202 with task_id immediately. Full validation happens in the worker; HTTP clients do not receive
+    business validation failures synchronously when the Celery serializer path is configured for JSON payloads.
+    """
+
+    authentication_classes = [OptionalJWTAuthentication, InternalOIDCAuthentication]
+    permission_classes = [(IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)) | HasValidJWT]
+
+    def post(self, request, *args, **kwargs):
+        with traceforest_whatsapp_broadcast("internal_whatsapp_broadcast_async"):
+            data = dict(request.data)
+            try:
+                org, user = resolve_org_and_user_internal_whatsapp(drf_request=request, data=data)
+            except ValueError as e:
+                msg = str(e)
+                if msg == "Project not found":
+                    return Response({"error": msg}, status=404)
+                return Response({"error": msg}, status=401)
+
+            payload = celery_json_safe_broadcast_payload(dict(request.data))
+            async_result = whatsapp_broadcast_deferred_task.delay(org.pk, user.pk, payload)
+
+            return Response({"status": "accepted", "task_id": async_result.id}, status=status.HTTP_202_ACCEPTED)
+
+
 class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
     permission_classes = [IsAuthenticated, IsUserInOrg]
