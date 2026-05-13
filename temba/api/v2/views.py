@@ -5097,11 +5097,15 @@ class TicketActionsEndpoint(BulkWriteAPIMixin, BaseAPIView):
 
         * _assign_ - Assign the tickets to the given user
         * _note_ - Add the given note to the tickets
+        * _change_topic_ - Move the tickets to the given topic
+        * _change_ticketer_ - Move the tickets to the given ticketer
         * _close_ - Close the tickets
         * _reopen_ - Re-open the tickets
 
     * **assignee** - the email of a user (string, optional)
     * **note** - the note to add to the tickets (string, optional)
+    * **topic** - the UUID of a topic (string, optional)
+    * **ticketer** - the UUID of a ticketer (string, optional)
 
     Example:
 
@@ -5131,6 +5135,8 @@ class TicketActionsEndpoint(BulkWriteAPIMixin, BaseAPIView):
                 {"name": "action", "required": True, "help": "One of the following strings: " + ", ".join(actions)},
                 {"name": "assignee", "required": False, "help": "The email address of a user"},
                 {"name": "note", "required": False, "help": "The note text"},
+                {"name": "topic", "required": False, "help": "The UUID of a topic"},
+                {"name": "ticketer", "required": False, "help": "The UUID of a ticketer"},
             ],
         }
 
