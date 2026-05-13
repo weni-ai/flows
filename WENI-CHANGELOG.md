@@ -1,3 +1,7 @@
+3.72.0
+----------
+* feat: Implement Idempotency-Key support for WhatsApp broadcasts endpoint
+
 3.71.2
 ----------
 * feat: Add email field to fallback auto-creation in contact updates

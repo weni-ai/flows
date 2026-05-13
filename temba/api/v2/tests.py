@@ -5593,6 +5593,35 @@ class APITest(TembaTest):
         self.assertEqual(1, len(resp_json["results"]))
         self.assertEqual("bob@acme.com", resp_json["results"][0]["name"])
 
+        # ticketers with sector_uuid in config (used by wenichats type) — same org
+        sector_uuid_match = "30df650c-f15a-4996-b825-2a35cdc941cc"
+        sector_uuid_other = "bae31477-1a17-4302-9b1a-902f1b22fdce"
+        t5 = Ticketer.create(
+            self.org, self.admin, MailgunType.slug, "sector ticketer", {"sector_uuid": sector_uuid_match}
+        )
+        Ticketer.create(
+            self.org, self.admin, MailgunType.slug, "other sector ticketer", {"sector_uuid": sector_uuid_other}
+        )
+
+        # same sector_uuid but on another org — must not leak across orgs
+        Ticketer.create(
+            self.org2, self.admin, ZendeskType.slug, "org2 sector ticketer", {"sector_uuid": sector_uuid_match}
+        )
+
+        # filter by sector_uuid (not there)
+        response = self.fetchJSON(url, "sector_uuid=11111111-1111-1111-1111-111111111111")
+        resp_json = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(0, len(resp_json["results"]))
+
+        # filter by sector_uuid present — only the matching ticketer on the caller's org
+        response = self.fetchJSON(url, "sector_uuid=" + sector_uuid_match)
+        resp_json = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(1, len(resp_json["results"]))
+        self.assertEqual(str(t5.uuid), resp_json["results"][0]["uuid"])
+        self.assertEqual("sector ticketer", resp_json["results"][0]["name"])
+
     @patch("temba.mailroom.client.MailroomClient.ticket_close")
     @patch("temba.mailroom.client.MailroomClient.ticket_reopen")
     def test_tickets(self, mock_ticket_reopen, mock_ticket_close):
