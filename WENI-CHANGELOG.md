@@ -1,3 +1,9 @@
+3.74.0
+----------
+* feat: Avoid subdomain error in Zendesk integration
+* feat: Update filter_templates endpoint documentation
+* feat: Add JWT authentication on internal first contacts endpoint
+
 3.73.0
 ----------
 * Add sector_uuid filter in ticketer.json API
