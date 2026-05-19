@@ -10,6 +10,10 @@ export COMPRESS_ENABLED=${COMPRESS_ENABLED:-'true'}
 export BRANDING_ENABLED=${BRANDING_ENABLED:-'true'}
 export CELERY_MAX_WORKERS=${CELERY_MAX_WORKERS:-'4'}
 export CELERY_BEAT_DATABASE_FILE=${CELERY_BEAT_DATABASE_FILE:-'/tmp/celery_beat_database'}
+export UVICORN_APP=${UVICORN_APP:-"temba.fastapi_app.main:app"}
+export UVICORN_HOST=${UVICORN_HOST:-"0.0.0.0"}
+export UVICORN_PORT=${UVICORN_PORT:-"8001"}
+export UVICORN_LOG_LEVEL=${UVICORN_LOG_LEVEL:-"info"}
 #set -o errexit
 #set -o pipefail
 #set -o nounset
@@ -96,6 +100,14 @@ elif [[ "sqsconsume" == "$1" ]]; then
         shift 1
     fi
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py sqsconsume --queue "$queue" "$@"
+elif [[ "fastapi" == "$1" ]]; then
+    shift 1
+    echo "Starting FastAPI server..."
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python -m uvicorn "${UVICORN_APP}" \
+      --host "${UVICORN_HOST}" \
+      --port "${UVICORN_PORT}" \
+      --log-level "${UVICORN_LOG_LEVEL}" \
+      "$@"
 fi
 
 exec "$@"
