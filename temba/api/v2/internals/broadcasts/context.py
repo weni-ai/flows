@@ -6,7 +6,6 @@ from django.contrib.auth import get_user_model
 
 from temba.orgs.models import Org
 
-
 User = get_user_model()
 
 
