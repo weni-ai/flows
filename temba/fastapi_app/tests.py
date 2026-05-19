@@ -3,7 +3,7 @@ import uuid
 from fastapi.testclient import TestClient
 
 from temba.fastapi_app.main import app
-from temba.tests.base import TembaTest
+from temba.tests.base import TembaNonAtomicTest, TembaTest
 
 
 class TestHealthEndpoint(TembaTest):
@@ -32,12 +32,16 @@ class TestHealthEndpoint(TembaTest):
         self.assertEqual(resp.json(), {"status": "ok"})
 
 
-class TestInternalWhatsappBroadcastFastAPI(TembaTest):
+class TestInternalWhatsappBroadcastFastAPI(TembaNonAtomicTest):
     url = "/fastapi/internal/whatsapp_broadcasts"
 
     def setUp(self):
         super().setUp()
+        self.setUpOrgs()
         self.client_fastapi = TestClient(app)
+        if not self.org.proj_uuid:
+            self.org.proj_uuid = uuid.uuid4()
+            self.org.save(update_fields=("proj_uuid",))
 
     def test_project_not_provided_returns_401(self):
         body = {
