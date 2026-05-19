@@ -1,6 +1,8 @@
 import json
 import uuid
+from unittest.mock import patch
 
+import jwt as pyjwt
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
@@ -178,3 +180,19 @@ class TestVerifyJwt(TembaTest):
 
         self.assertEqual(ctx.exception.status_code, 403)
         self.assertEqual(ctx.exception.detail, {"error": "Invalid token"})
+
+    @patch("temba.fastapi_app.auth.jwt.decode", side_effect=pyjwt.ExpiredSignatureError())
+    def test_expired_token_returns_403(self, _mock_decode):
+        with self.settings(JWT_PUBLIC_KEY="dummy-key"):
+            with self.assertRaises(HTTPException) as ctx:
+                verify_jwt(authorization="Bearer expired.jwt.here")
+
+        self.assertEqual(ctx.exception.status_code, 403)
+        self.assertEqual(ctx.exception.detail, {"error": "Token expired"})
+
+    @patch("temba.fastapi_app.auth.jwt.decode", return_value={"email": "x@example.com", "project_uuid": "abc"})
+    def test_valid_token_returns_payload(self, _mock_decode):
+        with self.settings(JWT_PUBLIC_KEY="dummy-key"):
+            payload = verify_jwt(authorization="Bearer valid.jwt.here")
+
+        self.assertEqual(payload, {"email": "x@example.com", "project_uuid": "abc"})
