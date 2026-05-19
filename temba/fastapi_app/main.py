@@ -18,7 +18,6 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "temba.settings")
 django.setup()
 
 
-
 app = FastAPI(title="Temba WhatsApp broadcasts (prototype)", version="0")
 app_fastapi = APIRouter(prefix="/fastapi")
 
