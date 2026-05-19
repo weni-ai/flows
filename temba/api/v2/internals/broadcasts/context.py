@@ -30,9 +30,7 @@ def resolve_org_and_user_internal_whatsapp(*, drf_request, data):
 
     if getattr(drf_request, "jwt_payload", None):
         email = (
-            drf_request.jwt_payload.get("email")
-            or drf_request.jwt_payload.get("user_email")
-            or data.get("user_email")
+            drf_request.jwt_payload.get("email") or drf_request.jwt_payload.get("user_email") or data.get("user_email")
         )
     else:
         email = data.get("user_email") or getattr(getattr(drf_request, "user", None), "email", None)
