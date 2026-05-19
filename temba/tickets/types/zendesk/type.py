@@ -13,6 +13,7 @@ class ZendeskType(TicketerType):
 
     CONFIG_SUBDOMAIN = "subdomain"
     CONFIG_OAUTH_TOKEN = "oauth_token"
+    CONFIG_REFRESH_TOKEN = "refresh_token"
     CONFIG_SECRET = "secret"
     CONFIG_PUSH_ID = "push_id"
     CONFIG_PUSH_TOKEN = "push_token"

@@ -32,11 +32,16 @@ from django.utils.decorators import method_decorator
 from temba.api.auth.jwt import BaseJWTAuthentication, OptionalJWTAuthentication, RequiredJWTAuthentication
 from temba.api.v2.internals.contacts.serializers import (
     CleanContactFieldsSerializer,
+    ContactSearchResultSerializer,
     ContactWithMessagesListSerializer,
     InternalContactFieldsValuesSerializer,
     InternalContactSerializer,
 )
-from temba.api.v2.internals.contacts.services import CleanContactFieldsService, ContactImportDeduplicationService
+from temba.api.v2.internals.contacts.services import (
+    CleanContactFieldsService,
+    ContactImportDeduplicationService,
+    ContactSearchService,
+)
 from temba.api.v2.internals.helpers import get_object_or_404
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
@@ -49,6 +54,7 @@ from temba.api.v2.validators import LambdaURLValidator
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
 from temba.channels.models import Channel
 from temba.contacts.models import Contact, ContactField, ContactGroup, ContactImport, ContactURN, ExportContactsTask
+from temba.contacts.search import SearchException
 from temba.contacts.tasks import export_contacts_by_status_task
 from temba.contacts.views import ContactImportCRUDL
 from temba.msgs.models import Broadcast, Msg
@@ -103,7 +109,7 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
 
     def get(self, request, *args, **kwargs):
         query_params = request.query_params
-        project_uuid = query_params.get("project")
+        project_uuid = query_params.get("project") or query_params.get("project_uuid")
         key = query_params.get("key")
 
         if not project_uuid:
@@ -192,6 +198,7 @@ class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
             validation_response = self.protected_resource(request)  # pragma: no cover
             if validation_response.status_code != 200:  # pragma: no cover
                 return validation_response
+
 
         project_uuid = (
             request.data.get("project_uuid") or request.data.get("project") or getattr(request, "project_uuid", None)
@@ -868,6 +875,92 @@ class CleanContactsFieldsView(APIViewMixin, APIView):
             {
                 "message": "Contact fields cleaned successfully",
                 "cleared_fields_count": cleared_fields_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ContactSearchView(APIViewMixin, APIView):
+    """
+    Search contacts using the Contact Search query language (same syntax used by the
+    flow/contact-list UI). Supports filtering by contact fields, attributes, URN scheme,
+    and group membership. Mailroom parses the query and runs it against Elasticsearch.
+
+    Authentication is JWT-only: the token must carry `project_uuid` in its payload.
+    The project is resolved from the token; if the client also passes `project_uuid`
+    as a query param it must match the one in the token.
+
+    Examples:
+
+        GET /api/v2/internals/contact_search?query=nickname%3D%22Macklemore%22
+        GET /api/v2/internals/contact_search?query=age%3E18+AND+city%3D%22SP%22
+
+    Query params:
+        - query: required, Contact Search syntax string
+        - project_uuid (or project): optional, must match token's project_uuid
+        - group_uuid: optional, restrict search to a single group
+        - sort: optional, mailroom sort string (e.g. `-created_on`, `name`)
+        - offset: optional, pagination offset (mailroom returns a fixed page size)
+    """
+
+    authentication_classes = [RequiredJWTAuthentication]
+    permission_classes = [HasValidJWT]
+
+    def get(self, request: Request):
+        token_project_uuid = getattr(request, "project_uuid", None)
+        request_project_uuid = request.query_params.get("project_uuid") or request.query_params.get("project")
+
+        if request_project_uuid and token_project_uuid and str(token_project_uuid) != str(request_project_uuid):
+            return Response({"error": "project_uuid does not match token"}, status=status.HTTP_403_FORBIDDEN)
+
+        org = self.get_org_from_request(
+            request,
+            missing_status=status.HTTP_400_BAD_REQUEST,
+            missing_error="Project not provided",
+            not_found_status=status.HTTP_404_NOT_FOUND,
+            not_found_error="Project not found",
+        )
+        if isinstance(org, Response):
+            return org
+
+        query = request.query_params.get("query")
+        if not query or not query.strip():
+            return Response({"error": "query is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        group_uuid = request.query_params.get("group_uuid")
+        sort = request.query_params.get("sort")
+
+        try:
+            offset = int(request.query_params.get("offset") or 0)
+        except (TypeError, ValueError):
+            return Response({"error": "offset must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        if offset < 0:
+            return Response({"error": "offset must be non-negative"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            contacts, total, returned_offset, parsed_query = ContactSearchService.search(
+                org,
+                query,
+                group_uuid=group_uuid,
+                sort=sort,
+                offset=offset,
+            )
+        except SearchException as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        contact_fields = ContactField.user_fields.active_for_org(org=org)
+        serializer = ContactSearchResultSerializer(
+            contacts,
+            many=True,
+            context={"contact_fields": contact_fields},
+        )
+
+        return Response(
+            {
+                "results": serializer.data,
+                "total": total,
+                "offset": returned_offset,
+                "query": parsed_query,
             },
             status=status.HTTP_200_OK,
         )

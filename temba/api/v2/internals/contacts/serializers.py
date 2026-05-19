@@ -16,17 +16,19 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 # Keys that update_contacts_fields may auto-create as text user fields when missing (org under field limit).
-FALLBACK_AUTO_CREATE_CONTACT_FIELD_KEYS = frozenset({"segment", "orderform"})
+FALLBACK_AUTO_CREATE_CONTACT_FIELD_KEYS = frozenset({"segment", "orderform", "email", "session"})
 FALLBACK_AUTO_CREATE_CONTACT_FIELD_LABELS = {
     "segment": "segment",
     "orderform": "orderform",
+    "email": "email",
+    "session": "session",
 }
 
 
 def _resolve_contact_field_for_update(org, user, raw_key):
     """
     Resolve a ContactField for PATCH update_contacts_fields. Unknown keys are ignored unless they are
-    segment or orderform: then we create a text field if missing and the org is under its field limit.
+    segment, orderform, email or session: then we create a text field if missing and the org is under its field limit.
     """
     canonical = raw_key.lower()
     field = ContactField.user_fields.active_for_org(org=org).filter(key=raw_key).first()
@@ -158,3 +160,42 @@ class ContactWithMessageSerializer(serializers.Serializer):
 class ContactWithMessagesListSerializer(serializers.Serializer):
     contact_id = serializers.IntegerField()
     messages = ContactWithMessageSerializer(many=True)
+
+
+class ContactSearchResultSerializer(serializers.Serializer):
+    """
+    Output serializer for the contact search endpoint. Returns full contact details
+    including URNs (full identity strings, e.g. `tel:+5511999999999`).
+    URNs are masked automatically by `ContactURN.api_urn` on anonymous orgs.
+    """
+
+    uuid = serializers.UUIDField()
+    name = serializers.CharField(allow_null=True)
+    language = serializers.CharField(allow_null=True)
+    urns = serializers.SerializerMethodField()
+    groups = serializers.SerializerMethodField()
+    fields = serializers.SerializerMethodField("get_contact_fields")
+    blocked = serializers.SerializerMethodField()
+    stopped = serializers.SerializerMethodField()
+    created_on = serializers.DateTimeField()
+    modified_on = serializers.DateTimeField()
+    last_seen_on = serializers.DateTimeField(allow_null=True)
+
+    def get_urns(self, obj):
+        return [urn.api_urn() for urn in obj.get_urns()]
+
+    def get_groups(self, obj):
+        groups = getattr(obj, "prefetched_user_groups", None)
+        if groups is None:
+            groups = obj.user_groups.all()
+        return [{"uuid": str(g.uuid), "name": g.name} for g in groups]
+
+    def get_contact_fields(self, obj):
+        contact_fields = self.context.get("contact_fields") or []
+        return {f.key: obj.get_field_serialized(f) for f in contact_fields}
+
+    def get_blocked(self, obj):
+        return obj.status == Contact.STATUS_BLOCKED
+
+    def get_stopped(self, obj):
+        return obj.status == Contact.STATUS_STOPPED

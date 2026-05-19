@@ -30,4 +30,5 @@ def create_default_wwc_channel(project, user) -> Channel:
         },
     )
     publish_channel_event(channel, action="create")
+    print(f"Channel published: {channel.uuid}")
     return channel

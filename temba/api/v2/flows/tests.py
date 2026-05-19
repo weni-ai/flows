@@ -77,3 +77,5 @@ class TestInternalFlowsAPIView(TembaTest):
         data = resp.json()
         self.assertEqual(len(data["results"]), 5)
         self.assertIsNotNone(data.get("next"))
+
+

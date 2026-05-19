@@ -263,6 +263,13 @@ class Ticket(models.Model):
         return mailroom.get_client().ticket_change_topic(org.id, user.id, ticket_ids, topic.id)
 
     @classmethod
+    def bulk_change_ticketer(cls, org, user: User, tickets: list, ticketer: "Ticketer"):
+        # we deliberately do NOT filter by t.ticketer.is_active here: this action exists precisely to repair
+        # tickets whose current ticketer is being (or has just been) released, so they can be moved to a new one
+        ticket_ids = [t.id for t in tickets]
+        return mailroom.get_client().ticket_change_ticketer(org.id, user.id, ticket_ids, ticketer.id)
+
+    @classmethod
     def bulk_close(cls, org, user, tickets, *, force: bool = False):
         ticket_ids = [t.id for t in tickets if t.ticketer.is_active]
         return mailroom.get_client().ticket_close(org.id, user.id, ticket_ids, force=force)

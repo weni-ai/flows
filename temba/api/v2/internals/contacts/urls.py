@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     CleanContactsFieldsView,
     ContactHasOpenTicketView,
+    ContactSearchView,
     ContactsExportByStatusView,
     ContactsImportConfirmView,
     ContactsImportUploadView,
@@ -27,6 +28,13 @@ urlpatterns = [
         name="internal_contacts_import_confirm",
     ),
     path("contacts_with_messages", ContactsWithMessagesView.as_view(), name="contacts_with_messages"),
+    path("contact_groups", InternalContactGroupsView.as_view(), name="internal_contact_groups"),
+    path("contacts_import_upload", ContactsImportUploadView.as_view(), name="internal_contacts_import_upload"),
+    path(
+        "contacts_import_confirm/<int:import_id>/",
+        ContactsImportConfirmView.as_view(),
+        name="internal_contacts_import_confirm",
+    ),
     path("groups_contact_fields", GroupsContactFieldsView.as_view(), name="groups_contact_fields"),
     path("clean_contacts_fields", CleanContactsFieldsView.as_view(), name="clean_contacts_fields"),
     path(
@@ -34,4 +42,5 @@ urlpatterns = [
         ContactsExportByStatusView.as_view(),
         name="contacts_export_by_status",
     ),
+    path("contact_search", ContactSearchView.as_view(), name="contact_search"),
 ]

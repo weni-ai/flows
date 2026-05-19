@@ -2645,9 +2645,15 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
      * **modified_on** - when this contact was last modified (datetime).
      * **last_seen_on** - when this contact last communicated with us (datetime).
 
+    **Filters:**
+
+     * **template** (required) - filter by the template **name** (string). UUID is not supported. ex: `template=template_test`
+     * **before** (optional) - only return contacts whose last message was sent before this date. ex: `before=2024-01-01`
+     * **after** (optional) - only return contacts whose last message was sent after this date. ex: `after=2023-01-01`
+
     Example:
 
-        GET /api/v2/filter_templates.json
+        GET /api/v2/filter_templates.json?template=template_test
 
     Response containing the contacts for your organization:
 
@@ -2794,18 +2800,18 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
             "params": [
                 {
                     "name": "template",
-                    "required": False,
-                    "help": "Only return contacts for this template, ex: template=template_test",
+                    "required": True,
+                    "help": "The template name to filter by. Must be the template name, not UUID. ex: template=template_test",
                 },
                 {
                     "name": "before",
                     "required": False,
-                    "help": "Only return contacts for this template before the date, ex: before=2024-01-01",
+                    "help": "Only return contacts whose last message was sent before this date. ex: before=2024-01-01",
                 },
                 {
                     "name": "after",
                     "required": False,
-                    "help": "Only return contacts for this template after the data, ex: after=2023-01-01",
+                    "help": "Only return contacts whose last message was sent after this date. ex: after=2023-01-01",
                 },
             ],
         }
@@ -4890,6 +4896,10 @@ class TicketersEndpoint(ListAPIMixin, BaseAPIView):
         if uuid:
             queryset = queryset.filter(uuid=uuid)
 
+        sector_uuid = params.get("sector_uuid")
+        if sector_uuid:
+            queryset = queryset.filter(config__sector_uuid=sector_uuid)
+
         return self.filter_before_after(queryset, "created_on")
 
     @classmethod
@@ -5099,11 +5109,15 @@ class TicketActionsEndpoint(BulkWriteAPIMixin, BaseAPIView):
 
         * _assign_ - Assign the tickets to the given user
         * _note_ - Add the given note to the tickets
+        * _change_topic_ - Move the tickets to the given topic
+        * _change_ticketer_ - Move the tickets to the given ticketer
         * _close_ - Close the tickets
         * _reopen_ - Re-open the tickets
 
     * **assignee** - the email of a user (string, optional)
     * **note** - the note to add to the tickets (string, optional)
+    * **topic** - the UUID of a topic (string, optional)
+    * **ticketer** - the UUID of a ticketer (string, optional)
 
     Example:
 
@@ -5133,6 +5147,8 @@ class TicketActionsEndpoint(BulkWriteAPIMixin, BaseAPIView):
                 {"name": "action", "required": True, "help": "One of the following strings: " + ", ".join(actions)},
                 {"name": "assignee", "required": False, "help": "The email address of a user"},
                 {"name": "note", "required": False, "help": "The note text"},
+                {"name": "topic", "required": False, "help": "The UUID of a topic"},
+                {"name": "ticketer", "required": False, "help": "The UUID of a ticketer"},
             ],
         }
 
@@ -5442,6 +5458,7 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
         }
     """
 
+    # permission = "wpp_flows.whatsapp_flows_api"
     model = WhatsappFlow
     serializer_class = WhatsappFlowReadSerializer
     pagination_class = CreatedOnCursorPagination

@@ -1387,6 +1387,7 @@ class APITest(TembaTest):
                 "uuid": template.uuid,
                 "variables": [],
                 "locale": None,
+                "category": None,
                 "is_carousel": False,
                 "carousel": [],
             },
@@ -1622,7 +1623,7 @@ class APITest(TembaTest):
                 "contacts": [self.joe.uuid, self.frank.uuid],
                 "groups": [reporters.uuid],
                 "ticket": str(ticket.uuid),
-                "msg": {"template": {"uuid": template.uuid}, "variables": ["1"]},
+                "msg": {"template": {"uuid": template.uuid}, "variables": ["1"], "locale": None},
                 "channel": channel.uuid,
             },
         )
@@ -1657,7 +1658,7 @@ class APITest(TembaTest):
                 "contacts": [self.joe.uuid, self.frank.uuid],
                 "groups": [reporters.uuid],
                 "ticket": str(ticket.uuid),
-                "msg": {"template": {"uuid": template.uuid, "variables": ["1"]}},
+                "msg": {"template": {"uuid": template.uuid, "variables": ["1"], "locale": None}},
                 "channel": channel.uuid,
             },
         )
@@ -5592,6 +5593,35 @@ class APITest(TembaTest):
         self.assertEqual(1, len(resp_json["results"]))
         self.assertEqual("bob@acme.com", resp_json["results"][0]["name"])
 
+        # ticketers with sector_uuid in config (used by wenichats type) — same org
+        sector_uuid_match = "30df650c-f15a-4996-b825-2a35cdc941cc"
+        sector_uuid_other = "bae31477-1a17-4302-9b1a-902f1b22fdce"
+        t5 = Ticketer.create(
+            self.org, self.admin, MailgunType.slug, "sector ticketer", {"sector_uuid": sector_uuid_match}
+        )
+        Ticketer.create(
+            self.org, self.admin, MailgunType.slug, "other sector ticketer", {"sector_uuid": sector_uuid_other}
+        )
+
+        # same sector_uuid but on another org — must not leak across orgs
+        Ticketer.create(
+            self.org2, self.admin, ZendeskType.slug, "org2 sector ticketer", {"sector_uuid": sector_uuid_match}
+        )
+
+        # filter by sector_uuid (not there)
+        response = self.fetchJSON(url, "sector_uuid=11111111-1111-1111-1111-111111111111")
+        resp_json = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(0, len(resp_json["results"]))
+
+        # filter by sector_uuid present — only the matching ticketer on the caller's org
+        response = self.fetchJSON(url, "sector_uuid=" + sector_uuid_match)
+        resp_json = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(1, len(resp_json["results"]))
+        self.assertEqual(str(t5.uuid), resp_json["results"][0]["uuid"])
+        self.assertEqual("sector ticketer", resp_json["results"][0]["name"])
+
     @patch("temba.mailroom.client.MailroomClient.ticket_close")
     @patch("temba.mailroom.client.MailroomClient.ticket_reopen")
     def test_tickets(self, mock_ticket_reopen, mock_ticket_close):
@@ -5730,6 +5760,12 @@ class APITest(TembaTest):
         response = self.postJSON(url, None, {"tickets": [str(ticket1.uuid)], "action": "change_topic"})
         self.assertResponseError(response, "non_field_errors", 'For action "change_topic" you must specify the topic')
 
+        # try to change ticketer without specifying ticketer
+        response = self.postJSON(url, None, {"tickets": [str(ticket1.uuid)], "action": "change_ticketer"})
+        self.assertResponseError(
+            response, "non_field_errors", 'For action "change_ticketer" you must specify the ticketer'
+        )
+
         # assign valid tickets to a user
         response = self.postJSON(
             url,
@@ -5775,6 +5811,39 @@ class APITest(TembaTest):
         self.assertEqual(response.status_code, 204)
         self.assertEqual(sales, ticket1.topic)
         self.assertEqual(sales, ticket2.topic)
+
+        # change ticketer of tickets — works even when the original ticketer was released
+        zendesk_org1 = Ticketer.create(self.org, self.admin, ZendeskType.slug, "Zendesk Sales", {})
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "tickets": [str(ticket1.uuid), str(ticket2.uuid)],
+                "action": "change_ticketer",
+                "ticketer": str(zendesk_org1.uuid),
+            },
+        )
+        ticket1.refresh_from_db()
+        ticket2.refresh_from_db()
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(zendesk_org1, ticket1.ticketer)
+        self.assertEqual(zendesk_org1, ticket2.ticketer)
+
+        # changing to an inactive ticketer is rejected by the field lookup itself
+        zendesk_org1.is_active = False
+        zendesk_org1.save(update_fields=("is_active",))
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "tickets": [str(ticket1.uuid)],
+                "action": "change_ticketer",
+                "ticketer": str(zendesk_org1.uuid),
+            },
+        )
+        self.assertResponseError(response, "ticketer", f"No such object: {zendesk_org1.uuid}")
+        zendesk_org1.is_active = True
+        zendesk_org1.save(update_fields=("is_active",))
 
         # close tickets
         response = self.postJSON(url, None, {"tickets": [str(ticket1.uuid), str(ticket2.uuid)], "action": "close"})

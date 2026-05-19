@@ -18,7 +18,7 @@ from django.views.generic import View
 
 from temba.orgs.views import OrgPermsMixin
 from temba.utils import json
-from temba.utils.s3 import public_file_storage
+from temba.utils.s3 import private_file_storage
 from temba.utils.text import random_string
 from temba.utils.views import ComponentFormMixin
 
@@ -40,9 +40,12 @@ class ConnectView(BaseConnectView):
             from .type import ZendeskType
 
             org = self.request.user.get_org()
-            data = self.cleaned_data["subdomain"]
+            # Zendesk subdomains are case-insensitive on Zendesk's side but our lookups against
+            # the Ticketer JSON config are case-sensitive, so we normalize on input to avoid
+            # case-mismatch bugs at the channel-account validation step.
+            data = self.cleaned_data["subdomain"].strip().lower()
 
-            if not re.match(r"^[\w\-]+", data):
+            if not re.match(r"^[\w\-]+$", data):
                 raise forms.ValidationError(_("Not a valid subdomain name."))
 
             for_domain = org.ticketers.filter(is_active=True, ticketer_type=ZendeskType.slug, config__subdomain=data)
@@ -89,10 +92,12 @@ class ConnectView(BaseConnectView):
         from .type import ZendeskType
 
         code = request.GET["code"]
-        subdomain = request.GET["state"]
+        # state is round-tripped through Zendesk; normalize to keep the stored config
+        # consistent with what Zendesk itself will POST back to the admin UI later.
+        subdomain = request.GET["state"].strip().lower()
         client = Client(subdomain)
         try:
-            access_token = client.get_oauth_token(
+            access_token, refresh_token = client.get_oauth_token(
                 settings.ZENDESK_CLIENT_ID, settings.ZENDESK_CLIENT_SECRET, code, self.get_absolute_url()
             )
         except ClientError:
@@ -104,6 +109,8 @@ class ConnectView(BaseConnectView):
             ZendeskType.CONFIG_OAUTH_TOKEN: access_token,
             ZendeskType.CONFIG_SECRET: random_string(32),
         }
+        if refresh_token:
+            config[ZendeskType.CONFIG_REFRESH_TOKEN] = refresh_token
 
         self.object = Ticketer.create(
             org=self.org,
@@ -180,7 +187,9 @@ class AdminUIView(SmartFormView):
 
     class Form(forms.Form):
         def __init__(self, **kwargs):
-            self.subdomain = kwargs.pop("subdomain")
+            # subdomain comes from Zendesk's POST; normalize so secret lookups against the
+            # ticketer config (which is now stored lowercase) match regardless of casing.
+            self.subdomain = (kwargs.pop("subdomain") or "").strip().lower()
             super().__init__(**kwargs)
 
         name = forms.CharField(
@@ -274,7 +283,7 @@ class AdminUIView(SmartFormView):
     def form_valid(self, form):
         from .type import ZendeskType
 
-        subdomain = form.cleaned_data["subdomain"]
+        subdomain = (form.cleaned_data["subdomain"] or "").strip().lower()
         secret = form.cleaned_data["secret"]
 
         ticketer = Ticketer.objects.get(
@@ -309,4 +318,4 @@ class FileCallbackView(View):
     def post(self, request, *args, **kwargs):
         path = "attachments/" + kwargs["path"]
         assert ".." not in kwargs["path"]
-        return FileResponse(public_file_storage.open(path))
+        return FileResponse(private_file_storage.open(path))

@@ -397,6 +397,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 "uuid": str(template.uuid),
                 "variables": template_data.get("variables", []),
                 "locale": template_data.get("locale", None),
+                "category": template_data.get("category", None),
                 "is_carousel": template_data.get("is_carousel", False),
                 "carousel": template_data.get("carousel", []),
             }
@@ -419,22 +420,26 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         Create a new whatsapp broadcast to send out
         """
 
+        msg_data = self.validated_data.get("msg", {})
+
         # create the broadcast
-        broadcast = Broadcast.create(
-            self.context["org"],
-            self.context["user"],
-            groups=self.validated_data.get("groups", []),
-            contacts=self.validated_data.get("contacts", []),
-            urns=self.validated_data.get("urns", []),
-            template_state=Broadcast.TEMPLATE_STATE_UNEVALUATED,
-            msg=self.validated_data.get("msg", {}),
-            channel=self.validated_data.get("channel", None),
-            broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
-            queue=self.validated_data.get("queue", None),
-            name=self.validated_data.get("name", None),
-            template_id=self.validated_data.get("template_id", None),
-            is_bulk_send=True if self.validated_data.get("queue") == "template_batch" else False,
-        )
+        create_kwargs = {
+            "org": self.context["org"],
+            "user": self.context["user"],
+            "groups": self.validated_data.get("groups", []),
+            "contacts": self.validated_data.get("contacts", []),
+            "urns": self.validated_data.get("urns", []),
+            "template_state": Broadcast.TEMPLATE_STATE_UNEVALUATED,
+            "channel": self.validated_data.get("channel", None),
+            "broadcast_type": Broadcast.BROADCAST_TYPE_WHATSAPP,
+            "queue": self.validated_data.get("queue", None),
+            "name": self.validated_data.get("name", None),
+            "template_id": self.validated_data.get("template_id", None),
+            "is_bulk_send": True if self.validated_data.get("queue") == "template_batch" else False,
+            "msg": msg_data,
+        }
+
+        broadcast = Broadcast.create(**create_kwargs)
         # create optional catch-all trigger (uncaught message) for provided flow and groups
         trigger_flow = self.validated_data.get("trigger_flow")
         if trigger_flow and self.validated_data.get("queue") == "template_batch":
@@ -1332,7 +1337,7 @@ class FlowReadSerializer(ReadSerializer):
         return self.FLOW_TYPES.get(obj.flow_type)
 
     def get_labels(self, obj):
-        return [{"uuid": l.uuid, "name": l.name} for l in obj.labels.all()]
+        return [{"uuid": label.uuid, "name": label.name} for label in obj.labels.all()]
 
     def get_runs(self, obj):
         stats = obj.get_run_stats()
@@ -1497,6 +1502,13 @@ class FlowStartWriteSerializer(WriteSerializer):
         args = data.get("groups", []) + data.get("contacts", []) + data.get("urns", [])
         if not args:
             raise serializers.ValidationError("Must specify at least one group, contact or URN")
+
+        if not data.get("flow").is_mutable:
+            request = self.context.get("request")
+            if request and hasattr(request, "user"):
+                user = request.user
+                if not user.email.endswith(settings.MUTABLE_EDITOR_DOMAINS):
+                    raise serializers.ValidationError("Flow is  immutable and can't be manually started")
 
         return data
 
@@ -1936,14 +1948,23 @@ class TicketBulkActionSerializer(WriteSerializer):
     ACTION_ASSIGN = "assign"
     ACTION_ADD_NOTE = "add_note"
     ACTION_CHANGE_TOPIC = "change_topic"
+    ACTION_CHANGE_TICKETER = "change_ticketer"
     ACTION_CLOSE = "close"
     ACTION_REOPEN = "reopen"
-    ACTION_CHOICES = (ACTION_ASSIGN, ACTION_ADD_NOTE, ACTION_CHANGE_TOPIC, ACTION_CLOSE, ACTION_REOPEN)
+    ACTION_CHOICES = (
+        ACTION_ASSIGN,
+        ACTION_ADD_NOTE,
+        ACTION_CHANGE_TOPIC,
+        ACTION_CHANGE_TICKETER,
+        ACTION_CLOSE,
+        ACTION_REOPEN,
+    )
 
     tickets = fields.TicketField(many=True)
     action = serializers.ChoiceField(required=True, choices=ACTION_CHOICES)
     assignee = fields.UserField(required=False, allow_null=True, assignable_only=True)
     topic = fields.TopicField(required=False)
+    ticketer = fields.TicketerField(required=False)
     note = serializers.CharField(required=False, max_length=Ticket.MAX_NOTE_LEN)
 
     def validate(self, data):
@@ -1955,6 +1976,8 @@ class TicketBulkActionSerializer(WriteSerializer):
             raise serializers.ValidationError('For action "%s" you must specify the note' % action)
         elif action == self.ACTION_CHANGE_TOPIC and not data.get("topic"):
             raise serializers.ValidationError('For action "%s" you must specify the topic' % action)
+        elif action == self.ACTION_CHANGE_TICKETER and not data.get("ticketer"):
+            raise serializers.ValidationError('For action "%s" you must specify the ticketer' % action)
 
         return data
 
@@ -1966,6 +1989,7 @@ class TicketBulkActionSerializer(WriteSerializer):
         assignee = self.validated_data.get("assignee")
         note = self.validated_data.get("note")
         topic = self.validated_data.get("topic")
+        ticketer = self.validated_data.get("ticketer")
 
         if action == self.ACTION_ASSIGN:
             Ticket.bulk_assign(org, user, tickets, assignee=assignee, note=note)
@@ -1973,6 +1997,8 @@ class TicketBulkActionSerializer(WriteSerializer):
             Ticket.bulk_add_note(org, user, tickets, note=note)
         elif action == self.ACTION_CHANGE_TOPIC:
             Ticket.bulk_change_topic(org, user, tickets, topic=topic)
+        elif action == self.ACTION_CHANGE_TICKETER:
+            Ticket.bulk_change_ticketer(org, user, tickets, ticketer=ticketer)
         elif action == self.ACTION_CLOSE:
             Ticket.bulk_close(org, user, tickets)
         elif action == self.ACTION_REOPEN:

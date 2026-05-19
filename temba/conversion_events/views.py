@@ -58,6 +58,9 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
 
             # If we have CTWA data, try to send to Meta
             if ctwa_data:
+                print("\n=== PROCESSANDO CTWA ===")
+                print(f"CTWA encontrado com waba: {ctwa_data.waba}")
+                print(f"CTWA encontrado com ctwa_clid: {ctwa_data.ctwa_clid}")
                 dataset_id = self._get_channel_dataset_id(channel_uuid)
                 if dataset_id:
                     # Build payload for Meta Conversion API
@@ -188,6 +191,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             )
 
         except Exception as e:
+            print(f"\nERRO ao buscar CTWA: {str(e)}\n")
             logger.error(f"Error fetching CTWA data: {str(e)}")
             return None
 
@@ -211,7 +215,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
         event_time = int(datetime.now().timestamp())
 
         # Map event types for Meta
-        event_name_map = {"lead": "LeadSubmitted", "purchase": "Purchase"}
+        event_name_map = {"lead": "LeadSubmitted", "purchase": "Purchase", "abandoned_cart": "AbandonedCart"}
 
         # Payload following the specified format for Meta
         meta_event = {
@@ -225,8 +229,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             },
         }
 
-        # Add value and currency only for purchase events
-        if event_type == "purchase":
+        if event_type in ("purchase", "abandoned_cart"):
             value = original_payload.get("value")
             currency = original_payload.get("currency", "BRL")  # Default to BRL if not provided
             if value:

@@ -304,6 +304,7 @@ INSTALLED_APPS = (
     "django.contrib.sitemaps",
     "django.contrib.postgres",
     "django.forms",
+    # ""
     # Haml-like templates
     "hamlpy",
     # Redis cache
@@ -353,6 +354,7 @@ INSTALLED_APPS = (
     "temba.projects",
     "temba.event_driven",
     "temba.conversion_events",
+    "temba.sqs",
 )
 
 # the last installed app that uses smartmin permissions
@@ -579,6 +581,7 @@ PERMISSIONS = {
     "tickets.ticketer": ("api", "connect", "configure"),
     "tickets.topic": ("api",),
     "triggers.trigger": ("archived", "type"),
+    "wpp_flows.whatsapp_flows": ("api"),
 }
 
 
@@ -815,6 +818,7 @@ GROUP_PERMISSIONS = {
         "tickets.topic.*",
         "triggers.trigger.*",
         "externals.external_services_api",
+        "wpp_flows.whatsapp_flows_api",
     ),
     "Editors": (
         "api.apitoken_refresh",
@@ -927,6 +931,7 @@ GROUP_PERMISSIONS = {
         "tickets.topic_api",
         "triggers.trigger.*",
         "externals.external_services_api",
+        "wpp_flows.whatsapp_flows_api",
     ),
     "Viewers": (
         "campaigns.campaign_archived",
@@ -1016,6 +1021,7 @@ GROUP_PERMISSIONS = {
         "triggers.trigger_list",
         "triggers.trigger_type",
         "externals.external_services_api",
+        "wpp_flows.whatsapp_flows_api",
     ),
     "Agents": (
         "contacts.contact_api",
@@ -1425,6 +1431,7 @@ ORG_LIMIT_DEFAULTS = {
 SQUASH_BATCH_SIZE = int(os.environ.get("SQUASH_BATCH_SIZE", 5000))
 
 FLOW_CATEGORY_COUNT_SQUASH_BATCH_SIZE = int(os.environ.get("FLOW_CATEGORY_COUNT_SQUASH_BATCH_SIZE", 100))
+FLOW_CATEGORY_COUNT_DELETE_BATCH_LIMIT = int(os.environ.get("FLOW_CATEGORY_COUNT_DELETE_BATCH_LIMIT", 10000))
 
 # -----------------------------------------------------------------------------------
 # Data retention periods - tasks trim away data older than these settings
@@ -1472,6 +1479,8 @@ FLOWEDITOR_SENTRY_DSN = os.environ.get("FLOWEDITOR_SENTRY_DSN", default="")
 
 INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
 
+DATALAKE_SERVER_ADDRESS = os.environ.get("DATALAKE_SERVER_ADDRESS", default="localhost:50051")
+
 FLOW_PATH_RECENT_RUN_BATCH_SIZE = os.environ.get("FLOW_PATH_RECENT_RUN_BATCH_SIZE", default=50)
 
 LAMBDA_VALIDATION_URL = os.environ.get("LAMBDA_VALIDATION_URL", default="")
@@ -1494,6 +1503,9 @@ try:
         JWT_PUBLIC_KEY = f.read()
 except FileNotFoundError:
     JWT_PUBLIC_KEY = None
+
+# JWT secret key
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", default="")
 
 WENI_VOICE_TOKEN = os.environ.get("WENI_VOICE_TOKEN", default="")
 

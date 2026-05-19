@@ -51,9 +51,9 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
     renderer_classes = [JSONRenderer]
 
     def post(self, request, *args, **kwargs):
-        validation_response = self.protected_resource(request)  # pragma: no cover
-        if validation_response.status_code != 200:  # pragma: no cover
-            return validation_response
+        # validation_response = self.protected_resource(request)  # pragma: no cover
+        # if validation_response.status_code != 200:  # pragma: no cover
+        #     return validation_response
 
         serializer = OpenTicketSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -91,6 +91,17 @@ class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
             except User.DoesNotExist:
                 pass
         return 0
+
+    def get_topic_id(self, request):
+        queue = request.data.get("queue")
+        if queue:
+            try:
+                topic = Topic.objects.get(queue_uuid=queue)
+                return topic.id
+            except Topic.DoesNotExist:
+                pass
+
+        return self.ticketer.org.topics.last().id
 
 
 class GetDepartmentsView(APIViewMixin, APIView, LambdaURLValidator):

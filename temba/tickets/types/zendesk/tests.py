@@ -18,11 +18,14 @@ class ClientTest(TembaTest):
         client = Client("acme")
 
         with patch("requests.post") as mock_post:
-            mock_post.return_value = MockResponse(200, '{"access_token": "987654321"}')
+            mock_post.return_value = MockResponse(
+                200, '{"access_token": "987654321", "refresh_token": "refresh123"}'
+            )
 
-            token = client.get_oauth_token("123-abc", "sesame", "mycode", "http://backhere.com")
+            access_token, refresh_token = client.get_oauth_token("123-abc", "sesame", "mycode", "http://backhere.com")
 
-            self.assertEqual("987654321", token)
+            self.assertEqual("987654321", access_token)
+            self.assertEqual("refresh123", refresh_token)
             mock_post.assert_called_once_with(
                 "https://acme.zendesk.com/oauth/tokens",
                 json={
@@ -39,6 +42,34 @@ class ClientTest(TembaTest):
 
             with self.assertRaises(ClientError):
                 client.get_oauth_token("123-abc", "sesame", "mycode", "http://backhere.com")
+
+    def test_refresh_oauth_token(self):
+        client = Client("acme")
+
+        with patch("requests.post") as mock_post:
+            mock_post.return_value = MockResponse(
+                200, '{"access_token": "new_access_token", "refresh_token": "new_refresh_token"}'
+            )
+
+            access_token, refresh_token = client.refresh_oauth_token("123-abc", "sesame", "refresh123")
+
+            self.assertEqual("new_access_token", access_token)
+            self.assertEqual("new_refresh_token", refresh_token)
+            mock_post.assert_called_once_with(
+                "https://acme.zendesk.com/oauth/tokens",
+                json={
+                    "grant_type": "refresh_token",
+                    "refresh_token": "refresh123",
+                    "client_id": "123-abc",
+                    "client_secret": "sesame",
+                    "scope": "read write",
+                },
+            )
+
+            mock_post.return_value = MockResponse(400, "problem")
+
+            with self.assertRaises(ClientError):
+                client.refresh_oauth_token("123-abc", "sesame", "refresh123")
 
 
 class ZendeskTypeTest(TembaTest):
@@ -82,9 +113,19 @@ class ZendeskTypeTest(TembaTest):
             response, "form", "subdomain", ["There is already a ticketing service configured for this subdomain."]
         )
 
+        # dedup must also catch the same subdomain typed with different casing or whitespace
+        response = self.client.post(connect_url, {"subdomain": "  ChispA  "})
+        self.assertFormError(
+            response, "form", "subdomain", ["There is already a ticketing service configured for this subdomain."]
+        )
+
         # submitting with valid subdomain redirects us to Zendesk
         response = self.client.post(connect_url, {"subdomain": "acme"}, follow=False)
         self.assertIn("https://acme.zendesk.com/oauth/authorizations/new?response_type=code", response.url)
+
+        # capitalized input must be normalized to lowercase before the redirect
+        response = self.client.post(connect_url, {"subdomain": "  ACME2  "}, follow=False)
+        self.assertIn("https://acme2.zendesk.com/oauth/authorizations/new?response_type=code", response.url)
 
         # if user doesn't authenticate, Zendesk returns to us with an error, which we display to the user
         response = self.client.get(connect_url + "?error=auth&error_description=thing%20went%20wrong")
@@ -100,15 +141,31 @@ class ZendeskTypeTest(TembaTest):
 
             # but if it succeeds...
             mock_get_oauth_token.side_effect = None
-            mock_get_oauth_token.return_value = "236272"
+            mock_get_oauth_token.return_value = ("236272", "refresh_abc")
 
             # ticketer will be created and user should be redirected to the configure page
             response = self.client.get(connect_url + "?code=please&state=temba")
 
             ticketer = Ticketer.objects.filter(ticketer_type="zendesk", is_active=True).order_by("id").last()
             self.assertEqual("temba", ticketer.name)
-            self.assertEqual({"oauth_token": "236272", "secret": "RAND346", "subdomain": "temba"}, ticketer.config)
+            self.assertEqual(
+                {
+                    "oauth_token": "236272",
+                    "refresh_token": "refresh_abc",
+                    "secret": "RAND346",
+                    "subdomain": "temba",
+                },
+                ticketer.config,
+            )
             self.assertRedirect(response, reverse("tickets.types.zendesk.configure", args=[ticketer.uuid]))
+
+            # if Zendesk happens to round-trip the state with different casing, the stored
+            # subdomain must still be lowercase so it matches what Zendesk POSTs to admin_ui later
+            response = self.client.get(connect_url + "?code=please&state=Temba2")
+
+            ticketer = Ticketer.objects.filter(ticketer_type="zendesk", is_active=True).order_by("id").last()
+            self.assertEqual("temba2", ticketer.name)
+            self.assertEqual("temba2", ticketer.config["subdomain"])
 
     def test_configure(self):
         ticketer = Ticketer.create(
@@ -222,14 +279,16 @@ class ZendeskTypeTest(TembaTest):
         )
         self.assertFormError(response, "form", "secret", "Secret is incorrect.")
 
-        # try submitting with correct secret
+        # secret lookup must tolerate Zendesk POSTing the subdomain with a different casing
+        # than what we have stored (we store everything lowercase, but Zendesk's POST is the
+        # source of truth for casing on its side and we must match against our normalized value)
         response = self.client.post(
             admin_url,
             {
                 "name": "My Channel",
                 "secret": "SECRET346",
                 "return_url": "https://example.zendesk.com",
-                "subdomain": "example",
+                "subdomain": "Example",
                 "locale": "en-US",
                 "instance_push_id": "push1234",
                 "zendesk_access_token": "sesame",

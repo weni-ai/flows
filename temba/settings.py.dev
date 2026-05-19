@@ -151,6 +151,17 @@ if USE_EDA:
 
 BOTHUB_SYNC_INTENTS_URL = os.environ.get("BOTHUB_SYNC_INTENTS_URL", default="https://nlp.bothub.it/info/")
 
+# SQS Consumer Configuration (for agent-toolkit broadcasts)
+USE_SQS_CONSUMER = os.environ.get("USE_SQS_CONSUMER", "False").lower() == "true"
+
+if USE_SQS_CONSUMER:
+    SQS_AWS_REGION = os.environ.get("SQS_AWS_REGION", "us-east-1")
+    SQS_BROADCAST_QUEUE_URL = os.environ.get("SQS_BROADCAST_QUEUE_URL", "")
+    # Number of parallel threads per worker
+    SQS_CONSUMER_THREADS = int(os.environ.get("SQS_CONSUMER_THREADS", "10"))
+    # Max seconds to wait for a single message to be processed
+    SQS_CONSUMER_TASK_TIMEOUT = int(os.environ.get("SQS_CONSUMER_TASK_TIMEOUT", "120"))
+
 ROUTER_FIXED_ACCESS_TOKEN = os.environ.get("ROUTER_FIXED_ACCESS_TOKEN", default="")
 BILLING_FIXED_ACCESS_TOKEN = ""
 COURIER_FIXED_ACCESS_TOKEN = os.environ.get("COURIER_FIXED_ACCESS_TOKEN", default="")

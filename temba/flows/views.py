@@ -56,7 +56,7 @@ from temba.utils.fields import (
     SelectMultipleWidget,
     SelectWidget,
 )
-from temba.utils.s3 import public_file_storage
+from temba.utils.s3 import private_file_storage
 from temba.utils.text import slugify_with
 from temba.utils.uuid import uuid4
 from temba.utils.views import BulkActionMixin, SpaMixin
@@ -767,7 +767,7 @@ class FlowCRUDL(SmartCRUDL):
 
         def save_recording_upload(self, file, actionset_id, action_uuid):  # pragma: needs cover
             flow = self.get_object()
-            return public_file_storage.save(
+            return private_file_storage.save(
                 "recordings/%d/%d/steps/%s.wav" % (flow.org.pk, flow.id, action_uuid), file
             )
 
@@ -786,7 +786,7 @@ class FlowCRUDL(SmartCRUDL):
             if extension == "m4a":
                 file.content_type = "audio/mp4"
 
-            url = public_file_storage.save(
+            url = private_file_storage.save(
                 "attachments/%d/%d/steps/%s/%s" % (flow.org.pk, flow.id, random_uuid_folder_name, file.name), file
             )
             return {"type": file.content_type, "url": f"{settings.STORAGE_URL}/{url}"}
@@ -1085,8 +1085,9 @@ class FlowCRUDL(SmartCRUDL):
             facebook_channel = org.get_channel(Channel.ROLE_SEND, scheme=URN.FACEBOOK_SCHEME)
             instagram_channel = org.get_channel(Channel.ROLE_SEND, scheme=URN.INSTAGRAM_SCHEME)
             whatsapp_channel = org.get_channel(Channel.ROLE_SEND, scheme=URN.WHATSAPP_SCHEME)
+            instagram_channel = org.get_channel(Channel.ROLE_SEND, scheme=URN.INSTAGRAM_SCHEME)
 
-            if facebook_channel:
+            if facebook_channel or instagram_channel:
                 features.append("facebook")
             if instagram_channel:
                 features.append("instagram")
