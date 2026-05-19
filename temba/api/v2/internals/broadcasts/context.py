@@ -1,8 +1,6 @@
 """
-Shared resolve logic for WhatsApp broadcast internal endpoints (sync, deferred, FastAPI bridge).
+Shared resolve logic for WhatsApp broadcast internal endpoints (Django sync + FastAPI bridge).
 """
-
-import json
 
 from django.contrib.auth import get_user_model
 
@@ -10,11 +8,6 @@ from temba.orgs.models import Org
 
 
 User = get_user_model()
-
-
-def celery_json_safe_broadcast_payload(data: dict) -> dict:
-    """Round-trip so UUID/datetime/other values become JSON-compatible for Celery brokers."""
-    return json.loads(json.dumps(data, default=str))
 
 
 def resolve_org_and_user_internal_whatsapp(*, drf_request, data):

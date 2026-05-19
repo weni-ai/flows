@@ -13,11 +13,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
-from temba.api.tasks import whatsapp_broadcast_deferred_task
-from temba.api.v2.internals.broadcasts.context import (
-    celery_json_safe_broadcast_payload,
-    resolve_org_and_user_internal_whatsapp,
-)
+from temba.api.v2.internals.broadcasts.context import resolve_org_and_user_internal_whatsapp
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.api.v2.serializers import WhatsappBroadcastReadSerializer, WhatsappBroadcastWriteSerializer
@@ -91,34 +87,6 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
                 return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
             return Response(serializer.errors, status=400)
-
-
-class InternalWhatsappBroadcastsDeferredEndpoint(APIViewMixin, APIView):
-    """
-    Accepts the same payload as InternalWhatsappBroadcastsEndpoint but enqueues work to Celery.
-
-    Returns 202 with task_id immediately. Full validation happens in the worker; HTTP clients do not receive
-    business validation failures synchronously when the Celery serializer path is configured for JSON payloads.
-    """
-
-    authentication_classes = [OptionalJWTAuthentication, InternalOIDCAuthentication]
-    permission_classes = [(IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)) | HasValidJWT]
-
-    def post(self, request, *args, **kwargs):
-        with traceforest_whatsapp_broadcast("internal_whatsapp_broadcast_async"):
-            data = dict(request.data)
-            try:
-                org, user = resolve_org_and_user_internal_whatsapp(drf_request=request, data=data)
-            except ValueError as e:
-                msg = str(e)
-                if msg == "Project not found":
-                    return Response({"error": msg}, status=404)
-                return Response({"error": msg}, status=401)
-
-            payload = celery_json_safe_broadcast_payload(dict(request.data))
-            async_result = whatsapp_broadcast_deferred_task.delay(org.pk, user.pk, payload)
-
-            return Response({"status": "accepted", "task_id": async_result.id}, status=status.HTTP_202_ACCEPTED)
 
 
 class InternalBroadcastStatisticsEndpoint(APIViewMixin, APIView):
