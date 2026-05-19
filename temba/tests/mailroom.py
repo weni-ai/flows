@@ -20,7 +20,7 @@ from temba.mailroom.client import ContactSpec, MailroomClient, MailroomException
 from temba.mailroom.modifiers import Modifier
 from temba.orgs.models import Org
 from temba.tests.dates import parse_datetime
-from temba.tickets.models import Ticket, TicketEvent, Ticketer, Topic
+from temba.tickets.models import Ticket, Ticketer, TicketEvent, Topic
 from temba.utils import format_number, get_anonymous_user, json
 from temba.utils.cache import incrby_existing
 

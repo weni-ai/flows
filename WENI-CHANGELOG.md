@@ -1,3 +1,14 @@
+3.74.0
+----------
+* feat: Avoid subdomain error in Zendesk integration
+* feat: Update filter_templates endpoint documentation
+* feat: Add JWT authentication on internal first contacts endpoint
+
+3.73.0
+----------
+* Add sector_uuid filter in ticketer.json API
+* Add change_ticketer action in TicketActions endpoint
+
 3.72.0
 ----------
 * feat: Implement Idempotency-Key support for WhatsApp broadcasts endpoint

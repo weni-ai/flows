@@ -2645,9 +2645,15 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
      * **modified_on** - when this contact was last modified (datetime).
      * **last_seen_on** - when this contact last communicated with us (datetime).
 
+    **Filters:**
+
+     * **template** (required) - filter by the template **name** (string). UUID is not supported. ex: `template=template_test`
+     * **before** (optional) - only return contacts whose last message was sent before this date. ex: `before=2024-01-01`
+     * **after** (optional) - only return contacts whose last message was sent after this date. ex: `after=2023-01-01`
+
     Example:
 
-        GET /api/v2/filter_templates.json
+        GET /api/v2/filter_templates.json?template=template_test
 
     Response containing the contacts for your organization:
 
@@ -2794,18 +2800,18 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
             "params": [
                 {
                     "name": "template",
-                    "required": False,
-                    "help": "Only return contacts for this template, ex: template=template_test",
+                    "required": True,
+                    "help": "The template name to filter by. Must be the template name, not UUID. ex: template=template_test",
                 },
                 {
                     "name": "before",
                     "required": False,
-                    "help": "Only return contacts for this template before the date, ex: before=2024-01-01",
+                    "help": "Only return contacts whose last message was sent before this date. ex: before=2024-01-01",
                 },
                 {
                     "name": "after",
                     "required": False,
-                    "help": "Only return contacts for this template after the data, ex: after=2023-01-01",
+                    "help": "Only return contacts whose last message was sent after this date. ex: after=2023-01-01",
                 },
             ],
         }

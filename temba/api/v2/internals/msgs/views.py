@@ -197,10 +197,7 @@ class FirstContactsPagination(LimitOffsetPagination):
     max_limit = 1000
 
 
-class InternalFirstContactsView(APIViewMixin, APIView):
-    authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
-
+class InternalFirstContactsView(JWTAuthMixinRequired, APIViewMixin, APIView):
     def get(self, request, *args, **kwargs):
         project_uuid = request.query_params.get("project_uuid")
 
