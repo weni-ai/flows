@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from temba.fastapi_app.auth import verify_jwt
-from temba.fastapi_app.main import app, post_internal_whatsapp_broadcast
+from temba.fastapi_app.broadcasts import app, post_internal_whatsapp_broadcast
 from temba.tests.base import TembaTest
 
 
