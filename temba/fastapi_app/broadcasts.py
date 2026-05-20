@@ -1,27 +1,25 @@
 import os
 
-from typing import Annotated, Optional
+from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, status as http_status  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
+from rest_framework.request import Request  # noqa: E402
+from rest_framework.test import APIRequestFactory  # noqa: E402
+
+import django  # noqa: E402
+
+from temba.api.v2.internals.broadcasts.context import resolve_org_and_user_internal_whatsapp  # noqa: E402
+from temba.api.v2.serializers import WhatsappBroadcastReadSerializer, WhatsappBroadcastWriteSerializer  # noqa: E402
+from temba.fastapi_app.auth import verify_jwt  # noqa: E402
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "temba.settings")
 
-import django
 
 django.setup()
 
-from fastapi import Body, APIRouter, FastAPI, Header, HTTPException, status as http_status
-from fastapi.responses import JSONResponse
-from rest_framework.request import Request
-from rest_framework.test import APIRequestFactory
-
-from temba.api.auth.jwt import OptionalJWTAuthentication
-from temba.api.v2.internals.broadcasts.context import resolve_org_and_user_internal_whatsapp
-from temba.api.v2.serializers import (
-    WhatsappBroadcastReadSerializer,
-    WhatsappBroadcastWriteSerializer,
-)
 
 app = FastAPI(title="Temba WhatsApp broadcasts (prototype)", version="0")
 app_fastapi = APIRouter(prefix="/fastapi")
+
 
 @app.get("/")
 @app.get("/health")
@@ -30,31 +28,29 @@ app_fastapi = APIRouter(prefix="/fastapi")
 def health():
     return {"status": "ok"}
 
+
 @app_fastapi.post("/internal/whatsapp_broadcasts")
 def post_internal_whatsapp_broadcast(
     body: dict = Body(...),
-    authorization: Annotated[Optional[str], Header()] = None,
+    jwt_payload: dict = Depends(verify_jwt),
 ):
     """
-    Same semantics as Django InternalWhatsappBroadcastsEndpoint with DRF serializers.
+    POST mirrors Django InternalWhatsappBroadcastsEndpoint with DRF serializers.
 
-    Bearer JWT behaves like OptionalJWTAuthentication on the Django route. OIDC internal auth used by Django
-    is not replicated here yet.
+    Requires a valid Bearer JWT signed with settings.JWT_PUBLIC_KEY. Any auth failure
+    (missing/invalid/expired token or missing public key) returns 403 from verify_jwt.
     """
     factory = APIRequestFactory()
-    headers = {}
-    if authorization:
-        headers["HTTP_AUTHORIZATION"] = authorization
-
     django_request = factory.post(
         "/api/v2/internals/whatsapp_broadcasts",
         body,
         format="json",
-        **headers,
     )
     drf_request = Request(django_request)
-
-    OptionalJWTAuthentication().authenticate(drf_request)
+    setattr(drf_request, "jwt_payload", jwt_payload)
+    project_uuid_from_jwt = jwt_payload.get("project_uuid") or jwt_payload.get("project")
+    if project_uuid_from_jwt:
+        setattr(drf_request, "project_uuid", project_uuid_from_jwt)
 
     try:
         org, user = resolve_org_and_user_internal_whatsapp(drf_request=drf_request, data=dict(body))
@@ -78,5 +74,6 @@ def post_internal_whatsapp_broadcast(
         return JSONResponse(content=dict(read_serializer.data), status_code=http_status.HTTP_201_CREATED)
 
     return JSONResponse(content=serializer.errors, status_code=http_status.HTTP_400_BAD_REQUEST)
+
 
 app.include_router(app_fastapi)

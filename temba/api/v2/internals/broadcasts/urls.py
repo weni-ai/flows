@@ -8,7 +8,6 @@ from .views import (
     InternalBroadcastStatisticMontlyEndpoint,
     InternalBroadcastStatisticsEndpoint,
     InternalBroadcastsUploadMediaEndpoint,
-    InternalWhatsappBroadcastsDeferredEndpoint,
     InternalWhatsappBroadcastsEndpoint,
 )
 
@@ -16,11 +15,6 @@ router = routers.DefaultRouter()
 router.register(r"broadcasts", BroadcastsViewSet, basename="broadcasts")
 
 urlpatterns = [
-    path(
-        "whatsapp_broadcasts/async",
-        InternalWhatsappBroadcastsDeferredEndpoint.as_view(),
-        name="internal-whatsapp-broadcasts-async",
-    ),
     path(
         "whatsapp_broadcasts",
         InternalWhatsappBroadcastsEndpoint.as_view(),

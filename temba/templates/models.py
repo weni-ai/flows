@@ -223,6 +223,8 @@ class TemplateTranslation(models.Model):
             body_value = body[:2048] if body is not None else None
             footer_value = footer[:60] if footer is not None else None
 
+            category_changed = existing.template.category != category
+
             if (
                 existing.status != status
                 or existing.content != content
@@ -230,6 +232,7 @@ class TemplateTranslation(models.Model):
                 or existing.language != language
                 or (body is not None and existing.body != body_value)
                 or (footer is not None and existing.footer != footer_value)
+                or category_changed
             ):
                 existing.status = status
                 existing.content = content
@@ -259,7 +262,11 @@ class TemplateTranslation(models.Model):
                 existing.save(update_fields=[*update_fields])
 
                 existing.template.modified_on = timezone.now()
-                existing.template.save(update_fields=["modified_on"])
+                template_update_fields = ["modified_on"]
+                if category_changed:
+                    existing.template.category = category
+                    template_update_fields.append("category")
+                existing.template.save(update_fields=template_update_fields)
 
         return existing
 

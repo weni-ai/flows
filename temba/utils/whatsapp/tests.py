@@ -197,6 +197,39 @@ class WhatsAppUtilsTest(TembaTest):
         self.assertEqual(TemplateTranslation.STATUS_UNSUPPORTED_LANGUAGE, ct.status)
         self.assertEqual("foo_namespace", ct.namespace)
 
+    def test_update_local_templates_updates_category(self):
+        channel = self.create_channel("WA", "channel", "5678", config={"fb_namespace": "ns"})
+
+        initial_data = [
+            {
+                "name": "order_update",
+                "components": [{"type": "BODY", "text": "Your order {{1}} is ready"}],
+                "language": "en",
+                "status": "APPROVED",
+                "category": "UTILITY",
+                "id": "tmpl-cat-1",
+            },
+        ]
+        update_local_templates(channel, initial_data)
+
+        template = Template.objects.get(org=self.org, name="order_update")
+        self.assertEqual(template.category, "UTILITY")
+
+        updated_data = [
+            {
+                "name": "order_update",
+                "components": [{"type": "BODY", "text": "Your order {{1}} is ready"}],
+                "language": "en",
+                "status": "APPROVED",
+                "category": "MARKETING",
+                "id": "tmpl-cat-1",
+            },
+        ]
+        update_local_templates(channel, updated_data)
+
+        template.refresh_from_db()
+        self.assertEqual(template.category, "MARKETING")
+
     def test_update_local_templates_dialog360(self):
         # no namespace in channel config
         channel = self.create_channel("D3", "channel", "1234", config={})
