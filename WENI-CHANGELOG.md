@@ -1,3 +1,8 @@
+3.75.0
+----------
+* feat: Add FastAPI server configuration to Docker start script
+* feat: FastAPI endpoint for WhatsApp broadcasts
+
 3.74.0
 ----------
 * feat: Avoid subdomain error in Zendesk integration
