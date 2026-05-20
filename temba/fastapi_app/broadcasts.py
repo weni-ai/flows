@@ -1,21 +1,11 @@
-import os
+from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, status as http_status
+from fastapi.responses import JSONResponse
+from rest_framework.request import Request
+from rest_framework.test import APIRequestFactory
 
-from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, status as http_status  # noqa: E402
-from fastapi.responses import JSONResponse  # noqa: E402
-from rest_framework.request import Request  # noqa: E402
-from rest_framework.test import APIRequestFactory  # noqa: E402
-
-import django  # noqa: E402
-
-from temba.api.v2.internals.broadcasts.context import resolve_org_and_user_internal_whatsapp  # noqa: E402
-from temba.api.v2.serializers import WhatsappBroadcastReadSerializer, WhatsappBroadcastWriteSerializer  # noqa: E402
-from temba.fastapi_app.auth import verify_jwt  # noqa: E402
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "temba.settings")
-
-
-django.setup()
-
+from temba.api.v2.internals.broadcasts.context import resolve_org_and_user_internal_whatsapp
+from temba.api.v2.serializers import WhatsappBroadcastReadSerializer, WhatsappBroadcastWriteSerializer
+from temba.fastapi_app.auth import verify_jwt
 
 app = FastAPI(title="Temba WhatsApp broadcasts (prototype)", version="0")
 app_fastapi = APIRouter(prefix="/fastapi")

@@ -1,3 +1,7 @@
+3.75.1
+----------
+* fix: Restructure FastAPI initialization and improve module imports
+
 3.75.0
 ----------
 * feat: Add FastAPI server configuration to Docker start script
