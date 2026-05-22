@@ -1,3 +1,7 @@
+3.76.0
+----------
+* feat: Add session field to auto-create contact fields
+
 3.75.1
 ----------
 * fix: Restructure FastAPI initialization and improve module imports
