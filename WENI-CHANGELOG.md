@@ -1,3 +1,7 @@
+3.75.0
+----------
+* feat: Add session field to auto-create contact fields
+
 3.74.0
 ----------
 * feat: Avoid subdomain error in Zendesk integration
