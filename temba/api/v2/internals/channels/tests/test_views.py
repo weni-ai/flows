@@ -32,9 +32,13 @@ class ChannelProjectViewTest(TembaTest):
     def test_get_channel_projects(self):
         with override_settings(BILLING_FIXED_ACCESS_TOKEN="12345"):
 
-            project = Project.objects.create(name="Test project", created_by=self.user, modified_by=self.user)
+            project = Project.objects.create(
+                name="Test project", created_by=self.user, modified_by=self.user
+            )
             channel = self.create_channel("TG", "Test Channel", "test", org=project.org)
-            channel_wac = self.create_channel("WAC", "Test WAC Channel", "74123456789", org=project.org)
+            channel_wac = self.create_channel(
+                "WAC", "Test WAC Channel", "74123456789", org=project.org
+            )
             channel_wac.config = {
                 "wa_waba_id": "12345678910",
                 "wa_number": "+55 00 900001234",
@@ -60,9 +64,94 @@ class ChannelProjectViewTest(TembaTest):
             self.assertEqual(result.get("project_uuid"), str(project.project_uuid))
 
             self.assertEqual(result_wac.get("channel_uuid"), str(channel_wac.uuid))
-            self.assertEqual(result_wac.get("waba"), str(channel_wac.config.get("wa_waba_id")))
-            self.assertEqual(result_wac.get("phone_number"), str(channel_wac.config.get("wa_number")))
+            self.assertEqual(
+                result_wac.get("waba"), str(channel_wac.config.get("wa_waba_id"))
+            )
+            self.assertEqual(
+                result_wac.get("phone_number"), str(channel_wac.config.get("wa_number"))
+            )
             self.assertEqual(result_wac.get("project_uuid"), str(project.project_uuid))
+
+
+class ChannelsByProjectInternalViewTest(TembaTest):
+    """Service-to-service variant of ``InternalChannelView`` (token-based auth).
+
+    Used by the billing entity-sync cascade to bulk-hydrate every active channel
+    of a project in a single call.
+    """
+
+    def test_request_without_token(self):
+        url = "/api/v2/internals/channels-by-project-internal"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_request_with_invalid_token(self):
+        url = "/api/v2/internals/channels-by-project-internal?token=invalidtoken"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_request_without_project_uuid(self):
+        with override_settings(BILLING_FIXED_ACCESS_TOKEN="12345"):
+            url = "/api/v2/internals/channels-by-project-internal?token=12345"
+            response = self.client.get(url)
+
+            self.assertEqual(response.status_code, 400)
+
+    def test_returns_active_channels_for_project(self):
+        with override_settings(BILLING_FIXED_ACCESS_TOKEN="12345"):
+            project = Project.objects.create(
+                name="Test project", created_by=self.user, modified_by=self.user
+            )
+            active = self.create_channel(
+                "TG", "Active Channel", "active", org=project.org
+            )
+            wac = self.create_channel(
+                "WAC", "WAC Channel", "74123456789", org=project.org
+            )
+            wac.config = {
+                "wa_waba_id": "waba-1",
+                "wa_number": "+5500900001234",
+                "is_demo": False,
+            }
+            wac.save()
+            inactive = self.create_channel(
+                "TG", "Inactive Channel", "inactive", org=project.org
+            )
+            inactive.is_active = False
+            inactive.save()
+
+            url = f"/api/v2/internals/channels-by-project-internal?token=12345&project_uuid={project.project_uuid}"
+            response = self.client.get(url)
+            data = response.json()
+
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("results", data)
+            uuids = {entry["uuid"] for entry in data["results"]}
+            self.assertIn(str(active.uuid), uuids)
+            self.assertIn(str(wac.uuid), uuids)
+            self.assertNotIn(str(inactive.uuid), uuids)
+
+            wac_entry = next(
+                entry for entry in data["results"] if entry["uuid"] == str(wac.uuid)
+            )
+            self.assertEqual(wac_entry["channel_type"], "WAC")
+            self.assertEqual(wac_entry["waba"], "waba-1")
+            self.assertEqual(wac_entry["phone_number"], "+5500900001234")
+            self.assertFalse(wac_entry["config"]["is_demo"])
+
+    def test_returns_empty_when_project_has_no_channels(self):
+        with override_settings(BILLING_FIXED_ACCESS_TOKEN="12345"):
+            project = Project.objects.create(
+                name="Empty project", created_by=self.user, modified_by=self.user
+            )
+
+            url = f"/api/v2/internals/channels-by-project-internal?token=12345&project_uuid={project.project_uuid}"
+            response = self.client.get(url)
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json(), {"results": []})
 
 
 class PatchedJWTAuthMixin(JWTAuthMockMixin):
@@ -143,7 +232,9 @@ class ChannelElevenLabsApiKeyViewTest(PatchedJWTAuthMixin, TembaTest):
         response = self.client.get(self.url, **self.auth_headers)
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"channel_uuid": ["This field may not be null."]})
+        self.assertEqual(
+            response.json(), {"channel_uuid": ["This field may not be null."]}
+        )
 
     def test_request_with_nonexistent_channel_uuid(self):
         self._set_jwt_payload(channel_uuid=str(uuid.uuid4()))
@@ -162,7 +253,9 @@ class ChannelElevenLabsApiKeyViewTest(PatchedJWTAuthMixin, TembaTest):
         self.assertEqual(response.json(), {"detail": "ElevenLabs API key not found"})
 
     def test_request_channel_with_partial_voice_mode_config(self):
-        channel = self.create_channel("TG", "Test Channel", "test", config={"voice_mode": {"otherProvider": {}}})
+        channel = self.create_channel(
+            "TG", "Test Channel", "test", config={"voice_mode": {"otherProvider": {}}}
+        )
 
         self._set_jwt_payload(channel_uuid=str(channel.uuid))
         response = self.client.get(self.url, **self.auth_headers)
@@ -171,7 +264,9 @@ class ChannelElevenLabsApiKeyViewTest(PatchedJWTAuthMixin, TembaTest):
         self.assertEqual(response.json(), {"detail": "ElevenLabs API key not found"})
 
     def test_request_channel_with_elevenlabs_but_no_api_key(self):
-        channel = self.create_channel("TG", "Test Channel", "test", config={"voice_mode": {"elevenLabs": {}}})
+        channel = self.create_channel(
+            "TG", "Test Channel", "test", config={"voice_mode": {"elevenLabs": {}}}
+        )
 
         self._set_jwt_payload(channel_uuid=str(channel.uuid))
         response = self.client.get(self.url, **self.auth_headers)
@@ -199,8 +294,14 @@ class InternalChannelViewTest(TembaTest):
         super().setUp()
         self.url = "/api/v2/internals/channels-by-project"
 
-    @patch("temba.api.v2.internals.channels.views.InternalChannelView.authentication_classes", [])
-    @patch("temba.api.v2.internals.channels.views.InternalChannelView.permission_classes", [])
+    @patch(
+        "temba.api.v2.internals.channels.views.InternalChannelView.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.channels.views.InternalChannelView.permission_classes",
+        [],
+    )
     def test_missing_project_uuid(self):
         from temba.channels.models import Channel
 
@@ -209,18 +310,32 @@ class InternalChannelViewTest(TembaTest):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {"error": "project_uuid is required"})
 
-    @patch("temba.api.v2.internals.channels.views.InternalChannelView.authentication_classes", [])
-    @patch("temba.api.v2.internals.channels.views.InternalChannelView.permission_classes", [])
+    @patch(
+        "temba.api.v2.internals.channels.views.InternalChannelView.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.channels.views.InternalChannelView.permission_classes",
+        [],
+    )
     def test_project_not_found(self):
         from temba.channels.models import Channel
 
         Channel.objects.all().delete()
-        response = self.client.get(f"{self.url}?project_uuid=00000000-0000-0000-0000-000000000000")
+        response = self.client.get(
+            f"{self.url}?project_uuid=00000000-0000-0000-0000-000000000000"
+        )
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json(), {"error": "Project not found"})
 
-    @patch("temba.api.v2.internals.channels.views.InternalChannelView.authentication_classes", [])
-    @patch("temba.api.v2.internals.channels.views.InternalChannelView.permission_classes", [])
+    @patch(
+        "temba.api.v2.internals.channels.views.InternalChannelView.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.channels.views.InternalChannelView.permission_classes",
+        [],
+    )
     def test_no_active_channels(self):
         from temba.channels.models import Channel
 
@@ -229,8 +344,14 @@ class InternalChannelViewTest(TembaTest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"results": []})
 
-    @patch("temba.api.v2.internals.channels.views.InternalChannelView.authentication_classes", [])
-    @patch("temba.api.v2.internals.channels.views.InternalChannelView.permission_classes", [])
+    @patch(
+        "temba.api.v2.internals.channels.views.InternalChannelView.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.channels.views.InternalChannelView.permission_classes",
+        [],
+    )
     def test_active_channels(self):
         from temba.channels.models import Channel
 
@@ -243,7 +364,11 @@ class InternalChannelViewTest(TembaTest):
             "Test WAC Channel",
             "74123456789",
             org=self.org,
-            config={"wa_waba_id": "12345678910", "wa_number": "+55 00 900001234", "mmlite": True},
+            config={
+                "wa_waba_id": "12345678910",
+                "wa_number": "+55 00 900001234",
+                "mmlite": True,
+            },
         )
         channel_wac.is_active = True
         channel_wac.save()
