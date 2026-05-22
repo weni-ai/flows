@@ -1515,11 +1515,12 @@ class APITest(TembaTest):
         broadcast = Broadcast.objects.get(id=response.json()["id"])
         self.assertEqual(carousel_msg, broadcast.metadata)
 
-        # send a msg with direct_send and ttl_seconds
+        # send a msg with direct_send, ttl_seconds and direct_send_template_name
         msg_with_options = {
             "text": "Urgent message",
             "direct_send": True,
             "ttl_seconds": 3600,
+            "direct_send_template_name": "Test Template",
         }
         response = self.postJSON(
             url,
@@ -1566,6 +1567,18 @@ class APITest(TembaTest):
             },
         )
         self.assertResponseError(response, "msg", "ttl_seconds must be a non-negative integer")
+
+        # direct_send_template_name must be a string
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "contacts": [self.joe.uuid],
+                "msg": {"text": "Test", "direct_send_template_name": 1},
+            },
+        )
+        self.assertResponseError(response, "msg", "direct_send_template_name must be a string")
 
         # send a msg with a non whatsapp cloud defined channel
         response = self.postJSON(

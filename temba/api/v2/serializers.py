@@ -313,6 +313,8 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 raise serializers.ValidationError("ttl_seconds must be an integer")
             if value["ttl_seconds"] < 0:
                 raise serializers.ValidationError("ttl_seconds must be a non-negative integer")
+        if "direct_send_template_name" in value and not isinstance(value["direct_send_template_name"], str):
+            raise serializers.ValidationError("direct_send_template_name must be a string")
         return value
 
     def validate(self, data):
