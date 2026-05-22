@@ -1,6 +1,15 @@
-3.75.0
+3.76.0
 ----------
 * feat: Add session field to auto-create contact fields
+
+3.75.1
+----------
+* fix: Restructure FastAPI initialization and improve module imports
+
+3.75.0
+----------
+* feat: Add FastAPI server configuration to Docker start script
+* feat: FastAPI endpoint for WhatsApp broadcasts
 
 3.74.0
 ----------
