@@ -144,15 +144,16 @@ class URN:
 
         if scheme in [cls.TEL_SCHEME, cls.WHATSAPP_SCHEME] and formatted:
             try:
+                parse_path = path
                 # whatsapp scheme is E164 without a leading +, add it so parsing works
-                if scheme == cls.WHATSAPP_SCHEME:
-                    path = "+" + path
+                if scheme == cls.WHATSAPP_SCHEME and path.isdigit():
+                    parse_path = "+" + path
 
-                if path and path[0] == "+":
+                if parse_path and parse_path[0] == "+":
                     phone_format = phonenumbers.PhoneNumberFormat.NATIONAL
                     if international:
                         phone_format = phonenumbers.PhoneNumberFormat.INTERNATIONAL
-                    return phonenumbers.format_number(phonenumbers.parse(path, None), phone_format)
+                    return phonenumbers.format_number(phonenumbers.parse(parse_path, None), phone_format)
             except phonenumbers.NumberParseException:  # pragma: no cover
                 pass
 
@@ -211,9 +212,13 @@ class URN:
                 except ValueError:
                     return False
 
-        # telegram, whatsapp and instagram use integer ids
-        elif scheme in [cls.TELEGRAM_SCHEME, cls.WHATSAPP_SCHEME, cls.INSTAGRAM_SCHEME]:
+        # telegram and instagram use integer ids
+        elif scheme in [cls.TELEGRAM_SCHEME, cls.INSTAGRAM_SCHEME]:
             return regex.match(r"^[0-9]+$", path, regex.V0)
+
+        # whatsapp supports numeric ids (phone-based) and BSUIDs (e.g. BR.35029025746744354)
+        elif scheme == cls.WHATSAPP_SCHEME:
+            return regex.match(r"^([0-9]+|[A-Z]{2}\.[0-9]+)$", path, regex.V0)
 
         # validate Viber URNS look right (this is a guess)
         elif scheme == cls.VIBER_SCHEME:  # pragma: needs cover
