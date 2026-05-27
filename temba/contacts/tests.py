@@ -4956,8 +4956,29 @@ class URNTest(TembaTest):
         self.assertFalse(URN.validate(URN.from_discord("not-a-discord-id")))
 
     def test_whatsapp_urn(self):
+        # phone-based numeric URNs
         self.assertTrue(URN.validate("whatsapp:12065551212"))
         self.assertFalse(URN.validate("whatsapp:+12065551212"))
+
+        # BSUID format: 2-letter country code + dot + numeric id
+        self.assertTrue(URN.validate("whatsapp:BR.35029025746744354"))
+        self.assertTrue(URN.validate("whatsapp:IN.35029025746744354"))
+        self.assertTrue(URN.validate("whatsapp:US.12345678901234567"))
+
+        # invalid BSUID formats
+        self.assertFalse(URN.validate("whatsapp:BR35029025746744354"))
+        self.assertFalse(URN.validate("whatsapp:BRA.35029025746744354"))
+        self.assertFalse(URN.validate("whatsapp:br.35029025746744354"))
+        self.assertFalse(URN.validate("whatsapp:.35029025746744354"))
+        self.assertFalse(URN.validate("whatsapp:BR."))
+        self.assertFalse(URN.validate("whatsapp:BR.abc123"))
+
+        # normalize preserves both formats
+        self.assertEqual(URN.normalize("whatsapp:BR.35029025746744354"), "whatsapp:BR.35029025746744354")
+        self.assertEqual(URN.normalize("whatsapp:12065551212"), "whatsapp:12065551212")
+
+        # format returns BSUID path as-is (no phone formatting)
+        self.assertEqual(URN.format("whatsapp:BR.35029025746744354"), "BR.35029025746744354")
 
     def test_freshchat_urn(self):
         self.assertTrue(
