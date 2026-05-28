@@ -372,6 +372,41 @@ class MailroomClientTest(TembaTest):
                 json={"org_id": 1, "user_id": 12, "ticket_ids": [123, 345], "ticketer_id": 89},
             )
 
+        # external_id is forwarded when supplied
+        with patch("requests.post") as mock_post:
+            mock_post.return_value = MockResponse(200, '{"changed_ids": [123]}')
+            response = get_client().ticket_change_ticketer(1, 12, [123, 345], 89, external_id="room-uuid")
+
+            self.assertEqual({"changed_ids": [123]}, response)
+            mock_post.assert_called_once_with(
+                "http://localhost:8090/mr/ticket/change_ticketer",
+                headers={"User-Agent": "Temba"},
+                json={
+                    "org_id": 1,
+                    "user_id": 12,
+                    "ticket_ids": [123, 345],
+                    "ticketer_id": 89,
+                    "external_id": "room-uuid",
+                },
+            )
+
+        # explicit empty string is forwarded (caller asked to clear)
+        with patch("requests.post") as mock_post:
+            mock_post.return_value = MockResponse(200, '{"changed_ids": [123]}')
+            get_client().ticket_change_ticketer(1, 12, [123, 345], 89, external_id="")
+
+            mock_post.assert_called_once_with(
+                "http://localhost:8090/mr/ticket/change_ticketer",
+                headers={"User-Agent": "Temba"},
+                json={
+                    "org_id": 1,
+                    "user_id": 12,
+                    "ticket_ids": [123, 345],
+                    "ticketer_id": 89,
+                    "external_id": "",
+                },
+            )
+
     def test_ticket_close(self):
         with patch("requests.post") as mock_post:
             mock_post.return_value = MockResponse(200, '{"changed_ids": [123]}')

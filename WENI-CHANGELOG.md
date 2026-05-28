@@ -3,6 +3,10 @@
 * Fix error on change_ticketer
 * feat: enhance WhatsApp URN validation and formatting
 
+3.76.1
+----------
+* feat(serializers): add validation for direct_send_template_name
+
 3.76.0
 ----------
 * feat: Add session field to auto-create contact fields
