@@ -263,11 +263,16 @@ class Ticket(models.Model):
         return mailroom.get_client().ticket_change_topic(org.id, user.id, ticket_ids, topic.id)
 
     @classmethod
-    def bulk_change_ticketer(cls, org, user: User, tickets: list, ticketer: "Ticketer"):
+    def bulk_change_ticketer(cls, org, user: User, tickets: list, ticketer: "Ticketer", external_id: str = None):
         # we deliberately do NOT filter by t.ticketer.is_active here: this action exists precisely to repair
-        # tickets whose current ticketer is being (or has just been) released, so they can be moved to a new one
+        # tickets whose current ticketer is being (or has just been) released, so they can be moved to a new one.
+        # external_id is the identifier issued by the new ticketer's external system (e.g. the wenichats room
+        # UUID used to route incoming messages to the assigned agent). When omitted, mailroom preserves the
+        # existing external_id so the link to the external system is not silently lost.
         ticket_ids = [t.id for t in tickets]
-        return mailroom.get_client().ticket_change_ticketer(org.id, user.id, ticket_ids, ticketer.id)
+        return mailroom.get_client().ticket_change_ticketer(
+            org.id, user.id, ticket_ids, ticketer.id, external_id=external_id
+        )
 
     @classmethod
     def bulk_close(cls, org, user, tickets, *, force: bool = False):
