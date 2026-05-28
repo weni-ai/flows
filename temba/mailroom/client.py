@@ -203,8 +203,12 @@ class MailroomClient:
 
         return self._request("ticket/change_topic", payload)
 
-    def ticket_change_ticketer(self, org_id: int, user_id: int, ticket_ids: list, ticketer_id: int):
+    def ticket_change_ticketer(
+        self, org_id: int, user_id: int, ticket_ids: list, ticketer_id: int, external_id: str = None
+    ):
         payload = {"org_id": org_id, "user_id": user_id, "ticket_ids": ticket_ids, "ticketer_id": ticketer_id}
+        if external_id is not None:
+            payload["external_id"] = external_id
 
         return self._request("ticket/change_ticketer", payload)
 

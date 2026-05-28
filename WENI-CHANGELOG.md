@@ -1,3 +1,7 @@
+3.76.1
+----------
+* feat(serializers): add validation for direct_send_template_name
+
 3.76.0
 ----------
 * feat: Add session field to auto-create contact fields

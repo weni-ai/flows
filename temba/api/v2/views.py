@@ -5112,6 +5112,9 @@ class TicketActionsEndpoint(BulkWriteAPIMixin, BaseAPIView):
     * **note** - the note to add to the tickets (string, optional)
     * **topic** - the UUID of a topic (string, optional)
     * **ticketer** - the UUID of a ticketer (string, optional)
+    * **external_id** - the identifier issued by the new ticketer's external system for the tickets being moved
+      (string, optional). Only meaningful for the `change_ticketer` action. When omitted, the existing
+      `external_id` is preserved so the link to the external system is not silently lost.
 
     Example:
 
@@ -5143,6 +5146,11 @@ class TicketActionsEndpoint(BulkWriteAPIMixin, BaseAPIView):
                 {"name": "note", "required": False, "help": "The note text"},
                 {"name": "topic", "required": False, "help": "The UUID of a topic"},
                 {"name": "ticketer", "required": False, "help": "The UUID of a ticketer"},
+                {
+                    "name": "external_id",
+                    "required": False,
+                    "help": "The identifier issued by the new ticketer's external system (only for change_ticketer)",
+                },
             ],
         }
 

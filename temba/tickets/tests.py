@@ -59,12 +59,22 @@ class TicketTest(TembaTest):
 
         mock_change_topic.assert_called_once_with(self.org.id, self.admin.id, [ticket.id], topic.id)
 
-        # test bulk changing ticketer
+        # test bulk changing ticketer (external_id defaults to None so mailroom preserves it)
         new_ticketer = Ticketer.create(self.org, self.admin, MailgunType.slug, "alt@acme.com", {})
         with patch("temba.mailroom.client.MailroomClient.ticket_change_ticketer") as mock_change_ticketer:
             Ticket.bulk_change_ticketer(self.org, self.admin, [ticket], new_ticketer)
 
-        mock_change_ticketer.assert_called_once_with(self.org.id, self.admin.id, [ticket.id], new_ticketer.id)
+        mock_change_ticketer.assert_called_once_with(
+            self.org.id, self.admin.id, [ticket.id], new_ticketer.id, external_id=None
+        )
+
+        # test bulk changing ticketer with an explicit external_id (the new ticketer's external identifier)
+        with patch("temba.mailroom.client.MailroomClient.ticket_change_ticketer") as mock_change_ticketer:
+            Ticket.bulk_change_ticketer(self.org, self.admin, [ticket], new_ticketer, external_id="room-uuid")
+
+        mock_change_ticketer.assert_called_once_with(
+            self.org.id, self.admin.id, [ticket.id], new_ticketer.id, external_id="room-uuid"
+        )
 
         # bulk_change_ticketer must NOT skip tickets whose current ticketer is inactive — that's the whole point
         ticketer.is_active = False
@@ -72,7 +82,9 @@ class TicketTest(TembaTest):
         with patch("temba.mailroom.client.MailroomClient.ticket_change_ticketer") as mock_change_ticketer:
             Ticket.bulk_change_ticketer(self.org, self.admin, [ticket], new_ticketer)
 
-        mock_change_ticketer.assert_called_once_with(self.org.id, self.admin.id, [ticket.id], new_ticketer.id)
+        mock_change_ticketer.assert_called_once_with(
+            self.org.id, self.admin.id, [ticket.id], new_ticketer.id, external_id=None
+        )
         ticketer.is_active = True
         ticketer.save(update_fields=("is_active",))
 

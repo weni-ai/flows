@@ -1967,6 +1967,7 @@ class TicketBulkActionSerializer(WriteSerializer):
     assignee = fields.UserField(required=False, allow_null=True, assignable_only=True)
     topic = fields.TopicField(required=False)
     ticketer = fields.TicketerField(required=False)
+    external_id = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=255)
     note = serializers.CharField(required=False, max_length=Ticket.MAX_NOTE_LEN)
 
     def validate(self, data):
@@ -1992,6 +1993,7 @@ class TicketBulkActionSerializer(WriteSerializer):
         note = self.validated_data.get("note")
         topic = self.validated_data.get("topic")
         ticketer = self.validated_data.get("ticketer")
+        external_id = self.validated_data.get("external_id")
 
         if action == self.ACTION_ASSIGN:
             Ticket.bulk_assign(org, user, tickets, assignee=assignee, note=note)
@@ -2000,7 +2002,7 @@ class TicketBulkActionSerializer(WriteSerializer):
         elif action == self.ACTION_CHANGE_TOPIC:
             Ticket.bulk_change_topic(org, user, tickets, topic=topic)
         elif action == self.ACTION_CHANGE_TICKETER:
-            Ticket.bulk_change_ticketer(org, user, tickets, ticketer=ticketer)
+            Ticket.bulk_change_ticketer(org, user, tickets, ticketer=ticketer, external_id=external_id)
         elif action == self.ACTION_CLOSE:
             Ticket.bulk_close(org, user, tickets)
         elif action == self.ACTION_REOPEN:

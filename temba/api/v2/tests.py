@@ -5826,6 +5826,10 @@ class APITest(TembaTest):
         self.assertEqual(sales, ticket2.topic)
 
         # change ticketer of tickets — works even when the original ticketer was released
+        # seed an external_id on ticket2 so we can verify it is preserved when no external_id is sent
+        ticket2.external_id = "old-room-uuid"
+        ticket2.save(update_fields=("external_id",))
+
         zendesk_org1 = Ticketer.create(self.org, self.admin, ZendeskType.slug, "Zendesk Sales", {})
         response = self.postJSON(
             url,
@@ -5841,6 +5845,38 @@ class APITest(TembaTest):
         self.assertEqual(response.status_code, 204)
         self.assertEqual(zendesk_org1, ticket1.ticketer)
         self.assertEqual(zendesk_org1, ticket2.ticketer)
+        # external_id is preserved when not sent (avoids breaking the link to the external system)
+        self.assertEqual("old-room-uuid", ticket2.external_id)
+
+        # change ticketer while supplying the new ticketer's external_id (e.g. wenichats room UUID)
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "tickets": [str(ticket1.uuid)],
+                "action": "change_ticketer",
+                "ticketer": str(zendesk_org1.uuid),
+                "external_id": "new-room-uuid",
+            },
+        )
+        ticket1.refresh_from_db()
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual("new-room-uuid", ticket1.external_id)
+
+        # an explicit empty external_id clears it (caller asked to drop the link)
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "tickets": [str(ticket2.uuid)],
+                "action": "change_ticketer",
+                "ticketer": str(zendesk_org1.uuid),
+                "external_id": "",
+            },
+        )
+        ticket2.refresh_from_db()
+        self.assertEqual(response.status_code, 204)
+        self.assertIsNone(ticket2.external_id)
 
         # changing to an inactive ticketer is rejected by the field lookup itself
         zendesk_org1.is_active = False
