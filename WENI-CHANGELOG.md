@@ -1,3 +1,8 @@
+3.77.0
+----------
+* Fix error on change_ticketer
+* feat: enhance WhatsApp URN validation and formatting
+
 3.76.0
 ----------
 * feat: Add session field to auto-create contact fields
