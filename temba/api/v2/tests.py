@@ -5730,20 +5730,26 @@ class APITest(TembaTest):
         ticket2.refresh_from_db()
         ticket3.refresh_from_db()
 
+        def result_uuids(resp):
+            return [r["uuid"] for r in resp.json()["results"]]
+
         # filter by before
         response = self.fetchJSON(url, "before=%s" % format_datetime(ticket2.modified_on))
-        self.assertResultsByUUID(response, [ticket2, ticket1])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(result_uuids(response), [str(ticket2.uuid), str(ticket1.uuid)])
 
         # filter by after
         response = self.fetchJSON(url, "after=%s" % format_datetime(ticket2.modified_on))
-        self.assertResultsByUUID(response, [ticket3, ticket2])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(result_uuids(response), [str(ticket3.uuid), str(ticket2.uuid)])
 
         # filter by before and after combined
         response = self.fetchJSON(
             url,
             "after=%s&before=%s" % (format_datetime(ticket2.modified_on), format_datetime(ticket2.modified_on)),
         )
-        self.assertResultsByUUID(response, [ticket2])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(result_uuids(response), [str(ticket2.uuid)])
 
         # invalid before returns no results
         response = self.fetchJSON(url, "before=invalid-date")
