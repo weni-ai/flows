@@ -5723,6 +5723,45 @@ class APITest(TembaTest):
         resp_json = response.json()
         self.assertEqual(1, len(resp_json["results"]))
 
+        # set known modified_on values to test before/after filters
+        Ticket.objects.filter(id=ticket1.id).update(modified_on=datetime(2021, 1, 1, 10, 0, 0, 0, pytz.UTC))
+        Ticket.objects.filter(id=ticket2.id).update(modified_on=datetime(2021, 6, 1, 10, 0, 0, 0, pytz.UTC))
+        Ticket.objects.filter(id=ticket3.id).update(modified_on=datetime(2021, 12, 1, 10, 0, 0, 0, pytz.UTC))
+        ticket1.refresh_from_db()
+        ticket2.refresh_from_db()
+        ticket3.refresh_from_db()
+
+        def result_uuids(resp):
+            return [r["uuid"] for r in resp.json()["results"]]
+
+        # filter by before
+        response = self.fetchJSON(url, "before=%s" % format_datetime(ticket2.modified_on))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(result_uuids(response), [str(ticket2.uuid), str(ticket1.uuid)])
+
+        # filter by after
+        response = self.fetchJSON(url, "after=%s" % format_datetime(ticket2.modified_on))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(result_uuids(response), [str(ticket3.uuid), str(ticket2.uuid)])
+
+        # filter by before and after combined
+        response = self.fetchJSON(
+            url,
+            "after=%s&before=%s" % (format_datetime(ticket2.modified_on), format_datetime(ticket2.modified_on)),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(result_uuids(response), [str(ticket2.uuid)])
+
+        # invalid before returns no results
+        response = self.fetchJSON(url, "before=invalid-date")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(0, len(response.json()["results"]))
+
+        # invalid after returns no results
+        response = self.fetchJSON(url, "after=invalid-date")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(0, len(response.json()["results"]))
+
     @mock_mailroom
     def test_ticket_actions(self, mr_mocks):
         url = reverse("api.v2.ticket_actions")

@@ -5014,6 +5014,7 @@ class TicketsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
      * **topic** - the topic of the ticket (object).
      * **body** - the body of the ticket (string).
      * **opened_on** - when this ticket was opened (datetime).
+     * **modified_on** - when this ticket was last modified (datetime), filterable as `before` and `after`.
 
     Example:
 
@@ -5073,7 +5074,7 @@ class TicketsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
             "assignee",
         )
 
-        return queryset
+        return self.filter_before_after(queryset, "modified_on")
 
     @classmethod
     def get_read_explorer(cls):
@@ -5087,6 +5088,16 @@ class TicketsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "name": "contact",
                     "required": False,
                     "help": "A contact UUID to filter by, ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                },
+                {
+                    "name": "before",
+                    "required": False,
+                    "help": "Only return tickets modified before this date, ex: 2015-01-28T18:00:00.000",
+                },
+                {
+                    "name": "after",
+                    "required": False,
+                    "help": "Only return tickets modified after this date, ex: 2015-01-28T18:00:00.000",
                 },
             ],
         }
