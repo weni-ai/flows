@@ -1,4 +1,4 @@
-3.78.0
+3.77.1
 ----------
 * feat: add date filter in tickets endpoint
 * feat: add vtex_account to auto-create contact fields
