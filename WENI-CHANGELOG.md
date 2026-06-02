@@ -1,3 +1,8 @@
+3.78.0
+----------
+* feat: add date filter in tickets endpoint
+* feat: add vtex_account to auto-create contact fields
+
 3.77.0
 ----------
 * Fix error on change_ticketer
