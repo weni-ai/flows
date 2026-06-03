@@ -40,6 +40,7 @@ from temba.utils.urns import ParsedURN, parse_number, parse_urn
 from temba.utils.uuid import uuid4
 
 from .search import SearchException, elastic, parse_query
+from .validators import CONTACT_NAME_MAX_LEN, validate_contact_phone
 
 logger = logging.getLogger(__name__)
 
@@ -2202,6 +2203,23 @@ class ContactImport(SmartModel):
 
         mappings = cls._auto_mappings(org, headers)
 
+        # locate the optional name column so we can validate its values per row
+        name_col_index = next(
+            (
+                idx
+                for idx, item in enumerate(mappings)
+                if item["mapping"].get("type") == "attribute" and item["mapping"].get("name") == "name"
+            ),
+            None,
+        )
+
+        # locate any tel: scheme columns so we can validate phone length per row
+        tel_col_indexes = [
+            idx
+            for idx, item in enumerate(mappings)
+            if item["mapping"].get("type") == "scheme" and item["mapping"].get("scheme") == URN.TEL_SCHEME
+        ]
+
         # iterate over rest of the rows to do row-level validation
         seen_uuids = set()
         seen_urns = set()
@@ -2221,6 +2239,34 @@ class ContactImport(SmartModel):
                         _("Import file contains duplicated contact URN '%(urn)s'."), params={"urn": urn}
                     )
                 seen_urns.add(urn)
+
+            # validate the name column value when present (blank means "leave unchanged")
+            if name_col_index is not None and name_col_index < len(row):
+                raw_name = row[name_col_index]
+                if (
+                    raw_name
+                    and raw_name != ContactImport.EXPLICIT_CLEAR
+                    and len(str(raw_name).strip()) > CONTACT_NAME_MAX_LEN
+                ):
+                    raise ValidationError(
+                        _("Import file contains a contact name longer than %(max)d characters at row %(row)d."),
+                        params={"max": CONTACT_NAME_MAX_LEN, "row": num_records + 2},
+                    )
+
+            # validate tel: URN columns when populated (blank means "no phone for this row")
+            for tel_idx in tel_col_indexes:
+                if tel_idx >= len(row):
+                    continue
+                raw_phone = row[tel_idx]
+                if not raw_phone or raw_phone == ContactImport.EXPLICIT_CLEAR:
+                    continue
+                try:
+                    validate_contact_phone(str(raw_phone))
+                except ValidationError as e:
+                    raise ValidationError(
+                        _("Import file contains an invalid phone at row %(row)d: %(error)s"),
+                        params={"row": num_records + 2, "error": str(e.messages[0])},
+                    )
 
             # check if we exceed record limit
             num_records += 1

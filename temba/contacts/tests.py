@@ -1420,6 +1420,53 @@ class ContactTest(TembaTest):
         )
         self.assertFormError(response, "form", "urn__tel__0", "Invalid input")
 
+        # reject creation with an empty/whitespace-only name
+        response = self.client.post(
+            reverse("contacts.contact_create"), data=dict(name="   ", urn__tel__0="+250788777777")
+        )
+        self.assertFormError(response, "form", "name", "Contact name cannot be empty.")
+
+        # reject creation with a name longer than the configured maximum
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            data=dict(name="x" * 101, urn__tel__0="+250788777777"),
+        )
+        self.assertFormError(response, "form", "name", "Contact name cannot exceed 100 characters.")
+
+        # reject phones with fewer than 8 digits
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            data=dict(name="Short Phone", urn__tel__0="+1234567"),
+        )
+        self.assertFormError(response, "form", "urn__tel__0", "Phone number must have at least 8 digits.")
+
+        # reject phones with more than 15 digits
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            data=dict(name="Long Phone", urn__tel__0="+" + ("5" * 16)),
+        )
+        self.assertFormError(response, "form", "urn__tel__0", "Phone number cannot exceed 15 digits.")
+
+    @mock_mailroom
+    def test_contact_update_name_validation(self, mr_mocks):
+        self.login(self.admin)
+
+        update_url = reverse("contacts.contact_update", args=[self.joe.id])
+
+        # reject update with empty/whitespace-only name
+        response = self.client.post(
+            update_url,
+            data=dict(name="   ", urn__tel__0="+250781111111", groups=[]),
+        )
+        self.assertFormError(response, "form", "name", "Contact name cannot be empty.")
+
+        # reject update with name longer than max length
+        response = self.client.post(
+            update_url,
+            data=dict(name="y" * 101, urn__tel__0="+250781111111", groups=[]),
+        )
+        self.assertFormError(response, "form", "name", "Contact name cannot exceed 100 characters.")
+
     @patch("temba.mailroom.client.MailroomClient.contact_modify")
     def test_block_and_stop(self, mock_contact_modify):
         mock_contact_modify.return_value = {self.joe.id: {"contact": {}, "events": []}}
@@ -5477,6 +5524,67 @@ class ContactImportTest(TembaTest):
                 try_to_parse(imp_file)
             self.assertEqual(imp_error, e.exception.messages[0], f"error mismatch for {imp_file}")
 
+    def test_parse_rejects_oversized_name(self):
+        # CSV with a name column whose value exceeds the configured max length
+        long_name = "x" * 101
+        csv_content = ("URN:Tel,name\n" f"+250788111111,{long_name}\n").encode("utf-8")
+
+        with self.assertRaises(ValidationError) as cm:
+            ContactImport.try_to_parse(self.org, io.BytesIO(csv_content), "import.csv")
+
+        self.assertIn(
+            "Import file contains a contact name longer than 100 characters at row 2.",
+            cm.exception.messages,
+        )
+
+    def test_parse_allows_blank_name(self):
+        # blank name values mean "leave unchanged" so they should not fail
+        csv_content = ("URN:Tel,name\n" "+250788111111,\n").encode("utf-8")
+
+        mappings, num_records = ContactImport.try_to_parse(self.org, io.BytesIO(csv_content), "import.csv")
+
+        self.assertEqual(1, num_records)
+        self.assertEqual(
+            [
+                {"header": "URN:Tel", "mapping": {"type": "scheme", "scheme": "tel"}},
+                {"header": "name", "mapping": {"type": "attribute", "name": "name"}},
+            ],
+            mappings,
+        )
+
+    def test_parse_rejects_phone_too_short(self):
+        # phone with fewer than 8 digits should be rejected
+        csv_content = ("URN:Tel,name\n" "+1234567,Alice\n").encode("utf-8")
+
+        with self.assertRaises(ValidationError) as cm:
+            ContactImport.try_to_parse(self.org, io.BytesIO(csv_content), "import.csv")
+
+        self.assertIn(
+            "Import file contains an invalid phone at row 2: Phone number must have at least 8 digits.",
+            cm.exception.messages,
+        )
+
+    def test_parse_rejects_phone_too_long(self):
+        # phone with more than 15 digits should be rejected
+        too_long = "+" + ("5" * 16)
+        csv_content = (f"URN:Tel,name\n{too_long},Bob\n").encode("utf-8")
+
+        with self.assertRaises(ValidationError) as cm:
+            ContactImport.try_to_parse(self.org, io.BytesIO(csv_content), "import.csv")
+
+        self.assertIn(
+            "Import file contains an invalid phone at row 2: Phone number cannot exceed 15 digits.",
+            cm.exception.messages,
+        )
+
+    def test_parse_allows_blank_phone(self):
+        # blank phone column does not reject (need either UUID or another URN column though)
+        csv_content = ("URN:Tel,URN:Twitter,name\n,handle1,Carol\n").encode("utf-8")
+
+        _, num_records = ContactImport.try_to_parse(self.org, io.BytesIO(csv_content), "import.csv")
+
+        self.assertEqual(1, num_records)
+
     def test_extract_mappings(self):
         # try simple import in different formats
         for ext in ("csv", "xls", "xlsx"):
@@ -6289,3 +6397,110 @@ class ExportContactsByStatusTaskTest(TembaTest):
 
         export.refresh_from_db()
         self.assertEqual(ExportContactsTask.STATUS_FAILED, export.status)
+
+
+class ContactNameValidatorTest(TembaTest):
+    """
+    Tests for the centralized contact name validator used at every entry point that
+    accepts a contact name (public API, internal API, UI form, file import).
+    """
+
+    def test_clean_contact_name_accepts_none(self):
+        from temba.contacts.validators import clean_contact_name
+
+        self.assertIsNone(clean_contact_name(None))
+
+    def test_clean_contact_name_trims_whitespace(self):
+        from temba.contacts.validators import clean_contact_name
+
+        self.assertEqual("Joe Blow", clean_contact_name("  Joe Blow  "))
+
+    def test_clean_contact_name_rejects_empty_string(self):
+        from temba.contacts.validators import clean_contact_name
+
+        with self.assertRaises(ValidationError) as cm:
+            clean_contact_name("")
+        self.assertIn("Contact name cannot be empty.", cm.exception.messages)
+
+    def test_clean_contact_name_rejects_whitespace_only(self):
+        from temba.contacts.validators import clean_contact_name
+
+        with self.assertRaises(ValidationError) as cm:
+            clean_contact_name("   ")
+        self.assertIn("Contact name cannot be empty.", cm.exception.messages)
+
+    def test_clean_contact_name_accepts_max_length(self):
+        from temba.contacts.validators import CONTACT_NAME_MAX_LEN, clean_contact_name
+
+        name = "x" * CONTACT_NAME_MAX_LEN
+        self.assertEqual(name, clean_contact_name(name))
+
+    def test_clean_contact_name_rejects_too_long(self):
+        from temba.contacts.validators import CONTACT_NAME_MAX_LEN, clean_contact_name
+
+        with self.assertRaises(ValidationError) as cm:
+            clean_contact_name("x" * (CONTACT_NAME_MAX_LEN + 1))
+        self.assertIn(f"Contact name cannot exceed {CONTACT_NAME_MAX_LEN} characters.", cm.exception.messages)
+
+    def test_clean_contact_name_rejects_non_string(self):
+        from temba.contacts.validators import clean_contact_name
+
+        with self.assertRaises(ValidationError):
+            clean_contact_name(123)
+
+
+class ContactPhoneValidatorTest(TembaTest):
+    """
+    Tests for the centralized contact phone validator used at every entry point that
+    accepts a phone (public API, internal API, UI form, file import).
+    """
+
+    def test_validate_contact_phone_accepts_none(self):
+        from temba.contacts.validators import validate_contact_phone
+
+        self.assertIsNone(validate_contact_phone(None))
+
+    def test_validate_contact_phone_accepts_min_digits(self):
+        from temba.contacts.validators import CONTACT_PHONE_MIN_DIGITS, validate_contact_phone
+
+        digits = "5" * CONTACT_PHONE_MIN_DIGITS
+        self.assertEqual(digits, validate_contact_phone(digits))
+
+    def test_validate_contact_phone_accepts_max_digits(self):
+        from temba.contacts.validators import CONTACT_PHONE_MAX_DIGITS, validate_contact_phone
+
+        number = "+" + ("5" * CONTACT_PHONE_MAX_DIGITS)
+        self.assertEqual(number, validate_contact_phone(number))
+
+    def test_validate_contact_phone_ignores_plus_and_formatting(self):
+        from temba.contacts.validators import validate_contact_phone
+
+        # 13 digits, comfortably between 8 and 15
+        formatted = "+55 (11) 99999-9999"
+        self.assertEqual(formatted, validate_contact_phone(formatted))
+
+    def test_validate_contact_phone_rejects_too_short(self):
+        from temba.contacts.validators import CONTACT_PHONE_MIN_DIGITS, validate_contact_phone
+
+        with self.assertRaises(ValidationError) as cm:
+            validate_contact_phone("+" + ("5" * (CONTACT_PHONE_MIN_DIGITS - 1)))
+        self.assertIn(f"Phone number must have at least {CONTACT_PHONE_MIN_DIGITS} digits.", cm.exception.messages)
+
+    def test_validate_contact_phone_rejects_too_long(self):
+        from temba.contacts.validators import CONTACT_PHONE_MAX_DIGITS, validate_contact_phone
+
+        with self.assertRaises(ValidationError) as cm:
+            validate_contact_phone("+" + ("5" * (CONTACT_PHONE_MAX_DIGITS + 1)))
+        self.assertIn(f"Phone number cannot exceed {CONTACT_PHONE_MAX_DIGITS} digits.", cm.exception.messages)
+
+    def test_validate_contact_phone_rejects_non_string(self):
+        from temba.contacts.validators import validate_contact_phone
+
+        with self.assertRaises(ValidationError):
+            validate_contact_phone(5511999999999)
+
+    def test_validate_contact_phone_rejects_no_digits(self):
+        from temba.contacts.validators import validate_contact_phone
+
+        with self.assertRaises(ValidationError):
+            validate_contact_phone("not a phone")

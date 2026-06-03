@@ -36,6 +36,7 @@ from django.views import View
 from temba.archives.models import Archive
 from temba.channels.models import Channel
 from temba.contacts.templatetags.contacts import MISSING_VALUE
+from temba.contacts.validators import clean_contact_name, validate_contact_phone
 from temba.flows.models import Flow, FlowStart
 from temba.mailroom.events import Event
 from temba.notifications.views import NotificationTargetMixin
@@ -469,6 +470,14 @@ class ContactForm(forms.ModelForm):
                         self._errors[key] = self.error_class([_("Invalid format")])
                     return False
 
+                # enforce strict 8-15 digit length on tel: URNs
+                if scheme == URN.TEL_SCHEME:
+                    try:
+                        validate_contact_phone(path)
+                    except ValidationError as e:
+                        self._errors[key] = self.error_class([str(e.messages[0])])
+                        return False
+
                 # validate whatsapp URN variations
                 if scheme == URN.WHATSAPP_SCHEME and path[:2] == "55":
                     return validate_urn_whatsapp(key, scheme, path)
@@ -491,6 +500,9 @@ class ContactForm(forms.ModelForm):
                 self.cleaned_data["new_path"] = self.data["new_path"]
 
         return self.cleaned_data
+
+    def clean_name(self):
+        return clean_contact_name(self.cleaned_data.get("name"))
 
     class Meta:
         model = Contact
