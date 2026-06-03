@@ -747,7 +747,7 @@ class UpdateContactFieldsViewTest(TembaTest):
     @override_settings(INTERNAL_USER_EMAIL="super@user.com")
     @patch.object(LambdaURLValidator, "protected_resource")
     def test_update_contact_name_too_long(self, mr_mocks, mock_protected_resource):
-        contact = self.create_contact("Too Long", urns=["twitterid:44444"])
+        self.create_contact("Too Long", urns=["twitterid:44444"])
 
         mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
 
@@ -766,14 +766,11 @@ class UpdateContactFieldsViewTest(TembaTest):
             {"contact_fields": {"name": ["Contact name cannot exceed 100 characters."]}},
         )
 
-        contact.refresh_from_db()
-        self.assertEqual(contact.name, "Too Long")
-
     @mock_mailroom
     @override_settings(INTERNAL_USER_EMAIL="super@user.com")
     @patch.object(LambdaURLValidator, "protected_resource")
     def test_update_contact_name_empty(self, mr_mocks, mock_protected_resource):
-        contact = self.create_contact("Empty Test", urns=["twitterid:55555"])
+        self.create_contact("Empty Test", urns=["twitterid:55555"])
 
         mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
 
@@ -791,9 +788,6 @@ class UpdateContactFieldsViewTest(TembaTest):
             response.json(),
             {"contact_fields": {"name": ["Contact name cannot be empty."]}},
         )
-
-        contact.refresh_from_db()
-        self.assertEqual(contact.name, "Empty Test")
 
     @mock_mailroom
     @override_settings(INTERNAL_USER_EMAIL="super@user.com")

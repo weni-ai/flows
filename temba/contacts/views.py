@@ -386,6 +386,17 @@ class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
 
 
 class ContactForm(forms.ModelForm):
+    # Override the name field so Django keeps whitespace-only input intact (default
+    # CharField strips it), letting clean_contact_name reject it consistently with the
+    # other entry points.
+    name = forms.CharField(
+        label=_("Name"),
+        required=False,
+        strip=False,
+        empty_value=None,
+        widget=InputWidget(attrs={"widget_only": False}),
+    )
+
     def __init__(self, *args, **kwargs):
         self.user = kwargs["user"]
         self.org = self.user.get_org()

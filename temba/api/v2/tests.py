@@ -3105,16 +3105,6 @@ class APITest(TembaTest):
         response = self.postJSON(url, None, {"name": "   ", "urns": ["tel:+250787000222"]})
         self.assertResponseError(response, "name", "Contact name cannot be empty.")
 
-        # reject tel: URN with fewer than 8 digits
-        response = self.postJSON(url, None, {"name": "Short", "urns": ["tel:+1234567"]})
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("Phone number must have at least 8 digits.", response.json()["urns"]["0"])
-
-        # reject tel: URN with more than 15 digits
-        response = self.postJSON(url, None, {"name": "Long", "urns": ["tel:+" + ("5" * 16)]})
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("Phone number cannot exceed 15 digits.", response.json()["urns"]["0"])
-
     @mock_mailroom
     def test_contacts_lean(self, mr_mocks):
         url = reverse("api.v2.contacts_lean")

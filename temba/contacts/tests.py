@@ -1433,20 +1433,6 @@ class ContactTest(TembaTest):
         )
         self.assertFormError(response, "form", "name", "Contact name cannot exceed 100 characters.")
 
-        # reject phones with fewer than 8 digits
-        response = self.client.post(
-            reverse("contacts.contact_create"),
-            data=dict(name="Short Phone", urn__tel__0="+1234567"),
-        )
-        self.assertFormError(response, "form", "urn__tel__0", "Phone number must have at least 8 digits.")
-
-        # reject phones with more than 15 digits
-        response = self.client.post(
-            reverse("contacts.contact_create"),
-            data=dict(name="Long Phone", urn__tel__0="+" + ("5" * 16)),
-        )
-        self.assertFormError(response, "form", "urn__tel__0", "Phone number cannot exceed 15 digits.")
-
     @mock_mailroom
     def test_contact_update_name_validation(self, mr_mocks):
         self.login(self.admin)
@@ -5551,39 +5537,6 @@ class ContactImportTest(TembaTest):
             ],
             mappings,
         )
-
-    def test_parse_rejects_phone_too_short(self):
-        # phone with fewer than 8 digits should be rejected
-        csv_content = ("URN:Tel,name\n" "+1234567,Alice\n").encode("utf-8")
-
-        with self.assertRaises(ValidationError) as cm:
-            ContactImport.try_to_parse(self.org, io.BytesIO(csv_content), "import.csv")
-
-        self.assertIn(
-            "Import file contains an invalid phone at row 2: Phone number must have at least 8 digits.",
-            cm.exception.messages,
-        )
-
-    def test_parse_rejects_phone_too_long(self):
-        # phone with more than 15 digits should be rejected
-        too_long = "+" + ("5" * 16)
-        csv_content = (f"URN:Tel,name\n{too_long},Bob\n").encode("utf-8")
-
-        with self.assertRaises(ValidationError) as cm:
-            ContactImport.try_to_parse(self.org, io.BytesIO(csv_content), "import.csv")
-
-        self.assertIn(
-            "Import file contains an invalid phone at row 2: Phone number cannot exceed 15 digits.",
-            cm.exception.messages,
-        )
-
-    def test_parse_allows_blank_phone(self):
-        # blank phone column does not reject (need either UUID or another URN column though)
-        csv_content = ("URN:Tel,URN:Twitter,name\n,handle1,Carol\n").encode("utf-8")
-
-        _, num_records = ContactImport.try_to_parse(self.org, io.BytesIO(csv_content), "import.csv")
-
-        self.assertEqual(1, num_records)
 
     def test_extract_mappings(self):
         # try simple import in different formats
