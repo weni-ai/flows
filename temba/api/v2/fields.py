@@ -46,13 +46,10 @@ def validate_urn(value, strict=True, country_code=None):
     except ValueError:
         raise serializers.ValidationError("Invalid URN: %s. Ensure phone numbers contain country codes." % value)
 
-    # enforce strict 8-15 digit length on tel: URNs (does not affect other schemes)
+    # enforce strict 8-15 digit length on tel: URNs (does not affect other schemes).
+    # URN.normalize already guarantees the result is parseable, so URN.to_parts is safe here.
     if strict:
-        try:
-            scheme, path, _, _ = URN.to_parts(normalized)
-        except ValueError:
-            scheme, path = None, None
-
+        scheme, path, _, _ = URN.to_parts(normalized)
         if scheme == URN.TEL_SCHEME:
             try:
                 validate_contact_phone(path)

@@ -1433,6 +1433,14 @@ class ContactTest(TembaTest):
         )
         self.assertFormError(response, "form", "name", "Contact name cannot exceed 100 characters.")
 
+        # reject phones that pass phonenumbers (4-digit Niue national + 3-digit country code)
+        # but fall under the 8-digit minimum, exercising validate_contact_phone in the form
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            data=dict(name="Niue Phone", urn__tel__0="+6831234"),
+        )
+        self.assertFormError(response, "form", "urn__tel__0", "Phone number must have at least 8 digits.")
+
     @mock_mailroom
     def test_contact_update_name_validation(self, mr_mocks):
         self.login(self.admin)
