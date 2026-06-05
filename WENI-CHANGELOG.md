@@ -1,3 +1,13 @@
+3.78.0
+----------
+* feat: validate contact name length (1-100 characters) on the public API, internal API, UI form and CSV/XLSX import
+* feat: validate phone number length (8-15 digits, ignoring "+") on every endpoint and form that accepts a tel URN
+
+3.77.1
+----------
+* feat: add date filter in tickets endpoint
+* feat: add vtex_account to auto-create contact fields
+
 3.77.0
 ----------
 * Fix error on change_ticketer

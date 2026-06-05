@@ -40,6 +40,7 @@ from temba.utils.urns import ParsedURN, parse_number, parse_urn
 from temba.utils.uuid import uuid4
 
 from .search import SearchException, elastic, parse_query
+from .validators import CONTACT_NAME_MAX_LEN
 
 logger = logging.getLogger(__name__)
 
@@ -1431,7 +1432,7 @@ class ContactURN(models.Model):
             urn_as_string = URN.normalize(urn_as_string, country_code)
 
         identity = URN.identity(urn_as_string)
-        (scheme, path, query, display) = URN.to_parts(urn_as_string)
+        scheme, path, query, display = URN.to_parts(urn_as_string)
 
         existing = cls.objects.filter(org=org, identity=identity).select_related("contact").first()
 
@@ -2202,6 +2203,16 @@ class ContactImport(SmartModel):
 
         mappings = cls._auto_mappings(org, headers)
 
+        # locate the optional name column so we can validate its values per row
+        name_col_index = next(
+            (
+                idx
+                for idx, item in enumerate(mappings)
+                if item["mapping"].get("type") == "attribute" and item["mapping"].get("name") == "name"
+            ),
+            None,
+        )
+
         # iterate over rest of the rows to do row-level validation
         seen_uuids = set()
         seen_urns = set()
@@ -2221,6 +2232,19 @@ class ContactImport(SmartModel):
                         _("Import file contains duplicated contact URN '%(urn)s'."), params={"urn": urn}
                     )
                 seen_urns.add(urn)
+
+            # validate the name column value when present (blank means "leave unchanged")
+            if name_col_index is not None and name_col_index < len(row):
+                raw_name = row[name_col_index]
+                if (
+                    raw_name
+                    and raw_name != ContactImport.EXPLICIT_CLEAR
+                    and len(str(raw_name).strip()) > CONTACT_NAME_MAX_LEN
+                ):
+                    raise ValidationError(
+                        _("Import file contains a contact name longer than %(max)d characters at row %(row)d."),
+                        params={"max": CONTACT_NAME_MAX_LEN, "row": num_records + 2},
+                    )
 
             # check if we exceed record limit
             num_records += 1
