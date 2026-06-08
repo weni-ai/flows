@@ -8012,3 +8012,6 @@ msgstr "O número de telefone não pode ter mais de %(max)d dígitos."
 
 msgid "Import file contains a contact name longer than %(max)d characters at row %(row)d."
 msgstr "O arquivo de importação contém um nome de contato com mais de %(max)d caracteres na linha %(row)d."
+
+msgid "At least one phone number or connection is required."
+msgstr "É necessário informar pelo menos um número de telefone ou conexão."

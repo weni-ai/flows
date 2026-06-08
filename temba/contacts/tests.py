@@ -1441,6 +1441,16 @@ class ContactTest(TembaTest):
         )
         self.assertFormError(response, "form", "urn__tel__0", "Phone number must have at least 8 digits.")
 
+        # reject creation with no name at all (empty input)
+        response = self.client.post(
+            reverse("contacts.contact_create"), data=dict(name="", urn__tel__0="+250788777777")
+        )
+        self.assertFormError(response, "form", "name", "This field is required.")
+
+        # reject creation when no URN field is filled in (no way to reach the contact)
+        response = self.client.post(reverse("contacts.contact_create"), data=dict(name="No Phone", urn__tel__0=""))
+        self.assertFormError(response, "form", None, "At least one phone number or connection is required.")
+
     @mock_mailroom
     def test_contact_update_name_validation(self, mr_mocks):
         self.login(self.admin)
