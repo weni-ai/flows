@@ -388,10 +388,12 @@ class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
 class ContactForm(forms.ModelForm):
     # Override the name field so Django keeps whitespace-only input intact (default
     # CharField strips it), letting clean_contact_name reject it consistently with the
-    # other entry points.
+    # other entry points. The field is required: an empty submission triggers the
+    # standard "This field is required." message instead of silently creating an
+    # anonymous contact.
     name = forms.CharField(
         label=_("Name"),
-        required=False,
+        required=True,
         strip=False,
         empty_value=None,
         widget=InputWidget(attrs={"widget_only": False}),
@@ -509,6 +511,15 @@ class ContactForm(forms.ModelForm):
             if validate_urn("new_path", self.data["new_scheme"], self.data["new_path"]):
                 self.cleaned_data["new_scheme"] = self.data["new_scheme"]
                 self.cleaned_data["new_path"] = self.data["new_path"]
+
+        # require at least one URN (existing field or the new connection) so the contact
+        # is reachable. Anonymous orgs do not expose URN fields on this form, so we skip
+        # the check there to preserve the existing behaviour.
+        if not self.org.is_anon:
+            has_existing_urn = any(value for field_key, value in self.data.items() if field_key.startswith("urn__"))
+            has_new_urn = bool(self.data.get("new_path"))
+            if not has_existing_urn and not has_new_urn:
+                raise forms.ValidationError(_("At least one phone number or connection is required."))
 
         return self.cleaned_data
 
