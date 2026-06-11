@@ -3097,6 +3097,20 @@ class APITest(TembaTest):
         response = self.postJSON(url, "urn=%s" % quote_plus("whatsapp:5589912345678"), {"name": "Rochel"})
         self.assertEqual(response.status_code, 200)
 
+        # reject names that exceed the configured maximum length
+        response = self.postJSON(url, None, {"name": "x" * 101, "urns": ["tel:+250787000111"]})
+        self.assertResponseError(response, "name", "Contact name cannot exceed 100 characters.")
+
+        # reject empty/whitespace-only names when explicitly provided
+        response = self.postJSON(url, None, {"name": "   ", "urns": ["tel:+250787000222"]})
+        self.assertResponseError(response, "name", "Contact name cannot be empty.")
+
+        # reject tel: URN that passes phonenumbers (4-digit Niue national + 3-digit country code)
+        # but has fewer than 8 digits, exercising validate_contact_phone in the URN field
+        response = self.postJSON(url, None, {"name": "Niue Phone", "urns": ["tel:+6831234"]})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Phone number must have at least 8 digits.", response.json()["urns"]["0"])
+
     @mock_mailroom
     def test_contacts_lean(self, mr_mocks):
         url = reverse("api.v2.contacts_lean")

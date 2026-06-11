@@ -36,6 +36,7 @@ from django.views import View
 from temba.archives.models import Archive
 from temba.channels.models import Channel
 from temba.contacts.templatetags.contacts import MISSING_VALUE
+from temba.contacts.validators import clean_contact_name, validate_contact_phone
 from temba.flows.models import Flow, FlowStart
 from temba.mailroom.events import Event
 from temba.notifications.views import NotificationTargetMixin
@@ -385,6 +386,19 @@ class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
 
 
 class ContactForm(forms.ModelForm):
+    # Override the name field so Django keeps whitespace-only input intact (default
+    # CharField strips it), letting clean_contact_name reject it consistently with the
+    # other entry points. The field is required: an empty submission triggers the
+    # standard "This field is required." message instead of silently creating an
+    # anonymous contact.
+    name = forms.CharField(
+        label=_("Name"),
+        required=True,
+        strip=False,
+        empty_value=None,
+        widget=InputWidget(attrs={"widget_only": False}),
+    )
+
     def __init__(self, *args, **kwargs):
         self.user = kwargs["user"]
         self.org = self.user.get_org()
@@ -469,6 +483,14 @@ class ContactForm(forms.ModelForm):
                         self._errors[key] = self.error_class([_("Invalid format")])
                     return False
 
+                # enforce strict 8-15 digit length on tel: URNs
+                if scheme == URN.TEL_SCHEME:
+                    try:
+                        validate_contact_phone(path)
+                    except ValidationError as e:
+                        self._errors[key] = self.error_class([str(e.messages[0])])
+                        return False
+
                 # validate whatsapp URN variations
                 if scheme == URN.WHATSAPP_SCHEME and path[:2] == "55":
                     return validate_urn_whatsapp(key, scheme, path)
@@ -490,7 +512,19 @@ class ContactForm(forms.ModelForm):
                 self.cleaned_data["new_scheme"] = self.data["new_scheme"]
                 self.cleaned_data["new_path"] = self.data["new_path"]
 
+        # require at least one URN (existing field or the new connection) so the contact
+        # is reachable. Anonymous orgs do not expose URN fields on this form, so we skip
+        # the check there to preserve the existing behaviour.
+        if not self.org.is_anon:
+            has_existing_urn = any(value for field_key, value in self.data.items() if field_key.startswith("urn__"))
+            has_new_urn = bool(self.data.get("new_path"))
+            if not has_existing_urn and not has_new_urn:
+                raise forms.ValidationError(_("At least one phone number or connection is required."))
+
         return self.cleaned_data
+
+    def clean_name(self):
+        return clean_contact_name(self.cleaned_data.get("name"))
 
     class Meta:
         model = Contact
