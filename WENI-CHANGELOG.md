@@ -1,7 +1,6 @@
 3.78.0
 ----------
-* feat: validate contact name length (1-100 characters) on the public API, internal API, UI form and CSV/XLSX import
-* feat: validate phone number length (8-15 digits, ignoring "+") on every endpoint and form that accepts a tel URN
+* feat: validate contact name length (1-100 characters) and validate phone number length (8-15 digits, ignoring "+")
 
 3.77.1
 ----------
