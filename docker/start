@@ -86,12 +86,12 @@ elif [[ "celery-beat" == "$1" ]]; then
         -s "${CELERY_BEAT_DATABASE_FILE}"
 elif [[ "edaconsume" == "$1" ]]; then
     shift 1
-    group="eda"
+    handle="temba.event_driven.handle.handle_default_consumers"
     if [[ "$1" == "template" ]]; then
-        group="template"
+        handle="temba.event_driven.handle.handle_template_consumers"
         shift 1
     fi
-    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume --group "$group" "$@"
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume --handle "$handle" "$@"
 elif [[ "sqsconsume" == "$1" ]]; then
     shift 1
     queue="broadcasts"
@@ -102,14 +102,10 @@ elif [[ "sqsconsume" == "$1" ]]; then
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py sqsconsume --queue "$queue" "$@"
 elif [[ "edaconsume-amq" == "$1" ]]; then
     shift 1
-    group="eda"
-    if [[ "$1" == "template" ]]; then
-        group="template"
-        shift 1
-    fi
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume \
-    --handle "temba.projects.handle.handle_project_creation_consumers" \
-    --params-class "weni.eda.django.AMQConnectionParamsFactory"
+        --handle "temba.projects.handle.handle_project_creation_consumers" \
+        --params-class "weni.eda.django.AMQConnectionParamsFactory" \
+        "$@"
 elif [[ "fastapi" == "$1" ]]; then
     shift 1
     echo "Starting FastAPI server..."
