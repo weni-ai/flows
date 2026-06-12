@@ -340,6 +340,7 @@ INSTALLED_APPS = (
     "temba.wpp_flows",
     "temba.projects",
     "temba.event_driven",
+    "weni.eda.django.eda_app",
     "temba.conversion_events",
 )
 
