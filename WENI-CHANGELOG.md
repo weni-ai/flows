@@ -1,3 +1,7 @@
+3.79.0
+----------
+* feat: enable carousel in catalog messages for WhatsApp broadcasts
+
 3.78.0
 ----------
 * feat: validate contact name length (1-100 characters) and validate phone number length (8-15 digits, ignoring "+")
