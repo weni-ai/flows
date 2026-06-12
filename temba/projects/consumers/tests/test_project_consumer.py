@@ -40,7 +40,7 @@ class TestProjectConsumer(TembaTest):
         }
         message = self._create_mock_message(body)
 
-        ProjectConsumer().consume(message)
+        ProjectConsumer().handle(message)
 
         mock_use_case.create_project.assert_called_once()
         project_dto, user_email, extra_fields, authorizations = mock_use_case.create_project.call_args[0]
@@ -74,7 +74,7 @@ class TestProjectConsumer(TembaTest):
         }
         message = self._create_mock_message(body)
 
-        ProjectConsumer().consume(message)
+        ProjectConsumer().handle(message)
 
         project_dto = mock_use_case.create_project.call_args[0][0]
         self.assertTrue(project_dto.inline_agent_switch)

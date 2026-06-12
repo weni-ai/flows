@@ -893,6 +893,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     }
                 },
                 "catalog_message": {
+                    "carousel": true,
                     "products": [
                         {
                             "product": "Example Product Name",
@@ -1053,6 +1054,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     }
                 },
                 "catalog_message": {
+                    "carousel": true,
                     "products": [
                         {
                             "product": "Example Product Name",
