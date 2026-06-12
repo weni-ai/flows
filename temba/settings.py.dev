@@ -140,7 +140,6 @@ OLD_DESIGN_EXCLUDED_CHANNELS_CODES = os.environ.get("OLD_DESIGN_EXCLUDED_CHANNEL
 USE_EDA = os.environ.get("USE_EDA", default=False)
 
 if USE_EDA:
-    EDA_CONNECTION_BACKEND = "temba.event_driven.backends.PyAMQPConnectionBackend"
     EDA_CONSUMERS_HANDLE = "temba.event_driven.handle.handle_consumers"
 
     EDA_BROKER_HOST = os.environ.get("EDA_BROKER_HOST", default="localhost")
