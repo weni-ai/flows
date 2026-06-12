@@ -1,3 +1,7 @@
+3.78.0
+----------
+* feat: validate contact name length (1-100 characters) and validate phone number length (8-15 digits, ignoring "+")
+
 3.77.1
 ----------
 * feat: add date filter in tickets endpoint

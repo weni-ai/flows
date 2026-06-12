@@ -11,6 +11,7 @@ from rest_framework import serializers
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from temba import mailroom
 from temba.api.models import Resthook, ResthookSubscriber, WebHookEvent
@@ -19,6 +20,7 @@ from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
 from temba.classifiers.models import Classifier
 from temba.contacts.models import Contact, ContactField, ContactGroup
+from temba.contacts.validators import clean_contact_name
 from temba.externals.models import ExternalService
 from temba.flows.models import Flow, FlowLabel, FlowRun, FlowStart
 from temba.globals.models import Global
@@ -776,7 +778,9 @@ class ContactReadSerializer(ReadSerializer):
 
 
 class ContactWriteSerializer(WriteSerializer):
-    name = serializers.CharField(required=False, max_length=64, allow_null=True)
+    # length and emptiness are enforced by validate_name via clean_contact_name; allow_blank/trim_whitespace
+    # are flipped here so DRF passes the raw value (including whitespace-only strings) to validate_name
+    name = serializers.CharField(required=False, allow_null=True, allow_blank=True, trim_whitespace=False)
     language = serializers.CharField(required=False, min_length=3, max_length=3, allow_null=True)
     urns = fields.URNListField(required=False)
     groups = fields.ContactGroupField(many=True, required=False, allow_dynamic=False)
@@ -784,6 +788,12 @@ class ContactWriteSerializer(WriteSerializer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def validate_name(self, value):
+        try:
+            return clean_contact_name(value)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.messages)
 
     def validate_language(self, value):
         if value and not pycountry.languages.get(alpha_3=value):

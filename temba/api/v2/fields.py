@@ -1,11 +1,13 @@
 from rest_framework import relations, serializers
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
 
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel
 from temba.contacts.models import URN, Contact, ContactField as ContactFieldModel, ContactGroup, ContactURN
+from temba.contacts.validators import validate_contact_phone
 from temba.flows.models import Flow
 from temba.msgs.models import Label, Msg
 from temba.tickets.models import Ticket, Ticketer, Topic
@@ -43,6 +45,17 @@ def validate_urn(value, strict=True, country_code=None):
             raise ValueError()
     except ValueError:
         raise serializers.ValidationError("Invalid URN: %s. Ensure phone numbers contain country codes." % value)
+
+    # enforce strict 8-15 digit length on tel: URNs (does not affect other schemes).
+    # URN.normalize already guarantees the result is parseable, so URN.to_parts is safe here.
+    if strict:
+        scheme, path, _, _ = URN.to_parts(normalized)
+        if scheme == URN.TEL_SCHEME:
+            try:
+                validate_contact_phone(path)
+            except DjangoValidationError as e:
+                raise serializers.ValidationError(str(e.messages[0]))
+
     return normalized
 
 
