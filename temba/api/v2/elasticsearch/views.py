@@ -15,6 +15,7 @@ from django.urls import reverse
 
 from temba.api.v2.elasticsearch.serializers import GetContactsSerializer
 from temba.contacts.models import Contact
+from temba.utils.whatsapp.ninth_digit import get_number_search_variations
 
 
 def get_pagination_links(base_url, page_number, total_pages, page_size):  # pragma: no cover
@@ -65,18 +66,21 @@ class ContactsElasticSearchEndpoint(APIView):
                 filte.append(Q("match_phrase", name=name))
                 filte.append(Q("exists", field="name"))
             if number:
+                number_queries = [
+                    Q("match_phrase", **{"urns.path": variation})
+                    for variation in (get_number_search_variations(number) or [number])
+                ]
                 filte.append(
                     Q(
                         "nested",
                         path="urns",
                         query=Q(
                             "bool",
+                            should=number_queries,
+                            minimum_should_match=1,
                             must=[
-                                Q(
-                                    "match_phrase",
-                                    **{"urns.path": number},
-                                ),
                                 Q("exists", field="urns.path"),
+                                Q("term", **{"urns.scheme": "whatsapp"}),
                             ],
                         ),
                     ),
@@ -88,17 +92,13 @@ class ContactsElasticSearchEndpoint(APIView):
 
             from_index = (page_number - 1) * page_size
 
-            contacts = Search(using=client, index=index).query(qs)
-            response = list(contacts.scan())
-
-            for _ in range(from_index):
-                next(response, None)
+            search = Search(using=client, index=index).query(qs)
+            search = search[from_index : from_index + page_size]
+            response = search.execute()
 
             results = [hit.to_dict() for hit in response]
 
-            results = results[:page_size]
-
-            total_results = len(results)
+            total_results = response.hits.total.value
             total_pages = ceil(total_results / page_size)
 
             new_url = request.build_absolute_uri()
