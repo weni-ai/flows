@@ -3104,3 +3104,174 @@ class InternalContactGroupsViewAdditionalTests(TembaTest):
             )
         self.assertEqual(resp.status_code, 404)
         self.assertEqual(resp.json(), {"error": "User not found"})
+
+
+class ContactSearchViewTest(JWTAuthMockMixin, TembaTest):
+    url = "/api/v2/internals/contact_search"
+
+    def setUp(self):
+        super().setUp()
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save(update_fields=("proj_uuid",))
+        self.org2.proj_uuid = uuid.uuid4()
+        self.org2.save(update_fields=("proj_uuid",))
+        self.jwt_payload_patch = {"project_uuid": str(self.org.proj_uuid)}
+
+    def _mock_jwt_authenticate(self, request, *args, **kwargs):
+        result = super()._mock_jwt_authenticate(request, *args, **kwargs)
+        if getattr(self, "jwt_payload_patch", None):
+            request.jwt_payload.update(self.jwt_payload_patch)
+            request.project_uuid = request.jwt_payload.get("project_uuid")
+            request.channel_uuid = request.jwt_payload.get("channel_uuid")
+        return result
+
+    def _set_jwt_payload(self, **kwargs):
+        self.jwt_payload_patch = kwargs
+
+    def _get(self, params=None):
+        return self.client.get(self.url, params or {}, **self.auth_headers)
+
+    def test_rejects_project_uuid_different_from_token(self):
+        resp = self._get(
+            {"project_uuid": str(self.org2.proj_uuid), "query": 'name = "Alice"'},
+        )
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.json(), {"error": "project_uuid does not match token"})
+
+    def test_unknown_project_in_token_returns_404(self):
+        self._set_jwt_payload(project_uuid=str(uuid.uuid4()))
+        resp = self._get({"query": 'name = "Alice"'})
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {"error": "Project not found"})
+
+    def test_missing_query_returns_400(self):
+        resp = self._get()
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json().get("error"), "query is required")
+
+    def test_blank_query_returns_400(self):
+        resp = self._get({"query": "   "})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json().get("error"), "query is required")
+
+    def test_invalid_offset_returns_400(self):
+        resp = self._get({"query": 'name = "Alice"', "offset": "abc"})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("offset", resp.json().get("error", ""))
+
+    def test_negative_offset_returns_400(self):
+        resp = self._get({"query": 'name = "Alice"', "offset": "-1"})
+        self.assertEqual(resp.status_code, 400)
+
+    @mock_mailroom
+    def test_search_by_contact_field_returns_full_contact_data(self, mr_mocks):
+        nickname = self.create_field("nickname", "Nickname")
+        alice = self.create_contact("Alice", urns=["tel:+5511999999991", "whatsapp:5511999999991"])
+        mods = alice.update_fields({nickname: "Macklemore"})
+        alice.modify(self.admin, mods)
+        bob = self.create_contact("Bob", urns=["tel:+5511999999992"])
+        bob.update_fields({nickname: "Bobby"})
+
+        query = 'nickname = "Macklemore"'
+        mr_mocks.contact_search(query, contacts=[alice], fields=[nickname])
+
+        resp = self._get({"query": query})
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["total"], 1)
+        self.assertEqual(body["offset"], 0)
+        self.assertEqual(len(body["results"]), 1)
+
+        result = body["results"][0]
+        self.assertEqual(result["uuid"], str(alice.uuid))
+        self.assertEqual(result["name"], "Alice")
+        self.assertIn("tel:+5511999999991", result["urns"])
+        self.assertIn("whatsapp:5511999999991", result["urns"])
+        self.assertEqual(result["fields"].get("nickname"), "Macklemore")
+        self.assertFalse(result["blocked"])
+        self.assertFalse(result["stopped"])
+
+    @mock_mailroom
+    def test_search_returns_empty_when_no_matches(self, mr_mocks):
+        query = 'name = "Nobody"'
+        mr_mocks.contact_search(query, contacts=[])
+
+        resp = self._get({"query": query})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["results"], [])
+        self.assertEqual(resp.json()["total"], 0)
+
+    @mock_mailroom
+    def test_search_preserves_mailroom_order(self, mr_mocks):
+        c1 = self.create_contact("Carol", urns=["tel:+5511999999993"])
+        c2 = self.create_contact("Dan", urns=["tel:+5511999999994"])
+        c3 = self.create_contact("Eve", urns=["tel:+5511999999995"])
+
+        query = 'name ~ ""'
+        mr_mocks.contact_search(query, contacts=[c3, c1, c2])
+
+        resp = self._get({"query": query, "sort": "name"})
+        self.assertEqual(resp.status_code, 200)
+        uuids = [r["uuid"] for r in resp.json()["results"]]
+        self.assertEqual(uuids, [str(c3.uuid), str(c1.uuid), str(c2.uuid)])
+
+    @mock_mailroom
+    def test_invalid_query_returns_400(self, mr_mocks):
+        mr_mocks.error(
+            "can't resolve 'foo' to a field or URN scheme", code="unknown_property", extra={"property": "foo"}
+        )
+
+        resp = self._get({"query": 'foo = "bar"'})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("foo", resp.json().get("error", ""))
+
+    @mock_mailroom
+    def test_search_restricted_by_group_uuid(self, mr_mocks):
+        alice = self.create_contact("Alice", urns=["tel:+5511999999996"])
+        group = self.create_group("VIPs", contacts=[alice])
+
+        query = 'name = "Alice"'
+        mr_mocks.contact_search(query, contacts=[alice])
+
+        resp = self._get({"query": query, "group_uuid": str(group.uuid)})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.json()["results"]), 1)
+
+        groups = resp.json()["results"][0]["groups"]
+        self.assertIn(str(group.uuid), [g["uuid"] for g in groups])
+
+    @mock_mailroom
+    def test_search_ignores_unknown_group_uuid(self, mr_mocks):
+        alice = self.create_contact("Alice", urns=["tel:+5511999999997"])
+        query = 'name = "Alice"'
+        mr_mocks.contact_search(query, contacts=[alice])
+
+        resp = self._get({"query": query, "group_uuid": "00000000-0000-0000-0000-000000000000"})
+        self.assertEqual(resp.status_code, 200)
+
+    @mock_mailroom
+    def test_offset_is_forwarded_to_mailroom(self, mr_mocks):
+        alice = self.create_contact("Alice", urns=["tel:+5511999999998"])
+        query = 'name = "Alice"'
+        mr_mocks.contact_search(query, contacts=[alice], total=120)
+
+        resp = self._get({"query": query, "offset": "50"})
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["offset"], 50)
+        self.assertEqual(body["total"], 120)
+
+    @mock_mailroom
+    def test_deleted_contacts_are_excluded(self, mr_mocks):
+        alice = self.create_contact("Alice", urns=["tel:+5511999999971"])
+        bob = self.create_contact("Bob", urns=["tel:+5511999999972"])
+        bob.release(self.admin, full=False)
+
+        query = 'name ~ ""'
+        mr_mocks.contact_search(query, contacts=[alice, bob])
+
+        resp = self._get({"query": query})
+        self.assertEqual(resp.status_code, 200)
+        uuids = [r["uuid"] for r in resp.json()["results"]]
+        self.assertIn(str(alice.uuid), uuids)
+        self.assertNotIn(str(bob.uuid), uuids)

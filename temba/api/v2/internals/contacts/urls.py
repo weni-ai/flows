@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     CleanContactsFieldsView,
     ContactHasOpenTicketView,
+    ContactSearchView,
     ContactsExportByStatusView,
     ContactsImportConfirmView,
     ContactsImportUploadView,
@@ -34,4 +35,5 @@ urlpatterns = [
         ContactsExportByStatusView.as_view(),
         name="contacts_export_by_status",
     ),
+    path("contact_search", ContactSearchView.as_view(), name="contact_search"),
 ]
