@@ -178,6 +178,10 @@ def trim_flow_starts_base(filter_kwargs, exclude_kwargs, retention_period_key, l
 
             run_ids = FlowRun.objects.filter(start_id__in=start_ids).values_list("id", flat=True)[:100000]
 
+        remaining_runs = FlowRun.objects.filter(start_id__in=start_ids).exists()
+        if remaining_runs:
+            FlowRun.objects.filter(start_id__in=start_ids).update(start_id=None)
+
         FlowStart.contacts.through.objects.filter(flowstart_id__in=start_ids).delete()
         FlowStart.groups.through.objects.filter(flowstart_id__in=start_ids).delete()
         FlowStartCount.objects.filter(start_id__in=start_ids).delete()
