@@ -83,21 +83,19 @@ class ContactsElasticSearchEndpoint(APIView):
                             ],
                         )
                     )
-                if not number_queries:
-                    number_queries.append(Q("match_phrase", **{"urns.path": number}))
-
-                filte.append(
-                    Q(
-                        "nested",
-                        path="urns",
-                        query=Q(
-                            "bool",
-                            should=number_queries,
-                            minimum_should_match=1,
-                            must=[Q("exists", field="urns.path")],
+                if number_queries:
+                    filte.append(
+                        Q(
+                            "nested",
+                            path="urns",
+                            query=Q(
+                                "bool",
+                                should=number_queries,
+                                minimum_should_match=1,
+                                must=[Q("exists", field="urns.path")],
+                            ),
                         ),
-                    ),
-                )
+                    )
             qs = Q("bool", must=filte)
 
             page_number = int(params.get("page_number", 1))
