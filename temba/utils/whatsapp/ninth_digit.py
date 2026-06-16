@@ -1,33 +1,67 @@
 import re
 
-# The generated variant (without the 9th digit) must keep at least this many digits.
-# 4 keeps "99676" -> "9676" working while blocking "9676" -> "676", which matched
-# thousands of unrelated contacts in production benchmarks.
-MIN_VARIANT_LEN = 4
+from django.conf import settings
+
+# Fallback defaults, used only when the matching setting is not defined.
+# CONTACT_SEARCH_MIN_VARIANT_LEN keeps "99676" -> "9676" working while blocking
+# "9676" -> "676", which matched thousands of unrelated contacts in production.
+# CONTACT_SEARCH_MIN_TERM_LEN mirrors the trigram analyzer minimum (3 chars).
+DEFAULT_MIN_VARIANT_LEN = 4
+DEFAULT_MIN_TERM_LEN = 3
 
 
-def get_number_search_variations(number: str) -> list:
+def _min_variant_len() -> int:
+    return getattr(settings, "CONTACT_SEARCH_MIN_VARIANT_LEN", DEFAULT_MIN_VARIANT_LEN)
+
+
+def _min_term_len() -> int:
+    return getattr(settings, "CONTACT_SEARCH_MIN_TERM_LEN", DEFAULT_MIN_TERM_LEN)
+
+
+def get_ninth_digit_variant(number: str):
     """
-    Returns the number plus its variant without the Brazilian extra 9th digit.
+    Returns the number without the Brazilian extra 9th digit, or None when it does
+    not apply.
 
     Only the no-9 variant is generated because the trigram index already covers the
     opposite direction (typed without 9 -> contact stored with 9). The variant is
-    only added when it keeps at least MIN_VARIANT_LEN digits, to avoid overly broad
-    short fragments.
+    only returned when it keeps at least CONTACT_SEARCH_MIN_VARIANT_LEN digits, to
+    avoid overly broad short fragments.
     """
     digits = re.sub(r"\D", "", number)
-    variations = [digits]
 
-    stripped = None
     if digits.startswith("55") and len(digits) >= 5 and digits[4] == "9":
         stripped = digits[:4] + digits[5:]
     elif len(digits) == 11 and digits[2] == "9":
         stripped = digits[:2] + digits[3:]
     elif digits.startswith("9"):
         stripped = digits[1:]
+    else:
+        return None
 
-    if stripped and len(stripped) >= MIN_VARIANT_LEN:
-        variations.append(stripped)
+    if len(stripped) < _min_variant_len() or stripped == digits:
+        return None
 
-    seen = set()
-    return [v for v in variations if len(v) >= 3 and not (v in seen or seen.add(v))]
+    return stripped
+
+
+def get_number_search_terms(number: str) -> dict:
+    """
+    Splits a typed number into the terms used by the contacts search query.
+
+    - "literal": the typed digits, searched across all URN schemes. Empty when it
+      has fewer than CONTACT_SEARCH_MIN_TERM_LEN digits, since the trigram analyzer
+      matches nothing below that.
+    - "whatsapp_variant": the number without the Brazilian extra 9th digit, searched
+      only within whatsapp URNs because stripping the 9 is a WhatsApp-specific rule.
+      None when it does not apply or equals the literal.
+    """
+    digits = re.sub(r"\D", "", number)
+
+    literal = digits if len(digits) >= _min_term_len() else ""
+
+    variant = get_ninth_digit_variant(digits)
+    if variant == literal:
+        variant = None
+
+    return {"literal": literal, "whatsapp_variant": variant}

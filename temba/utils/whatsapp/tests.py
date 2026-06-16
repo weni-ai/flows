@@ -4,6 +4,7 @@ import requests
 from django_redis import get_redis_connection
 
 from django.conf import settings
+from django.test import override_settings
 from django.utils import timezone
 
 from temba.channels.models import Channel
@@ -20,7 +21,7 @@ from temba.tests.requests import MockResponse
 from temba.wpp_products.models import Catalog, Product
 
 from . import update_api_version
-from .ninth_digit import get_number_search_variations
+from .ninth_digit import get_ninth_digit_variant, get_number_search_terms
 from .tasks import (
     _calculate_variable_count,
     refresh_whatsapp_catalog_and_products,
@@ -653,40 +654,91 @@ class SentenxTestCase(TembaTest):
 
 class NinthDigitVariationsTest(TembaTest):
     def test_full_number_with_country_code(self):
-        # DDI 55 + DDD + 9 + 8 digits -> also search without the 9th digit
+        # DDI 55 + DDD + 9 + 8 digits -> literal (any scheme) + no-9 variant (whatsapp)
         self.assertEqual(
-            get_number_search_variations("5584981204567"),
-            ["5584981204567", "558481204567"],
+            get_number_search_terms("5584981204567"),
+            {"literal": "5584981204567", "whatsapp_variant": "558481204567"},
         )
 
     def test_full_number_with_ddd(self):
-        # DDD + 9 + 8 digits (11 digits) -> also search without the 9th digit
+        # DDD + 9 + 8 digits (11 digits) -> literal + no-9 variant
         self.assertEqual(
-            get_number_search_variations("84981204567"),
-            ["84981204567", "8481204567"],
+            get_number_search_terms("84981204567"),
+            {"literal": "84981204567", "whatsapp_variant": "8481204567"},
         )
 
     def test_fragment_starting_with_nine(self):
         # fragment long enough that the stripped variant keeps >= 4 digits
         self.assertEqual(
-            get_number_search_variations("99676"),
-            ["99676", "9676"],
+            get_number_search_terms("99676"),
+            {"literal": "99676", "whatsapp_variant": "9676"},
         )
 
     def test_short_fragment_does_not_generate_broad_variant(self):
-        # "9676" -> "676" has only 3 digits, so it must not be added
-        self.assertEqual(get_number_search_variations("9676"), ["9676"])
+        # "9676" -> "676" has only 3 digits, so the variant must not be generated
+        self.assertEqual(
+            get_number_search_terms("9676"),
+            {"literal": "9676", "whatsapp_variant": None},
+        )
 
     def test_number_without_ninth_digit_has_no_variant(self):
         # already without the extra 9 -> nothing to strip
-        self.assertEqual(get_number_search_variations("558481204567"), ["558481204567"])
+        self.assertEqual(
+            get_number_search_terms("558481204567"),
+            {"literal": "558481204567", "whatsapp_variant": None},
+        )
 
     def test_input_shorter_than_trigram_minimum(self):
         # below 3 digits the trigram analyzer matches nothing
-        self.assertEqual(get_number_search_variations("12"), [])
+        self.assertEqual(
+            get_number_search_terms("12"),
+            {"literal": "", "whatsapp_variant": None},
+        )
 
     def test_non_digit_characters_are_stripped(self):
         self.assertEqual(
-            get_number_search_variations("+55 84 98120-4567"),
-            ["5584981204567", "558481204567"],
+            get_number_search_terms("+55 84 98120-4567"),
+            {"literal": "5584981204567", "whatsapp_variant": "558481204567"},
+        )
+
+    def test_ninth_digit_variant_helper(self):
+        self.assertEqual(get_ninth_digit_variant("5584981204567"), "558481204567")
+        self.assertEqual(get_ninth_digit_variant("84981204567"), "8481204567")
+        self.assertEqual(get_ninth_digit_variant("99676"), "9676")
+        self.assertIsNone(get_ninth_digit_variant("9676"))
+        self.assertIsNone(get_ninth_digit_variant("558481204567"))
+
+    def test_uses_default_settings(self):
+        # defaults: variant floor 4, term floor 3
+        self.assertEqual(settings.CONTACT_SEARCH_MIN_VARIANT_LEN, 4)
+        self.assertEqual(settings.CONTACT_SEARCH_MIN_TERM_LEN, 3)
+
+    @override_settings(CONTACT_SEARCH_MIN_VARIANT_LEN=5)
+    def test_variant_floor_is_configurable(self):
+        # with floor 5, "99676" -> "9676" (4 digits) is now too short for the variant
+        self.assertEqual(
+            get_number_search_terms("99676"),
+            {"literal": "99676", "whatsapp_variant": None},
+        )
+        self.assertIsNone(get_ninth_digit_variant("99676"))
+        # a longer number still produces the variant
+        self.assertEqual(
+            get_number_search_terms("84981204567"),
+            {"literal": "84981204567", "whatsapp_variant": "8481204567"},
+        )
+
+    @override_settings(CONTACT_SEARCH_MIN_VARIANT_LEN=3)
+    def test_lower_variant_floor_allows_shorter_fragments(self):
+        # with floor 3, "9676" -> "676" (3 digits) becomes a valid variant
+        self.assertEqual(
+            get_number_search_terms("9676"),
+            {"literal": "9676", "whatsapp_variant": "676"},
+        )
+
+    @override_settings(CONTACT_SEARCH_MIN_TERM_LEN=5)
+    def test_term_floor_is_configurable(self):
+        # with term floor 5, a 4-digit literal is dropped
+        self.assertEqual(
+            get_number_search_terms("9676"),
+            {"literal": "", "whatsapp_variant": None},
         )

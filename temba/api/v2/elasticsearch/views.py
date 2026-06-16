@@ -15,7 +15,7 @@ from django.urls import reverse
 
 from temba.api.v2.elasticsearch.serializers import GetContactsSerializer
 from temba.contacts.models import Contact
-from temba.utils.whatsapp.ninth_digit import get_number_search_variations
+from temba.utils.whatsapp.ninth_digit import get_number_search_terms
 
 
 def get_pagination_links(base_url, page_number, total_pages, page_size):  # pragma: no cover
@@ -66,10 +66,26 @@ class ContactsElasticSearchEndpoint(APIView):
                 filte.append(Q("match_phrase", name=name))
                 filte.append(Q("exists", field="name"))
             if number:
-                number_queries = [
-                    Q("match_phrase", **{"urns.path": variation})
-                    for variation in (get_number_search_variations(number) or [number])
-                ]
+                terms = get_number_search_terms(number)
+
+                # The literal number matches any URN scheme, while the no-9 variant is
+                # restricted to whatsapp URNs (stripping the 9 is a WhatsApp-only rule).
+                number_queries = []
+                if terms["literal"]:
+                    number_queries.append(Q("match_phrase", **{"urns.path": terms["literal"]}))
+                if terms["whatsapp_variant"]:
+                    number_queries.append(
+                        Q(
+                            "bool",
+                            must=[
+                                Q("match_phrase", **{"urns.path": terms["whatsapp_variant"]}),
+                                Q("term", **{"urns.scheme": "whatsapp"}),
+                            ],
+                        )
+                    )
+                if not number_queries:
+                    number_queries.append(Q("match_phrase", **{"urns.path": number}))
+
                 filte.append(
                     Q(
                         "nested",
@@ -78,10 +94,7 @@ class ContactsElasticSearchEndpoint(APIView):
                             "bool",
                             should=number_queries,
                             minimum_should_match=1,
-                            must=[
-                                Q("exists", field="urns.path"),
-                                Q("term", **{"urns.scheme": "whatsapp"}),
-                            ],
+                            must=[Q("exists", field="urns.path")],
                         ),
                     ),
                 )

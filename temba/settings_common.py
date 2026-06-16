@@ -1445,6 +1445,13 @@ MACHINE_HOSTNAME = socket.gethostname().split(".")[0]
 ELASTICSEARCH_URL = os.environ.get("ELASTICSEARCH_URL", "http://localhost:9200")
 ELASTICSEARCH_TIMEOUT_REQUEST = os.environ.get("ELASTICSEARCH_TIMEOUT_REQUEST", default=10)
 
+# Contact number search (Brazilian 9th digit) configuration.
+# CONTACT_SEARCH_MIN_VARIANT_LEN: minimum digits the no-9 variant must keep to be searched,
+# avoiding overly broad short fragments (e.g. "9676" -> "676").
+# CONTACT_SEARCH_MIN_TERM_LEN: minimum digits a term needs to match the trigram index.
+CONTACT_SEARCH_MIN_VARIANT_LEN = int(os.environ.get("CONTACT_SEARCH_MIN_VARIANT_LEN", default=4))
+CONTACT_SEARCH_MIN_TERM_LEN = int(os.environ.get("CONTACT_SEARCH_MIN_TERM_LEN", default=3))
+
 # SextenX url
 SENTENX_URL = os.environ.get("SENTENX_URL", default="")
 
