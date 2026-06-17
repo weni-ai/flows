@@ -11,7 +11,11 @@ from temba.api.v2.projects.views import (
     ProjectLanguageView,
     ProjectMessageCountView,
 )
-from temba.api.v2.templates.views import TemplateByIdEndpoint, TemplatesTranslationsEndpoint
+from temba.api.v2.templates.views import (
+    TemplateByIdEndpoint,
+    TemplateLastDispatchesEndpoint,
+    TemplatesTranslationsEndpoint,
+)
 
 from .billing.views import BillingPricingEndpoint
 from .flows.urls import urlpatterns as flows_urlpatterns
@@ -147,3 +151,10 @@ urlpatterns = format_suffix_patterns(urlpatterns, allowed=["json", "api"])
 
 urlpatterns += [path("internals/", include(internals_urlpatterns))]
 urlpatterns += flows_urlpatterns
+urlpatterns += [
+    url(
+        r"^templates/last_dispatches$",
+        TemplateLastDispatchesEndpoint.as_view(),
+        name="api.v2.templates_last_dispatches",
+    ),
+]

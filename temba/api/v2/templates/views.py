@@ -5,12 +5,13 @@ from weni.internal.authenticators import InternalOIDCAuthentication
 
 from django.db.models import F
 
+from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.v2.internals.views import APIViewMixin
-from temba.api.v2.permissions import IsUserInOrg
+from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
-from temba.templates.models import Template, TemplateTranslation
+from temba.templates.models import Template, TemplateLastDispatch, TemplateTranslation
 
-from .serializers import TemplateTranslationDetailsSerializer
+from .serializers import TemplateLastDispatchSerializer, TemplateTranslationDetailsSerializer
 
 
 class TemplatesTranslationsEndpoint(APIViewMixin, APIView):
@@ -143,3 +144,54 @@ class TemplateByIdEndpoint(APIViewMixin, APIView):
 
         data = TemplateTranslationDetailsSerializer(translation).data
         return Response(data)
+
+
+class TemplateLastDispatchesEndpoint(APIViewMixin, APIView):
+    """
+    GET returns paginated list of template last dispatch records for an org, selected by project_uuid.
+    Query params:
+      - project_uuid: required
+      - name: optional filter by template name (icontains)
+      - template_uuid: optional filter by template uuid (exact)
+      - meta_template_id: optional filter by Meta template id (exact)
+      - order_by: optional ordering, one of: last_fired_on, -last_fired_on (default -last_fired_on)
+      - limit: optional page size
+      - offset: optional offset for pagination
+    """
+
+    authentication_classes = [OptionalJWTAuthentication, InternalOIDCAuthentication]
+    permission_classes = [(IsAuthenticated & IsUserInOrg) | HasValidJWT]
+
+    def get(self, request, *args, **kwargs):
+        org = self.get_org_from_request(
+            request,
+            require_project_uuid=True,
+            missing_status=401,
+            missing_error="Project not provided",
+        )
+        if isinstance(org, Response):
+            return org
+
+        queryset = TemplateLastDispatch.objects.filter(org=org).select_related("template", "org")
+
+        name = request.query_params.get("name")
+        if name:
+            queryset = queryset.filter(name__icontains=name)
+
+        template_uuid = request.query_params.get("template_uuid")
+        if template_uuid:
+            queryset = queryset.filter(template_uuid=template_uuid)
+
+        meta_template_id = request.query_params.get("meta_template_id")
+        if meta_template_id:
+            queryset = queryset.filter(meta_template_id=meta_template_id)
+
+        order_by = request.query_params.get("order_by", "-last_fired_on")
+        if order_by not in ("last_fired_on", "-last_fired_on"):
+            order_by = "-last_fired_on"
+        queryset = queryset.order_by(order_by, "id")
+
+        pagination = DefaultLimitOffsetPagination()
+        page = pagination.paginate_queryset(queryset, request, self)
+        serializer = TemplateLastDispatchSerializer(page, many=True)
+        return pagination.get_paginated_response(serializer.data)
