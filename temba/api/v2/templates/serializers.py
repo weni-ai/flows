@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from temba.templates.models import TemplateTranslation
+from temba.templates.models import TemplateLastDispatch, TemplateTranslation
 
 
 class TemplateHeaderSerializer(serializers.Serializer):
@@ -66,3 +66,18 @@ class TemplateTranslationDetailsSerializer(serializers.Serializer):
             footer=footer_obj,
             buttons=buttons,
         )
+
+
+class TemplateLastDispatchSerializer(serializers.Serializer):
+    project_uuid = serializers.SerializerMethodField()
+    template = serializers.SerializerMethodField()
+    meta_template_id = serializers.CharField()
+    last_fired_on = serializers.DateTimeField()
+
+    def get_project_uuid(self, obj: TemplateLastDispatch):
+        return str(obj.org.proj_uuid) if obj.org.proj_uuid else None
+
+    def get_template(self, obj: TemplateLastDispatch):
+        if obj.template_id:
+            return {"uuid": str(obj.template.uuid), "name": obj.template.name}
+        return {"uuid": str(obj.template_uuid), "name": obj.name}
