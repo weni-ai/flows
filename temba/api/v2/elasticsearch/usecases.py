@@ -83,6 +83,11 @@ class SearchContactsElasticUseCase:
         self._number_query_usecase = number_query_usecase or BuildContactNumberQueryUseCase()
 
     def execute(self, org_id, name=None, number=None, page_number=1, page_size=10, base_url=""):
+        if page_size < 1:
+            raise ValueError("page_size must be at least 1")
+        if page_number < 1:
+            raise ValueError("page_number must be at least 1")
+
         client = self._client or self._create_client()
         filters = self._build_filters(org_id, name, number)
         qs = Q("bool", must=filters)

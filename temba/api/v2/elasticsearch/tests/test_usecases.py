@@ -110,6 +110,12 @@ class SearchContactsElasticUseCaseTest(TembaTest):
         self.assertIn("previous", result["pagination"]["links"])
         mock_search_cls.assert_called_once_with(using=self.client, index="contacts")
 
+    def test_execute_rejects_invalid_pagination(self):
+        with self.assertRaises(ValueError):
+            self.usecase.execute(org_id=1, page_size=0)
+        with self.assertRaises(ValueError):
+            self.usecase.execute(org_id=1, page_number=0)
+
     def test_build_filters_includes_name_and_number(self):
         number_usecase = Mock()
         number_usecase.execute.return_value = {"nested": "query"}
