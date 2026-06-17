@@ -531,7 +531,9 @@
       }
 
       if (href) {
-          if (event.metaKey) {
+          if (href.startsWith('http://') || href.startsWith('https://')) {
+              window.open(href, '_blank');
+          } else if (event.metaKey) {
               window.open(href, '_blank');
           } else {
               fetchURL(href);
