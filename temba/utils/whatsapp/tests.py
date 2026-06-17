@@ -688,13 +688,6 @@ class NinthDigitVariationsTest(TembaTest):
             {"literal": "558481204567", "whatsapp_variant": None},
         )
 
-    def test_input_shorter_than_trigram_minimum(self):
-        # below 3 digits the trigram analyzer matches nothing
-        self.assertEqual(
-            get_number_search_terms("12"),
-            {"literal": "", "whatsapp_variant": None},
-        )
-
     def test_non_digit_characters_are_stripped(self):
         self.assertEqual(
             get_number_search_terms("+55 84 98120-4567"),
@@ -709,9 +702,7 @@ class NinthDigitVariationsTest(TembaTest):
         self.assertIsNone(get_ninth_digit_variant("558481204567"))
 
     def test_uses_default_settings(self):
-        # defaults: variant floor 4, term floor 3
         self.assertEqual(settings.CONTACT_SEARCH_MIN_VARIANT_LEN, 4)
-        self.assertEqual(settings.CONTACT_SEARCH_MIN_TERM_LEN, 3)
 
     @override_settings(CONTACT_SEARCH_MIN_VARIANT_LEN=5)
     def test_variant_floor_is_configurable(self):
@@ -733,12 +724,4 @@ class NinthDigitVariationsTest(TembaTest):
         self.assertEqual(
             get_number_search_terms("9676"),
             {"literal": "9676", "whatsapp_variant": "676"},
-        )
-
-    @override_settings(CONTACT_SEARCH_MIN_TERM_LEN=5)
-    def test_term_floor_is_configurable(self):
-        # with term floor 5, a 4-digit literal is dropped
-        self.assertEqual(
-            get_number_search_terms("9676"),
-            {"literal": "", "whatsapp_variant": None},
         )

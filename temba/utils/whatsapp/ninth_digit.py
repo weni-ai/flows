@@ -2,20 +2,14 @@ import re
 
 from django.conf import settings
 
-# Fallback defaults, used only when the matching setting is not defined.
-# CONTACT_SEARCH_MIN_VARIANT_LEN keeps "99676" -> "9676" working while blocking
-# "9676" -> "676", which matched thousands of unrelated contacts in production.
-# CONTACT_SEARCH_MIN_TERM_LEN mirrors the trigram analyzer minimum (3 chars).
+# Fallback default, used only when CONTACT_SEARCH_MIN_VARIANT_LEN is not defined.
+# Keeps "99676" -> "9676" working while blocking "9676" -> "676", which matched
+# thousands of unrelated contacts in production benchmarks.
 DEFAULT_MIN_VARIANT_LEN = 4
-DEFAULT_MIN_TERM_LEN = 3
 
 
 def _min_variant_len() -> int:
     return getattr(settings, "CONTACT_SEARCH_MIN_VARIANT_LEN", DEFAULT_MIN_VARIANT_LEN)
-
-
-def _min_term_len() -> int:
-    return getattr(settings, "CONTACT_SEARCH_MIN_TERM_LEN", DEFAULT_MIN_TERM_LEN)
 
 
 def get_ninth_digit_variant(number: str):
@@ -49,19 +43,12 @@ def get_number_search_terms(number: str) -> dict:
     """
     Splits a typed number into the terms used by the contacts search query.
 
-    - "literal": the typed digits, searched across all URN schemes. Empty when it
-      has fewer than CONTACT_SEARCH_MIN_TERM_LEN digits, since the trigram analyzer
-      matches nothing below that.
+    - "literal": sanitized digits, searched across all URN schemes.
     - "whatsapp_variant": the number without the Brazilian extra 9th digit, searched
       only within whatsapp URNs because stripping the 9 is a WhatsApp-specific rule.
-      None when it does not apply or equals the literal.
+      None when it does not apply.
     """
     digits = re.sub(r"\D", "", number)
-
-    literal = digits if len(digits) >= _min_term_len() else ""
-
     variant = get_ninth_digit_variant(digits)
-    if variant == literal:
-        variant = None
 
-    return {"literal": literal, "whatsapp_variant": variant}
+    return {"literal": digits, "whatsapp_variant": variant}
