@@ -50,7 +50,7 @@ class TestProjectEventConsumer(TembaTest):
         }
         message = self._create_mock_message(body)
 
-        self.consumer.consume(message)
+        self.consumer.handle(message)
 
         # Verify message was acknowledged
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
@@ -76,7 +76,7 @@ class TestProjectEventConsumer(TembaTest):
             "temba.projects.consumers.project_event_consumer.update_project_config",
             return_value=None,
         ):
-            self.consumer.consume(message)
+            self.consumer.handle(message)
 
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
         message.channel.basic_reject.assert_not_called()
@@ -92,7 +92,7 @@ class TestProjectEventConsumer(TembaTest):
 
         self.assertTrue(self.test_org.is_active)
 
-        self.consumer.consume(message)
+        self.consumer.handle(message)
 
         # Verify message was acknowledged
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
@@ -114,7 +114,7 @@ class TestProjectEventConsumer(TembaTest):
 
         self.assertTrue(self.test_org.is_active)
 
-        self.consumer.consume(message)
+        self.consumer.handle(message)
 
         # Verify message was acknowledged
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
@@ -136,7 +136,7 @@ class TestProjectEventConsumer(TembaTest):
         }
         message = self._create_mock_message(body)
 
-        self.consumer.consume(message)
+        self.consumer.handle(message)
 
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
@@ -153,7 +153,7 @@ class TestProjectEventConsumer(TembaTest):
         }
         message = self._create_mock_message(body)
 
-        self.consumer.consume(message)
+        self.consumer.handle(message)
 
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
@@ -174,7 +174,7 @@ class TestProjectEventConsumer(TembaTest):
             "temba.projects.consumers.project_event_consumer.update_project_type",
             return_value=None,
         ):
-            self.consumer.consume(message)
+            self.consumer.handle(message)
 
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
         message.channel.basic_reject.assert_not_called()
@@ -192,7 +192,7 @@ class TestProjectEventConsumer(TembaTest):
         }
         message = self._create_mock_message(body)
 
-        self.consumer.consume(message)
+        self.consumer.handle(message)
 
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
@@ -208,7 +208,7 @@ class TestProjectEventConsumer(TembaTest):
         message = self._create_mock_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.consume(message)
+            self.consumer.handle(message)
 
             # Verify message was rejected
             message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
@@ -226,7 +226,7 @@ class TestProjectEventConsumer(TembaTest):
         message = self._create_mock_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.consume(message)
+            self.consumer.handle(message)
 
             message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
             message.channel.basic_ack.assert_not_called()
@@ -241,7 +241,7 @@ class TestProjectEventConsumer(TembaTest):
         message = self._create_mock_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.consume(message)
+            self.consumer.handle(message)
 
             message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
             message.channel.basic_ack.assert_not_called()
@@ -257,7 +257,7 @@ class TestProjectEventConsumer(TembaTest):
         message = self._create_mock_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.consume(message)
+            self.consumer.handle(message)
 
             message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
             message.channel.basic_ack.assert_not_called()
@@ -274,7 +274,7 @@ class TestProjectEventConsumer(TembaTest):
         message = self._create_mock_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.consume(message)
+            self.consumer.handle(message)
 
             message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
             message.channel.basic_ack.assert_not_called()
@@ -291,7 +291,7 @@ class TestProjectEventConsumer(TembaTest):
         message = self._create_mock_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.consume(message)
+            self.consumer.handle(message)
 
             message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
             message.channel.basic_ack.assert_not_called()
@@ -309,7 +309,7 @@ class TestProjectEventConsumer(TembaTest):
         message = self._create_mock_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.consume(message)
+            self.consumer.handle(message)
 
             # Should reject because Org.DoesNotExist is raised
             message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
@@ -325,7 +325,7 @@ class TestProjectEventConsumer(TembaTest):
         }
         message = self._create_mock_message(body)
 
-        self.consumer.consume(message)
+        self.consumer.handle(message)
 
         # Should acknowledge even though project doesn't exist
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
@@ -342,7 +342,7 @@ class TestProjectEventConsumer(TembaTest):
         }
         message = self._create_mock_message(body)
 
-        self.consumer.consume(message)
+        self.consumer.handle(message)
 
         # Should acknowledge even though project doesn't exist
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
@@ -362,7 +362,7 @@ class TestProjectEventConsumer(TembaTest):
         original_description = self.test_org.config["description"]
         original_language = self.test_org.language
 
-        self.consumer.consume(message)
+        self.consumer.handle(message)
 
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
@@ -379,7 +379,7 @@ class TestProjectEventConsumer(TembaTest):
         message.delivery_tag = "test-delivery-tag"
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.consume(message)
+            self.consumer.handle(message)
 
             message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
             message.channel.basic_ack.assert_not_called()
@@ -451,7 +451,7 @@ class TestProjectEventConsumer(TembaTest):
             mock_update.side_effect = Exception("Database error")
 
             with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-                self.consumer.consume(message)
+                self.consumer.handle(message)
 
                 message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
                 message.channel.basic_ack.assert_not_called()

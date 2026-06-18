@@ -4,9 +4,8 @@ import amqp
 from sentry_sdk import capture_exception
 from weni_datalake_sdk.clients.client import send_message_template_status_data_async
 from weni_datalake_sdk.paths.message_template_status_path import MessageTemplateStatusPath
-
-from temba.event_driven.consumers import EDAConsumer
-from temba.event_driven.parsers import JSONParser
+from weni.eda.django.consumers import EDAConsumer
+from weni.eda.parsers import JSONParser
 
 
 @dataclass
@@ -32,12 +31,9 @@ class MessageTemplateWebhookConsumer(EDAConsumer):
                 data=body,
             )
 
-            # Add data to lake
             send_message_template_status_data_async(MessageTemplateStatusPath, asdict(message_template_webhook_dto))
 
-            message.channel.basic_ack(message.delivery_tag)
-
+            self.ack()
         except Exception as exception:
             capture_exception(exception)
-            message.channel.basic_reject(message.delivery_tag, requeue=False)
-            print(f"[MessageTemplateWebhookConsumer] - Message rejected by: {exception}")
+            raise
