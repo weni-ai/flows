@@ -99,12 +99,13 @@ elif [[ "sqsconsume" == "$1" ]]; then
         queue="${1}"
         shift 1
     fi
-    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py sqsconsume --queue "$queue" "$@"
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume --group "$group" "$@"
 elif [[ "edaconsume-amq" == "$1" ]]; then
     shift 1
-    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume \
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume_amq \
         --handle "temba.projects.handle.handle_project_creation_consumers" \
         --params-class "weni.eda.django.AMQConnectionParamsFactory" \
+        --backend "weni.eda.backends.pyamqp_backend.PyAMQPConnectionBackend" \
         "$@"
 elif [[ "fastapi" == "$1" ]]; then
     shift 1
