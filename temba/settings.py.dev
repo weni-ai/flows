@@ -135,27 +135,6 @@ EXCLUDED_HTTP_HEADERS = os.environ.get("EXCLUDED_HTTP_HEADERS", default=[])
 OLD_DESIGN_EXCLUDED_CHANNELS_CODES = os.environ.get("OLD_DESIGN_EXCLUDED_CHANNELS_CODES", default=[])
 
 
-# Event Driven Architecture configurations
-
-USE_EDA = os.environ.get("USE_EDA", default=False)
-
-if USE_EDA:
-    EDA_CONSUMERS_HANDLE = "temba.event_driven.handle.handle_consumers"
-
-    EDA_BROKER_HOST = os.environ.get("EDA_BROKER_HOST", default="localhost")
-    EDA_VIRTUAL_HOST = os.environ.get("EDA_VIRTUAL_HOST", default="/")
-    EDA_BROKER_PORT = os.environ.get("EDA_BROKER_PORT", default=5672)
-    EDA_BROKER_USER = os.environ.get("EDA_BROKER_USER", default="guest")
-    EDA_BROKER_PASSWORD = os.environ.get("EDA_BROKER_PASSWORD", default="guest")
-
-    AMQ_BROKER_HOST = os.environ.get("AMQ_BROKER_HOST", default=EDA_BROKER_HOST)
-    AMQ_BROKER_PORT = int(os.environ.get("AMQ_BROKER_PORT", default=5671))
-    AMQ_BROKER_USER = os.environ.get("AMQ_BROKER_USER", default=EDA_BROKER_USER)
-    AMQ_BROKER_PASSWORD = os.environ.get("AMQ_BROKER_PASSWORD", default=EDA_BROKER_PASSWORD)
-    AMQ_VIRTUAL_HOST = os.environ.get("AMQ_VIRTUAL_HOST", default=EDA_VIRTUAL_HOST)
-    AMQ_BROKER_HEARTBEAT = int(os.environ.get("AMQ_BROKER_HEARTBEAT", default=300))
-    AMQ_BROKER_SSL_SERVER_HOSTNAME = os.environ.get("AMQ_BROKER_SSL_SERVER_HOSTNAME", default=None)
-
 BOTHUB_SYNC_INTENTS_URL = os.environ.get("BOTHUB_SYNC_INTENTS_URL", default="https://nlp.bothub.it/info/")
 
 # SQS Consumer Configuration (for agent-toolkit broadcasts)

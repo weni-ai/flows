@@ -1512,3 +1512,40 @@ WENI_WEBCHAT_ALLOWED_DOMAINS = [
 ]
 
 SOCKET_BASE_URL = os.environ.get("SOCKET_BASE_URL", default="")
+
+# -----------------------------------------------------------------------------------
+# Event Driven Architecture configurations
+# -----------------------------------------------------------------------------------
+
+USE_EDA = os.environ.get("USE_EDA", "false").lower() in ("true", "1", "yes")
+
+if USE_EDA:
+    _eda_connection_backend = os.environ.get("EDA_CONNECTION_BACKEND")
+    if _eda_connection_backend:
+        EDA_CONNECTION_BACKEND = _eda_connection_backend
+
+    EDA_CONSUMERS_HANDLE = os.environ.get(
+        "EDA_CONSUMERS_HANDLE", "temba.event_driven.handle.handle_consumers"
+    )
+
+    EDA_BROKER_HOST = os.environ.get("EDA_BROKER_HOST", "localhost")
+    EDA_VIRTUAL_HOST = os.environ.get("EDA_VIRTUAL_HOST", "/")
+    EDA_BROKER_PORT = int(os.environ.get("EDA_BROKER_PORT", 5672))
+    EDA_BROKER_USER = os.environ.get("EDA_BROKER_USER", "guest")
+    EDA_BROKER_PASSWORD = os.environ.get("EDA_BROKER_PASSWORD", "guest")
+    EDA_WAIT_TIME_RETRY = int(os.environ.get("EDA_WAIT_TIME_RETRY", 5))
+
+    PIKA_EDA_BROKER_HOST = os.environ.get("PIKA_EDA_BROKER_HOST", EDA_BROKER_HOST)
+    PIKA_EDA_BROKER_PORT = int(os.environ.get("PIKA_EDA_BROKER_PORT", 5671))
+    PIKA_EDA_BROKER_USER = os.environ.get("PIKA_EDA_BROKER_USER", EDA_BROKER_USER)
+    PIKA_EDA_BROKER_PASSWORD = os.environ.get("PIKA_EDA_BROKER_PASSWORD", EDA_BROKER_PASSWORD)
+    PIKA_EDA_VIRTUAL_HOST = os.environ.get("PIKA_EDA_VIRTUAL_HOST", EDA_VIRTUAL_HOST)
+    PIKA_EDA_SSL_ENABLED = os.environ.get("PIKA_EDA_SSL_ENABLED", "true").lower() in ("true", "1", "yes")
+
+    AMQ_BROKER_HOST = os.environ.get("AMQ_BROKER_HOST", PIKA_EDA_BROKER_HOST)
+    AMQ_BROKER_PORT = int(os.environ.get("AMQ_BROKER_PORT", PIKA_EDA_BROKER_PORT))
+    AMQ_BROKER_USER = os.environ.get("AMQ_BROKER_USER", PIKA_EDA_BROKER_USER)
+    AMQ_BROKER_PASSWORD = os.environ.get("AMQ_BROKER_PASSWORD", PIKA_EDA_BROKER_PASSWORD)
+    AMQ_VIRTUAL_HOST = os.environ.get("AMQ_VIRTUAL_HOST", PIKA_EDA_VIRTUAL_HOST)
+    AMQ_BROKER_HEARTBEAT = int(os.environ.get("AMQ_BROKER_HEARTBEAT", 300))
+    AMQ_BROKER_SSL_SERVER_HOSTNAME = os.environ.get("AMQ_BROKER_SSL_SERVER_HOSTNAME")
