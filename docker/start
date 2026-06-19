@@ -95,10 +95,6 @@ elif [[ "edaconsume" == "$1" ]]; then
 elif [[ "edaconsume-amq" == "$1" ]]; then
     shift 1
     group="eda"
-    if [[ "$1" == "template" ]]; then
-        group="template"
-        shift 1
-    fi
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume_amq --group "$group" "$@"
 elif [[ "fastapi" == "$1" ]]; then
     shift 1
