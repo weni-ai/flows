@@ -87,15 +87,15 @@ elif [[ "celery-beat" == "$1" ]]; then
 elif [[ "edaconsume" == "$1" ]]; then
     shift 1
     group="eda"
-    if [[ "$1" == "template" ]]; then
-        group="template"
-        shift 1
-    fi
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume --group "$group" "$@"
 elif [[ "edaconsume-amq" == "$1" ]]; then
     shift 1
     group="eda"
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume_amq --group "$group" "$@"
+elif [[ "templateconsume" == "$1" ]]; then
+    shift 1
+    group="template"
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume --group "$group" "$@"
 elif [[ "fastapi" == "$1" ]]; then
     shift 1
     echo "Starting FastAPI server..."
