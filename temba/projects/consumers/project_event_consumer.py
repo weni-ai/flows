@@ -1,4 +1,5 @@
 from enum import StrEnum
+import logging
 
 import amqp
 from sentry_sdk import capture_exception
@@ -9,6 +10,8 @@ from temba.projects.usecases.project_delete import delete_project
 from temba.projects.usecases.project_status_update import update_project_status
 from temba.projects.usecases.project_type_update import update_project_type
 from temba.projects.usecases.project_update import update_project_config
+
+logger = logging.getLogger(__name__)
 
 
 class EventAction(StrEnum):
@@ -37,6 +40,7 @@ class ProjectEventConsumer(EDAConsumer):
 
     def consume(self, message: amqp.Message):  # pragma: no cover
         try:
+            logger.info("[ProjectEventConsumer] Received message")
             body = JSONParser.parse(message.body)
 
             self._validate_message(body)
@@ -45,10 +49,23 @@ class ProjectEventConsumer(EDAConsumer):
             user_email = body.get("user_email")
             action = body.get("action")
 
+            logger.info(
+                "[ProjectEventConsumer] Processing project_uuid=%s action=%s user_email=%s",
+                project_uuid,
+                action,
+                user_email,
+            )
+
             self._process_event(project_uuid, user_email, action, body)
 
             self.ack()
+            logger.info(
+                "[ProjectEventConsumer] Message processed successfully project_uuid=%s action=%s",
+                project_uuid,
+                action,
+            )
         except Exception as exception:
+            logger.exception("[ProjectEventConsumer] Failed to process message")
             capture_exception(exception)
             raise
 

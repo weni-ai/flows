@@ -86,26 +86,14 @@ elif [[ "celery-beat" == "$1" ]]; then
         -s "${CELERY_BEAT_DATABASE_FILE}"
 elif [[ "edaconsume" == "$1" ]]; then
     shift 1
-    handle="temba.event_driven.handle.handle_default_consumers"
-
-    # Group selection, backward compatible with deploy manifests that still
-    # pass the legacy "--group <name>" flag instead of the positional form:
-    #   edaconsume template          / edaconsume --group template
-    #   edaconsume          (default) / edaconsume --group eda
-    group=""
-    if [[ "$1" == "--group" ]]; then
-        group="$2"
-        shift 2
-    elif [[ "$1" == "template" || "$1" == "eda" ]]; then
-        group="$1"
-        shift 1
-    fi
-
-    if [[ "$group" == "template" ]]; then
-        handle="temba.event_driven.handle.handle_template_consumers"
-    fi
-
-    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume --handle "$handle" "$@"
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume \
+        --handle "temba.event_driven.handle.handle_default_consumers" \
+        "$@"
+elif [[ "templateconsume" == "$1" ]]; then
+    shift 1
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume \
+        --handle "temba.event_driven.handle.handle_template_consumers" \
+        "$@"
 elif [[ "sqsconsume" == "$1" ]]; then
     shift 1
     queue="broadcasts"
