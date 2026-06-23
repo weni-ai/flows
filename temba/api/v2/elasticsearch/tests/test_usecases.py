@@ -14,29 +14,29 @@ from temba.tests import TembaTest
 
 class GetPaginationLinksTest(TembaTest):
     def test_first_page_with_more_pages(self):
-        links = get_pagination_links("http://test/contacts", 1, 3, 10)
-        self.assertEqual(links, {"next": "http://test/contacts?page_number=2&page_size=10"})
+        links = get_pagination_links("https://test/contacts", 1, 3, 10)
+        self.assertEqual(links, {"next": "https://test/contacts?page_number=2&page_size=10"})
 
     def test_middle_page(self):
-        links = get_pagination_links("http://test/contacts", 2, 3, 10)
+        links = get_pagination_links("https://test/contacts", 2, 3, 10)
         self.assertEqual(
             links,
             {
-                "next": "http://test/contacts?page_number=3&page_size=10",
-                "previous": "http://test/contacts?page_number=1&page_size=10",
+                "next": "https://test/contacts?page_number=3&page_size=10",
+                "previous": "https://test/contacts?page_number=1&page_size=10",
             },
         )
 
     def test_last_page_has_no_next(self):
-        links = get_pagination_links("http://test/contacts", 3, 3, 10)
-        self.assertEqual(links, {"previous": "http://test/contacts?page_number=2&page_size=10"})
+        links = get_pagination_links("https://test/contacts", 3, 3, 10)
+        self.assertEqual(links, {"previous": "https://test/contacts?page_number=2&page_size=10"})
 
     def test_single_page_has_no_links(self):
-        self.assertEqual(get_pagination_links("http://test/contacts", 1, 1, 10), {})
+        self.assertEqual(get_pagination_links("https://test/contacts", 1, 1, 10), {})
 
     def test_preserves_existing_query_params(self):
-        links = get_pagination_links("http://test/contacts?project_uuid=abc", 1, 3, 10)
-        self.assertEqual(links["next"], "http://test/contacts?project_uuid=abc&page_number=2&page_size=10")
+        links = get_pagination_links("https://test/contacts?project_uuid=abc", 1, 3, 10)
+        self.assertEqual(links["next"], "https://test/contacts?project_uuid=abc&page_number=2&page_size=10")
 
 
 class BuildContactNumberQueryUseCaseTest(TembaTest):
@@ -121,7 +121,7 @@ class SearchContactsElasticUseCaseTest(TembaTest):
             name="John",
             page_number=2,
             page_size=10,
-            base_url="http://test/contacts?page=1",
+            base_url="https://test/contacts?page=1",
         )
 
         self.assertEqual(result["results"], [{"name": "John", "uuid": "abc"}])
@@ -189,7 +189,7 @@ class SearchContactsElasticUseCaseTest(TembaTest):
         self.assertEqual(result["pagination"]["total_pages"], 0)
         mock_search.query.assert_called_once()
 
-    @override_settings(ELASTICSEARCH_URL="http://es.test:9200", ELASTICSEARCH_TIMEOUT_REQUEST=15)
+    @override_settings(ELASTICSEARCH_URL="https://es.test:9200", ELASTICSEARCH_TIMEOUT_REQUEST=15)
     @patch("temba.api.v2.elasticsearch.usecases.Elasticsearch")
     @patch("temba.api.v2.elasticsearch.usecases.Search")
     def test_create_client_when_not_injected(self, mock_search_cls, mock_elasticsearch_cls):
@@ -205,7 +205,7 @@ class SearchContactsElasticUseCaseTest(TembaTest):
         usecase = SearchContactsElasticUseCase()
         usecase.execute(org_id=1, name="John")
 
-        mock_elasticsearch_cls.assert_called_once_with("http://es.test:9200", timeout=15)
+        mock_elasticsearch_cls.assert_called_once_with("https://es.test:9200", timeout=15)
 
     def test_build_filters_org_id_only(self):
         filters = self.usecase._build_filters(org_id=42, name=None, number=None)
