@@ -24,8 +24,6 @@ from temba.contacts.models import URN
 from temba.utils import str_to_bool
 from temba.utils.views import NonAtomicMixin
 
-from weni_commons.auth import SessionTokenAuthentication
-
 from .serializers import BulkActionFailure
 
 
@@ -36,7 +34,6 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
 
     permission_classes = (SSLPermission, HasValidJWT | APIPermission)
     authentication_classes = (
-        SessionTokenAuthentication,
         OptionalJWTAuthentication,
         APISessionAuthentication,
         APITokenAuthentication,
