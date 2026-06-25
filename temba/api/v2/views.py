@@ -11,6 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from smartmin.views import SmartFormView, SmartTemplateView
+from weni_commons.kong import kong_expose
 from weni_datalake_sdk.clients.redshift.events import get_events as dl_get_events
 
 from django import forms
@@ -5507,6 +5508,7 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
         }
 
 
+@kong_expose
 class EventsEndpoint(BaseAPIView):
     permission = "orgs.org_api"
 

@@ -308,6 +308,8 @@ INSTALLED_APPS = (
     "smartmin.users",
     # django-timezone-field
     "timezone_field",
+    # weni shared utilities
+    "weni_commons",
     # temba apps
     "temba.apks",
     "temba.archives",
