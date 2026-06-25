@@ -1,3 +1,7 @@
+3.80.0
+----------
+* feat: improve endpoint to search contacts in elastic excluding the 9th digit
+
 3.79.0
 ----------
 * feat: enable carousel in catalog messages for WhatsApp broadcasts
