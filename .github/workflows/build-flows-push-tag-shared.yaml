@@ -108,6 +108,10 @@ jobs:
           poetry add git+https://github.com/noumar/iso639.git
           poetry install --no-interaction
 
+      - name: Initialize environment
+        run: |
+          ln -s ${{ github.workspace }}/temba/settings.py.dev ${{ github.workspace }}/temba/settings.py
+
       - name: Discover @kong_expose routes
         run: |
           poetry run python manage.py kong_sync --dry-run
