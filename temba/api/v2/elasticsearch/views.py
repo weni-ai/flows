@@ -1,7 +1,3 @@
-from math import ceil
-
-from elasticsearch import Elasticsearch
-from elasticsearch_dsl import Q, Search
 from mozilla_django_oidc.contrib.drf import OIDCAuthentication
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -10,20 +6,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.models import Project
 
-from django.conf import settings
 from django.urls import reverse
 
 from temba.api.v2.elasticsearch.serializers import GetContactsSerializer
+from temba.api.v2.elasticsearch.usecases import SearchContactsElasticUseCase
 from temba.contacts.models import Contact
-
-
-def get_pagination_links(base_url, page_number, total_pages, page_size):  # pragma: no cover
-    links = {}
-    if page_number < total_pages:
-        links["next"] = f"{base_url}&page_number={page_number + 1}&page_size={page_size}"
-    if page_number > 1:
-        links["previous"] = f"{base_url}&page_number={page_number - 1}&page_size={page_size}"
-    return links
 
 
 class ContactsElasticSearchEndpoint(APIView):
@@ -46,74 +33,41 @@ class ContactsElasticSearchEndpoint(APIView):
         params = request.query_params
         project_uuid = params.get("project_uuid")
 
-        project = Project.objects.get(project_uuid=project_uuid)
+        try:
+            project = Project.objects.get(project_uuid=project_uuid)
+        except Project.DoesNotExist:
+            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+
         if not project.get_users().filter(id=request.user.id).exists():
             return Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        org_id = project.org.id
 
         name = params.get("name")
         number = params.get("number", "")
 
         if name or number:
-            base_url = settings.ELASTICSEARCH_URL
-            timeout = int(settings.ELASTICSEARCH_TIMEOUT_REQUEST)
-            client = Elasticsearch(f"{base_url}", timeout=timeout)
-            filte = [Q("match", org_id=org_id)]
-            index = "contacts"
-            if name:
-                filte.append(Q("match_phrase", name=name))
-                filte.append(Q("exists", field="name"))
-            if number:
-                filte.append(
-                    Q(
-                        "nested",
-                        path="urns",
-                        query=Q(
-                            "bool",
-                            must=[
-                                Q(
-                                    "match_phrase",
-                                    **{"urns.path": number},
-                                ),
-                                Q("exists", field="urns.path"),
-                            ],
-                        ),
-                    ),
+            try:
+                page_number = int(params.get("page_number", 1))
+                page_size = int(params.get("page_size", 10))
+            except (TypeError, ValueError):
+                return Response(
+                    {"error": "Invalid pagination parameters"},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
-            qs = Q("bool", must=filte)
 
-            page_number = int(params.get("page_number", 1))
-            page_size = int(params.get("page_size", 10))
+            if page_number < 1 or page_size < 1:
+                return Response(
+                    {"error": "Invalid pagination parameters"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-            from_index = (page_number - 1) * page_size
-
-            contacts = Search(using=client, index=index).query(qs)
-            response = list(contacts.scan())
-
-            for _ in range(from_index):
-                next(response, None)
-
-            results = [hit.to_dict() for hit in response]
-
-            results = results[:page_size]
-
-            total_results = len(results)
-            total_pages = ceil(total_results / page_size)
-
-            new_url = request.build_absolute_uri()
-            pagination_links = get_pagination_links(new_url, page_number, total_pages, page_size)
-
-            data = {
-                "results": results,
-                "pagination": {
-                    "page_number": page_number,
-                    "page_size": page_size,
-                    "total_pages": total_pages,
-                    "links": pagination_links,
-                },
-            }
-
+            data = SearchContactsElasticUseCase().execute(
+                org_id=project.org.id,
+                name=name,
+                number=number,
+                page_number=page_number,
+                page_size=page_size,
+                base_url=request.build_absolute_uri(),
+            )
             return Response(data, status=status.HTTP_200_OK)
 
         queryset = Contact.objects.filter(org=project.org).order_by("-modified_on")[:10]
