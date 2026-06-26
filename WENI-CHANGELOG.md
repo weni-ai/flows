@@ -1,3 +1,7 @@
+3.80.1
+----------
+* fix: adjust Instagram page access token pagination check and improve token refresh validation message
+
 3.80.0
 ----------
 * feat: improve endpoint to search contacts in elastic excluding the 9th digit

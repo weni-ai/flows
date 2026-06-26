@@ -3,6 +3,7 @@ from smartmin.views import SmartFormView, SmartModelActionView
 
 from django import forms
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
@@ -10,6 +11,28 @@ from temba.orgs.views import ModalMixin, OrgObjPermsMixin
 
 from ...models import Channel
 from ...views import ClaimViewMixin
+
+
+def get_page_access_token(fb_user_id, page_id, long_lived_auth_token):
+    url = f"https://graph.facebook.com/v12.0/{fb_user_id}/accounts"
+    params = {"access_token": long_lived_auth_token}
+
+    while url:
+        response = requests.get(url, params=params)
+
+        if response.status_code != 200:  # pragma: no cover
+            raise Exception("Failed to get a page long lived token")
+
+        response_json = response.json()
+
+        for page in response_json.get("data", []):
+            if page["id"] == str(page_id) and page.get("access_token"):
+                return page["access_token"], page["name"]
+
+        url = response_json.get("paging", {}).get("next", None)
+        params = {}
+
+    raise Exception("Empty page access token!")
 
 
 class ClaimView(ClaimViewMixin, SmartFormView):
@@ -51,35 +74,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
                 if long_lived_auth_token == "":  # pragma: no cover
                     raise Exception("Empty user access token!")
 
-                url = f"https://graph.facebook.com/v12.0/{fb_user_id}/accounts"
-                params = {"access_token": long_lived_auth_token}
-
-                page_access_token = ""
-
-                while True:
-                    response = requests.get(url, params=params)
-                    response_json = response.json()
-
-                    if response.status_code != 200:  # pragma: no cover
-                        raise Exception("Failed to get a page long lived token")
-
-                    for page in response_json.get("data", []):
-                        if page["id"] == str(page_id):
-                            page_access_token = page["access_token"]
-                            name = page["name"]
-                            break
-
-                    if page_access_token != "":
-                        break
-                    next_ = response_json["paging"].get("next", None)
-
-                    if next_ is not None:
-                        url = next_
-                    else:  # pragma: no cover
-                        break
-
-                if page_access_token == "":  # pragma: no cover
-                    raise Exception("Empty page access token!")
+                page_access_token, name = get_page_access_token(fb_user_id, page_id, long_lived_auth_token)
 
                 url = f"https://graph.facebook.com/v12.0/{page_id}/subscribed_apps"
                 params = {"access_token": page_access_token}
@@ -225,33 +220,15 @@ class RefreshToken(ModalMixin, OrgObjPermsMixin, SmartModelActionView):
         if long_lived_auth_token == "":  # pragma: no cover
             raise Exception("Empty user access token!")
 
-        url = f"https://graph.facebook.com/v12.0/{fb_user_id}/accounts"
-        params = {"access_token": long_lived_auth_token}
-
-        page_access_token = ""
-
-        while True:
-            response = requests.get(url, params=params)
-            response_json = response.json()
-
-            if response.status_code != 200:  # pragma: no cover
-                raise Exception("Failed to get a page long lived token")
-
-            for page in response_json.get("data", []):
-                if page["id"] == str(page_id):
-                    page_access_token = page["access_token"]
-                    name = page["name"]
-                    break
-
-            if page_access_token != "":
-                break
-
-            next_ = response_json["paging"].get("next", None)
-            if next_ is not None:
-                url = next_
-
-            else:  # pragma: no cover
-                break
+        try:
+            page_access_token, name = get_page_access_token(fb_user_id, page_id, long_lived_auth_token)
+        except Exception:
+            raise ValidationError(
+                _(
+                    "Unable to refresh the token because this Facebook user doesn't have permission "
+                    "on the linked page. Check that you are still an admin on that page and try again."
+                )
+            )
 
         url = f"https://graph.facebook.com/v12.0/{page_id}/subscribed_apps"
         params = {"access_token": page_access_token}
