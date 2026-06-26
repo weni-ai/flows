@@ -7,9 +7,12 @@ from rest_framework.test import APIRequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
-from temba.api.v2.templates.serializers import TemplateTranslationDetailsSerializer
+from temba.api.auth.jwt import OptionalJWTAuthentication
+from temba.api.v2.internals.views import JWTAuthMockMixin
+from temba.api.v2.permissions import HasValidJWT
+from temba.api.v2.templates.serializers import TemplateLastDispatchSerializer, TemplateTranslationDetailsSerializer
 from temba.api.v2.templates.views import TemplateByIdEndpoint
-from temba.templates.models import Template, TemplateButton, TemplateHeader, TemplateTranslation
+from temba.templates.models import Template, TemplateButton, TemplateHeader, TemplateLastDispatch, TemplateTranslation
 from temba.tests import TembaTest
 
 
@@ -424,3 +427,143 @@ class TemplateSerializationTests(TembaTest):
         self.assertTrue(data["buttons"])  # non-empty
         self.assertEqual(data["buttons"][0]["type"], "QUICK_REPLY")
         self.assertEqual(data["buttons"][0]["text"], "Yes")
+
+
+class TemplateLastDispatchesEndpointTests(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.org.proj_uuid = uuid4()
+        self.org.save()
+
+    def _url(self, params=None):
+        base = reverse("api.v2.templates_last_dispatches")
+        if params:
+            return f"{base}?{urlencode(params)}"
+        return base
+
+    @patch("temba.api.v2.templates.views.TemplateLastDispatchesEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.templates.views.TemplateLastDispatchesEndpoint.permission_classes", [])
+    def test_missing_project_uuid(self):
+        self.login(self.admin)
+        resp = self.client.get(self._url())
+        self.assertEqual(resp.status_code, 401)
+
+    @patch("temba.api.v2.templates.views.TemplateLastDispatchesEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.templates.views.TemplateLastDispatchesEndpoint.permission_classes", [])
+    def test_invalid_project_uuid(self):
+        self.login(self.admin)
+        resp = self.client.get(self._url({"project_uuid": str(uuid4())}))
+        self.assertEqual(resp.status_code, 404)
+
+    @patch("temba.api.v2.templates.views.TemplateLastDispatchesEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.templates.views.TemplateLastDispatchesEndpoint.permission_classes", [])
+    def test_list_last_dispatches_success(self):
+        self.login(self.admin)
+
+        template = Template.objects.create(org=self.org, name="welcome_message")
+        fired_on = timezone.now()
+
+        TemplateLastDispatch.objects.create(
+            org=self.org,
+            template=template,
+            template_uuid=template.uuid,
+            name=template.name,
+            meta_template_id="123456789",
+            last_fired_on=fired_on,
+        )
+        TemplateLastDispatch.objects.create(
+            org=self.org2,
+            template_uuid=uuid4(),
+            name="other_org_template",
+            meta_template_id="123456789",
+            last_fired_on=fired_on,
+        )
+
+        resp = self.client.get(self._url({"project_uuid": str(self.org.proj_uuid)}))
+        self.assertEqual(resp.status_code, 200)
+
+        data = resp.json()
+        self.assertEqual(len(data["results"]), 1)
+
+        item = data["results"][0]
+        self.assertEqual(item["project_uuid"], str(self.org.proj_uuid))
+        self.assertEqual(item["template"]["uuid"], str(template.uuid))
+        self.assertEqual(item["template"]["name"], template.name)
+        self.assertEqual(item["meta_template_id"], "123456789")
+        self.assertIsNotNone(item["last_fired_on"])
+
+    @patch("temba.api.v2.templates.views.TemplateLastDispatchesEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.templates.views.TemplateLastDispatchesEndpoint.permission_classes", [])
+    def test_filter_by_name_and_meta_template_id(self):
+        self.login(self.admin)
+
+        TemplateLastDispatch.objects.create(
+            org=self.org,
+            template_uuid=uuid4(),
+            name="welcome_message",
+            meta_template_id="111",
+            last_fired_on=timezone.now(),
+        )
+        TemplateLastDispatch.objects.create(
+            org=self.org,
+            template_uuid=uuid4(),
+            name="alert_message",
+            meta_template_id="222",
+            last_fired_on=timezone.now(),
+        )
+
+        resp = self.client.get(
+            self._url({"project_uuid": str(self.org.proj_uuid), "name": "welcome", "meta_template_id": "111"})
+        )
+        self.assertEqual(resp.status_code, 200)
+        results = resp.json()["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["template"]["name"], "welcome_message")
+
+    def test_serializer_falls_back_when_template_fk_is_null(self):
+        template_uuid = uuid4()
+        record = TemplateLastDispatch.objects.create(
+            org=self.org,
+            template_uuid=template_uuid,
+            name="orphan_template",
+            meta_template_id="999",
+            last_fired_on=timezone.now(),
+        )
+
+        data = TemplateLastDispatchSerializer(record).data
+        self.assertEqual(data["template"]["uuid"], str(template_uuid))
+        self.assertEqual(data["template"]["name"], "orphan_template")
+
+
+class TemplateLastDispatchesJWTAuthTests(JWTAuthMockMixin, TembaTest):
+    jwt_patch_target = "temba.api.auth.jwt.OptionalJWTAuthentication.authenticate"
+
+    def setUp(self):
+        super().setUp()
+        self.org.proj_uuid = uuid4()
+        self.org.save()
+        self.jwt_payload_patch = {"project_uuid": str(self.org.proj_uuid)}
+
+    def _url(self, params=None):
+        base = reverse("api.v2.templates_last_dispatches")
+        params = params or {"project_uuid": str(self.org.proj_uuid)}
+        return f"{base}?{urlencode(params)}"
+
+    @patch(
+        "temba.api.v2.templates.views.TemplateLastDispatchesEndpoint.authentication_classes",
+        [OptionalJWTAuthentication],
+    )
+    @patch("temba.api.v2.templates.views.TemplateLastDispatchesEndpoint.permission_classes", [HasValidJWT])
+    def test_list_last_dispatches_with_jwt(self):
+        TemplateLastDispatch.objects.create(
+            org=self.org,
+            template_uuid=uuid4(),
+            name="jwt_template",
+            meta_template_id="555",
+            last_fired_on=timezone.now(),
+        )
+
+        resp = self.client.get(self._url(), **self.auth_headers)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.json()["results"]), 1)
+        self.assertEqual(resp.json()["results"][0]["template"]["name"], "jwt_template")

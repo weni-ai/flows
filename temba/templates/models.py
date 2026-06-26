@@ -305,3 +305,24 @@ class TemplateHeader(models.Model):
     translation = models.ForeignKey(TemplateTranslation, on_delete=models.CASCADE, related_name="headers")
     type = models.CharField(max_length=20, choices=HEADER_TYPE_CHOICES)
     text = models.CharField(max_length=60, default=None, null=True)
+
+
+class TemplateLastDispatch(models.Model):
+    """
+    Tracks when a WhatsApp template was last dispatched for an organization.
+    """
+
+    org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="template_last_dispatches")
+    template = models.ForeignKey(
+        Template, on_delete=models.SET_NULL, null=True, blank=True, related_name="last_dispatches"
+    )
+    template_uuid = models.UUIDField()
+    name = models.CharField(max_length=512)
+    meta_template_id = models.CharField(max_length=64)
+    last_fired_on = models.DateTimeField()
+
+    def __str__(self):
+        return f"{self.name} ({self.template_uuid})"
+
+    class Meta:
+        unique_together = ("org", "meta_template_id")
