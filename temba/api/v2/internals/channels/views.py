@@ -8,7 +8,10 @@ from weni.internal.authenticators import InternalOIDCAuthentication
 from django.conf import settings
 
 from temba.api.auth.jwt import RequiredJWTAuthentication
-from temba.api.v2.internals.channels.serializers import ChannelElevenLabsApiKeySerializer, ChannelProjectSerializer
+from temba.api.v2.internals.channels.serializers import (
+    ChannelElevenLabsApiKeySerializer,
+    ChannelProjectSerializer,
+)
 from temba.api.v2.internals.channels.usecases import GetElevenLabsApiKeyUseCase
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
@@ -44,9 +47,15 @@ class ChannelProjectView(APIViewMixin, APIView):
                 "project_uuid": str(channel.org.proj_uuid),
             }
             if channel.channel_type == "WAC":
-                channel_data["waba"] = channel.config.get("wa_waba_id") if channel.config.get("wa_waba_id") else ""
+                channel_data["waba"] = (
+                    channel.config.get("wa_waba_id")
+                    if channel.config.get("wa_waba_id")
+                    else ""
+                )
                 channel_data["phone_number"] = (
-                    channel.config.get("wa_number") if channel.config.get("wa_number") else ""
+                    channel.config.get("wa_number")
+                    if channel.config.get("wa_number")
+                    else ""
                 )
             response["results"].append(channel_data)
 
@@ -77,14 +86,69 @@ class InternalChannelView(APIViewMixin, APIView):
                 "name": channel.name,
             }
             if channel.channel_type == "WAC":
-                channel_data["waba"] = channel.config.get("wa_waba_id") if channel.config.get("wa_waba_id") else None
+                channel_data["waba"] = (
+                    channel.config.get("wa_waba_id")
+                    if channel.config.get("wa_waba_id")
+                    else None
+                )
                 channel_data["phone_number"] = (
-                    channel.config.get("wa_number") if channel.config.get("wa_number") else None
+                    channel.config.get("wa_number")
+                    if channel.config.get("wa_number")
+                    else None
                 )
                 channel_data["MMLite"] = True if channel.config.get("mmlite") else False
             response["results"].append(channel_data)
 
         return Response(response)
+
+
+class ChannelsByProjectInternalView(APIViewMixin, APIView):
+    """Service-to-service variant of `InternalChannelView`.
+
+    Authenticates via the shared `BILLING_FIXED_ACCESS_TOKEN` query token
+    (same pattern as `ChannelProjectView`) so that the billing service can
+    bulk-hydrate every channel of a project during entity-sync cascade.
+    """
+
+    def get(self, request: Request):
+        token = request.query_params.get("token")
+        if token is None:
+            raise NotAuthenticated()
+        if token != settings.BILLING_FIXED_ACCESS_TOKEN:
+            raise AuthenticationFailed()
+
+        project_uuid = request.query_params.get("project_uuid")
+        if not project_uuid:
+            return Response({"error": "project_uuid is required"}, status=400)
+
+        channels = (
+            Channel.objects.filter(org__proj_uuid=project_uuid, is_active=True)
+            .select_related("org")
+            .only(
+                "uuid", "channel_type", "name", "config", "is_active", "org__proj_uuid"
+            )
+        )
+
+        results = []
+        for channel in channels:
+            config = channel.config or {}
+            results.append(
+                {
+                    "uuid": str(channel.uuid),
+                    "channel_type": channel.channel_type,
+                    "name": channel.name,
+                    "is_active": channel.is_active,
+                    "waba": config.get("wa_waba_id") or None,
+                    "phone_number": config.get("wa_number") or None,
+                    "config": {
+                        "wa_waba_id": config.get("wa_waba_id"),
+                        "wa_number": config.get("wa_number"),
+                        "is_demo": bool(config.get("is_demo", False)),
+                    },
+                }
+            )
+
+        return Response({"results": results})
 
 
 class ChannelAllowedDomainsView(APIViewMixin, APIView):
@@ -115,7 +179,9 @@ class ChannelElevenLabsApiKeyView(APIViewMixin, APIView):
 
     def get(self, request: Request):
         channel_uuid = getattr(request, "channel_uuid", None)
-        serializer = ChannelElevenLabsApiKeySerializer(data={"channel_uuid": channel_uuid})
+        serializer = ChannelElevenLabsApiKeySerializer(
+            data={"channel_uuid": channel_uuid}
+        )
         serializer.is_valid(raise_exception=True)
 
         usecase = GetElevenLabsApiKeyUseCase()
