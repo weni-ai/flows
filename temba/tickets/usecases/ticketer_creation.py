@@ -90,17 +90,24 @@ def create_ticketer(
     )
 
     for queue in queues:
-        TicketerQueue.objects.get_or_create(
+        queue_obj, created = TicketerQueue.objects.get_or_create(
             queue_uuid=queue.get("uuid"),
             org=project.org,
             defaults=dict(
                 uuid=uuid4(),
                 name=queue.get("name"),
+                queue_purpose=queue.get("queue_purpose"),
                 created_by=user,
                 modified_by=user,
                 ticketer=ticketer,
             ),
         )
+        if not created:
+            queue_obj.name = queue.get("name")
+            queue_obj.queue_purpose = queue.get("queue_purpose")
+            queue_obj.modified_by = user
+            queue_obj.ticketer = ticketer
+            queue_obj.save(update_fields=("name", "queue_purpose", "modified_by", "ticketer", "modified_on"))
 
     for integration_request in integration_requests:
         update_flow_definition(integration_request, ticketer)
