@@ -560,6 +560,7 @@ class GetDepartmentsViewTest(TembaTest):
             modified_by=self.user,
             org=self.org,
             name="Fake Queue",
+            queue_purpose="Conversations related to billing",
             ticketer=ticketer,
         )
 
@@ -575,6 +576,7 @@ class GetDepartmentsViewTest(TembaTest):
                 {
                     "topic_name": queue.name,
                     "topic_uuid": str(queue.uuid),
+                    "topic_purpose": queue.queue_purpose,
                 }
             ],
         }
