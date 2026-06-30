@@ -79,7 +79,7 @@ django-permissions-policy = "^4.21.0"
 moto = "4.2.14"
 weni-datalake-sdk = "0.6.1"
 PyJWT = "^2.10.1"
-weni-eda = "0.1.2a1"
+weni-eda = "0.2.0a6"
 fastapi = "^0.115.12"
 uvicorn = { extras = ["standard"], version = "^0.32.1" }
 

@@ -1,17 +1,26 @@
+import logging
+
 import amqp
 from sentry_sdk import capture_exception
-
-from temba.event_driven.consumers import EDAConsumer
-from temba.event_driven.parsers.json_parser import JSONParser
+from weni.eda.django.consumers import EDAConsumer
+from weni.eda.parsers import JSONParser
 
 from ..usecases.ticketer_creation import create_ticketer
+
+logger = logging.getLogger(__name__)
 
 
 class TicketConsumer(EDAConsumer):
     def consume(self, message: amqp.Message):  # pragma: no cover
-        print(f"[TicketerConsumer] - Consuming a message. Body: {message.body}")
         try:
+            logger.info("[TicketConsumer] Received message")
             body = JSONParser.parse(message.body)
+            logger.info(
+                "[TicketConsumer] Processing uuid=%s project_uuid=%s user_email=%s",
+                body.get("uuid"),
+                body.get("project_uuid"),
+                body.get("user_email"),
+            )
             create_ticketer(
                 uuid=body.get("uuid"),
                 name=body.get("name"),
@@ -21,9 +30,9 @@ class TicketConsumer(EDAConsumer):
                 queues=body.get("queues"),
             )
 
-            message.channel.basic_ack(message.delivery_tag)
-
+            self.ack()
+            logger.info("[TicketConsumer] Message processed successfully uuid=%s", body.get("uuid"))
         except Exception as exception:
+            logger.exception("[TicketConsumer] Failed to process message")
             capture_exception(exception)
-            message.channel.basic_reject(message.delivery_tag, requeue=False)
-            print(f"[TicketerConsumer] - Message rejected by: {exception}")
+            raise

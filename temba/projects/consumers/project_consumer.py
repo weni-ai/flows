@@ -1,18 +1,28 @@
+import logging
+
 import amqp
 from sentry_sdk import capture_exception
+from weni.eda.django.consumers import EDAConsumer
+from weni.eda.parsers import JSONParser
 
-from temba.event_driven.consumers import EDAConsumer
-from temba.event_driven.parsers import JSONParser
 from temba.projects.usecases.project_creation import ProjectCreationUseCase
 
 from ..usecases import FlowSetupHandlerUseCase, ProjectCreationDTO, TemplateTypeIntegrationUseCase
 
+logger = logging.getLogger(__name__)
+
 
 class ProjectConsumer(EDAConsumer):
     def consume(self, message: amqp.Message):  # pragma: no cover
-        print(f"[ProjectConsumer] - Consuming a message. Body: {message.body}")
         try:
+            logger.info("[ProjectConsumer] Received message")
             body = JSONParser.parse(message.body)
+            logger.info(
+                "[ProjectConsumer] Processing project uuid=%s name=%s user_email=%s",
+                body.get("uuid"),
+                body.get("name"),
+                body.get("user_email"),
+            )
             project_dto = ProjectCreationDTO(
                 uuid=body.get("uuid"),
                 name=body.get("name"),
@@ -33,9 +43,9 @@ class ProjectConsumer(EDAConsumer):
                 project_dto, body.get("user_email"), body.get("extra_fields"), body.get("authorizations")
             )
 
-            message.channel.basic_ack(message.delivery_tag)
-
+            self.ack()
+            logger.info("[ProjectConsumer] Message processed successfully project_uuid=%s", body.get("uuid"))
         except Exception as exception:
+            logger.exception("[ProjectConsumer] Failed to process message")
             capture_exception(exception)
-            message.channel.basic_reject(message.delivery_tag, requeue=False)
-            print(f"[ProjectConsumer] - Message rejected by: {exception}")
+            raise

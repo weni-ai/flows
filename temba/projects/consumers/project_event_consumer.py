@@ -1,14 +1,17 @@
 from enum import StrEnum
+import logging
 
 import amqp
 from sentry_sdk import capture_exception
+from weni.eda.django.consumers import EDAConsumer
+from weni.eda.parsers import JSONParser
 
-from temba.event_driven.consumers import EDAConsumer
-from temba.event_driven.parsers.json_parser import JSONParser
 from temba.projects.usecases.project_delete import delete_project
 from temba.projects.usecases.project_status_update import update_project_status
 from temba.projects.usecases.project_type_update import update_project_type
 from temba.projects.usecases.project_update import update_project_config
+
+logger = logging.getLogger(__name__)
 
 
 class EventAction(StrEnum):
@@ -36,8 +39,8 @@ class ProjectEventConsumer(EDAConsumer):
     """
 
     def consume(self, message: amqp.Message):  # pragma: no cover
-        print(f"[ProjectEventConsumer] - Consuming a message. Body: {message.body}")
         try:
+            logger.info("[ProjectEventConsumer] Received message")
             body = JSONParser.parse(message.body)
 
             self._validate_message(body)
@@ -46,16 +49,25 @@ class ProjectEventConsumer(EDAConsumer):
             user_email = body.get("user_email")
             action = body.get("action")
 
-            # Process based on action
+            logger.info(
+                "[ProjectEventConsumer] Processing project_uuid=%s action=%s user_email=%s",
+                project_uuid,
+                action,
+                user_email,
+            )
+
             self._process_event(project_uuid, user_email, action, body)
 
-            message.channel.basic_ack(message.delivery_tag)
-            print(f"[ProjectEventConsumer] - Successfully processed {action} for project {project_uuid}")
-
+            self.ack()
+            logger.info(
+                "[ProjectEventConsumer] Message processed successfully project_uuid=%s action=%s",
+                project_uuid,
+                action,
+            )
         except Exception as exception:
+            logger.exception("[ProjectEventConsumer] Failed to process message")
             capture_exception(exception)
-            message.channel.basic_reject(message.delivery_tag, requeue=False)
-            print(f"[ProjectEventConsumer] - Message rejected by: {exception}")
+            raise
 
     def _validate_message(self, body):
         """Validate that all required fields are present in the message."""
@@ -92,66 +104,36 @@ class ProjectEventConsumer(EDAConsumer):
             action: Action to perform ('deleted', 'updated', or 'status_updated')
             body: Full message body
         """
-        try:
-            if action == EventAction.DELETED:
-                org = delete_project(
-                    project_uuid=project_uuid,
-                    user_email=user_email,
-                )
+        if action == EventAction.DELETED:
+            delete_project(
+                project_uuid=project_uuid,
+                user_email=user_email,
+            )
 
-                if org:
-                    print(f"[ProjectEventConsumer] - Successfully deleted project '{org.name}' ({project_uuid})")
-                else:
-                    print(f"[ProjectEventConsumer] - Project {project_uuid} not found for deletion")
+        elif action == EventAction.UPDATED:
+            update_project_config(
+                project_uuid=project_uuid,
+                user_email=user_email,
+                name=body.get("name"),
+                description=body.get("description"),
+                language=body.get("language"),
+                timezone_location=body.get("timezone"),
+            )
 
-            elif action == EventAction.UPDATED:
-                org = update_project_config(
-                    project_uuid=project_uuid,
-                    user_email=user_email,
-                    name=body.get("name"),
-                    description=body.get("description"),
-                    language=body.get("language"),
-                    timezone_location=body.get("timezone"),
-                )
+        elif action == EventAction.STATUS_UPDATED:
+            status = body.get("status")
+            update_project_status(
+                project_uuid=project_uuid,
+                status=status,
+                user_email=user_email,
+            )
 
-                if org:
-                    print(f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid})")
-                else:
-                    print(f"[ProjectEventConsumer] - Project {project_uuid} not found for update")
-
-            elif action == EventAction.STATUS_UPDATED:
-                status = body.get("status")
-                org = update_project_status(
-                    project_uuid=project_uuid,
-                    status=status,
-                    user_email=user_email,
-                )
-
-                if org:
-                    print(
-                        f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid}) "
-                        f"status to {status} (is_active={org.is_active})"
-                    )
-                else:
-                    print(f"[ProjectEventConsumer] - Project {project_uuid} not found for status update")
-
-            elif action == EventAction.PROJECT_TYPE_UPDATED:
-                is_multi_agents = bool(body.get("is_multi_agents"))
-                org = update_project_type(
-                    project_uuid=project_uuid,
-                    is_multi_agents=is_multi_agents,
-                    user_email=user_email,
-                )
-
-                if org:
-                    print(
-                        f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid}) is_multi_agents to {is_multi_agents}"
-                    )
-                else:
-                    print(f"[ProjectEventConsumer] - Project {project_uuid} not found for project type update")
-            else:
-                raise ValueError(f"Unknown action: {action}")
-
-        except Exception as e:
-            print(f"[ProjectEventConsumer] - Error processing {action} for project {project_uuid}: {e}")
-            raise
+        elif action == EventAction.PROJECT_TYPE_UPDATED:
+            is_multi_agents = bool(body.get("is_multi_agents"))
+            update_project_type(
+                project_uuid=project_uuid,
+                is_multi_agents=is_multi_agents,
+                user_email=user_email,
+            )
+        else:
+            raise ValueError(f"Unknown action: {action}")
