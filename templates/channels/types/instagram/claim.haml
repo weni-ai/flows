@@ -44,7 +44,10 @@
       %input#page-name(type="text" name="page_name")
 
   .mt-4.card#fb-channel-options(style="display:none;")
-    %p(style="font-size:1rem;")
+    #fb-channel-no-pages.mb-4(style="display:none;")
+      %p
+        -trans "No Facebook pages with permission were found for this account. Check that you are still an admin on the page linked to your Instagram business account and try again."
+    %p#fb-channel-select(style="font-size:1rem;")
       -trans "Select the page you want to add as a channel:"
 
 -block extra-less
@@ -124,13 +127,22 @@
             for (var i=0; i < data.length; i++){
               $("#fb-channel-options").append("<div class='fb-page-channel-option lbl mt-3 mr-2 p-2 linked' data-fb-id='" + data[i].id + "' data-fb-name='" + data[i].name + "' data-fb-access-token='" + data[i].access_token +"' >" + data[i].name + " </div>");
             }
+            $("#fb-channel-select").show();
+          } else {
+            $("#fb-channel-no-pages").show();
+            $("#fb-channel-select").hide();
           }
           $("#fb-channel-options").show();
           $("#fb-app-connect").hide();
           $("#throbber").hide();
 
         },
-        failure: function(req){
+        error: function(req){
+          $("#fb-channel-no-pages").show();
+          $("#fb-channel-select").hide();
+          $("#fb-channel-options").show();
+          $("#fb-app-connect").hide();
+          $("#throbber").hide();
         }
       });
     }
