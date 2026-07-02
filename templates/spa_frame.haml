@@ -527,6 +527,11 @@
       if (!href) {
         if(ele.tagName == "TD") {
           href = ele.closest("tr").getAttribute("href");
+        } else {
+          var parent = ele.closest("[href]");
+          if (parent) {
+            href = parent.getAttribute("href");
+          }
         }
       }
 
