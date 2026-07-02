@@ -24,12 +24,21 @@ function goto(event, ele) {
 
 function openMediaModal(url, type) {
     var overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;';
 
     var closeBtn = document.createElement('button');
     closeBtn.innerHTML = '&times;';
     closeBtn.style.cssText = 'position:absolute;top:20px;right:30px;font-size:40px;color:#fff;background:none;border:none;cursor:pointer;z-index:100000;line-height:1;';
     closeBtn.onclick = function() { overlay.remove(); };
+
+    function showError() {
+        var errorMsg = document.createElement('div');
+        errorMsg.style.cssText = 'color:#fff;text-align:center;padding:20px;';
+        errorMsg.innerHTML = '<div style="font-size:48px;margin-bottom:16px;">&#9888;</div>' +
+            '<div style="font-size:18px;margin-bottom:8px;">Unable to load media</div>' +
+            '<div style="font-size:14px;color:#aaa;">The file may have expired or is temporarily unavailable</div>';
+        overlay.appendChild(errorMsg);
+    }
 
     var media;
     if (type === 'video') {
@@ -38,16 +47,19 @@ function openMediaModal(url, type) {
         media.autoplay = true;
         media.style.cssText = 'max-width:90%;max-height:85%;border-radius:4px;';
         media.src = url;
+        media.onerror = showError;
     } else if (type === 'audio') {
         media = document.createElement('audio');
         media.controls = true;
         media.autoplay = true;
         media.style.cssText = 'width:400px;';
         media.src = url;
+        media.onerror = showError;
     } else {
         media = document.createElement('img');
         media.style.cssText = 'max-width:90%;max-height:85%;border-radius:4px;';
         media.src = url;
+        media.onerror = function() { media.remove(); showError(); };
     }
 
     overlay.appendChild(closeBtn);
