@@ -2,13 +2,15 @@ from unittest.mock import patch
 
 from rest_framework import status
 
+from django.db import IntegrityError
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from temba.templates.views import TemplateViewSet
 from temba.tests import TembaTest
 
-from .models import Template, TemplateTranslation
+from .models import Template, TemplateLastDispatch, TemplateTranslation
 
 
 class TemplateTest(TembaTest):
@@ -103,6 +105,103 @@ class TemplateTest(TembaTest):
         refreshed = TemplateTranslation.objects.get(id=tt.id)
         self.assertEqual(refreshed.body, "Body v2")
         self.assertEqual(refreshed.footer, "Foot v2")
+
+
+class TemplateLastDispatchTest(TembaTest):
+    def test_create_template_last_dispatch(self):
+        fired_on = timezone.now()
+        template_uuid = "44019537-9afe-4898-9626-a5c724d169ef"
+
+        record = TemplateLastDispatch.objects.create(
+            org=self.org,
+            template_uuid=template_uuid,
+            name="hello",
+            meta_template_id="123456789",
+            last_fired_on=fired_on,
+        )
+
+        self.assertEqual(record.org, self.org)
+        self.assertEqual(str(record.template_uuid), template_uuid)
+        self.assertIsNone(record.template)
+        self.assertEqual(record.name, "hello")
+        self.assertEqual(record.meta_template_id, "123456789")
+        self.assertEqual(record.last_fired_on, fired_on)
+
+    def test_link_to_template(self):
+        translation = TemplateTranslation.get_or_create(
+            self.channel,
+            "hello",
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "123456789",
+            "",
+            "AUTHENTICATION",
+        )
+        template = translation.template
+
+        record = TemplateLastDispatch.objects.create(
+            org=self.org,
+            template=template,
+            template_uuid=template.uuid,
+            name=template.name,
+            meta_template_id="123456789",
+            last_fired_on=timezone.now(),
+        )
+
+        self.assertEqual(record.template, template)
+        self.assertEqual(record.template_uuid, template.uuid)
+        self.assertEqual(template.last_dispatches.get(), record)
+
+    def test_unique_together_org_and_meta_template_id(self):
+        TemplateLastDispatch.objects.create(
+            org=self.org,
+            template_uuid="44019537-9afe-4898-9626-a5c724d169ef",
+            name="hello",
+            meta_template_id="123456789",
+            last_fired_on=timezone.now(),
+        )
+
+        with self.assertRaises(IntegrityError):
+            TemplateLastDispatch.objects.create(
+                org=self.org,
+                template_uuid="44019537-9afe-4898-9626-a5c724d169ef",
+                name="hello",
+                meta_template_id="123456789",
+                last_fired_on=timezone.now(),
+            )
+
+    def test_same_meta_template_id_allowed_for_different_orgs(self):
+        TemplateLastDispatch.objects.create(
+            org=self.org,
+            template_uuid="44019537-9afe-4898-9626-a5c724d169ef",
+            name="hello",
+            meta_template_id="123456789",
+            last_fired_on=timezone.now(),
+        )
+        TemplateLastDispatch.objects.create(
+            org=self.org2,
+            template_uuid="44019537-9afe-4898-9626-a5c724d169ef",
+            name="hello",
+            meta_template_id="123456789",
+            last_fired_on=timezone.now(),
+        )
+
+        self.assertEqual(1, TemplateLastDispatch.objects.filter(org=self.org).count())
+        self.assertEqual(1, TemplateLastDispatch.objects.filter(org=self.org2).count())
+
+    def test_str(self):
+        record = TemplateLastDispatch.objects.create(
+            org=self.org,
+            template_uuid="44019537-9afe-4898-9626-a5c724d169ef",
+            name="hello",
+            meta_template_id="123456789",
+            last_fired_on=timezone.now(),
+        )
+
+        self.assertEqual(str(record), "hello (44019537-9afe-4898-9626-a5c724d169ef)")
 
 
 class TemplateViewSetTests(TembaTest):
