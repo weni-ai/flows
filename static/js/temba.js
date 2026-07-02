@@ -22,7 +22,7 @@ function goto(event, ele) {
     }
 }
 
-function openMediaModal(url, type) {
+window.openMediaModal = function(url, type) {
     var overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;';
 
@@ -66,7 +66,7 @@ function openMediaModal(url, type) {
     overlay.appendChild(media);
     overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
     document.body.appendChild(overlay);
-}
+};
 
 function gotoLink(href) {
     document.location.href = href;
