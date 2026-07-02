@@ -1,16 +1,16 @@
 .attachment
   -if category == 'image'
-    .attachment-preview.button-light.rounded-r-none(onclick="goto(event, this)" href="{{url}}")
+    .attachment-preview.button-light.rounded-r-none(onclick="event.stopPropagation(); event.preventDefault(); openMediaModal(this.getAttribute('href'), 'image')" href="{{url}}")
       .attachment-icon.icon-photo
       {{preview}}
 
   -elif category == 'audio' and is_playable
-    .attachment-preview.button-light.rounded-r-none(onclick="goto(event, this)" href="{{url}}")
+    .attachment-preview.button-light.rounded-r-none(onclick="event.stopPropagation(); event.preventDefault(); openMediaModal(this.getAttribute('href'), 'audio')" href="{{url}}")
       .attachment-icon.icon-volume-medium
       {{preview}}
 
   -elif category == 'video' and is_playable
-    .attachment-preview.button-light.rounded-r-none(onclick="goto(event, this)" href="{{url}}")
+    .attachment-preview.button-light.rounded-r-none(onclick="event.stopPropagation(); event.preventDefault(); openMediaModal(this.getAttribute('href'), 'video')" href="{{url}}")
       .attachment-icon.icon-videocam
       {{preview}}
 
