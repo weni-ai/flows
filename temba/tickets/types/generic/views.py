@@ -52,7 +52,7 @@ class ConnectView(BaseConnectView):
             GenericType.CONFIG_BASE_URL: base_url,
             GenericType.CONFIG_API_TOKEN: api_token,
             GenericType.CONFIG_WEBHOOK_SECRET: webhook_secret,
-            GenericType.CONFIG_PROJECT_UUID: project_uuid,
+            GenericType.CONFIG_PROJECT_UUID: str(project_uuid),
             GenericType.CONFIG_PROJECT_NAME: project_name,
             GenericType.CONFIG_ROUTE_OPEN: route_open,
             GenericType.CONFIG_ROUTE_FORWARD: route_forward,
