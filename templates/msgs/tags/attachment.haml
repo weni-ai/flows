@@ -1,6 +1,6 @@
 .attachment
   -if category == 'image'
-    %a.attachment-preview.button-light.rounded-r-none(href="{{url}}" data-featherlight="image" data-featherlight-before-open="stopEvent(event)")
+    .attachment-preview.button-light.rounded-r-none(onclick="goto(event, this)" href="{{url}}")
       .attachment-icon.icon-photo
       {{preview}}
 
