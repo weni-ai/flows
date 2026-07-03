@@ -60,7 +60,7 @@ class EventsFilters(BaseModel):
 
 @app_fastapi.get("/events")
 def get_events(
-    filters: Annotated[EventsFilters, Query()],
+    filters: Annotated[EventsFilters, Depends()],
     project_uuid: Annotated[Optional[str], Query()] = None,
     jwt_payload: dict = Depends(verify_jwt),
 ):

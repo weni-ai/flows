@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from temba.fastapi_app.auth import verify_jwt
 from temba.fastapi_app.events import EventsFilters, app, get_events
 from temba.fastapi_app.events_context import resolve_org_and_user_for_events
 from temba.tests.base import TembaTest
@@ -105,6 +106,36 @@ class TestEventsFiltersModel(TembaTest):
         )
         self.assertTrue(f.silver)
         self.assertEqual(f.table, "silver_table")
+
+
+class TestGetEventsEndpoint(TembaTest):
+    def setUp(self):
+        super().setUp()
+        if not self.org.proj_uuid:
+            self.org.proj_uuid = uuid.uuid4()
+            self.org.save(update_fields=("proj_uuid",))
+        self.client_fastapi = TestClient(app)
+
+    @patch("temba.api.v2.services.events.fetch_events_for_org", return_value=[{"id": "evt-1"}])
+    def test_accepts_flat_query_params(self, mock_fetch):
+        app.dependency_overrides[verify_jwt] = lambda: {"project_uuid": str(self.org.proj_uuid)}
+        self.addCleanup(app.dependency_overrides.clear)
+
+        resp = self.client_fastapi.get(
+            "/fastapi/events",
+            params={
+                "date_start": "2025-01-01T00:00:00",
+                "date_end": "2025-01-02T00:00:00",
+                "event_name": "weni_nexus_data",
+                "limit": 100,
+                "offset": 0,
+            },
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), [{"id": "evt-1"}])
+        mock_fetch.assert_called_once()
 
 
 class TestGetEventsHandler(TembaTest):
