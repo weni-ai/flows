@@ -1,3 +1,7 @@
+3.81.0
+----------
+* feat: add generic ticketer type
+
 3.80.1
 ----------
 * fix: adjust Instagram page access token pagination check and improve token refresh validation message
