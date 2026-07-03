@@ -4056,14 +4056,14 @@ pytest = ">=8.4.0,<9.0.0"
 
 [[package]]
 name = "weni-eda"
-version = "0.2.0a6"
-description = ""
+version = "0.2.0a10"
+description = "Python library to simplify Event-Driven Architecture (EDA) with Django and RabbitMQ"
 optional = false
-python-versions = "<4.0,>=3.8"
+python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "weni_eda-0.2.0a6-py3-none-any.whl", hash = "sha256:753ad4e3a57941b09093b50e404701a2aeac3e4a127be19da91491157a7fda6b"},
-    {file = "weni_eda-0.2.0a6.tar.gz", hash = "sha256:ec33a954578db252900ee51f1faa5e02357912bb137e90fe9041da7a6321d773"},
+    {file = "weni_eda-0.2.0a10-py3-none-any.whl", hash = "sha256:afade51a4b511185b5980cb34d75e83699765f5559942be4ef7b71e4624cd806"},
+    {file = "weni_eda-0.2.0a10.tar.gz", hash = "sha256:1e9f83f785b8fce77de8f31cd219f19418abc2e4c261ee1c8ba47516d9267e8e"},
 ]
 
 [package.dependencies]
@@ -4286,4 +4286,4 @@ test = ["pytest", "pytest-cov"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.12"
-content-hash = "bfc1de4e0c959cc8c084ef6da19e5d91c6b95eccb147de7c961d6bec87c00f36"
+content-hash = "f55de20f890fe85f1d8fa7d8154c46a26173787b9e8208ea19ba3713ebed93cd"

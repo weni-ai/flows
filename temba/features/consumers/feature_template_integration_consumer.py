@@ -1,9 +1,8 @@
 import logging
 
-import amqp
 from sentry_sdk import capture_exception
 from weni.eda.django.consumers import EDAConsumer
-from weni.eda.parsers import JSONParser
+from weni.eda.messages import Message
 
 from temba.features.usecases.feature_template_integration import integrate_feature_template_consumer
 
@@ -11,10 +10,10 @@ logger = logging.getLogger(__name__)
 
 
 class IntegrateFeatureTemplateConsumer(EDAConsumer):
-    def consume(self, message: amqp.Message):  # pragma: no cover
+    def consume(self, message: Message):  # pragma: no cover
         try:
             logger.info("[IntegrateFeatureTemplateConsumer] Received message")
-            body = JSONParser.parse(message.body)
+            body = message.json()
             logger.info(
                 "[IntegrateFeatureTemplateConsumer] Processing project_uuid=%s feature_uuid=%s user_email=%s",
                 body.get("project_uuid"),

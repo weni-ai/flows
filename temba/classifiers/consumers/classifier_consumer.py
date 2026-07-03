@@ -1,9 +1,8 @@
 import logging
 
-import amqp
 from sentry_sdk import capture_exception
 from weni.eda.django.consumers import EDAConsumer
-from weni.eda.parsers import JSONParser
+from weni.eda.messages import Message
 
 from ..usecases.classifier_creation import create_classifier
 
@@ -11,10 +10,10 @@ logger = logging.getLogger(__name__)
 
 
 class ClassifierConsumer(EDAConsumer):
-    def consume(self, message: amqp.Message):  # pragma: no cover
+    def consume(self, message: Message):  # pragma: no cover
         try:
             logger.info("[ClassifierConsumer] Received message")
-            body = JSONParser.parse(message.body)
+            body = message.json()
             logger.info(
                 "[ClassifierConsumer] Processing uuid=%s project_uuid=%s user_email=%s",
                 body.get("uuid"),

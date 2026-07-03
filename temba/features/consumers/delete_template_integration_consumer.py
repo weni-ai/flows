@@ -1,9 +1,8 @@
 import logging
 
-import amqp
 from sentry_sdk import capture_exception
 from weni.eda.django.consumers import EDAConsumer
-from weni.eda.parsers import JSONParser
+from weni.eda.messages import Message
 
 from temba.features.usecases.delete_feature_integration import delete_feature_template
 
@@ -11,10 +10,10 @@ logger = logging.getLogger(__name__)
 
 
 class DeleteFeatureTemplateIntegrationConsumer(EDAConsumer):
-    def consume(self, message: amqp.Message):  # pragma: no cover
+    def consume(self, message: Message):  # pragma: no cover
         try:
             logger.info("[DeleteFeatureTemplateIntegrationConsumer] Received message")
-            body = JSONParser.parse(message.body)
+            body = message.json()
             logger.info(
                 "[DeleteFeatureTemplateIntegrationConsumer] Processing user_email=%s features_flow_count=%s",
                 body.get("user_email"),

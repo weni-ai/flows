@@ -1,12 +1,11 @@
 from dataclasses import asdict, dataclass
 import logging
 
-import amqp
 from sentry_sdk import capture_exception
 from weni_datalake_sdk.clients.client import send_message_template_status_data_async
 from weni_datalake_sdk.paths.message_template_status_path import MessageTemplateStatusPath
 from weni.eda.django.consumers import EDAConsumer
-from weni.eda.parsers import JSONParser
+from weni.eda.messages import Message
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +21,10 @@ class MessageTemplateWebhookDTO:  # pragma: no cover
 
 
 class MessageTemplateWebhookConsumer(EDAConsumer):
-    def consume(self, message: amqp.Message):  # pragma: no cover
+    def consume(self, message: Message):  # pragma: no cover
         try:
             logger.info("[MessageTemplateWebhookConsumer] Received message")
-            body = JSONParser.parse(message.body)
+            body = message.json()
             logger.info(
                 "[MessageTemplateWebhookConsumer] Processing message_id=%s status=%s channel=%s",
                 body.get("message_id"),

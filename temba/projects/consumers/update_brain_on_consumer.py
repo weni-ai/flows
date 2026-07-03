@@ -1,9 +1,8 @@
 import logging
 
-import amqp
 from sentry_sdk import capture_exception
 from weni.eda.django.consumers import EDAConsumer
-from weni.eda.parsers import JSONParser
+from weni.eda.messages import Message
 
 from temba.projects.usecases.update_brain_on import update_project_brain_on
 
@@ -11,10 +10,10 @@ logger = logging.getLogger(__name__)
 
 
 class UpdateBrainOnConsumer(EDAConsumer):
-    def consume(self, message: amqp.Message):  # pragma: no cover
+    def consume(self, message: Message):  # pragma: no cover
         try:
             logger.info("[UpdateBrainOnConsumer] Received message")
-            body = JSONParser.parse(message.body)
+            body = message.json()
             logger.info(
                 "[UpdateBrainOnConsumer] Processing project_uuid=%s brain_on=%s user_email=%s",
                 body.get("project_uuid"),
