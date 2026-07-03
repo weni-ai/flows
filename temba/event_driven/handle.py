@@ -1,4 +1,4 @@
-from amqp.channel import Channel  # pragma: no cover
+from weni.eda.channels import Channel  # pragma: no cover
 
 from temba.classifiers.handle import handle_consumers as classifier_handle_consumers  # pragma: no cover
 from temba.features.handle import handle_consumers as feature_handle_consumers  # pragma: no cover

@@ -1,10 +1,9 @@
 from enum import StrEnum
 import logging
 
-import amqp
 from sentry_sdk import capture_exception
 from weni.eda.django.consumers import EDAConsumer
-from weni.eda.parsers import JSONParser
+from weni.eda.messages import Message
 
 from temba.projects.usecases.project_delete import delete_project
 from temba.projects.usecases.project_status_update import update_project_status
@@ -38,10 +37,10 @@ class ProjectEventConsumer(EDAConsumer):
     - action: "status_updated" -> calls update_project_status
     """
 
-    def consume(self, message: amqp.Message):  # pragma: no cover
+    def consume(self, message: Message):  # pragma: no cover
         try:
             logger.info("[ProjectEventConsumer] Received message")
-            body = JSONParser.parse(message.body)
+            body = message.json()
 
             self._validate_message(body)
 

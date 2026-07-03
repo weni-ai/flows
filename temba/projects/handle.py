@@ -1,4 +1,4 @@
-import amqp
+from weni.eda.channels import Channel
 
 from .consumers import (  # pragma: no cover
     ProjectConsumer,
@@ -9,12 +9,12 @@ from .consumers import (  # pragma: no cover
 )
 
 
-def handle_consumers(channel: amqp.Channel):
+def handle_consumers(channel: Channel):
     channel.basic_consume("flows.template-types", callback=TemplateTypeConsumer().handle)
     channel.basic_consume("flows.update-permission", callback=UpdatePermissionConsumer().handle)  # pragma: no cover
     channel.basic_consume("recent-activity.flows", callback=UpdateBrainOnConsumer().handle)  # pragma: no cover
     channel.basic_consume("flows.project-events", callback=ProjectEventConsumer().handle)  # pragma: no cover
 
 
-def handle_project_creation_consumers(channel: amqp.Channel):  # pragma: no cover
+def handle_project_creation_consumers(channel: Channel):  # pragma: no cover
     channel.basic_consume("flows.projects.queue", callback=ProjectConsumer().handle)
