@@ -31,13 +31,9 @@ window.openMediaModal = function(url, type) {
     closeBtn.style.cssText = 'position:absolute;top:20px;right:30px;font-size:40px;color:#fff;background:none;border:none;cursor:pointer;z-index:100000;line-height:1;';
     closeBtn.onclick = function() { overlay.remove(); };
 
-    function showError() {
-        var errorMsg = document.createElement('div');
-        errorMsg.style.cssText = 'color:#fff;text-align:center;padding:20px;';
-        errorMsg.innerHTML = '<div style="font-size:48px;margin-bottom:16px;">&#9888;</div>' +
-            '<div style="font-size:18px;margin-bottom:8px;">Unable to load media</div>' +
-            '<div style="font-size:14px;color:#aaa;">The file may have expired or is temporarily unavailable</div>';
-        overlay.appendChild(errorMsg);
+    function openInNewTab() {
+        overlay.remove();
+        window.open(url, '_blank');
     }
 
     var media;
@@ -47,19 +43,19 @@ window.openMediaModal = function(url, type) {
         media.autoplay = true;
         media.style.cssText = 'max-width:90%;max-height:85%;border-radius:4px;';
         media.src = url;
-        media.onerror = showError;
+        media.onerror = openInNewTab;
     } else if (type === 'audio') {
         media = document.createElement('audio');
         media.controls = true;
         media.autoplay = true;
         media.style.cssText = 'width:400px;';
         media.src = url;
-        media.onerror = showError;
+        media.onerror = openInNewTab;
     } else {
         media = document.createElement('img');
         media.style.cssText = 'max-width:90%;max-height:85%;border-radius:4px;';
         media.src = url;
-        media.onerror = function() { media.remove(); showError(); };
+        media.onerror = openInNewTab;
     }
 
     overlay.appendChild(closeBtn);
