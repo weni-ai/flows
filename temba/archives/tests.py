@@ -6,12 +6,13 @@ from datetime import date, datetime
 from unittest.mock import call, patch
 
 import pytz
+from botocore.exceptions import ClientError
 
 from django.urls import reverse
 from django.utils import timezone
 
 from temba.tests import CRUDLTestMixin, TembaTest
-from temba.tests.s3 import MockS3Client
+from temba.tests.s3 import MockEventStream, MockS3Client
 
 from .models import Archive, jsonlgz_rewrite
 
@@ -67,6 +68,56 @@ class ArchiveTest(TembaTest):
                 OutputSerialization={"JSON": {"RecordDelimiter": "\n"}},
             ),
         )
+
+    @patch("temba.utils.s3.client")
+    def test_iter_records_over_max_record_size(self, mock_s3_client):
+        # simulate an archive where the second record is too big for S3 Select
+        mock_s3 = MockS3Client(max_chars_per_record=60)
+        mock_s3_client.return_value = mock_s3
+
+        records = [
+            {"id": 1, "responded": True},
+            {"id": 2, "responded": True, "padding": "x" * 100},  # too long for S3 Select
+            {"id": 3, "responded": True},
+            {"id": 4, "responded": False},
+        ]
+        archive = self.create_archive(Archive.TYPE_FLOWRUN, "D", timezone.now().date(), records, s3=mock_s3)
+
+        # S3 Select streams the first record, fails on the oversized one, then we fall back to filtering locally,
+        # returning the remaining matching records (including the oversized one) without duplicates
+        records_iter = archive.iter_records(where={"responded": True})
+
+        self.assertEqual(
+            [
+                {"id": 1, "responded": True},
+                {"id": 2, "responded": True, "padding": "x" * 100},
+                {"id": 3, "responded": True},
+            ],
+            list(records_iter),
+        )
+
+        # we used S3 Select first and then fell back to downloading the whole object
+        self.assertEqual(1, len(mock_s3.calls["select_object_content"]))
+        self.assertEqual(1, len(mock_s3.calls["get_object"]))
+
+    @patch("temba.utils.s3.client")
+    def test_iter_records_reraises_other_s3_errors(self, mock_s3_client):
+        mock_s3 = MockS3Client()
+        mock_s3_client.return_value = mock_s3
+
+        archive = self.create_archive(
+            Archive.TYPE_FLOWRUN, "D", timezone.now().date(), [{"id": 1, "responded": True}], s3=mock_s3
+        )
+
+        # S3 Select errors other than OverMaxRecordSize should propagate rather than trigger the local fallback
+        error = ClientError({"Error": {"Code": "InternalError", "Message": "boom"}}, "SelectObjectContent")
+        with patch.object(
+            mock_s3, "select_object_content", return_value={"Payload": MockEventStream([], error=error)}
+        ):
+            with self.assertRaises(ClientError):
+                list(archive.iter_records(where={"responded": True}))
+
+        self.assertEqual(0, len(mock_s3.calls["get_object"]))
 
     @patch("temba.utils.s3.client")
     def test_iter_all_records(self, mock_s3_client):
