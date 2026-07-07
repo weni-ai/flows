@@ -92,10 +92,12 @@ class GetDepartmentsSerializer(serializers.ModelSerializer):
 class GetTicketerQueueSerializer(ReadSerializer):
     topic_name = serializers.CharField(source="name")
     topic_uuid = serializers.UUIDField(source="uuid")
+    topic_purpose = serializers.CharField(source="queue_purpose", allow_null=True)
 
     class Meta:
         model = TicketerQueue
         fields = (
             "topic_name",
             "topic_uuid",
+            "topic_purpose",
         )
