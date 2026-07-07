@@ -1,0 +1,31 @@
+#!/bin/bash
+# Fast dev-loop test runner.
+#
+# Keeps PostGIS, Redis and a persistent app container ("devtest") up, then runs the
+# given test labels against the live (bind-mounted) code via `docker compose exec`.
+# After the first invocation there is no rebuild, no container recreation and the
+# test database is reused (--keepdb), so each run costs only the test runtime.
+#
+# Usage (from anywhere):
+#   ./docker/test                     # run all tests
+#   ./docker/test temba.flows
+#   ./docker/test temba.flows.tests:FlowTest.test_prune_recent_runs
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+COMPOSE=(docker compose -f docker/docker-compose.test.yml)
+
+# Bring up services + the persistent container (no-op if already running).
+"${COMPOSE[@]}" up -d database redis devtest
+
+# Ensure Django uses the dev-based settings (image ships a settings.py.prod symlink).
+"${COMPOSE[@]}" exec -T devtest ln -sf settings.py.dev temba/settings.py
+
+# coverage is a dev dependency and the image is built with only main deps (poetry export),
+# so make sure it is available (installed once, persists for the container's lifetime).
+# Invoked as `python -m coverage` (the console script entry point misbehaves here).
+"${COMPOSE[@]}" exec -T devtest sh -c "python -c 'import coverage' 2>/dev/null || pip install --quiet coverage"
+
+# Run the tests against the live code, reusing the test database.
+"${COMPOSE[@]}" exec -T devtest python -m coverage run manage.py test --keepdb --noinput --verbosity=2 "$@"

@@ -1,0 +1,104 @@
+name: flows-test
+
+# Reproducible test environment that mirrors .github/workflows/ci.yml:
+# PostGIS + Redis + the app image (docker/Dockerfile), running the suite with
+# DJANGO_SETTINGS_MODULE=temba.settings_docker_test.
+#
+# The test framework (temba.tests.base.clear_cache) refuses to flush redis unless
+# REDIS_HOST == "localhost". To satisfy that without breaking internet access (needed
+# to install the coverage dev dependency) or DNS to the database, the redis container
+# joins the app container's network namespace (network_mode: service:devtest), so redis
+# listens on the app's localhost:6379 while the app keeps normal networking.
+#
+# Two ways to run:
+#
+#   1. Fast dev loop (recommended) via the helper script, which keeps a persistent
+#      container up and only re-execs the tests against the live (bind-mounted) code:
+#        ./docker/test temba.flows
+#        ./docker/test temba.flows.tests.FlowTest.test_get_unique_name
+#
+#   2. One-shot (CI-like, migrate + run then exit):
+#        docker compose -f docker/docker-compose.test.yml run --rm test temba.flows
+#
+#   Tear everything down:
+#        docker compose -f docker/docker-compose.test.yml down -v
+#
+# Note: ElasticSearch and mailroom are not included, so tests that depend on them
+# will fail/skip. Database-only tests (e.g. temba.flows FlowPathCount) run fine.
+
+x-app: &app
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+  environment:
+    DJANGO_SETTINGS_MODULE: temba.settings_docker_test
+    POSTGRES_HOST: database
+    POSTGRES_PORT: "5432"
+    POSTGRES_DB: temba
+    POSTGRES_USER: temba
+    POSTGRES_PASSWORD: temba
+    REDIS_HOST: localhost
+    REDIS_PORT: "6379"
+  # Run as root and mount the source so local edits are picked up without a rebuild.
+  # The anonymous volume keeps the image's node_modules from being shadowed by the mount.
+  # label=disable avoids SELinux denials on the bind mount (Fedora) without relabeling.
+  user: root
+  security_opt:
+    - label=disable
+  volumes:
+    - ..:/app
+    - /app/node_modules
+  working_dir: /app
+
+services:
+  database:
+    image: postgis/postgis:15-3.5
+    environment:
+      POSTGRES_USER: temba
+      POSTGRES_PASSWORD: temba
+      POSTGRES_DB: temba
+    command: ["postgres", "-c", "jit=off"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temba"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Persistent runner for the fast dev loop: stays idle so tests can be re-executed
+  # via `docker compose exec` without recreating the container. Owns the network
+  # namespace that redis attaches to. Driven by ./docker/test.
+  devtest:
+    <<: *app
+    entrypoint: ["sleep", "infinity"]
+    depends_on:
+      database:
+        condition: service_healthy
+
+  redis:
+    image: redis:7
+    # Share the app container's network namespace so redis is reachable at localhost:6379
+    # from inside it (required by the test framework's clear_cache guard).
+    network_mode: "service:devtest"
+    depends_on:
+      devtest:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot runner: migrate + run the suite, then exit (CI-like). Shares devtest's
+  # namespace so it also sees redis on localhost.
+  test:
+    <<: *app
+    network_mode: "service:devtest"
+    entrypoint: ["bash", "./docker/run-tests.sh"]
+    command: ["temba.flows"]
+    depends_on:
+      database:
+        condition: service_healthy
+      devtest:
+        condition: service_started
+      redis:
+        condition: service_healthy
