@@ -35,8 +35,8 @@ window.openMediaModal = function(url, type) {
         var errorMsg = document.createElement('div');
         errorMsg.style.cssText = 'color:#fff;text-align:center;padding:20px;';
         errorMsg.innerHTML = '<div style="font-size:48px;margin-bottom:16px;">&#9888;</div>' +
-            '<div style="font-size:18px;margin-bottom:8px;">Mídia indisponível</div>' +
-            '<div style="font-size:14px;color:#aaa;">O arquivo expirou ou está temporariamente indisponível</div>';
+            '<div style="font-size:18px;margin-bottom:8px;">Unable to load media</div>' +
+            '<div style="font-size:14px;color:#aaa;">The file may have expired or is temporarily unavailable</div>';
         overlay.appendChild(errorMsg);
     }
 
@@ -66,19 +66,19 @@ window.openMediaModal = function(url, type) {
             media.autoplay = true;
             media.style.cssText = 'max-width:90%;max-height:85%;border-radius:4px;';
             media.src = url;
-            media.onerror = openInNewTab;
+            media.onerror = function() { media.remove(); showExpiredError(); };
         } else if (type === 'audio') {
             media = document.createElement('audio');
             media.controls = true;
             media.autoplay = true;
             media.style.cssText = 'width:400px;';
             media.src = url;
-            media.onerror = openInNewTab;
+            media.onerror = function() { media.remove(); showExpiredError(); };
         } else {
             media = document.createElement('img');
             media.style.cssText = 'max-width:90%;max-height:85%;border-radius:4px;';
             media.src = url;
-            media.onerror = openInNewTab;
+            media.onerror = function() { media.remove(); showExpiredError(); };
         }
 
         overlay.appendChild(closeBtn);
@@ -87,6 +87,33 @@ window.openMediaModal = function(url, type) {
         document.body.appendChild(overlay);
     }).catch(function() {
         openInNewTab();
+    });
+};
+
+window.downloadMedia = function(url) {
+    fetch(url, { mode: 'cors' }).then(function(response) {
+        if (!response.ok) {
+            return response.text().then(function(body) {
+                if (body.indexOf('ExpiredToken') > -1 || body.indexOf('token has expired') > -1) {
+                    alert('Unable to load media: the file may have expired or is temporarily unavailable.');
+                } else {
+                    window.open(url, '_blank');
+                }
+            });
+        }
+        return response.blob().then(function(blob) {
+            var blobUrl = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = blobUrl;
+            var filename = url.split('/').pop().split('?')[0] || 'download';
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+        });
+    }).catch(function() {
+        window.open(url, '_blank');
     });
 };
 

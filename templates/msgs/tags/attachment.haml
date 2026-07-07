@@ -25,5 +25,5 @@
       {{preview}}
 
   -if category != 'geo'
-    .attachment-download.rounded-l-none.button-light(onclick="goto(event, this)" href="{{url}}" download="true")
+    .attachment-download.rounded-l-none.button-light(onclick="event.stopPropagation(); event.preventDefault(); downloadMedia(this.getAttribute('href'))" href="{{url}}")
       .icon-file_download
