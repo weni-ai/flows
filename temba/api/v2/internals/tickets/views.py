@@ -13,6 +13,7 @@ from django.shortcuts import get_object_or_404
 
 from temba import mailroom
 from temba.api.v2.internals.tickets.serializers import (
+    CreateTicketerSerializer,
     GetDepartmentsSerializer,
     OpenTicketSerializer,
     TicketAssigneeSerializer,
@@ -45,6 +46,26 @@ class TicketAssigneeView(APIViewMixin, APIView):
         response = {"results": {"ticketer": ticket.uuid, "assignee": ticket.assignee.email}}
 
         return Response(response, status=status.HTTP_200_OK)
+
+
+class CreateTicketerView(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+
+    def post(self, request: Request):
+        serializer = CreateTicketerSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        ticketer = serializer.save()
+
+        response = {
+            "uuid": str(ticketer.uuid),
+            "name": ticketer.name,
+            "ticketer_type": ticketer.ticketer_type,
+            "config": ticketer.config,
+        }
+
+        return Response(response, status=status.HTTP_201_CREATED)
 
 
 class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
