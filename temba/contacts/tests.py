@@ -5034,6 +5034,7 @@ class URNTest(TembaTest):
         self.assertEqual(URN.format("whatsapp:BR.35029025746744354"), "BR.35029025746744354")
 
     def test_phone_scheme_inference(self):
+        self.assertFalse(URN.looks_like_phone(12065551212))
         self.assertTrue(URN.looks_like_phone("+12065551212", "US"))
         self.assertTrue(URN.looks_like_phone("0788 123 123", "RW"))
         self.assertFalse(URN.looks_like_phone("tel:+12065551212", "US"))

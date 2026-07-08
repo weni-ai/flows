@@ -331,6 +331,7 @@ class APITest(TembaTest):
                 "tel:(078) 812-3123": "tel:+250788123123",
                 "+250788123123": "whatsapp:250788123123",  # bare phone defaults to whatsapp
                 "0788 123 123": "whatsapp:250788123123",  # bare phone defaults to whatsapp
+                "whatsapp:6831234": serializers.ValidationError,  # too few digits
                 "12345": serializers.ValidationError,  # un-parseable
                 "tel:800-123-4567": serializers.ValidationError,  # no country code
                 18_001_234_567: serializers.ValidationError,  # non-string
