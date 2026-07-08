@@ -1,3 +1,8 @@
+3.81.1
+----------
+* fix: fall back to local filtering when exporting flow results from archives with records that exceed the S3 Select limit (OverMaxRecordSize)
+* feat: add queue porpuse in get departments
+
 3.81.0
 ----------
 * feat: add generic ticketer type
