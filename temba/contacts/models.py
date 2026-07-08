@@ -104,6 +104,24 @@ class URN:
 
     VALID_SCHEMES = {s[0] for s in SCHEME_CHOICES}
 
+    DEFAULT_PHONE_SCHEME = WHATSAPP_SCHEME
+
+    PHONE_COLUMN_HEADERS = frozenset(
+        {
+            "phone",
+            "mobile",
+            "telephone",
+            "cell",
+            "cellphone",
+            "cell phone",
+            "phone number",
+            "mobile number",
+            "contact phone",
+            "contact mobile",
+            "number",
+        }
+    )
+
     FACEBOOK_PATH_REF_PREFIX = "ref:"
 
     def __init__(self):  # pragma: no cover
@@ -269,6 +287,13 @@ class URN:
         elif scheme == cls.EMAIL_SCHEME:
             norm_path = norm_path.lower()
 
+        elif scheme == cls.WHATSAPP_SCHEME:
+            # phone-based whatsapp URNs are stored as E.164 without the + prefix
+            if norm_path and norm_path[0] in "+0123456789":
+                norm_path = cls.normalize_number(norm_path, country_code)
+                if norm_path.startswith("+"):
+                    norm_path = norm_path[1:]
+
         return cls.from_parts(scheme, norm_path, query, display)
 
     @classmethod
@@ -314,6 +339,53 @@ class URN:
     @classmethod
     def from_tel(cls, path):
         return cls.from_parts(cls.TEL_SCHEME, path)
+
+    @classmethod
+    def from_whatsapp(cls, path):
+        return cls.from_parts(cls.WHATSAPP_SCHEME, path)
+
+    @classmethod
+    def looks_like_phone(cls, value, country_code=None):
+        """
+        Returns whether the given value appears to be a phone number without an explicit URN scheme.
+        """
+        if not isinstance(value, str):
+            return False
+
+        value = value.strip()
+        if not value or ":" in value:
+            return False
+
+        if not any(c.isdigit() for c in value):
+            return False
+
+        # non-phone identifiers such as BSUIDs require an explicit scheme
+        if regex.match(r"^[A-Z]{2}\.", value, regex.V0):
+            return False
+
+        try:
+            parse_number(cls.normalize_number(value, country_code or ""), country_code)
+            return True
+        except ValueError:
+            return False
+
+    @classmethod
+    def ensure_scheme(cls, value, country_code=None, default_phone_scheme=None):
+        """
+        Returns a URN string, inferring the default phone scheme when no scheme is provided.
+        """
+        if default_phone_scheme is None:
+            default_phone_scheme = cls.DEFAULT_PHONE_SCHEME
+
+        value = str(value).strip()
+
+        if ":" in value:
+            return value
+
+        if cls.looks_like_phone(value, country_code):
+            return cls.from_parts(default_phone_scheme, value)
+
+        raise ValueError("URN strings must contain scheme and path components")
 
     @classmethod
     def from_twitterid(cls, id, screen_name=None):
@@ -2275,7 +2347,7 @@ class ContactImport(SmartModel):
             elif mapping["type"] == "scheme" and value:
                 urn = URN.from_parts(mapping["scheme"], value)
                 try:
-                    urn = URN.normalize(urn)
+                    urn = URN.normalize(urn, country_code=org.default_country_code)
                 except ValueError:
                     pass
                 urns.append(urn)
@@ -2305,6 +2377,8 @@ class ContactImport(SmartModel):
 
                 if attribute in ("uuid", "name", "language"):
                     mapping = {"type": "attribute", "name": attribute}
+                elif attribute in cls.PHONE_COLUMN_HEADERS:
+                    mapping = {"type": "scheme", "scheme": cls.DEFAULT_PHONE_SCHEME}
             elif header_prefix == "urn" and header_name:
                 mapping = {"type": "scheme", "scheme": header_name.lower()}
             elif header_prefix == "field" and header_name:
