@@ -5027,9 +5027,28 @@ class URNTest(TembaTest):
         # normalize preserves both formats
         self.assertEqual(URN.normalize("whatsapp:BR.35029025746744354"), "whatsapp:BR.35029025746744354")
         self.assertEqual(URN.normalize("whatsapp:12065551212"), "whatsapp:12065551212")
+        self.assertEqual(URN.normalize("whatsapp:+12065551212", "US"), "whatsapp:12065551212")
+        self.assertEqual(URN.normalize("whatsapp:0788 123 123", "RW"), "whatsapp:250788123123")
 
         # format returns BSUID path as-is (no phone formatting)
         self.assertEqual(URN.format("whatsapp:BR.35029025746744354"), "BR.35029025746744354")
+
+    def test_phone_scheme_inference(self):
+        self.assertFalse(URN.looks_like_phone(12065551212))
+        self.assertTrue(URN.looks_like_phone("+12065551212", "US"))
+        self.assertTrue(URN.looks_like_phone("0788 123 123", "RW"))
+        self.assertFalse(URN.looks_like_phone("tel:+12065551212", "US"))
+        self.assertFalse(URN.looks_like_phone("twitter:jean"))
+        self.assertFalse(URN.looks_like_phone("BR.35029025746744354"))
+        self.assertFalse(URN.looks_like_phone("12345", "RW"))
+
+        self.assertEqual(URN.ensure_scheme("+12065551212", "US"), "whatsapp:+12065551212")
+        self.assertEqual(URN.ensure_scheme("tel:+12065551212", "US"), "tel:+12065551212")
+        self.assertEqual(URN.ensure_scheme("whatsapp:+12065551212", "US"), "whatsapp:+12065551212")
+        self.assertEqual(URN.ensure_scheme("twitter:jean", "US"), "twitter:jean")
+        self.assertRaises(ValueError, URN.ensure_scheme, "12345", "RW")
+
+        self.assertEqual(URN.from_whatsapp("12065551212"), "whatsapp:12065551212")
 
     def test_freshchat_urn(self):
         self.assertTrue(
@@ -5555,6 +5574,49 @@ class ContactImportTest(TembaTest):
             ],
             mappings,
         )
+
+    def test_parse_maps_phone_columns_to_whatsapp(self):
+        csv_content = "Phone,name\n+250788111111,Jean\n".encode("utf-8")
+
+        mappings, num_records = ContactImport.try_to_parse(self.org, io.BytesIO(csv_content), "import.csv")
+
+        self.assertEqual(1, num_records)
+        self.assertEqual(
+            [
+                {"header": "Phone", "mapping": {"type": "scheme", "scheme": "whatsapp"}},
+                {"header": "name", "mapping": {"type": "attribute", "name": "name"}},
+            ],
+            mappings,
+        )
+
+    def test_row_to_spec_uses_whatsapp_for_phone_columns(self):
+        imp = ContactImport(
+            org=self.org,
+            created_by=self.admin,
+            mappings=[
+                {"header": "Phone", "mapping": {"type": "scheme", "scheme": "whatsapp"}},
+                {"header": "name", "mapping": {"type": "attribute", "name": "name"}},
+            ],
+        )
+
+        spec = imp._row_to_spec(["0788 111 111", "Jean"])
+
+        self.assertEqual(["whatsapp:250788111111"], spec["urns"])
+        self.assertEqual("Jean", spec["name"])
+
+    def test_row_to_spec_preserves_explicit_tel_mapping(self):
+        imp = ContactImport(
+            org=self.org,
+            created_by=self.admin,
+            mappings=[
+                {"header": "URN:Tel", "mapping": {"type": "scheme", "scheme": "tel"}},
+                {"header": "name", "mapping": {"type": "attribute", "name": "name"}},
+            ],
+        )
+
+        spec = imp._row_to_spec(["0788 111 111", "Jean"])
+
+        self.assertEqual(["tel:+250788111111"], spec["urns"])
 
     def test_extract_mappings(self):
         # try simple import in different formats
