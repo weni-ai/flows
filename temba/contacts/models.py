@@ -262,6 +262,46 @@ class URN:
         return True
 
     @classmethod
+    def _normalize_twitter_path(cls, norm_path):
+        norm_path = norm_path.lower()
+        if norm_path[0:1] == "@":  # strip @ prefix if provided
+            norm_path = norm_path[1:]
+        return norm_path.lower()  # Twitter handles are case-insensitive, so we always store as lowercase
+
+    @classmethod
+    def _normalize_twitterid_display(cls, display):
+        if not display:
+            return display
+
+        display = str(display).strip().lower()
+        if display and display[0] == "@":
+            display = display[1:]
+        return display
+
+    @classmethod
+    def _normalize_whatsapp_path(cls, norm_path, country_code):
+        # phone-based whatsapp URNs are stored as E.164 without the + prefix
+        if norm_path and norm_path[0] in "+0123456789":
+            norm_path = cls.normalize_number(norm_path, country_code)
+            if norm_path.startswith("+"):
+                norm_path = norm_path[1:]
+        return norm_path
+
+    @classmethod
+    def _normalize_path_for_scheme(cls, scheme, norm_path, display, country_code):
+        if scheme == cls.TEL_SCHEME:
+            return cls.normalize_number(norm_path, country_code), display
+        if scheme == cls.TWITTER_SCHEME:
+            return cls._normalize_twitter_path(norm_path), display
+        if scheme == cls.TWITTERID_SCHEME:
+            return norm_path, cls._normalize_twitterid_display(display)
+        if scheme == cls.EMAIL_SCHEME:
+            return norm_path.lower(), display
+        if scheme == cls.WHATSAPP_SCHEME:
+            return cls._normalize_whatsapp_path(norm_path, country_code), display
+        return norm_path, display
+
+    @classmethod
     def normalize(cls, urn, country_code=None):
         """
         Normalizes the path of a URN string. Should be called anytime looking for a URN match.
@@ -270,29 +310,7 @@ class URN:
         country_code = str(country_code) if country_code else ""
         norm_path = str(path).strip()
 
-        if scheme == cls.TEL_SCHEME:
-            norm_path = cls.normalize_number(norm_path, country_code)
-        elif scheme == cls.TWITTER_SCHEME:
-            norm_path = norm_path.lower()
-            if norm_path[0:1] == "@":  # strip @ prefix if provided
-                norm_path = norm_path[1:]
-            norm_path = norm_path.lower()  # Twitter handles are case-insensitive, so we always store as lowercase
-
-        elif scheme == cls.TWITTERID_SCHEME:
-            if display:
-                display = str(display).strip().lower()
-                if display and display[0] == "@":
-                    display = display[1:]
-
-        elif scheme == cls.EMAIL_SCHEME:
-            norm_path = norm_path.lower()
-
-        elif scheme == cls.WHATSAPP_SCHEME:
-            # phone-based whatsapp URNs are stored as E.164 without the + prefix
-            if norm_path and norm_path[0] in "+0123456789":
-                norm_path = cls.normalize_number(norm_path, country_code)
-                if norm_path.startswith("+"):
-                    norm_path = norm_path[1:]
+        norm_path, display = cls._normalize_path_for_scheme(scheme, norm_path, display, country_code)
 
         return cls.from_parts(scheme, norm_path, query, display)
 

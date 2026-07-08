@@ -5575,7 +5575,7 @@ class ContactImportTest(TembaTest):
         )
 
     def test_parse_maps_phone_columns_to_whatsapp(self):
-        csv_content = ("Phone,name\n" "+250788111111,Jean\n").encode("utf-8")
+        csv_content = "Phone,name\n+250788111111,Jean\n".encode("utf-8")
 
         mappings, num_records = ContactImport.try_to_parse(self.org, io.BytesIO(csv_content), "import.csv")
 
