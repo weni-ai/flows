@@ -89,6 +89,7 @@ class CreateTicketerViewTest(TembaTest):
     @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
     @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
     def test_create_ticketer_success(self):
+        self.client.force_login(self.admin)
         response = self.client.post(self.url, data=self.valid_body())
 
         self.assertEqual(response.status_code, 201)
@@ -106,6 +107,7 @@ class CreateTicketerViewTest(TembaTest):
     def test_create_ticketer_defaults_type_to_generic(self):
         body = self.valid_body()
         del body["ticketer_type"]
+        self.client.force_login(self.admin)
 
         response = self.client.post(self.url, data=body)
 
@@ -151,6 +153,30 @@ class CreateTicketerViewTest(TembaTest):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("config", response.data)
+
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_create_ticketer_user_mismatch(self):
+        other_user = User.objects.create_user(username="otheruser", email="other@example.com", password="secret")
+        body = self.valid_body()
+        body["user"] = other_user.email
+        self.client.force_login(self.admin)
+
+        response = self.client.post(self.url, data=body)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("permission", response.data)
+
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_create_ticketer_with_matching_user(self):
+        body = self.valid_body()
+        self.client.force_login(self.admin)
+
+        response = self.client.post(self.url, data=body)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["name"], "Generic Ticketer")
 
 
 class OpenTicketTest(TembaTest):
