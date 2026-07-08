@@ -134,8 +134,11 @@ class URNField(serializers.CharField):
             return str(obj)
 
     def to_internal_value(self, data):
+        if not isinstance(data, str):
+            raise serializers.ValidationError("Not a valid string.")
+
         country_code = self.context["org"].default_country_code
-        return validate_urn(str(data), country_code=country_code)
+        return validate_urn(data, country_code=country_code)
 
 
 class URNListField(LimitedListField):

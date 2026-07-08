@@ -2377,8 +2377,8 @@ class ContactImport(SmartModel):
 
                 if attribute in ("uuid", "name", "language"):
                     mapping = {"type": "attribute", "name": attribute}
-                elif attribute in cls.PHONE_COLUMN_HEADERS:
-                    mapping = {"type": "scheme", "scheme": cls.DEFAULT_PHONE_SCHEME}
+                elif attribute in URN.PHONE_COLUMN_HEADERS:
+                    mapping = {"type": "scheme", "scheme": URN.DEFAULT_PHONE_SCHEME}
             elif header_prefix == "urn" and header_name:
                 mapping = {"type": "scheme", "scheme": header_name.lower()}
             elif header_prefix == "field" and header_name:
