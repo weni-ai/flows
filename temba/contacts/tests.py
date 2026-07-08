@@ -5044,7 +5044,7 @@ class URNTest(TembaTest):
         self.assertEqual(URN.ensure_scheme("+12065551212", "US"), "whatsapp:+12065551212")
         self.assertEqual(URN.ensure_scheme("tel:+12065551212", "US"), "tel:+12065551212")
         self.assertEqual(URN.ensure_scheme("whatsapp:+12065551212", "US"), "whatsapp:+12065551212")
-        self.assertRaises(ValueError, URN.ensure_scheme, "twitter:jean", "US")
+        self.assertEqual(URN.ensure_scheme("twitter:jean", "US"), "twitter:jean")
         self.assertRaises(ValueError, URN.ensure_scheme, "12345", "RW")
 
         self.assertEqual(URN.from_whatsapp("12065551212"), "whatsapp:12065551212")
