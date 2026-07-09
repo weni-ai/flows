@@ -1873,7 +1873,7 @@ class ClassifiersEndpoint(ListAPIMixin, BaseAPIView):
             ],
         }
 
-
+@kong_expose
 class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list, create, update and delete contacts in your account.
