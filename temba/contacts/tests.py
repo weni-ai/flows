@@ -1395,13 +1395,15 @@ class ContactTest(TembaTest):
 
         # try creating a contact with a number that belongs to another contact
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__whatsapp__0="+250781111111")
+            reverse("contacts.contact_create"),
+            {"name": "Ben Haggerty", "urn__whatsapp__0": "+250781111111"},
         )
         self.assertFormError(response, "form", "urn__whatsapp__0", "Used by another contact")
 
         # now repost with a unique phone number
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__whatsapp__0="+250 783-835665")
+            reverse("contacts.contact_create"),
+            {"name": "Ben Haggerty", "urn__whatsapp__0": "+250 783-835665"},
         )
         self.assertNoFormErrors(response)
         ben = Contact.objects.get(name="Ben Haggerty")
@@ -1412,7 +1414,8 @@ class ContactTest(TembaTest):
 
         # repost with the phone number of an orphaned URN
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="Ben Orphan", urn__whatsapp__0="+250788888888")
+            reverse("contacts.contact_create"),
+            {"name": "Ben Orphan", "urn__whatsapp__0": "+250788888888"},
         )
         self.assertNoFormErrors(response)
 
@@ -1421,20 +1424,22 @@ class ContactTest(TembaTest):
 
         # check we display error for invalid input
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__whatsapp__0="=")
+            reverse("contacts.contact_create"),
+            {"name": "Ben Haggerty", "urn__whatsapp__0": "="},
         )
         self.assertFormError(response, "form", "urn__whatsapp__0", "Invalid input")
 
         # reject creation with an empty/whitespace-only name
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="   ", urn__whatsapp__0="+250788777777")
+            reverse("contacts.contact_create"),
+            {"name": "   ", "urn__whatsapp__0": "+250788777777"},
         )
         self.assertFormError(response, "form", "name", "Contact name cannot be empty.")
 
         # reject creation with a name longer than the configured maximum
         response = self.client.post(
             reverse("contacts.contact_create"),
-            data=dict(name="x" * 101, urn__whatsapp__0="+250788777777"),
+            {"name": "x" * 101, "urn__whatsapp__0": "+250788777777"},
         )
         self.assertFormError(response, "form", "name", "Contact name cannot exceed 100 characters.")
 
@@ -1442,18 +1447,22 @@ class ContactTest(TembaTest):
         # but fall under the 8-digit minimum, exercising validate_contact_phone in the form
         response = self.client.post(
             reverse("contacts.contact_create"),
-            data=dict(name="Niue Phone", urn__whatsapp__0="+6831234"),
+            {"name": "Niue Phone", "urn__whatsapp__0": "+6831234"},
         )
         self.assertFormError(response, "form", "urn__whatsapp__0", "Phone number must have at least 8 digits.")
 
         # reject creation with no name at all (empty input)
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="", urn__whatsapp__0="+250788777777")
+            reverse("contacts.contact_create"),
+            {"name": "", "urn__whatsapp__0": "+250788777777"},
         )
         self.assertFormError(response, "form", "name", "This field is required.")
 
         # reject creation when no URN field is filled in (no way to reach the contact)
-        response = self.client.post(reverse("contacts.contact_create"), data=dict(name="No Phone", urn__whatsapp__0=""))
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            {"name": "No Phone", "urn__whatsapp__0": ""},
+        )
         self.assertFormError(response, "form", None, "At least one WhatsApp number or connection is required.")
 
     @mock_mailroom
