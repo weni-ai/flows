@@ -1427,7 +1427,7 @@ class ContactTest(TembaTest):
             reverse("contacts.contact_create"),
             {"name": "Ben Haggerty", "urn__whatsapp__0": "="},
         )
-        self.assertFormError(response, "form", "urn__whatsapp__0", "Invalid input")
+        self.assertFormError(response, "form", "urn__whatsapp__0", "Invalid format")
 
         # reject creation with an empty/whitespace-only name
         response = self.client.post(

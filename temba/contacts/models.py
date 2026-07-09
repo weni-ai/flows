@@ -329,9 +329,17 @@ class URN:
             return ["+" + normalized]
 
         candidates = []
+        has_international = len(normalized) >= 11 and not normalized.startswith("0")
+
+        if country_code and has_international:
+            calling_code = str(phonenumbers.country_code_for_region(country_code.upper()))
+            if calling_code and normalized.startswith(calling_code):
+                candidates.append("+" + normalized)
+
         if country_code:
             candidates.append(normalized)
-        if len(normalized) >= 11 and not normalized.startswith("0"):
+
+        if has_international:
             international = "+" + normalized
             if international not in candidates:
                 candidates.append(international)
@@ -339,21 +347,16 @@ class URN:
         return candidates or [normalized]
 
     @classmethod
-    def _formatted_number_matches_country(
-        cls, formatted: str, parse_as: str, number: str, normalized: str, country_code: str
-    ) -> bool:
+    def _formatted_number_matches_country(cls, formatted: str, number: str, country_code: str) -> bool:
         if not country_code or number.startswith("+"):
             return True
 
         try:
             parsed = phonenumbers.parse(formatted, None)
             region = phonenumbers.region_code_for_number(parsed)
-            if region and region != country_code.upper() and parse_as != "+" + normalized:
-                return False
+            return region == country_code.upper()
         except phonenumbers.NumberParseException:
             return False
-
-        return True
 
     @classmethod
     def normalize_number(cls, number: str, country_code: str):
@@ -369,7 +372,7 @@ class URN:
             except ValueError:
                 continue
 
-            if cls._formatted_number_matches_country(formatted, parse_as, number, normalized, country_code):
+            if cls._formatted_number_matches_country(formatted, number, country_code):
                 return formatted
 
         return normalized

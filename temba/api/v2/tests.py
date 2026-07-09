@@ -2891,6 +2891,12 @@ class APITest(TembaTest):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["urns"], ["whatsapp:5511987654321"])
 
+        # restore default org country for subsequent tests in this method
+        self.org.timezone = "Africa/Kigali"
+        self.org.save(update_fields=("timezone",))
+        if "default_country" in self.org.__dict__:
+            del self.org.__dict__["default_country"]
+
         # explicit tel scheme is preserved
         response = self.postJSON(url, None, {"name": "TelUser", "urns": ["tel:+250788888888"]})
         self.assertEqual(response.status_code, 201)
