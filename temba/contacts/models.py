@@ -333,8 +333,13 @@ class URN:
 
         parse_as = normalized
 
-        # if we started with + prefix, or we have a sufficiently long number that doesn't start with 0, add + prefix
-        if number.startswith("+") or (len(normalized) >= 11 and not normalized.startswith("0")):
+        # prefer national parsing when the org country is known; only force a leading +
+        # for international-format numbers or when no country context is available
+        if number.startswith("+"):
+            parse_as = "+" + normalized
+        elif country_code:
+            parse_as = normalized
+        elif len(normalized) >= 11 and not normalized.startswith("0"):
             parse_as = "+" + normalized
 
         try:
@@ -361,6 +366,20 @@ class URN:
     @classmethod
     def from_whatsapp(cls, path):
         return cls.from_parts(cls.WHATSAPP_SCHEME, path)
+
+    @classmethod
+    def is_phone_based_path(cls, path):
+        return bool(path) and path[0] in "+0123456789"
+
+    @classmethod
+    def paired_phone_urns(cls, value, country_code=None):
+        """
+        Returns normalized whatsapp and tel URNs for the same phone number input.
+        """
+        country_code = str(country_code) if country_code else ""
+        whatsapp = cls.normalize(cls.from_parts(cls.WHATSAPP_SCHEME, value), country_code)
+        tel = cls.normalize(cls.from_parts(cls.TEL_SCHEME, value), country_code)
+        return [whatsapp, tel]
 
     @classmethod
     def looks_like_phone(cls, value, country_code=None):

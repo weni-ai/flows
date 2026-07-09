@@ -416,7 +416,7 @@ class ContactForm(forms.ModelForm):
 
             if not urns:
                 urn = ContactURN()
-                urn.scheme = "tel"
+                urn.scheme = URN.DEFAULT_PHONE_SCHEME
                 urns = [urn]
 
             for urn in urns:
@@ -430,7 +430,9 @@ class ContactForm(forms.ModelForm):
                 scheme = urn.scheme
                 label = urn.scheme
 
-                if urn_choice:
+                if scheme == URN.WHATSAPP_SCHEME:
+                    label = _("WhatsApp number")
+                elif urn_choice:
                     label = urn_choice[1]
 
                 help_text = _("%s for this contact") % label
@@ -467,26 +469,41 @@ class ContactForm(forms.ModelForm):
 
         def validate_urn(key, scheme, path):
             try:
-                normalized = URN.normalize(URN.from_parts(scheme, path), country)
-                existing_urn = ContactURN.lookup(self.org, normalized, normalize=False)
+                if scheme == URN.WHATSAPP_SCHEME and URN.is_phone_based_path(path):
+                    candidate_urns = URN.paired_phone_urns(path, country)
+                else:
+                    candidate_urns = [URN.normalize(URN.from_parts(scheme, path), country)]
 
-                if existing_urn and existing_urn.contact and existing_urn.contact != self.instance:
-                    self._errors[key] = self.error_class([_("Used by another contact")])
-                    return False
+                for normalized in candidate_urns:
+                    existing_urn = ContactURN.lookup(self.org, normalized, normalize=False)
+
+                    if existing_urn and existing_urn.contact and existing_urn.contact != self.instance:
+                        self._errors[key] = self.error_class([_("Used by another contact")])
+                        return False
+
+                normalized = candidate_urns[0]
+
                 # validate but not with country as users are allowed to enter numbers before adding a channel
-                elif not URN.validate(normalized):
-                    if scheme == URN.TEL_SCHEME:  # pragma: needs cover
+                if not URN.validate(normalized):
+                    if scheme in (URN.TEL_SCHEME, URN.WHATSAPP_SCHEME) and URN.is_phone_based_path(path):
                         self._errors[key] = self.error_class(
-                            [_("Invalid number. Ensure number includes country code, e.g. +1-541-754-3010")]
+                            [_("Invalid number. Ensure number includes country code, e.g. +55-11-98765-4321")]
                         )
                     else:
                         self._errors[key] = self.error_class([_("Invalid format")])
                     return False
 
-                # enforce strict 8-15 digit length on tel: URNs
+                # enforce strict 8-15 digit length on phone-based URNs
                 if scheme == URN.TEL_SCHEME:
                     try:
                         validate_contact_phone(path)
+                    except ValidationError as e:
+                        self._errors[key] = self.error_class([str(e.messages[0])])
+                        return False
+                elif scheme == URN.WHATSAPP_SCHEME and URN.is_phone_based_path(path):
+                    try:
+                        _, whatsapp_path, _, _ = URN.to_parts(normalized)
+                        validate_contact_phone(f"+{whatsapp_path}")
                     except ValidationError as e:
                         self._errors[key] = self.error_class([str(e.messages[0])])
                         return False
@@ -519,7 +536,7 @@ class ContactForm(forms.ModelForm):
             has_existing_urn = any(value for field_key, value in self.data.items() if field_key.startswith("urn__"))
             has_new_urn = bool(self.data.get("new_path"))
             if not has_existing_urn and not has_new_urn:
-                raise forms.ValidationError(_("At least one phone number or connection is required."))
+                raise forms.ValidationError(_("At least one WhatsApp number or connection is required."))
 
         return self.cleaned_data
 
@@ -1355,10 +1372,14 @@ class ContactCRUDL(SmartCRUDL):
 
         def save(self, obj):
             urns = []
+            country = obj.org.default_country_code
             for field_key, value in self.form.cleaned_data.items():
                 if field_key.startswith("urn__") and value:
                     scheme = field_key.split("__")[1]
-                    urns.append(URN.from_parts(scheme, value))
+                    if scheme == URN.WHATSAPP_SCHEME and URN.is_phone_based_path(value):
+                        urns.extend(URN.paired_phone_urns(value, country))
+                    else:
+                        urns.append(URN.normalize(URN.from_parts(scheme, value), country))
 
             Contact.create(obj.org, self.request.user, obj.name, language="", urns=urns, fields={}, groups=[])
 
