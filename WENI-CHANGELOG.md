@@ -1,3 +1,7 @@
+3.82.0
+----------
+* feat: add internal endpoint for ticketer creation
+
 3.81.1
 ----------
 * fix: fall back to local filtering when exporting flow results from archives with records that exceed the S3 Select limit (OverMaxRecordSize)
