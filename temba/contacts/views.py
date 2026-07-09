@@ -502,7 +502,7 @@ class ContactForm(forms.ModelForm):
                         return False
                 elif scheme == URN.WHATSAPP_SCHEME and URN.is_phone_based_path(path):
                     try:
-                        _, whatsapp_path, _, _ = URN.to_parts(normalized)
+                        _scheme, whatsapp_path, _query, _display = URN.to_parts(normalized)
                         validate_contact_phone(f"+{whatsapp_path}")
                     except ValidationError as e:
                         self._errors[key] = self.error_class([str(e.messages[0])])

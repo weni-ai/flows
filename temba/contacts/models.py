@@ -332,23 +332,39 @@ class URN:
         normalized = regex.sub(r"[^0-9a-z]", "", normalized, regex.V0)
 
         parse_as = normalized
+        candidates = []
 
-        # prefer national parsing when the org country is known; only force a leading +
-        # for international-format numbers or when no country context is available
         if number.startswith("+"):
-            parse_as = "+" + normalized
-        elif country_code:
-            parse_as = normalized
-        elif len(normalized) >= 11 and not normalized.startswith("0"):
-            parse_as = "+" + normalized
+            candidates.append("+" + normalized)
+        else:
+            if country_code:
+                candidates.append(normalized)
+            if len(normalized) >= 11 and not normalized.startswith("0"):
+                international = "+" + normalized
+                if international not in candidates:
+                    candidates.append(international)
 
-        try:
-            formatted = parse_number(parse_as, country_code)
-        except ValueError:
-            # if it's not a possible number, just return what we have minus the +
-            return normalized
+        if not candidates:
+            candidates.append(normalized)
 
-        return formatted
+        for parse_as in candidates:
+            try:
+                formatted = parse_number(parse_as, country_code)
+            except ValueError:
+                continue
+
+            if country_code and not number.startswith("+"):
+                try:
+                    parsed = phonenumbers.parse(formatted, None)
+                    region = phonenumbers.region_code_for_number(parsed)
+                    if region and region != country_code.upper() and parse_as != "+" + normalized:
+                        continue
+                except phonenumbers.NumberParseException:
+                    continue
+
+            return formatted
+
+        return normalized
 
     @classmethod
     def identity(cls, urn):
