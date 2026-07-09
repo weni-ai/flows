@@ -347,8 +347,14 @@ class URN:
         return candidates or [normalized]
 
     @classmethod
-    def _formatted_number_matches_country(cls, formatted: str, number: str, country_code: str) -> bool:
+    def _formatted_number_matches_country(
+        cls, formatted: str, parse_as: str, number: str, normalized: str, country_code: str
+    ) -> bool:
         if not country_code or number.startswith("+"):
+            return True
+
+        # accept valid international numbers even when they don't match the org country
+        if parse_as == "+" + normalized:
             return True
 
         try:
@@ -372,7 +378,7 @@ class URN:
             except ValueError:
                 continue
 
-            if cls._formatted_number_matches_country(formatted, number, country_code):
+            if cls._formatted_number_matches_country(formatted, parse_as, number, normalized, country_code):
                 return formatted
 
         return normalized
