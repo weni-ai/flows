@@ -1458,6 +1458,18 @@ class ContactTest(TembaTest):
         )
         self.assertFormError(response, "form", "name", "This field is required.")
 
+        # non-phone whatsapp URNs use the single-URN save path
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            {"name": "BSUID Contact", "urn__whatsapp__0": "BR.35029025746744354"},
+        )
+        self.assertNoFormErrors(response)
+        bsuid_contact = Contact.objects.get(name="BSUID Contact")
+        self.assertEqual(
+            list(bsuid_contact.urns.values_list("identity", flat=True)),
+            ["whatsapp:BR.35029025746744354"],
+        )
+
         # reject creation when no URN field is filled in (no way to reach the contact)
         response = self.client.post(
             reverse("contacts.contact_create"),
@@ -5071,6 +5083,26 @@ class URNTest(TembaTest):
         self.assertRaises(ValueError, URN.ensure_scheme, "12345", "RW")
 
         self.assertEqual(URN.from_whatsapp("12065551212"), "whatsapp:12065551212")
+
+    def test_formatted_number_matches_country(self):
+        self.assertTrue(
+            URN._formatted_number_matches_country(
+                formatted="+250788383383",
+                parse_as="0788383383",
+                number="0788383383",
+                normalized="0788383383",
+                country_code="RW",
+            )
+        )
+        self.assertFalse(
+            URN._formatted_number_matches_country(
+                formatted="not-a-phone",
+                parse_as="12345",
+                number="12345",
+                normalized="12345",
+                country_code="RW",
+            )
+        )
 
     def test_freshchat_urn(self):
         self.assertTrue(
