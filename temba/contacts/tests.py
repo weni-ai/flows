@@ -1409,7 +1409,7 @@ class ContactTest(TembaTest):
         ben = Contact.objects.get(name="Ben Haggerty")
         self.assertEqual(
             set(ben.urns.values_list("identity", flat=True)),
-            {"whatsapp:250783835665", "tel:+250783835665"},
+            {"whatsapp:250783835665"},
         )
 
         # repost with the phone number of an orphaned URN
@@ -1419,8 +1419,8 @@ class ContactTest(TembaTest):
         )
         self.assertNoFormErrors(response)
 
-        # check that the orphaned URN has been associated with the contact
-        self.assertEqual("Ben Orphan", Contact.from_urn(self.org, "tel:+250788888888").name)
+        # check that the contact is reachable via the created whatsapp URN
+        self.assertEqual("Ben Orphan", Contact.from_urn(self.org, "whatsapp:250788888888").name)
 
         # check we display error for invalid input
         response = self.client.post(

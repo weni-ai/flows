@@ -1376,10 +1376,7 @@ class ContactCRUDL(SmartCRUDL):
             for field_key, value in self.form.cleaned_data.items():
                 if field_key.startswith("urn__") and value:
                     scheme = field_key.split("__")[1]
-                    if scheme == URN.WHATSAPP_SCHEME and URN.is_phone_based_path(value):
-                        urns.extend(URN.paired_phone_urns(value, country))
-                    else:
-                        urns.append(URN.normalize(URN.from_parts(scheme, value), country))
+                    urns.append(URN.normalize(URN.from_parts(scheme, value), country))
 
             Contact.create(obj.org, self.request.user, obj.name, language="", urns=urns, fields={}, groups=[])
 
