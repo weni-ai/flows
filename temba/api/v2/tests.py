@@ -2882,6 +2882,22 @@ class APITest(TembaTest):
         whats_user = Contact.objects.get(name="WhatsUser")
         self.assertEqual(set(whats_user.urns.values_list("identity", flat=True)), {"whatsapp:250788999999"})
 
+        # bare brazilian numbers are normalized with country code 55
+        self.org.timezone = "America/Sao_Paulo"
+        self.org.save(update_fields=("timezone",))
+        if "default_country" in self.org.__dict__:
+            del self.org.__dict__["default_country"]
+
+        response = self.postJSON(url, None, {"name": "BR User", "urns": ["11987654321"]})
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["urns"], ["whatsapp:5511987654321"])
+
+        # restore default org country for subsequent tests in this method
+        self.org.timezone = "Africa/Kigali"
+        self.org.save(update_fields=("timezone",))
+        if "default_country" in self.org.__dict__:
+            del self.org.__dict__["default_country"]
+
         # explicit tel scheme is preserved
         response = self.postJSON(url, None, {"name": "TelUser", "urns": ["tel:+250788888888"]})
         self.assertEqual(response.status_code, 201)
