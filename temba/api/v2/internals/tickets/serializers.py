@@ -3,11 +3,13 @@ from rest_framework import serializers
 from weni.internal.models import TicketerQueue
 
 from django.contrib.auth import get_user_model
+from django.core import exceptions as django_exceptions
 
 from temba.api.v2.serializers import ReadSerializer
 from temba.contacts.models import Contact, ContactURN
 from temba.orgs.models import Org
 from temba.tickets.models import Ticketer, Topic
+from temba.tickets.types.generic.type import GenericType
 
 User = get_user_model()
 
@@ -15,6 +17,42 @@ User = get_user_model()
 class TicketAssigneeSerializer(serializers.Serializer):
     uuid = serializers.UUIDField()
     email = serializers.EmailField()
+
+
+class CreateTicketerSerializer(serializers.Serializer):
+    user = serializers.EmailField(required=True)
+    org = serializers.CharField(required=True)
+    name = serializers.CharField(required=True, max_length=64)
+    ticketer_type = serializers.CharField(required=False, default=GenericType.slug, max_length=16)
+    config = serializers.JSONField(required=True)
+
+    def validate_org(self, value):
+        try:
+            self.org = Org.objects.get(proj_uuid=value)
+        except (Org.DoesNotExist, django_exceptions.ValidationError, ValueError):
+            raise serializers.ValidationError("Project not found")
+        return value
+
+    def validate_user(self, value):
+        try:
+            self.acting_user = User.objects.get(email=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found")
+        return value
+
+    def validate_config(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("config must be an object")
+        return value
+
+    def create(self, validated_data):
+        return Ticketer.create(
+            org=self.org,
+            user=self.acting_user,
+            ticketer_type=validated_data.get("ticketer_type") or GenericType.slug,
+            name=validated_data["name"],
+            config=validated_data["config"],
+        )
 
 
 class OpenTicketSerializer(serializers.Serializer):
