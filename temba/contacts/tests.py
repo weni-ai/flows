@@ -4556,7 +4556,7 @@ class ContactFieldTest(TembaTest):
         )
 
     def test_derive_group_without_org_raises_404(self):
-        view = ContactCRUDL.Contact.List()
+        view = ContactCRUDL.List()
         view.request = self.rf.get("/contact/")
         view.request.user = self.user
         view.system_group = ContactGroup.TYPE_ACTIVE
