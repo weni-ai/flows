@@ -670,6 +670,21 @@ class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
             with self.assertRaises(Http404):
                 view.derive_group()
 
+    def test_derive_group_recreates_missing_system_groups(self):
+        view = ContactCRUDL.List()
+        request = RequestFactory().get("/contact/")
+        request.user = self.user
+        view.request = request
+        view.system_group = ContactGroup.TYPE_ACTIVE
+
+        self.org.all_groups(manager="system_groups").delete()
+
+        group = view.derive_group()
+
+        self.assertEqual(group.group_type, ContactGroup.TYPE_ACTIVE)
+        self.assertEqual(group.org, self.org)
+        self.assertTrue(self.org.all_groups(manager="system_groups").exists())
+
 
 class ContactGroupTest(TembaTest):
     def setUp(self):

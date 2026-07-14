@@ -5207,3 +5207,40 @@ class UserCRUDLTestCase(TestCase):
 
         self.assertTrue(form.is_valid())
         self.assertEqual(form.cleaned_data["email"], self.user_email)
+
+
+class RestoreInactivatedOrgsMigrationTest(TembaTest):
+    def test_restore_inactivated_orgs(self):
+        from django.apps import apps
+
+        from temba.orgs.migrations.0095_restore_inactivated_orgs import restore_inactivated_orgs
+
+        inactivated_org = Org.objects.create(
+            name="Inactivated Org",
+            timezone=pytz.timezone("Africa/Kigali"),
+            brand=settings.DEFAULT_BRAND,
+            created_by=self.admin,
+            modified_by=self.admin,
+            is_active=False,
+            is_suspended=False,
+        )
+        released_org = Org.objects.create(
+            name="Released Org",
+            timezone=pytz.timezone("Africa/Kigali"),
+            brand=settings.DEFAULT_BRAND,
+            created_by=self.admin,
+            modified_by=self.admin,
+            is_active=False,
+            is_suspended=False,
+            released_on=timezone.now(),
+        )
+
+        restore_inactivated_orgs(apps, None)
+
+        inactivated_org.refresh_from_db()
+        released_org.refresh_from_db()
+
+        self.assertTrue(inactivated_org.is_active)
+        self.assertTrue(inactivated_org.is_suspended)
+        self.assertFalse(released_org.is_active)
+        self.assertFalse(released_org.is_suspended)
