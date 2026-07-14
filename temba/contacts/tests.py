@@ -18,8 +18,8 @@ from django.db.models import Value as DbValue
 from django.db.models.functions import Concat, Substr
 from django.db.utils import IntegrityError
 from django.http import Http404
-from django.test.utils import override_settings
 from django.test import RequestFactory
+from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
