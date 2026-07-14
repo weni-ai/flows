@@ -5211,9 +5211,12 @@ class UserCRUDLTestCase(TestCase):
 
 class RestoreInactivatedOrgsMigrationTest(TembaTest):
     def test_restore_inactivated_orgs(self):
+        import importlib
+
         from django.apps import apps
 
-        from temba.orgs.migrations.0095_restore_inactivated_orgs import restore_inactivated_orgs
+        migration = importlib.import_module("temba.orgs.migrations.0095_restore_inactivated_orgs")
+        restore_inactivated_orgs = migration.restore_inactivated_orgs
 
         inactivated_org = Org.objects.create(
             name="Inactivated Org",

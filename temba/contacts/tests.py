@@ -677,7 +677,7 @@ class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
         view.request = request
         view.system_group = ContactGroup.TYPE_ACTIVE
 
-        self.org.all_groups(manager="system_groups").delete()
+        self.org.all_groups(manager="system_groups").all().delete()
 
         group = view.derive_group()
 
