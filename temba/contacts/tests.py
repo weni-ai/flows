@@ -14,10 +14,10 @@ from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.validators import ValidationError
 from django.db import connection
-from django.http import Http404
 from django.db.models import Value as DbValue
 from django.db.models.functions import Concat, Substr
 from django.db.utils import IntegrityError
+from django.http import Http404
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
