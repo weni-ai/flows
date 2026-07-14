@@ -19,6 +19,7 @@ from django.db.models.functions import Concat, Substr
 from django.db.utils import IntegrityError
 from django.http import Http404
 from django.test.utils import override_settings
+from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
@@ -657,6 +658,17 @@ class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
 
         # that has been queued to mailroom
         self.assertEqual("start_flow", mr_mocks.queued_batch_tasks[-1]["type"])
+
+    def test_derive_group_without_org_raises_404(self):
+        view = ContactCRUDL.List()
+        request = RequestFactory().get("/contact/")
+        request.user = self.user
+        view.request = request
+        view.system_group = ContactGroup.TYPE_ACTIVE
+
+        with patch.object(type(self.user), "get_org", return_value=None):
+            with self.assertRaises(Http404):
+                view.derive_group()
 
 
 class ContactGroupTest(TembaTest):
@@ -4554,16 +4566,6 @@ class ContactFieldTest(TembaTest):
             ContactListView.prepare_sort_field_struct(sort_on="22084b5a-3ad3-4dc6-a857-91fb3f20eb57"),
             (None, None, None),
         )
-
-    def test_derive_group_without_org_raises_404(self):
-        view = ContactCRUDL.List()
-        view.request = self.rf.get("/contact/")
-        view.request.user = self.user
-        view.system_group = ContactGroup.TYPE_ACTIVE
-
-        with patch.object(type(self.user), "get_org", return_value=None):
-            with self.assertRaises(Http404):
-                view.derive_group()
 
     @mock_mailroom
     def test_contact_field_list_sort_contactfields(self, mr_mocks):
