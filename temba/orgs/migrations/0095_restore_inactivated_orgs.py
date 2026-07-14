@@ -6,8 +6,8 @@ def restore_inactivated_orgs(apps, schema_editor):
     Orgs marked inactive via project status were incorrectly stored as is_active=False.
     Restore them as active and suspended instead.
     """
-    Org = apps.get_model("orgs", "Org")
-    Org.objects.filter(is_active=False, released_on__isnull=True).update(
+    org = apps.get_model("orgs", "Org")
+    org.objects.filter(is_active=False, released_on__isnull=True).update(
         is_active=True,
         is_suspended=True,
     )
