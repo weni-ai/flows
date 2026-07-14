@@ -14,6 +14,7 @@ from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.validators import ValidationError
 from django.db import connection
+from django.http import Http404
 from django.db.models import Value as DbValue
 from django.db.models.functions import Concat, Substr
 from django.db.utils import IntegrityError
@@ -25,7 +26,7 @@ from temba.airtime.models import AirtimeTransfer
 from temba.campaigns.models import Campaign, CampaignEvent, EventFire
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
 from temba.contacts.search import SearchException, SearchResults, search_contacts
-from temba.contacts.views import ContactListView
+from temba.contacts.views import ContactCRUDL, ContactListView
 from temba.flows.models import Flow, FlowSession, FlowStart
 from temba.ivr.models import IVRCall
 from temba.locations.models import AdminBoundary
@@ -4553,6 +4554,16 @@ class ContactFieldTest(TembaTest):
             ContactListView.prepare_sort_field_struct(sort_on="22084b5a-3ad3-4dc6-a857-91fb3f20eb57"),
             (None, None, None),
         )
+
+    def test_derive_group_without_org_raises_404(self):
+        view = ContactCRUDL.Contact.List()
+        view.request = self.rf.get("/contact/")
+        view.request.user = self.user
+        view.system_group = ContactGroup.TYPE_ACTIVE
+
+        with patch.object(type(self.user), "get_org", return_value=None):
+            with self.assertRaises(Http404):
+                view.derive_group()
 
     @mock_mailroom
     def test_contact_field_list_sort_contactfields(self, mr_mocks):

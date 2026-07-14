@@ -1,3 +1,8 @@
+3.84.0
+----------
+* fix: map project INACTIVE status to is_suspended instead of is_active to prevent contacts module failures
+* fix: harden contact list derive_group when org is unresolved or system groups are missing
+
 3.83.0
 ----------
 * feat: default bare phone URNs to whatsapp on API, import and contact create form
