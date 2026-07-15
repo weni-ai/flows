@@ -121,11 +121,12 @@ class TestProjectEventConsumer(TembaTest):
 
         # Verify project status was updated
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
-        self.assertFalse(reloaded_org.is_active)
+        self.assertTrue(reloaded_org.is_suspended)
+        self.assertTrue(reloaded_org.is_active)
 
     def test_consume_status_updated_to_active(self):
         """Test consuming a status_updated action to ACTIVE"""
-        self.test_org.is_active = False
+        self.test_org.is_suspended = True
         self.test_org.save()
 
         body = {
@@ -141,6 +142,7 @@ class TestProjectEventConsumer(TembaTest):
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertFalse(reloaded_org.is_suspended)
         self.assertTrue(reloaded_org.is_active)
 
     def test_consume_project_type_update_action_successfully(self):
@@ -181,7 +183,7 @@ class TestProjectEventConsumer(TembaTest):
 
     def test_consume_status_updated_to_in_test(self):
         """Test consuming a status_updated action to IN_TEST"""
-        self.test_org.is_active = False
+        self.test_org.is_suspended = True
         self.test_org.save()
 
         body = {
@@ -197,6 +199,7 @@ class TestProjectEventConsumer(TembaTest):
         message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertFalse(reloaded_org.is_suspended)
         self.assertTrue(reloaded_org.is_active)
 
     def test_consume_missing_project_uuid_rejects_message(self):

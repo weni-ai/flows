@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.test import APIClient
 from weni.internal.models import TicketerQueue
 
 from django.contrib.auth.models import User
@@ -87,11 +88,15 @@ class CreateTicketerViewTest(TembaTest):
             "config": json.dumps(self.config),
         }
 
+    def authenticated_client(self, user=None):
+        client = APIClient()
+        client.force_authenticate(user=user or self.admin)
+        return client
+
     @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
     @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
     def test_create_ticketer_success(self):
-        self.client.force_login(self.admin)
-        response = self.client.post(self.url, data=self.valid_body())
+        response = self.authenticated_client().post(self.url, data=self.valid_body())
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["name"], "Generic Ticketer")
@@ -108,9 +113,8 @@ class CreateTicketerViewTest(TembaTest):
     def test_create_ticketer_defaults_type_to_generic(self):
         body = self.valid_body()
         del body["ticketer_type"]
-        self.client.force_login(self.admin)
 
-        response = self.client.post(self.url, data=body)
+        response = self.authenticated_client().post(self.url, data=body)
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["ticketer_type"], "generic")
@@ -150,7 +154,7 @@ class CreateTicketerViewTest(TembaTest):
         body = self.valid_body()
         del body["config"]
 
-        response = self.client.post(self.url, data=body)
+        response = self.authenticated_client().post(self.url, data=body)
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("config", response.data)
@@ -161,9 +165,8 @@ class CreateTicketerViewTest(TembaTest):
         other_user = User.objects.create_user(username="otheruser", email="other@example.com", password="secret")
         body = self.valid_body()
         body["user"] = other_user.email
-        self.client.force_login(self.admin)
 
-        response = self.client.post(self.url, data=body)
+        response = self.authenticated_client().post(self.url, data=body)
 
         self.assertEqual(response.status_code, 403)
         self.assertIn("permission", response.data)
@@ -172,9 +175,8 @@ class CreateTicketerViewTest(TembaTest):
     @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
     def test_create_ticketer_with_matching_user(self):
         body = self.valid_body()
-        self.client.force_login(self.admin)
 
-        response = self.client.post(self.url, data=body)
+        response = self.authenticated_client().post(self.url, data=body)
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["name"], "Generic Ticketer")

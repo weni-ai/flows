@@ -17,6 +17,8 @@ from django.db import connection
 from django.db.models import Value as DbValue
 from django.db.models.functions import Concat, Substr
 from django.db.utils import IntegrityError
+from django.http import Http404
+from django.test import RequestFactory
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -25,7 +27,7 @@ from temba.airtime.models import AirtimeTransfer
 from temba.campaigns.models import Campaign, CampaignEvent, EventFire
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
 from temba.contacts.search import SearchException, SearchResults, search_contacts
-from temba.contacts.views import ContactListView
+from temba.contacts.views import ContactCRUDL, ContactListView
 from temba.flows.models import Flow, FlowSession, FlowStart
 from temba.ivr.models import IVRCall
 from temba.locations.models import AdminBoundary
@@ -656,6 +658,32 @@ class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
 
         # that has been queued to mailroom
         self.assertEqual("start_flow", mr_mocks.queued_batch_tasks[-1]["type"])
+
+    def test_derive_group_without_org_raises_404(self):
+        view = ContactCRUDL.List()
+        request = RequestFactory().get("/contact/")
+        request.user = self.user
+        view.request = request
+        view.system_group = ContactGroup.TYPE_ACTIVE
+
+        with patch.object(type(self.user), "get_org", return_value=None):
+            with self.assertRaises(Http404):
+                view.derive_group()
+
+    def test_derive_group_recreates_missing_system_groups(self):
+        view = ContactCRUDL.List()
+        request = RequestFactory().get("/contact/")
+        request.user = self.user
+        view.request = request
+        view.system_group = ContactGroup.TYPE_ACTIVE
+
+        self.org.all_groups(manager="system_groups").all().delete()
+
+        group = view.derive_group()
+
+        self.assertEqual(group.group_type, ContactGroup.TYPE_ACTIVE)
+        self.assertEqual(group.org, self.org)
+        self.assertTrue(self.org.all_groups(manager="system_groups").exists())
 
 
 class ContactGroupTest(TembaTest):
