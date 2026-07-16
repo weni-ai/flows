@@ -194,6 +194,48 @@ class ChannelElevenLabsApiKeyViewTest(PatchedJWTAuthMixin, TembaTest):
         self.assertEqual(response.json(), {"api_key": "sk-test-key-123"})
 
 
+class ChannelMarketingTagsViewTest(PatchedJWTAuthMixin, TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.url = "/api/v2/internals/channel_marketing_tags"
+        self.jwt_payload_patch = {}
+
+    def _set_jwt_payload(self, **kwargs):
+        self.jwt_payload_patch = kwargs
+
+    def test_request_without_channel_uuid(self):
+        self._set_jwt_payload(channel_uuid=None)
+        response = self.client.get(self.url, **self.auth_headers)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"channel_uuid": ["This field may not be null."]})
+
+    def test_request_with_nonexistent_channel_uuid(self):
+        self._set_jwt_payload(channel_uuid=str(uuid.uuid4()))
+        response = self.client.get(self.url, **self.auth_headers)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"detail": "Channel not found"})
+
+    def test_request_returns_false_when_config_missing(self):
+        channel = self.create_channel("WWC", "Test Channel", "test")
+
+        self._set_jwt_payload(channel_uuid=str(channel.uuid))
+        response = self.client.get(self.url, **self.auth_headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"marketing_tags": False})
+
+    def test_request_returns_true_when_config_enabled(self):
+        channel = self.create_channel("WWC", "Test Channel", "test", config={"marketing_tags": True})
+
+        self._set_jwt_payload(channel_uuid=str(channel.uuid))
+        response = self.client.get(self.url, **self.auth_headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"marketing_tags": True})
+
+
 class InternalChannelViewTest(TembaTest):
     def setUp(self):
         super().setUp()
