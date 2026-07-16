@@ -104,6 +104,24 @@ class URN:
 
     VALID_SCHEMES = {s[0] for s in SCHEME_CHOICES}
 
+    DEFAULT_PHONE_SCHEME = WHATSAPP_SCHEME
+
+    PHONE_COLUMN_HEADERS = frozenset(
+        {
+            "phone",
+            "mobile",
+            "telephone",
+            "cell",
+            "cellphone",
+            "cell phone",
+            "phone number",
+            "mobile number",
+            "contact phone",
+            "contact mobile",
+            "number",
+        }
+    )
+
     FACEBOOK_PATH_REF_PREFIX = "ref:"
 
     def __init__(self):  # pragma: no cover
@@ -244,6 +262,46 @@ class URN:
         return True
 
     @classmethod
+    def _normalize_twitter_path(cls, norm_path):
+        norm_path = norm_path.lower()
+        if norm_path[0:1] == "@":  # strip @ prefix if provided
+            norm_path = norm_path[1:]
+        return norm_path.lower()  # Twitter handles are case-insensitive, so we always store as lowercase
+
+    @classmethod
+    def _normalize_twitterid_display(cls, display):
+        if not display:
+            return display
+
+        display = str(display).strip().lower()
+        if display and display[0] == "@":
+            display = display[1:]
+        return display
+
+    @classmethod
+    def _normalize_whatsapp_path(cls, norm_path, country_code):
+        # phone-based whatsapp URNs are stored as E.164 without the + prefix
+        if norm_path and norm_path[0] in "+0123456789":
+            norm_path = cls.normalize_number(norm_path, country_code)
+            if norm_path.startswith("+"):
+                norm_path = norm_path[1:]
+        return norm_path
+
+    @classmethod
+    def _normalize_path_for_scheme(cls, scheme, norm_path, display, country_code):
+        if scheme == cls.TEL_SCHEME:
+            return cls.normalize_number(norm_path, country_code), display
+        if scheme == cls.TWITTER_SCHEME:
+            return cls._normalize_twitter_path(norm_path), display
+        if scheme == cls.TWITTERID_SCHEME:
+            return norm_path, cls._normalize_twitterid_display(display)
+        if scheme == cls.EMAIL_SCHEME:
+            return norm_path.lower(), display
+        if scheme == cls.WHATSAPP_SCHEME:
+            return cls._normalize_whatsapp_path(norm_path, country_code), display
+        return norm_path, display
+
+    @classmethod
     def normalize(cls, urn, country_code=None):
         """
         Normalizes the path of a URN string. Should be called anytime looking for a URN match.
@@ -252,24 +310,59 @@ class URN:
         country_code = str(country_code) if country_code else ""
         norm_path = str(path).strip()
 
-        if scheme == cls.TEL_SCHEME:
-            norm_path = cls.normalize_number(norm_path, country_code)
-        elif scheme == cls.TWITTER_SCHEME:
-            norm_path = norm_path.lower()
-            if norm_path[0:1] == "@":  # strip @ prefix if provided
-                norm_path = norm_path[1:]
-            norm_path = norm_path.lower()  # Twitter handles are case-insensitive, so we always store as lowercase
-
-        elif scheme == cls.TWITTERID_SCHEME:
-            if display:
-                display = str(display).strip().lower()
-                if display and display[0] == "@":
-                    display = display[1:]
-
-        elif scheme == cls.EMAIL_SCHEME:
-            norm_path = norm_path.lower()
+        norm_path, display = cls._normalize_path_for_scheme(scheme, norm_path, display, country_code)
 
         return cls.from_parts(scheme, norm_path, query, display)
+
+    @classmethod
+    def _sanitize_number_digits(cls, number: str) -> str:
+        normalized = number.strip().lower()
+
+        if normalized.endswith("e+11") or normalized.endswith("e+12"):
+            normalized = normalized[0:-4].replace(".", "")
+
+        return regex.sub(r"[^0-9a-z]", "", normalized, regex.V0)
+
+    @classmethod
+    def _number_parse_candidates(cls, number: str, normalized: str, country_code: str) -> list[str]:
+        if number.startswith("+"):
+            return ["+" + normalized]
+
+        candidates = []
+        has_international = len(normalized) >= 11 and not normalized.startswith("0")
+
+        if country_code and has_international:
+            calling_code = str(phonenumbers.country_code_for_region(country_code.upper()))
+            if calling_code and normalized.startswith(calling_code):
+                candidates.append("+" + normalized)
+
+        if country_code:
+            candidates.append(normalized)
+
+        if has_international:
+            international = "+" + normalized
+            if international not in candidates:
+                candidates.append(international)
+
+        return candidates or [normalized]
+
+    @classmethod
+    def _formatted_number_matches_country(
+        cls, formatted: str, parse_as: str, number: str, normalized: str, country_code: str
+    ) -> bool:
+        if not country_code or number.startswith("+"):
+            return True
+
+        # accept valid international numbers even when they don't match the org country
+        if parse_as == "+" + normalized:
+            return True
+
+        try:
+            parsed = phonenumbers.parse(formatted, None)
+            region = phonenumbers.region_code_for_number(parsed)
+            return region == country_code.upper()
+        except phonenumbers.NumberParseException:
+            return False
 
     @classmethod
     def normalize_number(cls, number: str, country_code: str):
@@ -277,30 +370,18 @@ class URN:
         Normalizes the passed in number, they should be only digits, some backends prepend + and
         maybe crazy users put in dashes or parentheses in the console.
         """
+        normalized = cls._sanitize_number_digits(number)
 
-        number = number.strip()
-        normalized = number.lower()
+        for parse_as in cls._number_parse_candidates(number, normalized, country_code):
+            try:
+                formatted = parse_number(parse_as, country_code)
+            except ValueError:
+                continue
 
-        # if the number ends with e11, then that is Excel corrupting it, remove it
-        if normalized.endswith("e+11") or normalized.endswith("e+12"):
-            normalized = normalized[0:-4].replace(".", "")
+            if cls._formatted_number_matches_country(formatted, parse_as, number, normalized, country_code):
+                return formatted
 
-        # remove non alphanumeric characters
-        normalized = regex.sub(r"[^0-9a-z]", "", normalized, regex.V0)
-
-        parse_as = normalized
-
-        # if we started with + prefix, or we have a sufficiently long number that doesn't start with 0, add + prefix
-        if number.startswith("+") or (len(normalized) >= 11 and not normalized.startswith("0")):
-            parse_as = "+" + normalized
-
-        try:
-            formatted = parse_number(parse_as, country_code)
-        except ValueError:
-            # if it's not a possible number, just return what we have minus the +
-            return normalized
-
-        return formatted
+        return normalized
 
     @classmethod
     def identity(cls, urn):
@@ -314,6 +395,67 @@ class URN:
     @classmethod
     def from_tel(cls, path):
         return cls.from_parts(cls.TEL_SCHEME, path)
+
+    @classmethod
+    def from_whatsapp(cls, path):
+        return cls.from_parts(cls.WHATSAPP_SCHEME, path)
+
+    @classmethod
+    def is_phone_based_path(cls, path):
+        return bool(path) and path[0] in "+0123456789"
+
+    @classmethod
+    def paired_phone_urns(cls, value, country_code=None):
+        """
+        Returns normalized whatsapp and tel URNs for the same phone number input.
+        """
+        country_code = str(country_code) if country_code else ""
+        whatsapp = cls.normalize(cls.from_parts(cls.WHATSAPP_SCHEME, value), country_code)
+        tel = cls.normalize(cls.from_parts(cls.TEL_SCHEME, value), country_code)
+        return [whatsapp, tel]
+
+    @classmethod
+    def looks_like_phone(cls, value, country_code=None):
+        """
+        Returns whether the given value appears to be a phone number without an explicit URN scheme.
+        """
+        if not isinstance(value, str):
+            return False
+
+        value = value.strip()
+        if not value or ":" in value:
+            return False
+
+        if not any(c.isdigit() for c in value):
+            return False
+
+        # non-phone identifiers such as BSUIDs require an explicit scheme
+        if regex.match(r"^[A-Z]{2}\.", value, regex.V0):
+            return False
+
+        try:
+            parse_number(cls.normalize_number(value, country_code or ""), country_code)
+            return True
+        except ValueError:
+            return False
+
+    @classmethod
+    def ensure_scheme(cls, value, country_code=None, default_phone_scheme=None):
+        """
+        Returns a URN string, inferring the default phone scheme when no scheme is provided.
+        """
+        if default_phone_scheme is None:
+            default_phone_scheme = cls.DEFAULT_PHONE_SCHEME
+
+        value = str(value).strip()
+
+        if ":" in value:
+            return value
+
+        if cls.looks_like_phone(value, country_code):
+            return cls.from_parts(default_phone_scheme, value)
+
+        raise ValueError("URN strings must contain scheme and path components")
 
     @classmethod
     def from_twitterid(cls, id, screen_name=None):
@@ -2275,7 +2417,7 @@ class ContactImport(SmartModel):
             elif mapping["type"] == "scheme" and value:
                 urn = URN.from_parts(mapping["scheme"], value)
                 try:
-                    urn = URN.normalize(urn)
+                    urn = URN.normalize(urn, country_code=org.default_country_code)
                 except ValueError:
                     pass
                 urns.append(urn)
@@ -2305,6 +2447,8 @@ class ContactImport(SmartModel):
 
                 if attribute in ("uuid", "name", "language"):
                     mapping = {"type": "attribute", "name": attribute}
+                elif attribute in URN.PHONE_COLUMN_HEADERS:
+                    mapping = {"type": "scheme", "scheme": URN.DEFAULT_PHONE_SCHEME}
             elif header_prefix == "urn" and header_name:
                 mapping = {"type": "scheme", "scheme": header_name.lower()}
             elif header_prefix == "field" and header_name:

@@ -329,6 +329,9 @@ class APITest(TembaTest):
                 "tel:+1-800-123-4567": "tel:+18001234567",
                 "tel:0788 123 123": "tel:+250788123123",  # using org country
                 "tel:(078) 812-3123": "tel:+250788123123",
+                "+250788123123": "whatsapp:250788123123",  # bare phone defaults to whatsapp
+                "0788 123 123": "whatsapp:250788123123",  # bare phone defaults to whatsapp
+                "whatsapp:6831234": serializers.ValidationError,  # too few digits
                 "12345": serializers.ValidationError,  # un-parseable
                 "tel:800-123-4567": serializers.ValidationError,  # no country code
                 18_001_234_567: serializers.ValidationError,  # non-string
@@ -2869,6 +2872,40 @@ class APITest(TembaTest):
         self.assertEqual(set(jean.urns.values_list("identity", flat=True)), {"tel:+250783333333", "twitter:jean"})
         self.assertEqual(set(jean.user_groups.all()), {group})
         self.assertEqual(jean.get_field_value(nickname), "Jado")
+
+        # bare phone numbers default to whatsapp URNs
+        response = self.postJSON(url, None, {"name": "WhatsUser", "urns": ["+250788999999"]})
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["urns"], ["whatsapp:250788999999"])
+
+        whats_user = Contact.objects.get(name="WhatsUser")
+        self.assertEqual(set(whats_user.urns.values_list("identity", flat=True)), {"whatsapp:250788999999"})
+
+        # bare brazilian numbers are normalized with country code 55
+        self.org.timezone = "America/Sao_Paulo"
+        self.org.save(update_fields=("timezone",))
+        if "default_country" in self.org.__dict__:
+            del self.org.__dict__["default_country"]
+
+        response = self.postJSON(url, None, {"name": "BR User", "urns": ["11987654321"]})
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["urns"], ["whatsapp:5511987654321"])
+
+        # restore default org country for subsequent tests in this method
+        self.org.timezone = "Africa/Kigali"
+        self.org.save(update_fields=("timezone",))
+        if "default_country" in self.org.__dict__:
+            del self.org.__dict__["default_country"]
+
+        # explicit tel scheme is preserved
+        response = self.postJSON(url, None, {"name": "TelUser", "urns": ["tel:+250788888888"]})
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["urns"], ["tel:+250788888888"])
+
+        # explicit whatsapp scheme is preserved
+        response = self.postJSON(url, None, {"name": "ExplicitWhats", "urns": ["whatsapp:250788777777"]})
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["urns"], ["whatsapp:250788777777"])
 
         # try to create with group from other org
         response = self.postJSON(url, None, {"name": "Jim", "groups": [other_org_group.uuid]})

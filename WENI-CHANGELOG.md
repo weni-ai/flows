@@ -1,3 +1,7 @@
+3.83.0
+----------
+* feat: default bare phone URNs to whatsapp on API, import and contact create form
+
 3.82.0
 ----------
 * feat: add internal endpoint for ticketer creation
