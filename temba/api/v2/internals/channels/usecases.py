@@ -26,3 +26,13 @@ class GetElevenLabsApiKeyUseCase:
             raise ElevenLabsApiKeyNotFoundError()
 
         return api_key
+
+
+class GetChannelMarketingTagsUseCase:
+    def execute(self, channel_uuid: str) -> bool:
+        try:
+            channel = Channel.objects.get(uuid=channel_uuid)
+        except Channel.DoesNotExist:
+            raise ChannelNotFoundError()
+
+        return bool(channel.config.get("marketing_tags", False))
