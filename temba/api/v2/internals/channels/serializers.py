@@ -7,3 +7,7 @@ class ChannelProjectSerializer(serializers.Serializer):
 
 class ChannelElevenLabsApiKeySerializer(serializers.Serializer):
     channel_uuid = serializers.UUIDField(required=True)
+
+
+class ChannelMarketingTagsSerializer(serializers.Serializer):
+    channel_uuid = serializers.UUIDField(required=True)

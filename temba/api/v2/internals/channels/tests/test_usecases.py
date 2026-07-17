@@ -3,6 +3,7 @@ import uuid
 from temba.api.v2.internals.channels.usecases import (
     ChannelNotFoundError,
     ElevenLabsApiKeyNotFoundError,
+    GetChannelMarketingTagsUseCase,
     GetElevenLabsApiKeyUseCase,
 )
 from temba.tests import TembaTest
@@ -41,3 +42,28 @@ class GetElevenLabsApiKeyUseCaseTest(TembaTest):
         )
         result = self.usecase.execute(str(channel.uuid))
         self.assertEqual(result, "sk-test-key-123")
+
+
+class GetChannelMarketingTagsUseCaseTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.usecase = GetChannelMarketingTagsUseCase()
+
+    def test_raises_channel_not_found_for_nonexistent_uuid(self):
+        with self.assertRaises(ChannelNotFoundError):
+            self.usecase.execute(str(uuid.uuid4()))
+
+    def test_returns_false_when_config_missing(self):
+        channel = self.create_channel("WWC", "Test Channel", "test")
+        result = self.usecase.execute(str(channel.uuid))
+        self.assertFalse(result)
+
+    def test_returns_false_when_config_is_false(self):
+        channel = self.create_channel("WWC", "Test Channel", "test", config={"marketing_tags": False})
+        result = self.usecase.execute(str(channel.uuid))
+        self.assertFalse(result)
+
+    def test_returns_true_when_config_is_true(self):
+        channel = self.create_channel("WWC", "Test Channel", "test", config={"marketing_tags": True})
+        result = self.usecase.execute(str(channel.uuid))
+        self.assertTrue(result)

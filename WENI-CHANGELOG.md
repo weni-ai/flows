@@ -1,3 +1,7 @@
+3.84.0
+----------
+* feat: add ChannelMarketingTags functionality
+
 3.83.2
 ----------
 * feat: enhance squash flowpathcount

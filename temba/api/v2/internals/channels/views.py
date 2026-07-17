@@ -10,8 +10,12 @@ from temba.api.auth.billing import (
     HasBillingFixedAccessToken,
 )
 from temba.api.auth.jwt import RequiredJWTAuthentication
-from temba.api.v2.internals.channels.serializers import ChannelElevenLabsApiKeySerializer, ChannelProjectSerializer
-from temba.api.v2.internals.channels.usecases import GetElevenLabsApiKeyUseCase
+from temba.api.v2.internals.channels.serializers import (
+    ChannelElevenLabsApiKeySerializer,
+    ChannelMarketingTagsSerializer,
+    ChannelProjectSerializer,
+)
+from temba.api.v2.internals.channels.usecases import GetChannelMarketingTagsUseCase, GetElevenLabsApiKeyUseCase
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel
@@ -120,3 +124,18 @@ class ChannelElevenLabsApiKeyView(APIViewMixin, APIView):
         api_key = usecase.execute(serializer.validated_data["channel_uuid"])
 
         return Response({"api_key": api_key})
+
+
+class ChannelMarketingTagsView(APIViewMixin, APIView):
+    authentication_classes = [RequiredJWTAuthentication]
+    permission_classes = [HasValidJWT]
+
+    def get(self, request: Request):
+        channel_uuid = getattr(request, "channel_uuid", None)
+        serializer = ChannelMarketingTagsSerializer(data={"channel_uuid": channel_uuid})
+        serializer.is_valid(raise_exception=True)
+
+        usecase = GetChannelMarketingTagsUseCase()
+        marketing_tags = usecase.execute(serializer.validated_data["channel_uuid"])
+
+        return Response({"marketing_tags": marketing_tags})
