@@ -1,3 +1,7 @@
+3.83.2
+----------
+* feat: enhance squash flowpathcount
+
 3.83.1
 ----------
 * feat: extend InternalChannelView with billing dual auth and additive fields
