@@ -1,3 +1,7 @@
+3.84.0
+----------
+* feat: add ChannelMarketingTags functionality
+
 3.83.0
 ----------
 * feat: default bare phone URNs to whatsapp on API, import and contact create form
