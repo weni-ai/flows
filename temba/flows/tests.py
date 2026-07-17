@@ -1336,9 +1336,7 @@ class FlowTest(TembaTest):
 
         for minute in (0, 15, 30):
             period = base_period.replace(minute=minute)
-            FlowPathCount.objects.create(
-                flow=flow, from_uuid=from_uuid, to_uuid=to_uuid, period=period, count=1
-            )
+            FlowPathCount.objects.create(flow=flow, from_uuid=from_uuid, to_uuid=to_uuid, period=period, count=1)
 
         FlowPathCount.squash()
 

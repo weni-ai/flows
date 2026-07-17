@@ -1613,7 +1613,6 @@ class FlowPathCount(SquashableModel):
     """
 
     squash_over = ("flow_id", "from_uuid", "to_uuid", "period")
-    squash_batch_size = settings.FLOW_PATH_COUNT_SQUASH_BATCH_SIZE
 
     flow = models.ForeignKey(Flow, on_delete=models.PROTECT, related_name="path_counts")
 
@@ -1661,7 +1660,7 @@ class FlowPathCount(SquashableModel):
         - Execute the squash SQL per key
         """
         start = time.time()
-        batch_size = cls.squash_batch_size or settings.SQUASH_BATCH_SIZE
+        batch_size = settings.FLOW_PATH_COUNT_SQUASH_BATCH_SIZE
 
         # Pull a small window of candidate rows (ordered by id) and derive distinct keys client-side
         rows = list(
@@ -1684,9 +1683,7 @@ class FlowPathCount(SquashableModel):
         with connection.cursor() as cursor:
             cursor.execute("SET application_name = 'flows_nokill';")
             for flow_id, from_uuid, to_uuid, period in distinct_keys.keys():
-                distinct_set = SimpleNamespace(
-                    flow_id=flow_id, from_uuid=from_uuid, to_uuid=to_uuid, period=period
-                )
+                distinct_set = SimpleNamespace(flow_id=flow_id, from_uuid=from_uuid, to_uuid=to_uuid, period=period)
                 sql, params = cls.get_squash_query(distinct_set)
                 cursor.execute(sql, params)
                 num_sets += 1
