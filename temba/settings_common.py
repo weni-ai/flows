@@ -1462,6 +1462,11 @@ FLOWEDITOR_SENTRY_DSN = os.environ.get("FLOWEDITOR_SENTRY_DSN", default="")
 
 INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
 
+# Connect session tokens (weni_commons.auth.SessionTokenAuthentication)
+WENI_SESSION_TOKEN_ORG_MODEL = "temba.orgs.models.Org"
+WENI_SESSION_TOKEN_ORG_FIELD = "proj_uuid"
+
+
 FLOW_PATH_RECENT_RUN_BATCH_SIZE = os.environ.get("FLOW_PATH_RECENT_RUN_BATCH_SIZE", default=50)
 
 LAMBDA_VALIDATION_URL = os.environ.get("LAMBDA_VALIDATION_URL", default="")
