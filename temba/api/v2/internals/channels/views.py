@@ -1,12 +1,14 @@
-from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
 
-from django.conf import settings
-
+from temba.api.auth.billing import (
+    BillingFixedAccessTokenAuthentication,
+    BillingFixedAccessTokenViewMixin,
+    HasBillingFixedAccessToken,
+)
 from temba.api.auth.jwt import RequiredJWTAuthentication
 from temba.api.v2.internals.channels.serializers import (
     ChannelElevenLabsApiKeySerializer,
@@ -19,17 +21,8 @@ from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel
 
 
-class ChannelProjectView(APIViewMixin, APIView):
+class ChannelProjectView(BillingFixedAccessTokenViewMixin, APIViewMixin, APIView):
     def post(self, request: Request):
-        params = request.query_params
-        token = params.get("token")
-
-        if token is None:
-            raise NotAuthenticated()
-
-        if token != settings.BILLING_FIXED_ACCESS_TOKEN:
-            raise AuthenticationFailed()
-
         serializer = ChannelProjectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         channels_uuids = serializer.validated_data.get("channels")
@@ -58,8 +51,8 @@ class ChannelProjectView(APIViewMixin, APIView):
 
 
 class InternalChannelView(APIViewMixin, APIView):
-    authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, IsUserInOrg]
+    authentication_classes = [BillingFixedAccessTokenAuthentication, InternalOIDCAuthentication]
+    permission_classes = [(IsAuthenticated & IsUserInOrg) | HasBillingFixedAccessToken]
 
     def get(self, request: Request):
         org = self.get_org_from_request(
@@ -71,24 +64,29 @@ class InternalChannelView(APIViewMixin, APIView):
         if isinstance(org, Response):
             return org
 
-        response = {"results": []}
-
         channels = Channel.objects.filter(org=org, is_active=True)
-        for channel in channels:
-            channel_data = {
-                "uuid": str(channel.uuid),
-                "channel_type": channel.channel_type,
-                "name": channel.name,
-            }
-            if channel.channel_type == "WAC":
-                channel_data["waba"] = channel.config.get("wa_waba_id") if channel.config.get("wa_waba_id") else None
-                channel_data["phone_number"] = (
-                    channel.config.get("wa_number") if channel.config.get("wa_number") else None
-                )
-                channel_data["MMLite"] = True if channel.config.get("mmlite") else False
-            response["results"].append(channel_data)
+        results = [self._serialize_channel(channel) for channel in channels]
+        return Response({"results": results})
 
-        return Response(response)
+    @staticmethod
+    def _serialize_channel(channel):
+        config = channel.config or {}
+        channel_data = {
+            "uuid": str(channel.uuid),
+            "channel_type": channel.channel_type,
+            "name": channel.name,
+            "is_active": channel.is_active,
+            "waba": config.get("wa_waba_id") or None,
+            "phone_number": config.get("wa_number") or None,
+            "config": {
+                "wa_waba_id": config.get("wa_waba_id"),
+                "wa_number": config.get("wa_number"),
+                "is_demo": bool(config.get("is_demo", False)),
+            },
+        }
+        if channel.channel_type == "WAC":
+            channel_data["MMLite"] = True if config.get("mmlite") else False
+        return channel_data
 
 
 class ChannelAllowedDomainsView(APIViewMixin, APIView):

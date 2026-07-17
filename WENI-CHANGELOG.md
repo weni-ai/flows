@@ -2,6 +2,14 @@
 ----------
 * feat: add ChannelMarketingTags functionality
 
+3.83.2
+----------
+* feat: enhance squash flowpathcount
+
+3.83.1
+----------
+* feat: extend InternalChannelView with billing dual auth and additive fields
+
 3.83.0
 ----------
 * feat: default bare phone URNs to whatsapp on API, import and contact create form
