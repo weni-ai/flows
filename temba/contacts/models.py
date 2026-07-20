@@ -315,73 +315,35 @@ class URN:
         return cls.from_parts(scheme, norm_path, query, display)
 
     @classmethod
-    def _sanitize_number_digits(cls, number: str) -> str:
-        normalized = number.strip().lower()
-
-        if normalized.endswith("e+11") or normalized.endswith("e+12"):
-            normalized = normalized[0:-4].replace(".", "")
-
-        return regex.sub(r"[^0-9a-z]", "", normalized, regex.V0)
-
-    @classmethod
-    def _number_parse_candidates(cls, number: str, normalized: str, country_code: str) -> list[str]:
-        if number.startswith("+"):
-            return ["+" + normalized]
-
-        candidates = []
-        has_international = len(normalized) >= 11 and not normalized.startswith("0")
-
-        if country_code and has_international:
-            calling_code = str(phonenumbers.country_code_for_region(country_code.upper()))
-            if calling_code and normalized.startswith(calling_code):
-                candidates.append("+" + normalized)
-
-        if country_code:
-            candidates.append(normalized)
-
-        if has_international:
-            international = "+" + normalized
-            if international not in candidates:
-                candidates.append(international)
-
-        return candidates or [normalized]
-
-    @classmethod
-    def _formatted_number_matches_country(
-        cls, formatted: str, parse_as: str, number: str, normalized: str, country_code: str
-    ) -> bool:
-        if not country_code or number.startswith("+"):
-            return True
-
-        # accept valid international numbers even when they don't match the org country
-        if parse_as == "+" + normalized:
-            return True
-
-        try:
-            parsed = phonenumbers.parse(formatted, None)
-            region = phonenumbers.region_code_for_number(parsed)
-            return region == country_code.upper()
-        except phonenumbers.NumberParseException:
-            return False
-
-    @classmethod
     def normalize_number(cls, number: str, country_code: str):
         """
         Normalizes the passed in number, they should be only digits, some backends prepend + and
         maybe crazy users put in dashes or parentheses in the console.
         """
-        normalized = cls._sanitize_number_digits(number)
 
-        for parse_as in cls._number_parse_candidates(number, normalized, country_code):
-            try:
-                formatted = parse_number(parse_as, country_code)
-            except ValueError:
-                continue
+        number = number.strip()
+        normalized = number.lower()
 
-            if cls._formatted_number_matches_country(formatted, parse_as, number, normalized, country_code):
-                return formatted
+        # if the number ends with e11, then that is Excel corrupting it, remove it
+        if normalized.endswith("e+11") or normalized.endswith("e+12"):
+            normalized = normalized[0:-4].replace(".", "")
 
-        return normalized
+        # remove non alphanumeric characters
+        normalized = regex.sub(r"[^0-9a-z]", "", normalized, regex.V0)
+
+        parse_as = normalized
+
+        # if we started with + prefix, or we have a sufficiently long number that doesn't start with 0, add + prefix
+        if number.startswith("+") or (len(normalized) >= 11 and not normalized.startswith("0")):
+            parse_as = "+" + normalized
+
+        try:
+            formatted = parse_number(parse_as, country_code)
+        except ValueError:
+            # if it's not a possible number, just return what we have minus the +
+            return normalized
+
+        return formatted
 
     @classmethod
     def identity(cls, urn):

@@ -1,8 +1,9 @@
 import logging
 import time
 from array import array
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 import iso8601
 import pytz
@@ -17,7 +18,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.contrib.postgres.fields import ArrayField
 from django.core.files.temp import NamedTemporaryFile
-from django.db import models, transaction
+from django.db import connection, models, transaction
 from django.db.models import Max, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
@@ -1640,7 +1641,7 @@ class FlowPathCount(SquashableModel):
           USING (
             SELECT id FROM {cls._meta.db_table}
             WHERE is_squashed = false
-              AND "flow_id" = %s AND "from_uuid" = %s AND "to_uuid" = %s AND "period" = date_trunc('hour', %s)
+              AND "flow_id" = %s AND "from_uuid" = %s AND "to_uuid" = %s AND date_trunc('hour', "period") = date_trunc('hour', %s)
             LIMIT {delete_limit}
           ) s
           WHERE t.id = s.id
@@ -1662,10 +1663,8 @@ class FlowPathCount(SquashableModel):
         - Build up to `batch_size` distinct keys in memory
         - Execute the squash SQL per key
         """
-        from collections import OrderedDict
-        from django.db import connection
-
-        batch_size = cls.squash_batch_size or settings.SQUASH_BATCH_SIZE
+        start = time.time()
+        batch_size = settings.FLOW_PATH_COUNT_SQUASH_BATCH_SIZE
 
         # Pull a small window of candidate rows (ordered by id) and derive distinct keys client-side
         rows = list(
@@ -1675,26 +1674,25 @@ class FlowPathCount(SquashableModel):
         )
 
         distinct_keys = OrderedDict()
-        for r in rows:
-            # r is (flow_id, from_uuid, to_uuid, period)
-            distinct_keys.setdefault(r, None)
+        for flow_id, from_uuid, to_uuid, period in rows:
+            key = (flow_id, from_uuid, to_uuid, period.replace(minute=0, second=0, microsecond=0))
+            distinct_keys.setdefault(key, None)
             if len(distinct_keys) >= batch_size:
                 break
 
         if not distinct_keys:
             return
 
+        num_sets = 0
         with connection.cursor() as cursor:
             cursor.execute("SET application_name = 'flows_nokill';")
-            for (flow_id, from_uuid, to_uuid, period) in distinct_keys.keys():
-                # Build a light object carrying the attributes expected by get_squash_query
-                distinct_set = type(
-                    "_K",
-                    (),
-                    dict(flow_id=flow_id, from_uuid=from_uuid, to_uuid=to_uuid, period=period),
-                )
+            for flow_id, from_uuid, to_uuid, period in distinct_keys.keys():
+                distinct_set = SimpleNamespace(flow_id=flow_id, from_uuid=from_uuid, to_uuid=to_uuid, period=period)
                 sql, params = cls.get_squash_query(distinct_set)
                 cursor.execute(sql, params)
+                num_sets += 1
+
+        logger.info("Squashed %d distinct sets of %s in %0.3fs" % (num_sets, cls.__name__, time.time() - start))
 
     @classmethod
     def get_totals(cls, flow):

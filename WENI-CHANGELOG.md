@@ -2,6 +2,15 @@
 ----------
 * fix: map project INACTIVE status to is_suspended instead of is_active to prevent contacts module failures
 * fix: harden contact list derive_group when org is unresolved or system groups are missing
+* feat: add ChannelMarketingTags functionality
+
+3.83.2
+----------
+* feat: enhance squash flowpathcount
+
+3.83.1
+----------
+* feat: extend InternalChannelView with billing dual auth and additive fields
 
 3.83.0
 ----------

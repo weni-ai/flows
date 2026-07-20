@@ -5,7 +5,6 @@ from typing import Optional
 
 import pyexcel
 from rest_framework import status
-from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
 from rest_framework.pagination import CursorPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -29,6 +28,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.decorators import method_decorator
 
+from temba.api.auth.billing import BillingFixedAccessTokenViewMixin
 from temba.api.auth.jwt import BaseJWTAuthentication, OptionalJWTAuthentication, RequiredJWTAuthentication
 from temba.api.v2.internals.contacts.serializers import (
     CleanContactFieldsSerializer,
@@ -67,17 +67,8 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-class InternalContactView(APIViewMixin, APIView):
+class InternalContactView(BillingFixedAccessTokenViewMixin, APIViewMixin, APIView):
     def post(self, request: Request):
-        params = request.query_params
-        token = params.get("token")
-
-        if token is None:
-            raise NotAuthenticated()
-
-        if token != settings.BILLING_FIXED_ACCESS_TOKEN:
-            raise AuthenticationFailed()
-
         serializer = InternalContactSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         contacts_uuids = serializer.validated_data.get("contacts")
