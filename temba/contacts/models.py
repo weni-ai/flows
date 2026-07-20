@@ -279,15 +279,6 @@ class URN:
         return display
 
     @classmethod
-    def _normalize_whatsapp_path(cls, norm_path, country_code):
-        # phone-based whatsapp URNs are stored as E.164 without the + prefix
-        if norm_path and norm_path[0] in "+0123456789":
-            norm_path = cls.normalize_number(norm_path, country_code)
-            if norm_path.startswith("+"):
-                norm_path = norm_path[1:]
-        return norm_path
-
-    @classmethod
     def _normalize_path_for_scheme(cls, scheme, norm_path, display, country_code):
         if scheme == cls.TEL_SCHEME:
             return cls.normalize_number(norm_path, country_code), display
@@ -297,8 +288,6 @@ class URN:
             return norm_path, cls._normalize_twitterid_display(display)
         if scheme == cls.EMAIL_SCHEME:
             return norm_path.lower(), display
-        if scheme == cls.WHATSAPP_SCHEME:
-            return cls._normalize_whatsapp_path(norm_path, country_code), display
         return norm_path, display
 
     @classmethod
@@ -315,73 +304,35 @@ class URN:
         return cls.from_parts(scheme, norm_path, query, display)
 
     @classmethod
-    def _sanitize_number_digits(cls, number: str) -> str:
-        normalized = number.strip().lower()
-
-        if normalized.endswith("e+11") or normalized.endswith("e+12"):
-            normalized = normalized[0:-4].replace(".", "")
-
-        return regex.sub(r"[^0-9a-z]", "", normalized, regex.V0)
-
-    @classmethod
-    def _number_parse_candidates(cls, number: str, normalized: str, country_code: str) -> list[str]:
-        if number.startswith("+"):
-            return ["+" + normalized]
-
-        candidates = []
-        has_international = len(normalized) >= 11 and not normalized.startswith("0")
-
-        if country_code and has_international:
-            calling_code = str(phonenumbers.country_code_for_region(country_code.upper()))
-            if calling_code and normalized.startswith(calling_code):
-                candidates.append("+" + normalized)
-
-        if country_code:
-            candidates.append(normalized)
-
-        if has_international:
-            international = "+" + normalized
-            if international not in candidates:
-                candidates.append(international)
-
-        return candidates or [normalized]
-
-    @classmethod
-    def _formatted_number_matches_country(
-        cls, formatted: str, parse_as: str, number: str, normalized: str, country_code: str
-    ) -> bool:
-        if not country_code or number.startswith("+"):
-            return True
-
-        # accept valid international numbers even when they don't match the org country
-        if parse_as == "+" + normalized:
-            return True
-
-        try:
-            parsed = phonenumbers.parse(formatted, None)
-            region = phonenumbers.region_code_for_number(parsed)
-            return region == country_code.upper()
-        except phonenumbers.NumberParseException:
-            return False
-
-    @classmethod
     def normalize_number(cls, number: str, country_code: str):
         """
         Normalizes the passed in number, they should be only digits, some backends prepend + and
         maybe crazy users put in dashes or parentheses in the console.
         """
-        normalized = cls._sanitize_number_digits(number)
 
-        for parse_as in cls._number_parse_candidates(number, normalized, country_code):
-            try:
-                formatted = parse_number(parse_as, country_code)
-            except ValueError:
-                continue
+        number = number.strip()
+        normalized = number.lower()
 
-            if cls._formatted_number_matches_country(formatted, parse_as, number, normalized, country_code):
-                return formatted
+        # if the number ends with e11, then that is Excel corrupting it, remove it
+        if normalized.endswith("e+11") or normalized.endswith("e+12"):
+            normalized = normalized[0:-4].replace(".", "")
 
-        return normalized
+        # remove non alphanumeric characters
+        normalized = regex.sub(r"[^0-9a-z]", "", normalized, regex.V0)
+
+        parse_as = normalized
+
+        # if we started with + prefix, or we have a sufficiently long number that doesn't start with 0, add + prefix
+        if number.startswith("+") or (len(normalized) >= 11 and not normalized.startswith("0")):
+            parse_as = "+" + normalized
+
+        try:
+            formatted = parse_number(parse_as, country_code)
+        except ValueError:
+            # if it's not a possible number, just return what we have minus the +
+            return normalized
+
+        return formatted
 
     @classmethod
     def identity(cls, urn):
@@ -453,7 +404,8 @@ class URN:
             return value
 
         if cls.looks_like_phone(value, country_code):
-            return cls.from_parts(default_phone_scheme, value)
+            phone = value.lstrip("+")
+            return cls.from_parts(default_phone_scheme, phone)
 
         raise ValueError("URN strings must contain scheme and path components")
 
@@ -2417,7 +2369,7 @@ class ContactImport(SmartModel):
             elif mapping["type"] == "scheme" and value:
                 urn = URN.from_parts(mapping["scheme"], value)
                 try:
-                    urn = URN.normalize(urn, country_code=org.default_country_code)
+                    urn = URN.normalize(urn)
                 except ValueError:
                     pass
                 urns.append(urn)

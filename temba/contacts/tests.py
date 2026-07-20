@@ -1406,11 +1406,6 @@ class ContactTest(TembaTest):
             {"name": "Ben Haggerty", "urn__whatsapp__0": "+250 783-835665"},
         )
         self.assertNoFormErrors(response)
-        ben = Contact.objects.get(name="Ben Haggerty")
-        self.assertEqual(
-            set(ben.urns.values_list("identity", flat=True)),
-            {"whatsapp:250783835665", "tel:+250783835665"},
-        )
 
         # repost with the phone number of an orphaned URN
         response = self.client.post(
@@ -5053,10 +5048,9 @@ class URNTest(TembaTest):
         # normalize preserves both formats
         self.assertEqual(URN.normalize("whatsapp:BR.35029025746744354"), "whatsapp:BR.35029025746744354")
         self.assertEqual(URN.normalize("whatsapp:12065551212"), "whatsapp:12065551212")
-        self.assertEqual(URN.normalize("whatsapp:+12065551212", "US"), "whatsapp:12065551212")
-        self.assertEqual(URN.normalize("whatsapp:0788 123 123", "RW"), "whatsapp:250788123123")
-        self.assertEqual(URN.normalize("whatsapp:11987654321", "BR"), "whatsapp:5511987654321")
-        self.assertEqual(URN.normalize("tel:11987654321", "BR"), "tel:+5511987654321")
+        self.assertEqual(URN.normalize("whatsapp:+12065551212", "US"), "whatsapp:+12065551212")
+        self.assertEqual(URN.normalize("whatsapp:86982810225", "BR"), "whatsapp:86982810225")
+        self.assertEqual(URN.normalize("tel:86982810225", "BR"), "tel:+86982810225")
 
         # format returns BSUID path as-is (no phone formatting)
         self.assertEqual(URN.format("whatsapp:BR.35029025746744354"), "BR.35029025746744354")
@@ -5066,8 +5060,8 @@ class URNTest(TembaTest):
         self.assertTrue(URN.is_phone_based_path("11987654321"))
         self.assertFalse(URN.is_phone_based_path("BR.35029025746744354"))
         self.assertEqual(
-            URN.paired_phone_urns("11987654321", "BR"),
-            ["whatsapp:5511987654321", "tel:+5511987654321"],
+            URN.paired_phone_urns("86982810225", "BR"),
+            ["whatsapp:86982810225", "tel:+86982810225"],
         )
         self.assertTrue(URN.looks_like_phone("+12065551212", "US"))
         self.assertTrue(URN.looks_like_phone("0788 123 123", "RW"))
@@ -5076,33 +5070,13 @@ class URNTest(TembaTest):
         self.assertFalse(URN.looks_like_phone("BR.35029025746744354"))
         self.assertFalse(URN.looks_like_phone("12345", "RW"))
 
-        self.assertEqual(URN.ensure_scheme("+12065551212", "US"), "whatsapp:+12065551212")
+        self.assertEqual(URN.ensure_scheme("+12065551212", "US"), "whatsapp:12065551212")
         self.assertEqual(URN.ensure_scheme("tel:+12065551212", "US"), "tel:+12065551212")
         self.assertEqual(URN.ensure_scheme("whatsapp:+12065551212", "US"), "whatsapp:+12065551212")
         self.assertEqual(URN.ensure_scheme("twitter:jean", "US"), "twitter:jean")
         self.assertRaises(ValueError, URN.ensure_scheme, "12345", "RW")
 
         self.assertEqual(URN.from_whatsapp("12065551212"), "whatsapp:12065551212")
-
-    def test_formatted_number_matches_country(self):
-        self.assertTrue(
-            URN._formatted_number_matches_country(
-                formatted="+250788383383",
-                parse_as="0788383383",
-                number="0788383383",
-                normalized="0788383383",
-                country_code="RW",
-            )
-        )
-        self.assertFalse(
-            URN._formatted_number_matches_country(
-                formatted="not-a-phone",
-                parse_as="12345",
-                number="12345",
-                normalized="12345",
-                country_code="RW",
-            )
-        )
 
     def test_freshchat_urn(self):
         self.assertTrue(
@@ -5655,7 +5629,7 @@ class ContactImportTest(TembaTest):
 
         spec = imp._row_to_spec(["0788 111 111", "Jean"])
 
-        self.assertEqual(["whatsapp:250788111111"], spec["urns"])
+        self.assertEqual(["whatsapp:0788 111 111"], spec["urns"])
         self.assertEqual("Jean", spec["name"])
 
     def test_row_to_spec_preserves_explicit_tel_mapping(self):
