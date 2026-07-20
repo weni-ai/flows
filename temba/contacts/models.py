@@ -279,15 +279,6 @@ class URN:
         return display
 
     @classmethod
-    def _normalize_whatsapp_path(cls, norm_path, country_code):
-        # phone-based whatsapp URNs are stored as E.164 without the + prefix
-        if norm_path and norm_path[0] in "+0123456789":
-            norm_path = cls.normalize_number(norm_path, country_code)
-            if norm_path.startswith("+"):
-                norm_path = norm_path[1:]
-        return norm_path
-
-    @classmethod
     def _normalize_path_for_scheme(cls, scheme, norm_path, display, country_code):
         if scheme == cls.TEL_SCHEME:
             return cls.normalize_number(norm_path, country_code), display
@@ -297,8 +288,6 @@ class URN:
             return norm_path, cls._normalize_twitterid_display(display)
         if scheme == cls.EMAIL_SCHEME:
             return norm_path.lower(), display
-        if scheme == cls.WHATSAPP_SCHEME:
-            return cls._normalize_whatsapp_path(norm_path, country_code), display
         return norm_path, display
 
     @classmethod
@@ -415,7 +404,8 @@ class URN:
             return value
 
         if cls.looks_like_phone(value, country_code):
-            return cls.from_parts(default_phone_scheme, value)
+            phone = value.lstrip("+")
+            return cls.from_parts(default_phone_scheme, phone)
 
         raise ValueError("URN strings must contain scheme and path components")
 
@@ -2379,7 +2369,7 @@ class ContactImport(SmartModel):
             elif mapping["type"] == "scheme" and value:
                 urn = URN.from_parts(mapping["scheme"], value)
                 try:
-                    urn = URN.normalize(urn, country_code=org.default_country_code)
+                    urn = URN.normalize(urn)
                 except ValueError:
                     pass
                 urns.append(urn)

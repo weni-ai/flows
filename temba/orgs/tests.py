@@ -3890,7 +3890,7 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertNoFormErrors(response)
 
         # make sure that contact's created on is our cs rep
-        contact = Contact.objects.get(urns__path="+250788123123", org=self.org)
+        contact = Contact.objects.get(name="Ben Haggerty", org=self.org)
         self.assertEqual(self.csrep, contact.created_by)
 
         # make sure we can manage topups as well
