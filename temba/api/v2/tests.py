@@ -82,27 +82,7 @@ from .serializers import (
 NUM_BASE_REQUEST_QUERIES = 6  # number of db queries required for any API request
 
 
-class APITest(TembaTest):
-    def setUp(self):
-        super().setUp()
-
-        self.joe = self.create_contact("Joe Blow", phone="0788123123")
-        self.frank = self.create_contact("Frank", urns=["twitter:franky"])
-
-        self.twitter = self.create_channel("TT", "Twitter Channel", "billy_bob")
-
-        self.hans = self.create_contact("Hans Gruber", phone="+4921551511", org=self.org2)
-
-        self.org2channel = self.create_channel("A", "Org2Channel", "123456", country="RW", org=self.org2)
-
-        # this is needed to prevent REST framework from rolling back transaction created around each unit test
-        connection.settings_dict["ATOMIC_REQUESTS"] = False
-
-    def tearDown(self):
-        super().tearDown()
-
-        connection.settings_dict["ATOMIC_REQUESTS"] = True
-
+class APIJSONMixin:
     def fetchHTML(self, url, query=None):
         if query:
             url += "?" + query
@@ -138,6 +118,28 @@ class APITest(TembaTest):
             url = url + "?" + query
 
         return self.client.delete(url, content_type="application/json", HTTP_X_FORWARDED_HTTPS="https")
+
+
+class APITest(APIJSONMixin, TembaTest):
+    def setUp(self):
+        super().setUp()
+
+        self.joe = self.create_contact("Joe Blow", phone="0788123123")
+        self.frank = self.create_contact("Frank", urns=["twitter:franky"])
+
+        self.twitter = self.create_channel("TT", "Twitter Channel", "billy_bob")
+
+        self.hans = self.create_contact("Hans Gruber", phone="+4921551511", org=self.org2)
+
+        self.org2channel = self.create_channel("A", "Org2Channel", "123456", country="RW", org=self.org2)
+
+        # this is needed to prevent REST framework from rolling back transaction created around each unit test
+        connection.settings_dict["ATOMIC_REQUESTS"] = False
+
+    def tearDown(self):
+        super().tearDown()
+
+        connection.settings_dict["ATOMIC_REQUESTS"] = True
 
     def assertEndpointAccess(self, url, query=None, fetch_returns=200):
         self.client.logout()
@@ -180,6 +182,28 @@ class APITest(TembaTest):
     def assertResultsByUUID(self, response, expected):
         self.assertEqual(response.status_code, 200)
         self.assertEqual([r["uuid"] for r in response.json()["results"]], [o.uuid for o in expected])
+
+    def assertFlowReadResponse(self, actual, flow, *, flow_type, archived, labels, expires, runs, results):
+        flow.refresh_from_db()
+        self.assertEqual(actual["uuid"], str(flow.uuid))
+        self.assertEqual(actual["name"], flow.name)
+        self.assertEqual(actual["type"], flow_type)
+        self.assertEqual(actual["archived"], archived)
+        self.assertEqual(actual["labels"], labels)
+        self.assertEqual(actual["expires"], expires)
+        self.assertEqual(actual["runs"], runs)
+        self.assertEqual(actual["parent_refs"], [])
+        self.assertEqual(actual["created_on"], format_datetime(flow.created_on))
+        self.assertEqual(actual["modified_on"], format_datetime(flow.modified_on))
+
+        self.assertEqual(len(actual["results"]), len(results))
+        for actual_result, expected_result in zip(actual["results"], results):
+            self.assertEqual(actual_result["key"], expected_result["key"])
+            self.assertEqual(actual_result["name"], expected_result["name"])
+            self.assertEqual(actual_result["categories"], expected_result["categories"])
+            self.assertTrue(actual_result["node_uuids"])
+            for node_uuid in actual_result["node_uuids"]:
+                self.assertRegex(node_uuid, matchers.UUID4_REGEX.pattern)
 
     def assertResponseError(self, response, field, expected_message, status_code=400):
         self.assertEqual(response.status_code, status_code)
@@ -3815,99 +3839,49 @@ class APITest(TembaTest):
         resp_json = response.json()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(resp_json["next"], None)
-        self.assertEqual(
-            resp_json["results"],
-            [
-                {
-                    "uuid": archived.uuid,
-                    "name": "Favorites",
-                    "type": "message",
-                    "archived": True,
-                    "labels": [],
-                    "expires": 720,
-                    "runs": {"active": 0, "completed": 0, "interrupted": 0, "expired": 0},
-                    "results": [
-                        {
-                            "key": "color",
-                            "name": "Color",
-                            "categories": ["Red", "Green", "Blue", "Cyan", "Other"],
-                            "node_uuids": [matchers.UUID4String()],
-                        },
-                        {
-                            "key": "beer",
-                            "name": "Beer",
-                            "categories": ["Mutzig", "Primus", "Turbo King", "Skol", "Other"],
-                            "node_uuids": [matchers.UUID4String()],
-                        },
-                        {
-                            "key": "name",
-                            "name": "Name",
-                            "categories": ["All Responses"],
-                            "node_uuids": [matchers.UUID4String()],
-                        },
-                    ],
-                    "parent_refs": [],
-                    "created_on": format_datetime(archived.created_on),
-                    "modified_on": format_datetime(archived.modified_on),
-                },
-                {
-                    "uuid": color.uuid,
-                    "name": "Color Flow",
-                    "type": "message",
-                    "archived": False,
-                    "labels": [{"uuid": reporting.uuid, "name": "Reporting"}],
-                    "expires": 10080,
-                    "runs": {"active": 0, "completed": 1, "interrupted": 0, "expired": 0},
-                    "results": [
-                        {
-                            "key": "color",
-                            "name": "color",
-                            "categories": ["Orange", "Blue", "Other", "Nothing"],
-                            "node_uuids": [matchers.UUID4String()],
-                        }
-                    ],
-                    "parent_refs": [],
-                    "created_on": format_datetime(color.created_on),
-                    "modified_on": format_datetime(color.modified_on),
-                },
-                {
-                    "uuid": survey.uuid,
-                    "name": "Media Survey",
-                    "type": "survey",
-                    "archived": False,
-                    "labels": [],
-                    "expires": 10080,
-                    "runs": {"active": 0, "completed": 0, "interrupted": 0, "expired": 0},
-                    "results": [
-                        {
-                            "key": "name",
-                            "name": "Name",
-                            "categories": ["All Responses"],
-                            "node_uuids": [matchers.UUID4String()],
-                        },
-                        {
-                            "key": "photo",
-                            "name": "Photo",
-                            "categories": ["All Responses"],
-                            "node_uuids": [matchers.UUID4String()],
-                        },
-                        {
-                            "key": "location",
-                            "name": "Location",
-                            "categories": ["All Responses"],
-                            "node_uuids": [matchers.UUID4String()],
-                        },
-                        {
-                            "key": "video",
-                            "name": "Video",
-                            "categories": ["All Responses"],
-                            "node_uuids": [matchers.UUID4String()],
-                        },
-                    ],
-                    "parent_refs": [],
-                    "created_on": format_datetime(survey.created_on),
-                    "modified_on": format_datetime(survey.modified_on),
-                },
+        self.assertResultsByUUID(response, [archived, color, survey])
+
+        by_uuid = {r["uuid"]: r for r in resp_json["results"]}
+
+        self.assertFlowReadResponse(
+            by_uuid[str(archived.uuid)],
+            archived,
+            flow_type="message",
+            archived=True,
+            labels=[],
+            expires=720,
+            runs={"active": 0, "completed": 0, "interrupted": 0, "expired": 0},
+            results=[
+                {"key": "color", "name": "Color", "categories": ["Red", "Green", "Blue", "Cyan", "Other"]},
+                {"key": "beer", "name": "Beer", "categories": ["Mutzig", "Primus", "Turbo King", "Skol", "Other"]},
+                {"key": "name", "name": "Name", "categories": ["All Responses"]},
+            ],
+        )
+        self.assertFlowReadResponse(
+            by_uuid[str(color.uuid)],
+            color,
+            flow_type="message",
+            archived=False,
+            labels=[{"uuid": str(reporting.uuid), "name": "Reporting"}],
+            expires=10080,
+            runs={"active": 0, "completed": 1, "interrupted": 0, "expired": 0},
+            results=[
+                {"key": "color", "name": "color", "categories": ["Orange", "Blue", "Other", "Nothing"]},
+            ],
+        )
+        self.assertFlowReadResponse(
+            by_uuid[str(survey.uuid)],
+            survey,
+            flow_type="survey",
+            archived=False,
+            labels=[],
+            expires=10080,
+            runs={"active": 0, "completed": 0, "interrupted": 0, "expired": 0},
+            results=[
+                {"key": "name", "name": "Name", "categories": ["All Responses"]},
+                {"key": "photo", "name": "Photo", "categories": ["All Responses"]},
+                {"key": "location", "name": "Location", "categories": ["All Responses"]},
+                {"key": "video", "name": "Video", "categories": ["All Responses"]},
             ],
         )
 
@@ -3935,6 +3909,8 @@ class APITest(TembaTest):
         # filter by labels
         response = self.fetchJSON(url, "labels=Reporting")
         self.assertResultsByUUID(response, [color])
+
+        color.refresh_from_db(fields=("modified_on",))
 
         # filter by before
         response = self.fetchJSON(url, "before=%s" % format_datetime(color.modified_on))
@@ -7402,7 +7378,7 @@ class EventsV2EndpointTest(APITest):
         self.assertEqual(call_kwargs["date_end"], "2025-10-08T23:59:59Z")
 
 
-class EventsGroupByCountEndpointTest(APITest):
+class EventsGroupByCountEndpointTest(APIJSONMixin, TembaTest):
     @patch("temba.api.v2.services.events.fetch_event_counts_for_org")
     def test_events_group_by_count_endpoint(self, mock_fetch_event_counts_for_org):
         url = reverse("api.v2.events_group_by")
