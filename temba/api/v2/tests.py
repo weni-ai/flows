@@ -354,7 +354,7 @@ class APITest(APIJSONMixin, TembaTest):
                 "tel:0788 123 123": "tel:+250788123123",  # using org country
                 "tel:(078) 812-3123": "tel:+250788123123",
                 "+250788123123": "whatsapp:250788123123",  # bare phone defaults to whatsapp
-                "0788 123 123": "whatsapp:250788123123",  # bare phone defaults to whatsapp
+                "0788 123 123": serializers.ValidationError,  # whatsapp paths are not tel-normalized
                 "whatsapp:6831234": serializers.ValidationError,  # too few digits
                 "12345": serializers.ValidationError,  # un-parseable
                 "tel:800-123-4567": serializers.ValidationError,  # no country code
@@ -2905,7 +2905,7 @@ class APITest(APIJSONMixin, TembaTest):
         whats_user = Contact.objects.get(name="WhatsUser")
         self.assertEqual(set(whats_user.urns.values_list("identity", flat=True)), {"whatsapp:250788999999"})
 
-        # bare brazilian numbers are normalized with country code 55
+        # bare local numbers default to whatsapp without country normalization
         self.org.timezone = "America/Sao_Paulo"
         self.org.save(update_fields=("timezone",))
         if "default_country" in self.org.__dict__:
@@ -2913,7 +2913,7 @@ class APITest(APIJSONMixin, TembaTest):
 
         response = self.postJSON(url, None, {"name": "BR User", "urns": ["11987654321"]})
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["urns"], ["whatsapp:5511987654321"])
+        self.assertEqual(response.json()["urns"], ["whatsapp:11987654321"])
 
         # restore default org country for subsequent tests in this method
         self.org.timezone = "Africa/Kigali"
