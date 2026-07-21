@@ -1,19 +1,11 @@
 <!--
   SYNC IMPACT REPORT
   ==================
-  Version change: 0.0.0 → 1.0.0 (Initial adoption)
+  Version change: 1.0.0 → 1.1.0 (Pre-commit lint gate)
   Modified principles:
-    - Added I. Django/Temba Channel Type Conventions
-    - Added II. API & Integration Contract Discipline
-    - Added III. Secrets, Security & Least Privilege
-    - Added IV. Test-First Quality Gates
-    - Added V. Observability & Operational Resilience
-    - Added VI. Fidelity to the Product Spec
-    - Added VII. Release & Migrations Alignment
+    - IV. Test-First Quality Gates (added pre-commit code_check requirement)
   Added sections:
-    - Engineering Standards
-    - Delivery Workflow
-    - Governance
+    - Engineering Standards: Pre-Commit Code Quality
   Removed sections: None
   Templates requiring updates:
     - .specify/templates/plan-template.md ✅ verified (Constitution Check present)
@@ -84,6 +76,8 @@ APIs.
   `temba/channels/types/weniwebchat/tests.py`).
 - API changes MUST include view and use-case tests where applicable.
 - CI (`pytest`) MUST pass locally before code review and before merge.
+- Before every commit, developers MUST run the same formatting and lint
+  checks as CI (see **Pre-Commit Code Quality** below).
 - Bug fixes MUST include a regression test whenever technically feasible.
 
 ### V. Observability & Operational Resilience
@@ -128,6 +122,24 @@ Courier, Mailroom, and related components.
 
 ## Engineering Standards
 
+### Pre-Commit Code Quality
+
+Before committing and before opening a pull request, developers MUST run the
+repository code checks so CI does not fail on formatting or import order:
+
+```bash
+poetry run ./code_check.py
+```
+
+`code_check.py` runs, in order: `makemigrations`, `black`, `flake8`, and
+`isort` on `temba` and `locale`, then fails if `git diff` shows any changes.
+
+For staged Python files only, the repository also provides `pre-commit.sh`
+(isort, black, flake8 on the git index).
+
+Do NOT commit auto-generated migration files unless the model change is
+intentional and part of the same change set.
+
 - Python code MUST follow existing project formatting and lint conventions.
 - New channel types MUST mirror the structure and test coverage of a
   comparable existing type in `temba/channels/types/`.
@@ -171,4 +183,4 @@ it.
 - Reviewers MUST reject changes that bypass required tests or binding
   decisions.
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-21 | **Last Amended**: 2026-07-21
+**Version**: 1.1.0 | **Ratified**: 2026-07-21 | **Last Amended**: 2026-07-21

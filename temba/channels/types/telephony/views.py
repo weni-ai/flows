@@ -49,9 +49,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
                     raise forms.ValidationError(_("Invalid phone number"))
                 return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
             except Exception:
-                raise forms.ValidationError(
-                    _("Invalid phone number, include the country code (e.g. +15551234567)")
-                )
+                raise forms.ValidationError(_("Invalid phone number, include the country code (e.g. +15551234567)"))
 
     form_class = Form
 
