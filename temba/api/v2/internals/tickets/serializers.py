@@ -10,6 +10,7 @@ from temba.contacts.models import Contact, ContactURN
 from temba.orgs.models import Org
 from temba.tickets.models import Ticketer, Topic
 from temba.tickets.types.generic.type import GenericType
+from temba.tickets.types.wenichats.type import WeniChatsType
 
 User = get_user_model()
 
@@ -58,7 +59,7 @@ class CreateTicketerSerializer(serializers.Serializer):
 class OpenTicketSerializer(serializers.Serializer):
     project = serializers.UUIDField()
     ticketer = serializers.UUIDField()
-    topic = serializers.UUIDField()
+    topic = serializers.UUIDField(required=False, allow_null=True)
     contact = serializers.UUIDField(required=False, allow_null=True)
     contact_urn = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     assignee = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
@@ -82,10 +83,15 @@ class OpenTicketSerializer(serializers.Serializer):
         except Ticketer.DoesNotExist:
             raise serializers.ValidationError({"ticketer": "ticketer not found"})
 
-        try:
-            topic = Topic.objects.get(uuid=topic_uuid)
-        except Topic.DoesNotExist:
-            raise serializers.ValidationError({"topic": "topic not found"})
+        if topic_uuid is not None:
+            try:
+                topic = Topic.objects.get(uuid=topic_uuid)
+            except Topic.DoesNotExist:
+                raise serializers.ValidationError({"topic": "topic not found"})
+        elif ticketer.ticketer_type == WeniChatsType.slug:
+            raise serializers.ValidationError({"topic": "This field is required."})
+        else:
+            topic = org.default_ticket_topic
 
         if contact_uuid is not None:
             try:
