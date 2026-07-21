@@ -624,6 +624,49 @@ class OpenTicketTest(TembaTest):
 
         self.assertEqual(response.status_code, 200)
 
+    @patch.object(LambdaURLValidator, "protected_resource")
+    @patch("temba.mailroom.client.MailroomClient.ticket_open")
+    def test_open_ticket_wenichats_without_topic(self, mock_ticket_open, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/open_ticket"
+        body = {
+            "project": self.org.proj_uuid,
+            "ticketer": self.ticketer.uuid,
+            "contact": self.joe.uuid,
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("topic", response.data)
+        mock_ticket_open.assert_not_called()
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    @patch("temba.mailroom.client.MailroomClient.ticket_open")
+    def test_open_ticket_non_wenichats_without_topic(self, mock_ticket_open, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+        mock_ticket_open.return_value = self.ticket_open_return_value()
+
+        generic_ticketer = Ticketer.create(self.org, self.admin, "generic", "Generic Ticketer", {})
+
+        url = "/api/v2/internals/open_ticket"
+        body = {
+            "project": self.org.proj_uuid,
+            "ticketer": generic_ticketer.uuid,
+            "contact": self.joe.uuid,
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
+
+        mock_ticket_open.assert_called_once_with(
+            self.org.id,
+            self.joe.id,
+            generic_ticketer.id,
+            self.org.default_ticket_topic.id,
+            0,
+            "{}",
+        )
+        self.assertEqual(response.status_code, 200)
+
 
 class GetDepartmentsViewTest(TembaTest):
     @patch.object(LambdaURLValidator, "protected_resource")
