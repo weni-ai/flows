@@ -1414,6 +1414,7 @@ ORG_LIMIT_DEFAULTS = {
 SQUASH_BATCH_SIZE = int(os.environ.get("SQUASH_BATCH_SIZE", 5000))
 
 FLOW_CATEGORY_COUNT_SQUASH_BATCH_SIZE = int(os.environ.get("FLOW_CATEGORY_COUNT_SQUASH_BATCH_SIZE", 100))
+FLOW_PATH_COUNT_SQUASH_BATCH_SIZE = int(os.environ.get("FLOW_PATH_COUNT_SQUASH_BATCH_SIZE", 5000))
 
 # -----------------------------------------------------------------------------------
 # Data retention periods - tasks trim away data older than these settings
