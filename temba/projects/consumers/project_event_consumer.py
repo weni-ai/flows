@@ -130,7 +130,7 @@ class ProjectEventConsumer(EDAConsumer):
                 if org:
                     print(
                         f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid}) "
-                        f"status to {status} (is_active={org.is_active})"
+                        f"status to {status} (is_suspended={org.is_suspended})"
                     )
                 else:
                     print(f"[ProjectEventConsumer] - Project {project_uuid} not found for status update")

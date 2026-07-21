@@ -211,7 +211,16 @@ class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
         return self.derive_group()
 
     def derive_group(self):
-        return ContactGroup.all_groups.get(org=self.request.user.get_org(), group_type=self.system_group)
+        org = self.request.user.get_org()
+        if not org:
+            raise Http404()
+
+        try:
+            return ContactGroup.all_groups.get(org=org, group_type=self.system_group)
+        except ContactGroup.DoesNotExist:
+            if not org.all_groups(manager="system_groups").exists():
+                ContactGroup.create_system_groups(org)
+            return ContactGroup.all_groups.get(org=org, group_type=self.system_group)
 
     def derive_export_url(self):
         search = urlquote_plus(self.request.GET.get("search", ""))

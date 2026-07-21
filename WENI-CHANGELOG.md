@@ -1,3 +1,9 @@
+3.85.0
+----------
+* fix: map project INACTIVE status to is_suspended instead of is_active to prevent contacts module failures
+* feat: revert whatsapp and tel urns normalization for old stable state
+* feat: allow none topic on open ticket if is not wenichats
+
 3.84.0
 ----------
 * feat: add ChannelMarketingTags functionality
