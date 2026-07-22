@@ -1,3 +1,8 @@
+3.86.0
+----------
+* feat: add marketing_opt_in field to contact updates
+* feat: add request_contact_info to interaction_type in the WhatsappBroadcastsEndpoint documentation
+
 3.85.0
 ----------
 * fix: map project INACTIVE status to is_suspended instead of is_active to prevent contacts module failures
