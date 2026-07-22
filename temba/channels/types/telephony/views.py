@@ -4,6 +4,7 @@ from smartmin.views import SmartFormView
 from django import forms
 from django.utils.translation import ugettext_lazy as _
 
+from temba.contacts.models import URN
 from temba.utils.fields import ExternalURLField
 
 from ...models import Channel
@@ -24,7 +25,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
         )
         phone_number = forms.CharField(
             label=_("Telephone number (DID)"),
-            help_text=_("The inbound number callers dial, in E.164 format (e.g. +15551234567)"),
+            help_text=_("The inbound number callers dial, in E.164 format (e.g. +12065551212)"),
         )
         base_url = ExternalURLField(
             label=_("Voice gateway base URL"),
@@ -40,16 +41,19 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             number = self.cleaned_data["phone_number"]
             country = self.data.get("country")
 
+            normalized = URN.normalize_number(number, country)
+            if not URN.validate(URN.from_parts(URN.TEL_SCHEME, normalized), country):
+                raise forms.ValidationError(_("Invalid phone number"))
+
             try:
-                if number and number[0] != "+":
-                    parsed = phonenumbers.parse(number, country)
-                else:
-                    parsed = phonenumbers.parse(number, None)
-                if not phonenumbers.is_valid_number(parsed):
-                    raise forms.ValidationError(_("Invalid phone number"))
-                return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
-            except Exception:
-                raise forms.ValidationError(_("Invalid phone number, include the country code (e.g. +15551234567)"))
+                parsed = phonenumbers.parse(normalized, None)
+            except phonenumbers.NumberParseException:
+                raise forms.ValidationError(_("Invalid phone number"))
+
+            if not phonenumbers.is_valid_number(parsed):
+                raise forms.ValidationError(_("Invalid phone number"))
+
+            return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
 
     form_class = Form
 
