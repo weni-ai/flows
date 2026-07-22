@@ -10,6 +10,8 @@ from temba.utils.fields import ExternalURLField
 from ...models import Channel
 from ...views import ALL_COUNTRIES, ClaimViewMixin
 
+INVALID_PHONE_NUMBER = _("Invalid phone number")
+
 
 class ClaimView(ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
@@ -43,15 +45,15 @@ class ClaimView(ClaimViewMixin, SmartFormView):
 
             normalized = URN.normalize_number(number, country)
             if not URN.validate(URN.from_parts(URN.TEL_SCHEME, normalized), country):
-                raise forms.ValidationError(_("Invalid phone number"))
+                raise forms.ValidationError(INVALID_PHONE_NUMBER)
 
             try:
                 parsed = phonenumbers.parse(normalized, None)
             except phonenumbers.NumberParseException:
-                raise forms.ValidationError(_("Invalid phone number"))
+                raise forms.ValidationError(INVALID_PHONE_NUMBER)
 
             if not phonenumbers.is_valid_number(parsed):
-                raise forms.ValidationError(_("Invalid phone number"))
+                raise forms.ValidationError(INVALID_PHONE_NUMBER)
 
             return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
 
