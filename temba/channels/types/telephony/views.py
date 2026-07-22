@@ -40,11 +40,11 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             number = self.cleaned_data["phone_number"]
             country = self.data.get("country")
 
-            if number and not number.startswith("+"):
-                number = "+" + number
-
             try:
-                parsed = phonenumbers.parse(number, country)
+                if number and number[0] != "+":
+                    parsed = phonenumbers.parse(number, country)
+                else:
+                    parsed = phonenumbers.parse(number, None)
                 if not phonenumbers.is_valid_number(parsed):
                     raise forms.ValidationError(_("Invalid phone number"))
                 return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)

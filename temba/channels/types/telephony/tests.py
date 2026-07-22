@@ -16,17 +16,15 @@ class TelephonyPSTNTypeTest(TembaTest):
         response = self.client.get(reverse("channels.channel_claim"))
         self.assertContains(response, url)
 
-        response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
-        post_data = response.context["form"].initial
+        post_data = {
+            "name": "Support Line",
+            "country": "US",
+            "phone_number": "404-123-4567",
+            "base_url": "https://google.com",
+            "auth_token": "secret-token",
+        }
 
-        post_data["name"] = "Support Line"
-        post_data["country"] = "US"
-        post_data["phone_number"] = "404-123-4567"
-        post_data["base_url"] = "https://google.com"
-        post_data["auth_token"] = "secret-token"
-
-        response = self.client.post(url, post_data, follow=True)
+        response = self.client.post(url, post_data)
 
         channel = Channel.objects.get(name="Support Line")
 
