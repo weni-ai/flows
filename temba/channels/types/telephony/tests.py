@@ -23,7 +23,7 @@ class TelephonyPSTNTypeTest(TembaTest):
         post_data["name"] = "Support Line"
         post_data["country"] = "US"
         post_data["phone_number"] = "404-123-4567"
-        post_data["base_url"] = "https://gateway.example.com"
+        post_data["base_url"] = "https://google.com"
         post_data["auth_token"] = "secret-token"
 
         response = self.client.post(url, post_data, follow=True)
@@ -34,7 +34,7 @@ class TelephonyPSTNTypeTest(TembaTest):
         self.assertEqual("+14041234567", channel.address)
         self.assertEqual("US", channel.country)
         self.assertEqual(["tel"], channel.schemes)
-        self.assertEqual("https://gateway.example.com", channel.config[CONFIG_BASE_URL])
+        self.assertEqual("https://google.com", channel.config[CONFIG_BASE_URL])
         self.assertEqual("secret-token", channel.config[CONFIG_AUTH_TOKEN])
 
         read_url = reverse("channels.channel_read", args=[channel.uuid])
