@@ -40,9 +40,9 @@ class TelephonyPSTNType(ChannelType):
     )
 
     configuration_urls = (
-        dict(
-            label=_("Inbound voice receive URL"),
-            url="https://{{ channel.callback_domain }}{% url 'courier.tph' %}",
-            description=_("Gateway endpoint for inbound voice turns (POST JSON)."),
-        ),
+        {
+            "label": _("Inbound voice receive URL"),
+            "url": "https://{{ channel.callback_domain }}{% url 'courier.tph' %}",
+            "description": _("Gateway endpoint for inbound voice turns (POST JSON)."),
+        },
     )
