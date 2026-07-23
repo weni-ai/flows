@@ -9,7 +9,7 @@ from temba.tests.base import TembaTest
 class TestProjectConsumer(TembaTest):
     def _create_mock_message(self, body_dict):
         message = Mock()
-        message.body = json.dumps(body_dict, default=str)
+        message.body = json.dumps(body_dict, default=str).encode()
         message.channel = Mock()
         message.delivery_tag = "test-delivery-tag"
         return message
