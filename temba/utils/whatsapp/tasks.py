@@ -123,12 +123,25 @@ def update_template_status(value, template):
         return True
 
 
+def update_template_category(value, template_id):
+    """Updates a template's category based on a completed category change webhook."""
+    previous_category = value.get("previous_category")
+    if not previous_category:
+        return
+
+    new_category = value.get("new_category")
+    template_object = Template.objects.get(id=template_id)
+    template_object.category = new_category
+    template_object.modified_on = timezone.now()
+    template_object.save(update_fields=["category", "modified_on"])
+
+
 def process_event(field, value, template):
     if field == "message_template_status_update":
         update_template_status(value, template)
 
     elif field == "template_category_update":
-        pass
+        update_template_category(value, template)
 
     elif field == "message_template_quality_update":
         pass
@@ -137,6 +150,7 @@ def process_event(field, value, template):
 def update_template_sync(template_id, webhook):
     allowed_event_types = [
         "message_template_status_update",
+        "template_category_update",
     ]
 
     for entry in webhook["entry"]:
