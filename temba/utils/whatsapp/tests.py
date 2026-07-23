@@ -30,6 +30,7 @@ from .tasks import (
     update_local_products_non_vtex,
     update_local_products_vtex_task,
     update_local_templates,
+    update_template_category,
 )
 
 
@@ -38,6 +39,37 @@ class WhatsAppUtilsTest(TembaTest):
         self.assertEqual(2, _calculate_variable_count("Hi {{1}} how are you? {{2}}"))
         self.assertEqual(2, _calculate_variable_count("Hi {{1}} how are you? {{2}} {{1}}"))
         self.assertEqual(0, _calculate_variable_count("Hi there."))
+
+    def test_update_template_category_updates_when_previous_category_present(self):
+        template = Template.objects.create(
+            org=self.org,
+            name="order_update",
+            category="AUTHENTICATION",
+        )
+        modified_before = template.modified_on
+
+        update_template_category(
+            {"previous_category": "AUTHENTICATION", "new_category": "MARKETING"},
+            template.id,
+        )
+
+        template.refresh_from_db()
+        self.assertEqual("MARKETING", template.category)
+        self.assertGreater(template.modified_on, modified_before)
+
+    def test_update_template_category_skips_when_previous_category_missing(self):
+        template = Template.objects.create(
+            org=self.org,
+            name="order_update",
+            category="AUTHENTICATION",
+        )
+        modified_before = template.modified_on
+
+        update_template_category({"new_category": "MARKETING"}, template.id)
+
+        template.refresh_from_db()
+        self.assertEqual("AUTHENTICATION", template.category)
+        self.assertEqual(modified_before, template.modified_on)
 
     def test_update_local_templates_whatsapp(self):
         # channel has namespace in the channel config
