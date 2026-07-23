@@ -29,10 +29,10 @@ class TestProjectEventConsumer(TembaTest):
         self.project_uuid = str(self.test_org.proj_uuid)
 
     def _create_mock_message(self, body_dict):
-        """Helper to create a mock AMQP message"""
+        """Helper to create a mock AMQP message for EDAConsumer.handle"""
         message = Mock()
-        # ensure we can serialize UUIDs etc in test payloads
-        message.body = json.dumps(body_dict, default=str)
+        # ensure we can serialize UUIDs etc in test payloads; body must be bytes
+        message.body = json.dumps(body_dict, default=str).encode()
         message.channel = Mock()
         message.delivery_tag = "test-delivery-tag"
         return message
@@ -377,7 +377,7 @@ class TestProjectEventConsumer(TembaTest):
     def test_consume_invalid_json_rejects_message(self):
         """Test that invalid JSON in message body causes rejection"""
         message = Mock()
-        message.body = "invalid json {{"
+        message.body = b"invalid json {{"
         message.channel = Mock()
         message.delivery_tag = "test-delivery-tag"
 

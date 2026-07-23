@@ -1547,9 +1547,7 @@ if USE_EDA:
     if _eda_connection_backend:
         EDA_CONNECTION_BACKEND = _eda_connection_backend
 
-    EDA_CONSUMERS_HANDLE = os.environ.get(
-        "EDA_CONSUMERS_HANDLE", "temba.event_driven.handle.handle_consumers"
-    )
+    EDA_CONSUMERS_HANDLE = os.environ.get("EDA_CONSUMERS_HANDLE", "temba.event_driven.handle.handle_consumers")
 
     EDA_BROKER_HOST = os.environ.get("EDA_BROKER_HOST", "localhost")
     EDA_VIRTUAL_HOST = os.environ.get("EDA_VIRTUAL_HOST", "/")
