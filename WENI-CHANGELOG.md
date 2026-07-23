@@ -1,3 +1,7 @@
+3.87.0
+----------
+* feat: implement template category update functionality in WhatsApp tasks
+
 3.86.1
 ----------
 * Add classifier, flow, global, and ticket permissions to Marketing group
