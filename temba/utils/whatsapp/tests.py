@@ -31,6 +31,8 @@ from .tasks import (
     update_local_products_vtex_task,
     update_local_templates,
     update_template_category,
+    update_template_sync,
+    process_event,
 )
 
 
@@ -70,6 +72,106 @@ class WhatsAppUtilsTest(TembaTest):
         template.refresh_from_db()
         self.assertEqual("AUTHENTICATION", template.category)
         self.assertEqual(modified_before, template.modified_on)
+
+    def test_process_event_message_template_status_update(self):
+        tt = TemplateTranslation.get_or_create(
+            self.channel,
+            "status_tpl",
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "status-ext-1",
+            "",
+            "UTILITY",
+        )
+
+        process_event(
+            "message_template_status_update",
+            {"message_template_id": "status-ext-1", "event": "APPROVED"},
+            tt.template_id,
+        )
+
+        tt.refresh_from_db()
+        self.assertEqual(TemplateTranslation.STATUS_APPROVED, tt.status)
+
+    def test_process_event_template_category_update(self):
+        template = Template.objects.create(
+            org=self.org,
+            name="cat_tpl",
+            category="UTILITY",
+        )
+
+        process_event(
+            "template_category_update",
+            {"previous_category": "UTILITY", "new_category": "MARKETING"},
+            template.id,
+        )
+
+        template.refresh_from_db()
+        self.assertEqual("MARKETING", template.category)
+
+    def test_process_event_message_template_quality_update(self):
+        process_event("message_template_quality_update", {"score": "GREEN"}, 1)
+
+    @patch("temba.utils.whatsapp.tasks.process_event")
+    def test_update_template_sync_calls_process_event_for_allowed_fields(self, mock_process_event):
+        template = Template.objects.create(org=self.org, name="sync_tpl", category="UTILITY")
+        webhook = {
+            "entry": [
+                {
+                    "changes": [
+                        {
+                            "field": "message_template_status_update",
+                            "value": {"message_template_id": "1", "event": "APPROVED"},
+                        },
+                        {
+                            "field": "template_category_update",
+                            "value": {
+                                "previous_category": "UTILITY",
+                                "new_category": "MARKETING",
+                            },
+                        },
+                        {
+                            "field": "message_template_quality_update",
+                            "value": {"score": "GREEN"},
+                        },
+                    ]
+                }
+            ]
+        }
+
+        update_template_sync(template.id, webhook)
+
+        self.assertEqual(2, mock_process_event.call_count)
+        mock_process_event.assert_any_call(
+            "message_template_status_update",
+            {"message_template_id": "1", "event": "APPROVED"},
+            template.id,
+        )
+        mock_process_event.assert_any_call(
+            "template_category_update",
+            {"previous_category": "UTILITY", "new_category": "MARKETING"},
+            template.id,
+        )
+
+    @patch("temba.utils.whatsapp.tasks.logger")
+    def test_update_template_sync_logs_unmapped_event(self, mock_logger):
+        template = Template.objects.create(org=self.org, name="sync_tpl", category="UTILITY")
+        webhook = {
+            "entry": [
+                {
+                    "changes": [
+                        {"field": "phone_number_name_update", "value": {}},
+                    ]
+                }
+            ]
+        }
+
+        update_template_sync(template.id, webhook)
+
+        mock_logger.info.assert_called_once_with("Event: phone_number_name_update, not mapped to usage")
 
     def test_update_local_templates_whatsapp(self):
         # channel has namespace in the channel config
