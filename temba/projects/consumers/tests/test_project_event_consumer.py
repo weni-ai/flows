@@ -3,6 +3,7 @@ import uuid
 from unittest.mock import Mock, patch
 
 import pytz
+from weni.eda.messages import Message
 
 from django.conf import settings
 
@@ -28,14 +29,17 @@ class TestProjectEventConsumer(TembaTest):
         )
         self.project_uuid = str(self.test_org.proj_uuid)
 
-    def _create_mock_message(self, body_dict):
-        """Helper to create a mock AMQP message for EDAConsumer.handle"""
-        message = Mock()
-        # ensure we can serialize UUIDs etc in test payloads; body must be bytes
-        message.body = json.dumps(body_dict, default=str).encode()
-        message.channel = Mock()
-        message.delivery_tag = "test-delivery-tag"
-        return message
+    def _create_message(self, body_dict):
+        """Build a weni.eda Message without going through handle() (avoids close_old_connections)."""
+        channel = Mock()
+        message = Message(
+            body=json.dumps(body_dict, default=str).encode(),
+            delivery_tag="test-delivery-tag",
+            channel=channel,
+        )
+        # Required so consumer.ack() can delegate to the channel
+        self.consumer._message = message
+        return message, channel
 
     def test_consume_update_action_successfully(self):
         """Test consuming an update action message"""
@@ -48,14 +52,12 @@ class TestProjectEventConsumer(TembaTest):
             "language": "pt-br",
             "timezone": "America/Sao_Paulo",
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
-        self.consumer.handle(message)
+        self.consumer.consume(message)
 
-        # Verify message was acknowledged
-        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
+        channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
-        # Verify project was updated
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
         self.assertEqual(reloaded_org.name, "Updated Org Name")
         self.assertEqual(reloaded_org.config["description"], "Updated description")
@@ -70,16 +72,16 @@ class TestProjectEventConsumer(TembaTest):
             "action": "updated",
             "name": "Any Name",
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
         with patch(
             "temba.projects.consumers.project_event_consumer.update_project_config",
             return_value=None,
         ):
-            self.consumer.handle(message)
+            self.consumer.consume(message)
 
-        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
-        message.channel.basic_reject.assert_not_called()
+        channel.basic_ack.assert_called_once_with(message.delivery_tag)
+        channel.basic_reject.assert_not_called()
 
     def test_consume_delete_action_successfully(self):
         """Test consuming a delete action message"""
@@ -88,16 +90,14 @@ class TestProjectEventConsumer(TembaTest):
             "user_email": self.user.email,
             "action": "deleted",
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
         self.assertTrue(self.test_org.is_active)
 
-        self.consumer.handle(message)
+        self.consumer.consume(message)
 
-        # Verify message was acknowledged
-        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
+        channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
-        # Verify project was deleted (soft delete)
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
         self.assertFalse(reloaded_org.is_active)
         self.assertIsNotNone(reloaded_org.released_on)
@@ -110,16 +110,14 @@ class TestProjectEventConsumer(TembaTest):
             "action": "status_updated",
             "status": "INACTIVE",
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
         self.assertTrue(self.test_org.is_active)
 
-        self.consumer.handle(message)
+        self.consumer.consume(message)
 
-        # Verify message was acknowledged
-        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
+        channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
-        # Verify project status was updated
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
         self.assertTrue(reloaded_org.is_suspended)
         self.assertTrue(reloaded_org.is_active)
@@ -135,11 +133,11 @@ class TestProjectEventConsumer(TembaTest):
             "action": "status_updated",
             "status": "ACTIVE",
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
-        self.consumer.handle(message)
+        self.consumer.consume(message)
 
-        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
+        channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
         self.assertFalse(reloaded_org.is_suspended)
@@ -153,11 +151,11 @@ class TestProjectEventConsumer(TembaTest):
             "action": "project_type_update",
             "is_multi_agents": True,
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
-        self.consumer.handle(message)
+        self.consumer.consume(message)
 
-        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
+        channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
         self.assertTrue(reloaded_org.config.get("is_multi_agents"))
@@ -170,16 +168,16 @@ class TestProjectEventConsumer(TembaTest):
             "action": "project_type_update",
             "is_multi_agents": True,
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
         with patch(
             "temba.projects.consumers.project_event_consumer.update_project_type",
             return_value=None,
         ):
-            self.consumer.handle(message)
+            self.consumer.consume(message)
 
-        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
-        message.channel.basic_reject.assert_not_called()
+        channel.basic_ack.assert_called_once_with(message.delivery_tag)
+        channel.basic_reject.assert_not_called()
 
     def test_consume_status_updated_to_in_test(self):
         """Test consuming a status_updated action to IN_TEST"""
@@ -192,116 +190,112 @@ class TestProjectEventConsumer(TembaTest):
             "action": "status_updated",
             "status": "IN_TEST",
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
-        self.consumer.handle(message)
+        self.consumer.consume(message)
 
-        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
+        channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
         self.assertFalse(reloaded_org.is_suspended)
         self.assertTrue(reloaded_org.is_active)
 
-    def test_consume_missing_project_uuid_rejects_message(self):
-        """Test that missing project_uuid causes message rejection"""
+    def test_consume_missing_project_uuid_raises(self):
+        """Test that missing project_uuid raises and is captured"""
         body = {
             "user_email": self.user.email,
             "action": "updated",
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.handle(message)
+            with self.assertRaises(ValueError):
+                self.consumer.consume(message)
 
-            # Verify message was rejected
-            message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
-            message.channel.basic_ack.assert_not_called()
-
-            # Verify exception was captured
+            channel.basic_ack.assert_not_called()
             mock_capture.assert_called_once()
 
-    def test_consume_missing_action_rejects_message(self):
-        """Test that missing action causes message rejection"""
+    def test_consume_missing_action_raises(self):
+        """Test that missing action raises and is captured"""
         body = {
             "project_uuid": self.project_uuid,
             "user_email": self.user.email,
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.handle(message)
+            with self.assertRaises(ValueError):
+                self.consumer.consume(message)
 
-            message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
-            message.channel.basic_ack.assert_not_called()
+            channel.basic_ack.assert_not_called()
             mock_capture.assert_called_once()
 
-    def test_consume_missing_user_email_rejects_message(self):
-        """Test that missing user_email causes message rejection"""
+    def test_consume_missing_user_email_raises(self):
+        """Test that missing user_email raises and is captured"""
         body = {
             "project_uuid": self.project_uuid,
             "action": "updated",
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.handle(message)
+            with self.assertRaises(ValueError):
+                self.consumer.consume(message)
 
-            message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
-            message.channel.basic_ack.assert_not_called()
+            channel.basic_ack.assert_not_called()
             mock_capture.assert_called_once()
 
-    def test_consume_invalid_action_rejects_message(self):
-        """Test that invalid action causes message rejection"""
+    def test_consume_invalid_action_raises(self):
+        """Test that invalid action raises and is captured"""
         body = {
             "project_uuid": self.project_uuid,
             "user_email": self.user.email,
             "action": "invalid_action",
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.handle(message)
+            with self.assertRaises(ValueError):
+                self.consumer.consume(message)
 
-            message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
-            message.channel.basic_ack.assert_not_called()
+            channel.basic_ack.assert_not_called()
             mock_capture.assert_called_once()
 
-    def test_consume_status_updated_missing_status_rejects_message(self):
-        """Test that status_updated action without status field rejects message"""
+    def test_consume_status_updated_missing_status_raises(self):
+        """Test that status_updated action without status field raises"""
         body = {
             "project_uuid": self.project_uuid,
             "user_email": self.user.email,
             "action": "status_updated",
-            # Missing "status" field
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.handle(message)
+            with self.assertRaises(ValueError):
+                self.consumer.consume(message)
 
-            message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
-            message.channel.basic_ack.assert_not_called()
+            channel.basic_ack.assert_not_called()
             mock_capture.assert_called_once()
 
-    def test_consume_status_updated_invalid_status_rejects_message(self):
-        """Test that status_updated action with invalid status rejects message"""
+    def test_consume_status_updated_invalid_status_raises(self):
+        """Test that status_updated action with invalid status raises"""
         body = {
             "project_uuid": self.project_uuid,
             "user_email": self.user.email,
             "action": "status_updated",
             "status": "INVALID_STATUS",
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.handle(message)
+            with self.assertRaises(ValueError):
+                self.consumer.consume(message)
 
-            message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
-            message.channel.basic_ack.assert_not_called()
+            channel.basic_ack.assert_not_called()
             mock_capture.assert_called_once()
 
-    def test_consume_nonexistent_project_for_update_acknowledges(self):
-        """Test that updating a non-existent project still acknowledges the message"""
+    def test_consume_nonexistent_project_for_update_raises(self):
+        """Test that updating a non-existent project raises Org.DoesNotExist"""
         fake_uuid = str(uuid.uuid4())
         body = {
             "project_uuid": fake_uuid,
@@ -309,13 +303,13 @@ class TestProjectEventConsumer(TembaTest):
             "action": "updated",
             "name": "New Name",
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.handle(message)
+            with self.assertRaises(Org.DoesNotExist):
+                self.consumer.consume(message)
 
-            # Should reject because Org.DoesNotExist is raised
-            message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
+            channel.basic_ack.assert_not_called()
             mock_capture.assert_called_once()
 
     def test_consume_nonexistent_project_for_delete_acknowledges(self):
@@ -326,13 +320,12 @@ class TestProjectEventConsumer(TembaTest):
             "user_email": self.user.email,
             "action": "deleted",
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
-        self.consumer.handle(message)
+        self.consumer.consume(message)
 
-        # Should acknowledge even though project doesn't exist
-        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
-        message.channel.basic_reject.assert_not_called()
+        channel.basic_ack.assert_called_once_with(message.delivery_tag)
+        channel.basic_reject.assert_not_called()
 
     def test_consume_nonexistent_project_for_status_update_acknowledges(self):
         """Test that status updating a non-existent project still acknowledges the message"""
@@ -343,13 +336,12 @@ class TestProjectEventConsumer(TembaTest):
             "action": "status_updated",
             "status": "ACTIVE",
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
-        self.consumer.handle(message)
+        self.consumer.consume(message)
 
-        # Should acknowledge even though project doesn't exist
-        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
-        message.channel.basic_reject.assert_not_called()
+        channel.basic_ack.assert_called_once_with(message.delivery_tag)
+        channel.basic_reject.assert_not_called()
 
     def test_consume_update_partial_fields(self):
         """Test updating only some fields"""
@@ -358,34 +350,32 @@ class TestProjectEventConsumer(TembaTest):
             "user_email": self.user.email,
             "action": "updated",
             "name": "Only Name Updated",
-            # description and language not provided
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
         original_description = self.test_org.config["description"]
         original_language = self.test_org.language
 
-        self.consumer.handle(message)
+        self.consumer.consume(message)
 
-        message.channel.basic_ack.assert_called_once_with(message.delivery_tag)
+        channel.basic_ack.assert_called_once_with(message.delivery_tag)
 
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
         self.assertEqual(reloaded_org.name, "Only Name Updated")
         self.assertEqual(reloaded_org.config["description"], original_description)
         self.assertEqual(reloaded_org.language, original_language)
 
-    def test_consume_invalid_json_rejects_message(self):
-        """Test that invalid JSON in message body causes rejection"""
-        message = Mock()
-        message.body = b"invalid json {{"
-        message.channel = Mock()
-        message.delivery_tag = "test-delivery-tag"
+    def test_consume_invalid_json_raises(self):
+        """Test that invalid JSON in message body raises and is captured"""
+        channel = Mock()
+        message = Message(body=b"invalid json {{", delivery_tag="test-delivery-tag", channel=channel)
+        self.consumer._message = message
 
         with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-            self.consumer.handle(message)
+            with self.assertRaises(Exception):
+                self.consumer.consume(message)
 
-            message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
-            message.channel.basic_ack.assert_not_called()
+            channel.basic_ack.assert_not_called()
             mock_capture.assert_called_once()
 
     def test_validate_message_with_all_valid_actions(self):
@@ -402,7 +392,6 @@ class TestProjectEventConsumer(TembaTest):
             if action == "status_updated":
                 body["status"] = "ACTIVE"
 
-            # Should not raise any exception
             try:
                 self.consumer._validate_message(body)
             except ValueError:
@@ -420,7 +409,6 @@ class TestProjectEventConsumer(TembaTest):
                 "status": status,
             }
 
-            # Should not raise any exception
             try:
                 self.consumer._validate_message(body)
             except ValueError:
@@ -440,22 +428,22 @@ class TestProjectEventConsumer(TembaTest):
                 body,
             )
 
-    def test_process_event_with_exception_in_usecase_rejects_message(self):
-        """Test that exceptions in usecases are properly handled"""
+    def test_process_event_with_exception_in_usecase_raises(self):
+        """Test that exceptions in usecases are captured and re-raised"""
         body = {
             "project_uuid": self.project_uuid,
             "user_email": self.user.email,
             "action": "updated",
             "name": "New Name",
         }
-        message = self._create_mock_message(body)
+        message, channel = self._create_message(body)
 
         with patch("temba.projects.consumers.project_event_consumer.update_project_config") as mock_update:
             mock_update.side_effect = Exception("Database error")
 
             with patch("temba.projects.consumers.project_event_consumer.capture_exception") as mock_capture:
-                self.consumer.handle(message)
+                with self.assertRaises(Exception):
+                    self.consumer.consume(message)
 
-                message.channel.basic_reject.assert_called_once_with(message.delivery_tag, requeue=False)
-                message.channel.basic_ack.assert_not_called()
+                channel.basic_ack.assert_not_called()
                 mock_capture.assert_called_once()
