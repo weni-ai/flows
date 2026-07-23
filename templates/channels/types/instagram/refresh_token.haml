@@ -10,6 +10,10 @@
 
 -block form
   .mt-4.card
+    -if form.non_field_errors
+      .alert-error.my-4
+        {{ form.non_field_errors }}
+
     #fb-channel-error.mb-4(style="display:none;")
       %p
         -trans "Error reconnecting Instagram Business Account. Please retry"

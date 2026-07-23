@@ -5,10 +5,12 @@ from sentry_sdk import capture_message
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from temba.api.v2.internals.helpers import get_object_or_404
 from temba.channels.models import Channel
 from temba.contacts.models import Contact, ContactField, ContactURN
+from temba.contacts.validators import clean_contact_name
 from temba.orgs.models import Org
 
 User = get_user_model()
@@ -16,20 +18,23 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 # Keys that update_contacts_fields may auto-create as text user fields when missing (org under field limit).
-FALLBACK_AUTO_CREATE_CONTACT_FIELD_KEYS = frozenset({"segment", "orderform", "email", "session", "vtex_account"})
+FALLBACK_AUTO_CREATE_CONTACT_FIELD_KEYS = frozenset(
+    {"segment", "orderform", "email", "session", "vtex_account", "marketing_opt_in"}
+)
 FALLBACK_AUTO_CREATE_CONTACT_FIELD_LABELS = {
     "segment": "segment",
     "orderform": "orderform",
     "email": "email",
     "session": "session",
     "vtex_account": "vtex_account",
+    "marketing_opt_in": "marketing_opt_in",
 }
 
 
 def _resolve_contact_field_for_update(org, user, raw_key):
     """
     Resolve a ContactField for PATCH update_contacts_fields. Unknown keys are ignored unless they are
-    segment, orderform, email, session or vtex_account: then we create a text field if missing and the org is under its field limit.
+    segment, orderform, email, session, vtex_account or marketing_opt_in: then we create a text field if missing and the org is under its field limit.
     """
     canonical = raw_key.lower()
     field = ContactField.user_fields.active_for_org(org=org).filter(key=raw_key).first()
@@ -89,6 +94,13 @@ class InternalContactFieldsValuesSerializer(serializers.Serializer):
     def validate_contact_fields(self, value):
         if not value:
             raise serializers.ValidationError("contact_fields must not be an empty dictionary")
+
+        if "name" in value:
+            try:
+                value["name"] = clean_contact_name(value["name"])
+            except DjangoValidationError as e:
+                raise serializers.ValidationError({"name": e.messages})
+
         return value
 
     def update(self, instance, validated_data):

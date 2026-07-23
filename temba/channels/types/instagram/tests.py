@@ -155,6 +155,7 @@ class InstagramTypeTest(TembaTest):
             MockResponse(
                 200, json.dumps({"paging": {}, "data": [{"id": "2", "access_token": "", "name": "pagina2"}]})
             ),
+            MockResponse(200, json.dumps({"data": {"is_valid": True}})),
         ]
 
         response = self.client.get(url)
@@ -179,7 +180,13 @@ class InstagramTypeTest(TembaTest):
         post_data["fb_user_id"] = "098765"
         post_data["user_access_token"] = token
 
-        response = self.client.post(url, post_data, follow=True)
+        response = self.client.post(url, post_data)
+
+        self.assertEqual(
+            response.context["form"].errors["__all__"][0],
+            "Unable to refresh the token because this Facebook user doesn't have permission "
+            "on the linked page. Check that you are still an admin on that page and try again.",
+        )
 
     @override_settings(FACEBOOK_APPLICATION_ID="FB_APP_ID", FACEBOOK_APPLICATION_SECRET="FB_APP_SECRET")
     @patch("requests.post")
@@ -371,3 +378,57 @@ class InstagramTypeTest(TembaTest):
             self.client.post(url, post_data, follow=True)
 
         self.assertEqual(str(context.exception), "Failed to get channel page ID")
+
+    @override_settings(FACEBOOK_APPLICATION_ID="FB_APP_ID", FACEBOOK_APPLICATION_SECRET="FB_APP_SECRET")
+    @patch("requests.post")
+    @patch("requests.get")
+    def test_refresh_token_without_page_permission(self, mock_get, mock_post):
+        token = "x" * 200
+        url = reverse("channels.types.instagram.refresh_token", args=(self.channel.uuid,))
+
+        self.login(self.admin)
+
+        mock_get.side_effect = [
+            MockResponse(200, json.dumps({"data": {"is_valid": True}})),
+            MockResponse(200, json.dumps({"access_token": self.long_life_page_token})),
+            MockResponse(200, json.dumps({"data": []})),
+            MockResponse(200, json.dumps({"data": {"is_valid": True}})),
+        ]
+
+        response = self.client.get(url)
+        post_data = response.context["form"].initial
+        post_data["fb_user_id"] = "098765"
+        post_data["user_access_token"] = token
+
+        response = self.client.post(url, post_data)
+
+        self.assertEqual(
+            response.context["form"].errors["__all__"][0],
+            "Unable to refresh the token because this Facebook user doesn't have permission "
+            "on the linked page. Check that you are still an admin on that page and try again.",
+        )
+
+    @override_settings(FACEBOOK_APPLICATION_ID="FB_APP_ID", FACEBOOK_APPLICATION_SECRET="FB_APP_SECRET")
+    @patch("requests.post")
+    @patch("requests.get")
+    def test_claim_without_page_permission(self, mock_get, mock_post):
+        mock_get.side_effect = [
+            MockResponse(200, json.dumps({"access_token": self.long_life_page_token})),
+            MockResponse(200, json.dumps({"data": []})),
+        ]
+
+        url = reverse("channels.types.instagram.claim")
+        self.login(self.admin)
+
+        response = self.client.get(url)
+        post_data = response.context["form"].initial
+        post_data["fb_user_id"] = "098765"
+        post_data["user_access_token"] = self.token
+        post_data["page_id"] = "123456"
+        post_data["page_name"] = "Temba"
+
+        response = self.client.post(url, post_data, follow=True)
+        self.assertEqual(
+            response.context["form"].errors["__all__"][0],
+            "Sorry your Instagram channel could not be connected. Please try again",
+        )

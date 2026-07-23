@@ -13,6 +13,7 @@ from django.shortcuts import get_object_or_404
 
 from temba import mailroom
 from temba.api.v2.internals.tickets.serializers import (
+    CreateTicketerSerializer,
     GetDepartmentsSerializer,
     OpenTicketSerializer,
     TicketAssigneeSerializer,
@@ -45,6 +46,56 @@ class TicketAssigneeView(APIViewMixin, APIView):
         response = {"results": {"ticketer": ticket.uuid, "assignee": ticket.assignee.email}}
 
         return Response(response, status=status.HTTP_200_OK)
+
+
+class CreateTicketerView(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request):
+        project_uuid = request.data.get("org")
+        user_email = request.data.get("user")
+
+        if not project_uuid:
+            return Response({"org": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except (Org.DoesNotExist, django_exceptions.ValidationError, ValueError):
+            return Response({"org": ["Project not found"]}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            acting_user = User.objects.get(email=user_email)
+        except User.DoesNotExist:
+            return Response({"user": ["User not found"]}, status=status.HTTP_400_BAD_REQUEST)
+
+        is_internal = request.user.user_permissions.filter(codename="can_communicate_internally").exists()
+        if not is_internal:
+            if request.user.email != acting_user.email:
+                return Response(
+                    {"permission": ["Authenticated user must match payload user"]},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            if not request.user.has_org_perm(org, "tickets.ticketer_connect"):
+                return Response(
+                    {"permission": ["User lacks tickets.ticketer_connect on this org"]},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        serializer = CreateTicketerSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        ticketer = serializer.save()
+
+        response = {
+            "uuid": str(ticketer.uuid),
+            "name": ticketer.name,
+            "ticketer_type": ticketer.ticketer_type,
+            "config": ticketer.config,
+        }
+
+        return Response(response, status=status.HTTP_201_CREATED)
 
 
 class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):

@@ -1,11 +1,13 @@
 from rest_framework import relations, serializers
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
 
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel
 from temba.contacts.models import URN, Contact, ContactField as ContactFieldModel, ContactGroup, ContactURN
+from temba.contacts.validators import validate_contact_phone
 from temba.flows.models import Flow
 from temba.msgs.models import Label, Msg
 from temba.tickets.models import Ticket, Ticketer, Topic
@@ -37,12 +39,29 @@ def validate_translations(value, base_language, max_length):
 
 def validate_urn(value, strict=True, country_code=None):
     try:
+        value = URN.ensure_scheme(value, country_code=country_code)
         normalized = URN.normalize(value, country_code=country_code)
 
         if strict and not URN.validate(normalized, country_code=country_code):
             raise ValueError()
     except ValueError:
         raise serializers.ValidationError("Invalid URN: %s. Ensure phone numbers contain country codes." % value)
+
+    # enforce strict 8-15 digit length on phone-based URNs (does not affect other schemes).
+    # URN.normalize already guarantees the result is parseable, so URN.to_parts is safe here.
+    if strict:
+        scheme, path, _, _ = URN.to_parts(normalized)
+        if scheme == URN.TEL_SCHEME:
+            try:
+                validate_contact_phone(path)
+            except DjangoValidationError as e:
+                raise serializers.ValidationError(str(e.messages[0]))
+        elif scheme == URN.WHATSAPP_SCHEME and path.isdigit():
+            try:
+                validate_contact_phone(f"+{path}")
+            except DjangoValidationError as e:
+                raise serializers.ValidationError(str(e.messages[0]))
+
     return normalized
 
 
@@ -115,8 +134,11 @@ class URNField(serializers.CharField):
             return str(obj)
 
     def to_internal_value(self, data):
+        if not isinstance(data, str):
+            raise serializers.ValidationError("Not a valid string.")
+
         country_code = self.context["org"].default_country_code
-        return validate_urn(str(data), country_code=country_code)
+        return validate_urn(data, country_code=country_code)
 
 
 class URNListField(LimitedListField):

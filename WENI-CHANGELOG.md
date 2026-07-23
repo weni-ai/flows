@@ -1,3 +1,64 @@
+3.86.1
+----------
+* Add classifier, flow, global, and ticket permissions to Marketing group
+* Endpoint to update waba in WAC
+
+3.86.0
+----------
+* feat: add marketing_opt_in field to contact updates
+* feat: add request_contact_info to interaction_type in the WhatsappBroadcastsEndpoint documentation
+
+3.85.0
+----------
+* fix: map project INACTIVE status to is_suspended instead of is_active to prevent contacts module failures
+* feat: revert whatsapp and tel urns normalization for old stable state
+* feat: allow none topic on open ticket if is not wenichats
+
+3.84.0
+----------
+* feat: add ChannelMarketingTags functionality
+
+3.83.2
+----------
+* feat: enhance squash flowpathcount
+
+3.83.1
+----------
+* feat: extend InternalChannelView with billing dual auth and additive fields
+
+3.83.0
+----------
+* feat: default bare phone URNs to whatsapp on API, import and contact create form
+
+3.82.0
+----------
+* feat: add internal endpoint for ticketer creation
+
+3.81.1
+----------
+* fix: fall back to local filtering when exporting flow results from archives with records that exceed the S3 Select limit (OverMaxRecordSize)
+* feat: add queue porpuse in get departments
+
+3.81.0
+----------
+* feat: add generic ticketer type
+
+3.80.1
+----------
+* fix: adjust Instagram page access token pagination check and improve token refresh validation message
+
+3.80.0
+----------
+* feat: improve endpoint to search contacts in elastic excluding the 9th digit
+
+3.79.0
+----------
+* feat: enable carousel in catalog messages for WhatsApp broadcasts
+
+3.78.0
+----------
+* feat: validate contact name length (1-100 characters) and validate phone number length (8-15 digits, ignoring "+")
+
 3.77.1
 ----------
 * feat: add date filter in tickets endpoint

@@ -746,6 +746,52 @@ class UpdateContactFieldsViewTest(TembaTest):
     @mock_mailroom
     @override_settings(INTERNAL_USER_EMAIL="super@user.com")
     @patch.object(LambdaURLValidator, "protected_resource")
+    def test_update_contact_name_too_long(self, mr_mocks, mock_protected_resource):
+        self.create_contact("Too Long", urns=["twitterid:44444"])
+
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/update_contacts_fields"
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "twitterid:44444",
+            "contact_fields": {"name": "x" * 101},
+        }
+
+        response = self.client.patch(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            {"contact_fields": {"name": ["Contact name cannot exceed 100 characters."]}},
+        )
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_update_contact_name_empty(self, mr_mocks, mock_protected_resource):
+        self.create_contact("Empty Test", urns=["twitterid:55555"])
+
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/update_contacts_fields"
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "twitterid:55555",
+            "contact_fields": {"name": "   "},
+        }
+
+        response = self.client.patch(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            {"contact_fields": {"name": ["Contact name cannot be empty."]}},
+        )
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    @patch.object(LambdaURLValidator, "protected_resource")
     def test_update_custom_field_with_case_insensitive_key(self, mr_mocks, mock_protected_resource):
         contact = self.create_contact("Case Test", urns=["twitterid:77777"])
         self.create_field("nickname", "Apelido")
@@ -845,6 +891,31 @@ class UpdateContactFieldsViewTest(TembaTest):
         contact.refresh_from_db()
         email_f = ContactField.get_by_key(self.org, "email")
         self.assertEqual(contact.get_field_display(email_f), "user@example.com")
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_fallback_creates_marketing_opt_in_when_missing(self, mr_mocks, mock_protected_resource):
+        contact = self.create_contact("Marketing Opt-in Test", urns=["twitterid:77777"])
+        self.assertFalse(ContactField.user_fields.filter(org=self.org, key="marketing_opt_in").exists())
+
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/update_contacts_fields"
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "twitterid:77777",
+            "contact_fields": {"marketing_opt_in": "false"},
+        }
+
+        response = self.client.patch(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(ContactField.user_fields.filter(org=self.org, key="marketing_opt_in").exists())
+
+        contact.refresh_from_db()
+        field = ContactField.get_by_key(self.org, "marketing_opt_in")
+        self.assertEqual(contact.get_field_display(field), "false")
 
     @mock_mailroom
     @override_settings(INTERNAL_USER_EMAIL="super@user.com")

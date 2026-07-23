@@ -7991,3 +7991,27 @@ msgstr "Escolha a frequência semanal que você deseja disparar."
 
 msgid "Add the contact groups to which you want to send the messages. Finally, click on “Create Trigger”."
 msgstr "Adicione os grupos de contatos aos quais deseja enviar as mensagens. Por fim, clique em “Criar Disparador”."
+
+msgid "Contact name must be a string."
+msgstr "O nome do contato deve ser um texto."
+
+msgid "Contact name cannot be empty."
+msgstr "O nome do contato não pode ser vazio."
+
+msgid "Contact name cannot exceed %(max)d characters."
+msgstr "O nome do contato não pode ter mais de %(max)d caracteres."
+
+msgid "Phone number must be a string."
+msgstr "O número de telefone deve ser um texto."
+
+msgid "Phone number must have at least %(min)d digits."
+msgstr "O número de telefone deve ter no mínimo %(min)d dígitos."
+
+msgid "Phone number cannot exceed %(max)d digits."
+msgstr "O número de telefone não pode ter mais de %(max)d dígitos."
+
+msgid "Import file contains a contact name longer than %(max)d characters at row %(row)d."
+msgstr "O arquivo de importação contém um nome de contato com mais de %(max)d caracteres na linha %(row)d."
+
+msgid "At least one phone number or connection is required."
+msgstr "É necessário informar pelo menos um número de telefone ou conexão."

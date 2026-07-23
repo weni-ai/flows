@@ -40,6 +40,7 @@ from temba.utils.urns import ParsedURN, parse_number, parse_urn
 from temba.utils.uuid import uuid4
 
 from .search import SearchException, elastic, parse_query
+from .validators import CONTACT_NAME_MAX_LEN
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,24 @@ class URN:
     )
 
     VALID_SCHEMES = {s[0] for s in SCHEME_CHOICES}
+
+    DEFAULT_PHONE_SCHEME = WHATSAPP_SCHEME
+
+    PHONE_COLUMN_HEADERS = frozenset(
+        {
+            "phone",
+            "mobile",
+            "telephone",
+            "cell",
+            "cellphone",
+            "cell phone",
+            "phone number",
+            "mobile number",
+            "contact phone",
+            "contact mobile",
+            "number",
+        }
+    )
 
     FACEBOOK_PATH_REF_PREFIX = "ref:"
 
@@ -243,6 +262,35 @@ class URN:
         return True
 
     @classmethod
+    def _normalize_twitter_path(cls, norm_path):
+        norm_path = norm_path.lower()
+        if norm_path[0:1] == "@":  # strip @ prefix if provided
+            norm_path = norm_path[1:]
+        return norm_path.lower()  # Twitter handles are case-insensitive, so we always store as lowercase
+
+    @classmethod
+    def _normalize_twitterid_display(cls, display):
+        if not display:
+            return display
+
+        display = str(display).strip().lower()
+        if display and display[0] == "@":
+            display = display[1:]
+        return display
+
+    @classmethod
+    def _normalize_path_for_scheme(cls, scheme, norm_path, display, country_code):
+        if scheme == cls.TEL_SCHEME:
+            return cls.normalize_number(norm_path, country_code), display
+        if scheme == cls.TWITTER_SCHEME:
+            return cls._normalize_twitter_path(norm_path), display
+        if scheme == cls.TWITTERID_SCHEME:
+            return norm_path, cls._normalize_twitterid_display(display)
+        if scheme == cls.EMAIL_SCHEME:
+            return norm_path.lower(), display
+        return norm_path, display
+
+    @classmethod
     def normalize(cls, urn, country_code=None):
         """
         Normalizes the path of a URN string. Should be called anytime looking for a URN match.
@@ -251,22 +299,7 @@ class URN:
         country_code = str(country_code) if country_code else ""
         norm_path = str(path).strip()
 
-        if scheme == cls.TEL_SCHEME:
-            norm_path = cls.normalize_number(norm_path, country_code)
-        elif scheme == cls.TWITTER_SCHEME:
-            norm_path = norm_path.lower()
-            if norm_path[0:1] == "@":  # strip @ prefix if provided
-                norm_path = norm_path[1:]
-            norm_path = norm_path.lower()  # Twitter handles are case-insensitive, so we always store as lowercase
-
-        elif scheme == cls.TWITTERID_SCHEME:
-            if display:
-                display = str(display).strip().lower()
-                if display and display[0] == "@":
-                    display = display[1:]
-
-        elif scheme == cls.EMAIL_SCHEME:
-            norm_path = norm_path.lower()
+        norm_path, display = cls._normalize_path_for_scheme(scheme, norm_path, display, country_code)
 
         return cls.from_parts(scheme, norm_path, query, display)
 
@@ -313,6 +346,68 @@ class URN:
     @classmethod
     def from_tel(cls, path):
         return cls.from_parts(cls.TEL_SCHEME, path)
+
+    @classmethod
+    def from_whatsapp(cls, path):
+        return cls.from_parts(cls.WHATSAPP_SCHEME, path)
+
+    @classmethod
+    def is_phone_based_path(cls, path):
+        return bool(path) and path[0] in "+0123456789"
+
+    @classmethod
+    def paired_phone_urns(cls, value, country_code=None):
+        """
+        Returns normalized whatsapp and tel URNs for the same phone number input.
+        """
+        country_code = str(country_code) if country_code else ""
+        whatsapp = cls.normalize(cls.from_parts(cls.WHATSAPP_SCHEME, value), country_code)
+        tel = cls.normalize(cls.from_parts(cls.TEL_SCHEME, value), country_code)
+        return [whatsapp, tel]
+
+    @classmethod
+    def looks_like_phone(cls, value, country_code=None):
+        """
+        Returns whether the given value appears to be a phone number without an explicit URN scheme.
+        """
+        if not isinstance(value, str):
+            return False
+
+        value = value.strip()
+        if not value or ":" in value:
+            return False
+
+        if not any(c.isdigit() for c in value):
+            return False
+
+        # non-phone identifiers such as BSUIDs require an explicit scheme
+        if regex.match(r"^[A-Z]{2}\.", value, regex.V0):
+            return False
+
+        try:
+            parse_number(cls.normalize_number(value, country_code or ""), country_code)
+            return True
+        except ValueError:
+            return False
+
+    @classmethod
+    def ensure_scheme(cls, value, country_code=None, default_phone_scheme=None):
+        """
+        Returns a URN string, inferring the default phone scheme when no scheme is provided.
+        """
+        if default_phone_scheme is None:
+            default_phone_scheme = cls.DEFAULT_PHONE_SCHEME
+
+        value = str(value).strip()
+
+        if ":" in value:
+            return value
+
+        if cls.looks_like_phone(value, country_code):
+            phone = value.lstrip("+")
+            return cls.from_parts(default_phone_scheme, phone)
+
+        raise ValueError("URN strings must contain scheme and path components")
 
     @classmethod
     def from_twitterid(cls, id, screen_name=None):
@@ -1431,7 +1526,7 @@ class ContactURN(models.Model):
             urn_as_string = URN.normalize(urn_as_string, country_code)
 
         identity = URN.identity(urn_as_string)
-        (scheme, path, query, display) = URN.to_parts(urn_as_string)
+        scheme, path, query, display = URN.to_parts(urn_as_string)
 
         existing = cls.objects.filter(org=org, identity=identity).select_related("contact").first()
 
@@ -2202,6 +2297,16 @@ class ContactImport(SmartModel):
 
         mappings = cls._auto_mappings(org, headers)
 
+        # locate the optional name column so we can validate its values per row
+        name_col_index = next(
+            (
+                idx
+                for idx, item in enumerate(mappings)
+                if item["mapping"].get("type") == "attribute" and item["mapping"].get("name") == "name"
+            ),
+            None,
+        )
+
         # iterate over rest of the rows to do row-level validation
         seen_uuids = set()
         seen_urns = set()
@@ -2221,6 +2326,19 @@ class ContactImport(SmartModel):
                         _("Import file contains duplicated contact URN '%(urn)s'."), params={"urn": urn}
                     )
                 seen_urns.add(urn)
+
+            # validate the name column value when present (blank means "leave unchanged")
+            if name_col_index is not None and name_col_index < len(row):
+                raw_name = row[name_col_index]
+                if (
+                    raw_name
+                    and raw_name != ContactImport.EXPLICIT_CLEAR
+                    and len(str(raw_name).strip()) > CONTACT_NAME_MAX_LEN
+                ):
+                    raise ValidationError(
+                        _("Import file contains a contact name longer than %(max)d characters at row %(row)d."),
+                        params={"max": CONTACT_NAME_MAX_LEN, "row": num_records + 2},
+                    )
 
             # check if we exceed record limit
             num_records += 1
@@ -2281,6 +2399,8 @@ class ContactImport(SmartModel):
 
                 if attribute in ("uuid", "name", "language"):
                     mapping = {"type": "attribute", "name": attribute}
+                elif attribute in URN.PHONE_COLUMN_HEADERS:
+                    mapping = {"type": "scheme", "scheme": URN.DEFAULT_PHONE_SCHEME}
             elif header_prefix == "urn" and header_name:
                 mapping = {"type": "scheme", "scheme": header_name.lower()}
             elif header_prefix == "field" and header_name:
