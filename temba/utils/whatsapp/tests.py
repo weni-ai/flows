@@ -22,6 +22,7 @@ from temba.wpp_products.models import Catalog, Product
 from . import update_api_version
 from .tasks import (
     _calculate_variable_count,
+    process_event,
     refresh_whatsapp_catalog_and_products,
     sent_products_to_sentenx,
     sent_trim_products_to_sentenx,
@@ -32,7 +33,6 @@ from .tasks import (
     update_local_templates,
     update_template_category,
     update_template_sync,
-    process_event,
 )
 
 
