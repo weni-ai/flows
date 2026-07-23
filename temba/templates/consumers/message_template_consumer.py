@@ -1,11 +1,11 @@
-from dataclasses import asdict, dataclass
 import logging
+from dataclasses import asdict, dataclass
 
 from sentry_sdk import capture_exception
-from weni_datalake_sdk.clients.client import send_message_template_data_async
-from weni_datalake_sdk.paths.message_template_path import MessageTemplatePath
 from weni.eda.django.consumers import EDAConsumer
 from weni.eda.messages import Message
+from weni_datalake_sdk.clients.client import send_message_template_data_async
+from weni_datalake_sdk.paths.message_template_path import MessageTemplatePath
 
 logger = logging.getLogger(__name__)
 

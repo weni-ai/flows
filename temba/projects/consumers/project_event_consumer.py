@@ -1,5 +1,5 @@
-from enum import StrEnum
 import logging
+from enum import StrEnum
 
 from sentry_sdk import capture_exception
 from weni.eda.django.consumers import EDAConsumer
@@ -104,13 +104,22 @@ class ProjectEventConsumer(EDAConsumer):
             body: Full message body
         """
         if action == EventAction.DELETED:
-            delete_project(
+            org = delete_project(
                 project_uuid=project_uuid,
                 user_email=user_email,
             )
 
+            if org:
+                logger.info(
+                    "[ProjectEventConsumer] Successfully deleted project name=%s project_uuid=%s",
+                    org.name,
+                    project_uuid,
+                )
+            else:
+                logger.info("[ProjectEventConsumer] Project %s not found for deletion", project_uuid)
+
         elif action == EventAction.UPDATED:
-            update_project_config(
+            org = update_project_config(
                 project_uuid=project_uuid,
                 user_email=user_email,
                 name=body.get("name"),
@@ -119,39 +128,52 @@ class ProjectEventConsumer(EDAConsumer):
                 timezone_location=body.get("timezone"),
             )
 
+            if org:
+                logger.info(
+                    "[ProjectEventConsumer] Successfully updated project name=%s project_uuid=%s",
+                    org.name,
+                    project_uuid,
+                )
+            else:
+                logger.info("[ProjectEventConsumer] Project %s not found for update", project_uuid)
+
         elif action == EventAction.STATUS_UPDATED:
             status = body.get("status")
-            update_project_status(
+            org = update_project_status(
                 project_uuid=project_uuid,
                 status=status,
                 user_email=user_email,
             )
 
-                if org:
-                    print(
-                        f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid}) "
-                        f"status to {status} (is_suspended={org.is_suspended})"
-                    )
-                else:
-                    print(f"[ProjectEventConsumer] - Project {project_uuid} not found for status update")
-
-            elif action == EventAction.PROJECT_TYPE_UPDATED:
-                is_multi_agents = bool(body.get("is_multi_agents"))
-                org = update_project_type(
-                    project_uuid=project_uuid,
-                    is_multi_agents=is_multi_agents,
-                    user_email=user_email,
+            if org:
+                logger.info(
+                    "[ProjectEventConsumer] Successfully updated project name=%s project_uuid=%s "
+                    "status=%s is_suspended=%s",
+                    org.name,
+                    project_uuid,
+                    status,
+                    org.is_suspended,
                 )
-
-                if org:
-                    print(
-                        f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid}) is_multi_agents to {is_multi_agents}"
-                    )
-                else:
-                    print(f"[ProjectEventConsumer] - Project {project_uuid} not found for project type update")
             else:
-                raise ValueError(f"Unknown action: {action}")
+                logger.info("[ProjectEventConsumer] Project %s not found for status update", project_uuid)
 
-        except Exception as e:
-            print(f"[ProjectEventConsumer] - Error processing {action} for project {project_uuid}: {e}")
-            raise
+        elif action == EventAction.PROJECT_TYPE_UPDATED:
+            is_multi_agents = bool(body.get("is_multi_agents"))
+            org = update_project_type(
+                project_uuid=project_uuid,
+                is_multi_agents=is_multi_agents,
+                user_email=user_email,
+            )
+
+            if org:
+                logger.info(
+                    "[ProjectEventConsumer] Successfully updated project name=%s project_uuid=%s "
+                    "is_multi_agents=%s",
+                    org.name,
+                    project_uuid,
+                    is_multi_agents,
+                )
+            else:
+                logger.info("[ProjectEventConsumer] Project %s not found for project type update", project_uuid)
+        else:
+            raise ValueError(f"Unknown action: {action}")
