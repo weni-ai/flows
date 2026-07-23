@@ -650,6 +650,7 @@ GROUP_PERMISSIONS = {
         "flows.flowstart_list",
         "flows.flowlabel.*",
         "flows.ruleset.*",
+        "globals.global_api",
         "msgs.broadcast.*",
         "msgs.broadcastschedule.*",
         "msgs.label.*",
