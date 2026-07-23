@@ -790,7 +790,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                         ]
                     }
                 ],
-                "interaction_type": "flow_msg | cta_url | location | order_details | carousel",
+                "interaction_type": "flow_msg | cta_url | location | order_details | carousel | request_contact_info",
                 "flow_message": {
                     "flow_id": "1234567890",
                     "flow_data": {
@@ -951,7 +951,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                         ]
                     }
                 ],
-                "interaction_type": "flow_msg | cta_url | location | order_details | carousel",
+                "interaction_type": "flow_msg | cta_url | location | order_details | carousel | request_contact_info",
                 "flow_message": {
                     "flow_id": "1234567890",
                     "flow_data": {

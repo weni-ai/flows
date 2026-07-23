@@ -17,6 +17,8 @@ from django.db import connection
 from django.db.models import Value as DbValue
 from django.db.models.functions import Concat, Substr
 from django.db.utils import IntegrityError
+from django.http import Http404
+from django.test import RequestFactory
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -25,7 +27,7 @@ from temba.airtime.models import AirtimeTransfer
 from temba.campaigns.models import Campaign, CampaignEvent, EventFire
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
 from temba.contacts.search import SearchException, SearchResults, search_contacts
-from temba.contacts.views import ContactListView
+from temba.contacts.views import ContactCRUDL, ContactListView
 from temba.flows.models import Flow, FlowSession, FlowStart
 from temba.ivr.models import IVRCall
 from temba.locations.models import AdminBoundary
@@ -656,6 +658,32 @@ class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
 
         # that has been queued to mailroom
         self.assertEqual("start_flow", mr_mocks.queued_batch_tasks[-1]["type"])
+
+    def test_derive_group_without_org_raises_404(self):
+        view = ContactCRUDL.List()
+        request = RequestFactory().get("/contact/")
+        request.user = self.user
+        view.request = request
+        view.system_group = ContactGroup.TYPE_ACTIVE
+
+        with patch.object(type(self.user), "get_org", return_value=None):
+            with self.assertRaises(Http404):
+                view.derive_group()
+
+    def test_derive_group_recreates_missing_system_groups(self):
+        view = ContactCRUDL.List()
+        request = RequestFactory().get("/contact/")
+        request.user = self.user
+        view.request = request
+        view.system_group = ContactGroup.TYPE_ACTIVE
+
+        self.org.all_groups(manager="system_groups").all().delete()
+
+        group = view.derive_group()
+
+        self.assertEqual(group.group_type, ContactGroup.TYPE_ACTIVE)
+        self.assertEqual(group.org, self.org)
+        self.assertTrue(self.org.all_groups(manager="system_groups").exists())
 
 
 class ContactGroupTest(TembaTest):
@@ -1395,41 +1423,46 @@ class ContactTest(TembaTest):
 
         # try creating a contact with a number that belongs to another contact
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__tel__0="+250781111111")
+            reverse("contacts.contact_create"),
+            {"name": "Ben Haggerty", "urn__whatsapp__0": "+250781111111"},
         )
-        self.assertFormError(response, "form", "urn__tel__0", "Used by another contact")
+        self.assertFormError(response, "form", "urn__whatsapp__0", "Used by another contact")
 
         # now repost with a unique phone number
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__tel__0="+250 783-835665")
+            reverse("contacts.contact_create"),
+            {"name": "Ben Haggerty", "urn__whatsapp__0": "+250 783-835665"},
         )
         self.assertNoFormErrors(response)
 
         # repost with the phone number of an orphaned URN
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__tel__0="+250788888888")
+            reverse("contacts.contact_create"),
+            {"name": "Ben Orphan", "urn__whatsapp__0": "+250788888888"},
         )
         self.assertNoFormErrors(response)
 
-        # check that the orphaned URN has been associated with the contact
-        self.assertEqual("Ben Haggerty", Contact.from_urn(self.org, "tel:+250788888888").name)
+        # check that the orphaned tel URN has been associated with the contact
+        self.assertEqual("Ben Orphan", Contact.from_urn(self.org, "tel:+250788888888").name)
 
         # check we display error for invalid input
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__tel__0="=")
+            reverse("contacts.contact_create"),
+            {"name": "Ben Haggerty", "urn__whatsapp__0": "="},
         )
-        self.assertFormError(response, "form", "urn__tel__0", "Invalid input")
+        self.assertFormError(response, "form", "urn__whatsapp__0", "Invalid format")
 
         # reject creation with an empty/whitespace-only name
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="   ", urn__tel__0="+250788777777")
+            reverse("contacts.contact_create"),
+            {"name": "   ", "urn__whatsapp__0": "+250788777777"},
         )
         self.assertFormError(response, "form", "name", "Contact name cannot be empty.")
 
         # reject creation with a name longer than the configured maximum
         response = self.client.post(
             reverse("contacts.contact_create"),
-            data=dict(name="x" * 101, urn__tel__0="+250788777777"),
+            {"name": "x" * 101, "urn__whatsapp__0": "+250788777777"},
         )
         self.assertFormError(response, "form", "name", "Contact name cannot exceed 100 characters.")
 
@@ -1437,19 +1470,35 @@ class ContactTest(TembaTest):
         # but fall under the 8-digit minimum, exercising validate_contact_phone in the form
         response = self.client.post(
             reverse("contacts.contact_create"),
-            data=dict(name="Niue Phone", urn__tel__0="+6831234"),
+            {"name": "Niue Phone", "urn__whatsapp__0": "+6831234"},
         )
-        self.assertFormError(response, "form", "urn__tel__0", "Phone number must have at least 8 digits.")
+        self.assertFormError(response, "form", "urn__whatsapp__0", "Phone number must have at least 8 digits.")
 
         # reject creation with no name at all (empty input)
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="", urn__tel__0="+250788777777")
+            reverse("contacts.contact_create"),
+            {"name": "", "urn__whatsapp__0": "+250788777777"},
         )
         self.assertFormError(response, "form", "name", "This field is required.")
 
+        # non-phone whatsapp URNs use the single-URN save path
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            {"name": "BSUID Contact", "urn__whatsapp__0": "BR.35029025746744354"},
+        )
+        self.assertNoFormErrors(response)
+        bsuid_contact = Contact.objects.get(name="BSUID Contact")
+        self.assertEqual(
+            list(bsuid_contact.urns.values_list("identity", flat=True)),
+            ["whatsapp:BR.35029025746744354"],
+        )
+
         # reject creation when no URN field is filled in (no way to reach the contact)
-        response = self.client.post(reverse("contacts.contact_create"), data=dict(name="No Phone", urn__tel__0=""))
-        self.assertFormError(response, "form", None, "At least one phone number or connection is required.")
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            {"name": "No Phone", "urn__whatsapp__0": ""},
+        )
+        self.assertFormError(response, "form", None, "At least one WhatsApp number or connection is required.")
 
     @mock_mailroom
     def test_contact_update_name_validation(self, mr_mocks):
@@ -5027,9 +5076,35 @@ class URNTest(TembaTest):
         # normalize preserves both formats
         self.assertEqual(URN.normalize("whatsapp:BR.35029025746744354"), "whatsapp:BR.35029025746744354")
         self.assertEqual(URN.normalize("whatsapp:12065551212"), "whatsapp:12065551212")
+        self.assertEqual(URN.normalize("whatsapp:+12065551212", "US"), "whatsapp:+12065551212")
+        self.assertEqual(URN.normalize("whatsapp:86982810225", "BR"), "whatsapp:86982810225")
+        self.assertEqual(URN.normalize("tel:86982810225", "BR"), "tel:+86982810225")
 
         # format returns BSUID path as-is (no phone formatting)
         self.assertEqual(URN.format("whatsapp:BR.35029025746744354"), "BR.35029025746744354")
+
+    def test_phone_scheme_inference(self):
+        self.assertFalse(URN.looks_like_phone(12065551212))
+        self.assertTrue(URN.is_phone_based_path("11987654321"))
+        self.assertFalse(URN.is_phone_based_path("BR.35029025746744354"))
+        self.assertEqual(
+            URN.paired_phone_urns("86982810225", "BR"),
+            ["whatsapp:86982810225", "tel:+86982810225"],
+        )
+        self.assertTrue(URN.looks_like_phone("+12065551212", "US"))
+        self.assertTrue(URN.looks_like_phone("0788 123 123", "RW"))
+        self.assertFalse(URN.looks_like_phone("tel:+12065551212", "US"))
+        self.assertFalse(URN.looks_like_phone("twitter:jean"))
+        self.assertFalse(URN.looks_like_phone("BR.35029025746744354"))
+        self.assertFalse(URN.looks_like_phone("12345", "RW"))
+
+        self.assertEqual(URN.ensure_scheme("+12065551212", "US"), "whatsapp:12065551212")
+        self.assertEqual(URN.ensure_scheme("tel:+12065551212", "US"), "tel:+12065551212")
+        self.assertEqual(URN.ensure_scheme("whatsapp:+12065551212", "US"), "whatsapp:+12065551212")
+        self.assertEqual(URN.ensure_scheme("twitter:jean", "US"), "twitter:jean")
+        self.assertRaises(ValueError, URN.ensure_scheme, "12345", "RW")
+
+        self.assertEqual(URN.from_whatsapp("12065551212"), "whatsapp:12065551212")
 
     def test_freshchat_urn(self):
         self.assertTrue(
@@ -5555,6 +5630,49 @@ class ContactImportTest(TembaTest):
             ],
             mappings,
         )
+
+    def test_parse_maps_phone_columns_to_whatsapp(self):
+        csv_content = "Phone,name\n+250788111111,Jean\n".encode("utf-8")
+
+        mappings, num_records = ContactImport.try_to_parse(self.org, io.BytesIO(csv_content), "import.csv")
+
+        self.assertEqual(1, num_records)
+        self.assertEqual(
+            [
+                {"header": "Phone", "mapping": {"type": "scheme", "scheme": "whatsapp"}},
+                {"header": "name", "mapping": {"type": "attribute", "name": "name"}},
+            ],
+            mappings,
+        )
+
+    def test_row_to_spec_uses_whatsapp_for_phone_columns(self):
+        imp = ContactImport(
+            org=self.org,
+            created_by=self.admin,
+            mappings=[
+                {"header": "Phone", "mapping": {"type": "scheme", "scheme": "whatsapp"}},
+                {"header": "name", "mapping": {"type": "attribute", "name": "name"}},
+            ],
+        )
+
+        spec = imp._row_to_spec(["0788 111 111", "Jean"])
+
+        self.assertEqual(["whatsapp:0788 111 111"], spec["urns"])
+        self.assertEqual("Jean", spec["name"])
+
+    def test_row_to_spec_preserves_explicit_tel_mapping(self):
+        imp = ContactImport(
+            org=self.org,
+            created_by=self.admin,
+            mappings=[
+                {"header": "URN:Tel", "mapping": {"type": "scheme", "scheme": "tel"}},
+                {"header": "name", "mapping": {"type": "attribute", "name": "name"}},
+            ],
+        )
+
+        spec = imp._row_to_spec(["0788 111 111", "Jean"])
+
+        self.assertEqual(["tel:+250788111111"], spec["urns"])
 
     def test_extract_mappings(self):
         # try simple import in different formats

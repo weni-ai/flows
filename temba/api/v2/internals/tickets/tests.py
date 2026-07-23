@@ -1,7 +1,9 @@
+import json
 from unittest.mock import patch
 
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.test import APIClient
 from weni.internal.models import TicketerQueue
 
 from django.contrib.auth.models import User
@@ -61,6 +63,122 @@ class TicketAssigneeViewTest(TembaTest):
 
         ticket.refresh_from_db()
         self.assertEqual(ticket.assignee.email, "user_email@email.com")
+
+
+class CreateTicketerViewTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.url = "/api/v2/internals/ticketer"
+        self.config = {
+            "base_url": "https://example.com",
+            "api_token": "api-token-123",
+            "webhook_secret": "webhook-secret-123",
+            "skip_webhook_hmac": "true",
+            "project_uuid": str(self.org.proj_uuid),
+            "project_name": "org support",
+        }
+
+    def valid_body(self):
+        return {
+            "user": self.admin.email,
+            "org": str(self.org.proj_uuid),
+            "name": "Generic Ticketer",
+            "ticketer_type": "generic",
+            "config": json.dumps(self.config),
+        }
+
+    def authenticated_client(self, user=None):
+        client = APIClient()
+        client.force_authenticate(user=user or self.admin)
+        return client
+
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_create_ticketer_success(self):
+        response = self.authenticated_client().post(self.url, data=self.valid_body())
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["name"], "Generic Ticketer")
+        self.assertEqual(response.data["ticketer_type"], "generic")
+        self.assertEqual(response.data["config"], self.config)
+
+        ticketer = Ticketer.objects.get(uuid=response.data["uuid"])
+        self.assertEqual(ticketer.org, self.org)
+        self.assertEqual(ticketer.created_by, self.admin)
+        self.assertEqual(ticketer.config, self.config)
+
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_create_ticketer_defaults_type_to_generic(self):
+        body = self.valid_body()
+        del body["ticketer_type"]
+
+        response = self.authenticated_client().post(self.url, data=body)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["ticketer_type"], "generic")
+
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_create_ticketer_without_body(self):
+        response = self.client.post(self.url)
+
+        self.assertEqual(response.status_code, 400)
+
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_create_ticketer_with_invalid_project(self):
+        body = self.valid_body()
+        body["org"] = "91b45788-8beb-48dd-8355-64aab570e0c9"
+
+        response = self.client.post(self.url, data=body)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("org", response.data)
+
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_create_ticketer_with_unknown_user(self):
+        body = self.valid_body()
+        body["user"] = "unknown@email.com"
+
+        response = self.client.post(self.url, data=body)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("user", response.data)
+
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_create_ticketer_without_config(self):
+        body = self.valid_body()
+        del body["config"]
+
+        response = self.authenticated_client().post(self.url, data=body)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("config", response.data)
+
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_create_ticketer_user_mismatch(self):
+        other_user = User.objects.create_user(username="otheruser", email="other@example.com", password="secret")
+        body = self.valid_body()
+        body["user"] = other_user.email
+
+        response = self.authenticated_client().post(self.url, data=body)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("permission", response.data)
+
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_create_ticketer_with_matching_user(self):
+        body = self.valid_body()
+
+        response = self.authenticated_client().post(self.url, data=body)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["name"], "Generic Ticketer")
 
 
 class OpenTicketTest(TembaTest):
@@ -506,6 +624,49 @@ class OpenTicketTest(TembaTest):
 
         self.assertEqual(response.status_code, 200)
 
+    @patch.object(LambdaURLValidator, "protected_resource")
+    @patch("temba.mailroom.client.MailroomClient.ticket_open")
+    def test_open_ticket_wenichats_without_topic(self, mock_ticket_open, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/open_ticket"
+        body = {
+            "project": self.org.proj_uuid,
+            "ticketer": self.ticketer.uuid,
+            "contact": self.joe.uuid,
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("topic", response.data)
+        mock_ticket_open.assert_not_called()
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    @patch("temba.mailroom.client.MailroomClient.ticket_open")
+    def test_open_ticket_non_wenichats_without_topic(self, mock_ticket_open, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+        mock_ticket_open.return_value = self.ticket_open_return_value()
+
+        generic_ticketer = Ticketer.create(self.org, self.admin, "generic", "Generic Ticketer", {})
+
+        url = "/api/v2/internals/open_ticket"
+        body = {
+            "project": self.org.proj_uuid,
+            "ticketer": generic_ticketer.uuid,
+            "contact": self.joe.uuid,
+        }
+        response = self.client.post(url, data=body, content_type="application/json")
+
+        mock_ticket_open.assert_called_once_with(
+            self.org.id,
+            self.joe.id,
+            generic_ticketer.id,
+            self.org.default_ticket_topic.id,
+            0,
+            "{}",
+        )
+        self.assertEqual(response.status_code, 200)
+
 
 class GetDepartmentsViewTest(TembaTest):
     @patch.object(LambdaURLValidator, "protected_resource")
@@ -533,6 +694,7 @@ class GetDepartmentsViewTest(TembaTest):
             modified_by=self.user,
             org=self.org,
             name="Fake Queue",
+            queue_purpose="Conversations related to billing",
             ticketer=ticketer,
         )
 
@@ -548,6 +710,7 @@ class GetDepartmentsViewTest(TembaTest):
                 {
                     "topic_name": queue.name,
                     "topic_uuid": str(queue.uuid),
+                    "topic_purpose": queue.queue_purpose,
                 }
             ],
         }

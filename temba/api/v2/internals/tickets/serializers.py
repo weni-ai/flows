@@ -3,11 +3,14 @@ from rest_framework import serializers
 from weni.internal.models import TicketerQueue
 
 from django.contrib.auth import get_user_model
+from django.core import exceptions as django_exceptions
 
 from temba.api.v2.serializers import ReadSerializer
 from temba.contacts.models import Contact, ContactURN
 from temba.orgs.models import Org
 from temba.tickets.models import Ticketer, Topic
+from temba.tickets.types.generic.type import GenericType
+from temba.tickets.types.wenichats.type import WeniChatsType
 
 User = get_user_model()
 
@@ -17,10 +20,46 @@ class TicketAssigneeSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
 
+class CreateTicketerSerializer(serializers.Serializer):
+    user = serializers.EmailField(required=True)
+    org = serializers.CharField(required=True)
+    name = serializers.CharField(required=True, max_length=64)
+    ticketer_type = serializers.CharField(required=False, default=GenericType.slug, max_length=16)
+    config = serializers.JSONField(required=True)
+
+    def validate_org(self, value):
+        try:
+            self.org = Org.objects.get(proj_uuid=value)
+        except (Org.DoesNotExist, django_exceptions.ValidationError, ValueError):
+            raise serializers.ValidationError("Project not found")
+        return value
+
+    def validate_user(self, value):
+        try:
+            self.acting_user = User.objects.get(email=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found")
+        return value
+
+    def validate_config(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("config must be an object")
+        return value
+
+    def create(self, validated_data):
+        return Ticketer.create(
+            org=self.org,
+            user=self.acting_user,
+            ticketer_type=validated_data.get("ticketer_type") or GenericType.slug,
+            name=validated_data["name"],
+            config=validated_data["config"],
+        )
+
+
 class OpenTicketSerializer(serializers.Serializer):
     project = serializers.UUIDField()
     ticketer = serializers.UUIDField()
-    topic = serializers.UUIDField()
+    topic = serializers.UUIDField(required=False, allow_null=True)
     contact = serializers.UUIDField(required=False, allow_null=True)
     contact_urn = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     assignee = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
@@ -44,10 +83,15 @@ class OpenTicketSerializer(serializers.Serializer):
         except Ticketer.DoesNotExist:
             raise serializers.ValidationError({"ticketer": "ticketer not found"})
 
-        try:
-            topic = Topic.objects.get(uuid=topic_uuid)
-        except Topic.DoesNotExist:
-            raise serializers.ValidationError({"topic": "topic not found"})
+        if topic_uuid is not None:
+            try:
+                topic = Topic.objects.get(uuid=topic_uuid)
+            except Topic.DoesNotExist:
+                raise serializers.ValidationError({"topic": "topic not found"})
+        elif ticketer.ticketer_type == WeniChatsType.slug:
+            raise serializers.ValidationError({"topic": "This field is required."})
+        else:
+            topic = org.default_ticket_topic
 
         if contact_uuid is not None:
             try:
@@ -92,10 +136,12 @@ class GetDepartmentsSerializer(serializers.ModelSerializer):
 class GetTicketerQueueSerializer(ReadSerializer):
     topic_name = serializers.CharField(source="name")
     topic_uuid = serializers.UUIDField(source="uuid")
+    topic_purpose = serializers.CharField(source="queue_purpose", allow_null=True)
 
     class Meta:
         model = TicketerQueue
         fields = (
             "topic_name",
             "topic_uuid",
+            "topic_purpose",
         )

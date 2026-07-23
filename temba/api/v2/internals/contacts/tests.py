@@ -895,6 +895,31 @@ class UpdateContactFieldsViewTest(TembaTest):
     @mock_mailroom
     @override_settings(INTERNAL_USER_EMAIL="super@user.com")
     @patch.object(LambdaURLValidator, "protected_resource")
+    def test_fallback_creates_marketing_opt_in_when_missing(self, mr_mocks, mock_protected_resource):
+        contact = self.create_contact("Marketing Opt-in Test", urns=["twitterid:77777"])
+        self.assertFalse(ContactField.user_fields.filter(org=self.org, key="marketing_opt_in").exists())
+
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/update_contacts_fields"
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "twitterid:77777",
+            "contact_fields": {"marketing_opt_in": "false"},
+        }
+
+        response = self.client.patch(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(ContactField.user_fields.filter(org=self.org, key="marketing_opt_in").exists())
+
+        contact.refresh_from_db()
+        field = ContactField.get_by_key(self.org, "marketing_opt_in")
+        self.assertEqual(contact.get_field_display(field), "false")
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    @patch.object(LambdaURLValidator, "protected_resource")
     def test_fallback_creates_session_when_missing(self, mr_mocks, mock_protected_resource):
         contact = self.create_contact("Session Test", urns=["twitterid:66666"])
         self.assertFalse(ContactField.user_fields.filter(org=self.org, key="session").exists())

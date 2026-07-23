@@ -127,12 +127,31 @@ class ProjectEventConsumer(EDAConsumer):
                 user_email=user_email,
             )
 
-        elif action == EventAction.PROJECT_TYPE_UPDATED:
-            is_multi_agents = bool(body.get("is_multi_agents"))
-            update_project_type(
-                project_uuid=project_uuid,
-                is_multi_agents=is_multi_agents,
-                user_email=user_email,
-            )
-        else:
-            raise ValueError(f"Unknown action: {action}")
+                if org:
+                    print(
+                        f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid}) "
+                        f"status to {status} (is_suspended={org.is_suspended})"
+                    )
+                else:
+                    print(f"[ProjectEventConsumer] - Project {project_uuid} not found for status update")
+
+            elif action == EventAction.PROJECT_TYPE_UPDATED:
+                is_multi_agents = bool(body.get("is_multi_agents"))
+                org = update_project_type(
+                    project_uuid=project_uuid,
+                    is_multi_agents=is_multi_agents,
+                    user_email=user_email,
+                )
+
+                if org:
+                    print(
+                        f"[ProjectEventConsumer] - Successfully updated project '{org.name}' ({project_uuid}) is_multi_agents to {is_multi_agents}"
+                    )
+                else:
+                    print(f"[ProjectEventConsumer] - Project {project_uuid} not found for project type update")
+            else:
+                raise ValueError(f"Unknown action: {action}")
+
+        except Exception as e:
+            print(f"[ProjectEventConsumer] - Error processing {action} for project {project_uuid}: {e}")
+            raise
