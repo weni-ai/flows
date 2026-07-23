@@ -384,3 +384,75 @@ class InternalChannelViewBillingTokenTest(TembaTest):
             self.assertEqual(wac_entry["waba"], "waba-1")
             self.assertEqual(wac_entry["phone_number"], "+5500900001234")
             self.assertTrue(wac_entry["config"]["is_demo"])
+
+
+class ChannelWabaMigrationViewTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.url = "/api/v2/internals/channel_waba_migration"
+
+    @patch("temba.api.v2.internals.channels.views.ChannelWabaMigrationView.authentication_classes", [])
+    def test_request_without_auth(self):
+        response = self.client.post(self.url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 403)
+
+    @patch("temba.api.v2.internals.channels.views.ChannelWabaMigrationView.authentication_classes", [])
+    @patch("temba.api.v2.internals.channels.views.ChannelWabaMigrationView.permission_classes", [])
+    def test_request_without_body(self):
+        response = self.client.post(self.url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+
+    @patch("temba.api.v2.internals.channels.views.ChannelWabaMigrationView.authentication_classes", [])
+    @patch("temba.api.v2.internals.channels.views.ChannelWabaMigrationView.permission_classes", [])
+    def test_request_with_nonexistent_waba(self):
+        response = self.client.post(
+            self.url,
+            data={"old_waba_id": "old-waba", "new_waba_id": "new-waba"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"detail": "No WhatsApp Cloud channel found for the provided WABA"})
+
+    @patch("temba.api.v2.internals.channels.views.ChannelWabaMigrationView.authentication_classes", [])
+    @patch("temba.api.v2.internals.channels.views.ChannelWabaMigrationView.permission_classes", [])
+    @patch("temba.channels.types.whatsapp_cloud.usecases.UpdateWhatsAppCloudWabaUseCase.execute")
+    def test_migrates_matching_channels(self, mock_execute):
+        channel = self.create_channel(
+            "WAC",
+            "WAC Channel",
+            "74123456789",
+            config={"wa_waba_id": "old-waba", "wa_currency": "USD", "wa_business_id": "business-1"},
+        )
+        mock_execute.return_value = [
+            {
+                "channel_uuid": str(channel.uuid),
+                "after": {"wa_waba_id": "new-waba", "wa_previous_waba_id": "old-waba"},
+            }
+        ]
+
+        response = self.client.post(
+            self.url,
+            data={"old_waba_id": "old-waba", "new_waba_id": "new-waba"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_execute.assert_called_once_with(old_waba_id="old-waba", new_waba_id="new-waba")
+        data = response.json()
+        self.assertEqual(len(data["results"]), 1)
+        self.assertEqual(data["results"][0]["after"]["wa_waba_id"], "new-waba")
+
+    @patch("temba.api.v2.internals.channels.views.ChannelWabaMigrationView.authentication_classes", [])
+    @patch("temba.api.v2.internals.channels.views.ChannelWabaMigrationView.permission_classes", [])
+    @patch("temba.channels.types.whatsapp_cloud.usecases.UpdateWhatsAppCloudWabaUseCase.execute")
+    def test_migrates_all_channels_with_same_waba(self, mock_execute):
+        mock_execute.return_value = [{"channel_uuid": "a"}, {"channel_uuid": "b"}]
+
+        response = self.client.post(
+            self.url,
+            data={"old_waba_id": "old-waba", "new_waba_id": "new-waba"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()["results"]), 2)
