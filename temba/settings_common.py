@@ -627,6 +627,11 @@ GROUP_PERMISSIONS = {
         "policies.policy_history",
     ),
     "Marketing": (
+        "classifiers.classifier_api",
+        "classifiers.classifier_read",
+        "classifiers.classifier_list",
+        "classifiers.classifier_menu",
+        "classifiers.intent_api",
         "contacts.contact_api",
         "contacts.contact_archive",
         "contacts.contact_archived",
@@ -674,6 +679,9 @@ GROUP_PERMISSIONS = {
         "msgs.msg_outbox",
         "msgs.msg_sent",
         "msgs.msg_update",
+        "tickets.ticket.*",
+        "tickets.ticketer_api",
+        "tickets.topic_api",
     ),
     "Administrators": (
         "airtime.airtimetransfer_list",
