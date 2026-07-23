@@ -18,7 +18,9 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 # Keys that update_contacts_fields may auto-create as text user fields when missing (org under field limit).
-FALLBACK_AUTO_CREATE_CONTACT_FIELD_KEYS = frozenset({"segment", "orderform", "email", "session", "vtex_account", "marketing_opt_in"})
+FALLBACK_AUTO_CREATE_CONTACT_FIELD_KEYS = frozenset(
+    {"segment", "orderform", "email", "session", "vtex_account", "marketing_opt_in"}
+)
 FALLBACK_AUTO_CREATE_CONTACT_FIELD_LABELS = {
     "segment": "segment",
     "orderform": "orderform",

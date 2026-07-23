@@ -1,3 +1,14 @@
+3.86.0
+----------
+* feat: add marketing_opt_in field to contact updates
+* feat: add request_contact_info to interaction_type in the WhatsappBroadcastsEndpoint documentation
+
+3.85.0
+----------
+* fix: map project INACTIVE status to is_suspended instead of is_active to prevent contacts module failures
+* feat: revert whatsapp and tel urns normalization for old stable state
+* feat: allow none topic on open ticket if is not wenichats
+
 3.84.0
 ----------
 * fix: map project INACTIVE status to is_suspended instead of is_active to prevent contacts module failures
