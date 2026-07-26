@@ -22,6 +22,101 @@ function goto(event, ele) {
     }
 }
 
+window.openMediaModal = function(url, type) {
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;';
+
+    var closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '&times;';
+    closeBtn.style.cssText = 'position:absolute;top:20px;right:30px;font-size:40px;color:#fff;background:none;border:none;cursor:pointer;z-index:100000;line-height:1;';
+    closeBtn.onclick = function() { overlay.remove(); };
+
+    function showExpiredError() {
+        var errorMsg = document.createElement('div');
+        errorMsg.style.cssText = 'color:#fff;text-align:center;padding:20px;';
+        errorMsg.innerHTML = '<div style="font-size:48px;margin-bottom:16px;">&#9888;</div>' +
+            '<div style="font-size:18px;margin-bottom:8px;">Unable to load media</div>' +
+            '<div style="font-size:14px;color:#aaa;">The file may have expired or is temporarily unavailable</div>';
+        overlay.appendChild(errorMsg);
+    }
+
+    function openInNewTab() {
+        overlay.remove();
+        window.open(url, '_blank');
+    }
+
+    fetch(url, { method: 'GET', mode: 'cors' }).then(function(response) {
+        if (!response.ok) {
+            return response.text().then(function(body) {
+                if (body.indexOf('ExpiredToken') > -1 || body.indexOf('token has expired') > -1) {
+                    overlay.appendChild(closeBtn);
+                    showExpiredError();
+                    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+                    document.body.appendChild(overlay);
+                } else {
+                    openInNewTab();
+                }
+            });
+        }
+
+        var media;
+        if (type === 'video') {
+            media = document.createElement('video');
+            media.controls = true;
+            media.autoplay = true;
+            media.style.cssText = 'max-width:90%;max-height:85%;border-radius:4px;';
+            media.src = url;
+            media.onerror = function() { media.remove(); showExpiredError(); };
+        } else if (type === 'audio') {
+            media = document.createElement('audio');
+            media.controls = true;
+            media.autoplay = true;
+            media.style.cssText = 'width:400px;';
+            media.src = url;
+            media.onerror = function() { media.remove(); showExpiredError(); };
+        } else {
+            media = document.createElement('img');
+            media.style.cssText = 'max-width:90%;max-height:85%;border-radius:4px;';
+            media.src = url;
+            media.onerror = function() { media.remove(); showExpiredError(); };
+        }
+
+        overlay.appendChild(closeBtn);
+        overlay.appendChild(media);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }).catch(function() {
+        openInNewTab();
+    });
+};
+
+window.downloadMedia = function(url) {
+    fetch(url, { mode: 'cors' }).then(function(response) {
+        if (!response.ok) {
+            return response.text().then(function(body) {
+                if (body.indexOf('ExpiredToken') > -1 || body.indexOf('token has expired') > -1) {
+                    alert('Unable to load media: the file may have expired or is temporarily unavailable.');
+                } else {
+                    window.open(url, '_blank');
+                }
+            });
+        }
+        return response.blob().then(function(blob) {
+            var blobUrl = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = blobUrl;
+            var filename = url.split('/').pop().split('?')[0] || 'download';
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+        });
+    }).catch(function() {
+        window.open(url, '_blank');
+    });
+};
+
 function gotoLink(href) {
     document.location.href = href;
 }
