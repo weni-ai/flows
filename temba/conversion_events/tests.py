@@ -51,6 +51,17 @@ class ConversionEventSerializerTest(TembaTest):
         self.assertFalse(serializer.is_valid())
         self.assertIn("contact_urn", serializer.errors)
 
+    def test_valid_abandoned_cart_event_type(self):
+        """Test serializer accepts abandoned_cart event type"""
+        data = {
+            "event_type": "abandoned_cart",
+            "channel_uuid": str(uuid4()),
+            "contact_urn": "whatsapp:5511999999999",
+            "payload": {"value": "59.90", "currency": "BRL"},
+        }
+        serializer = ConversionEventSerializer(data=data)
+        self.assertTrue(serializer.is_valid())
+
     def test_invalid_event_type(self):
         """Test serializer with invalid event type"""
         data = {
@@ -798,6 +809,136 @@ class ConversionEventAPITest(TembaTest):
 
                 # Verify Datalake was called and succeeded
                 mock_send_event.assert_called_once()
+
+    def test_successful_abandoned_cart_conversion(self):
+        """Test successful abandoned_cart conversion with value and currency"""
+        payload = self.valid_payload.copy()
+        payload["event_type"] = "abandoned_cart"
+        payload["payload"] = {
+            "value": "249.90",
+            "currency": "BRL",
+            "cart_id": "cart_abc_123",
+        }
+
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"success": True}
+            mock_post.return_value = mock_response
+
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
+            with override_settings(
+                WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
+                WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
+                META_PARTNER_AGENT="Weni by VTEX",
+            ):
+                response = self.client.post(
+                    self.endpoint_url,
+                    data=json.dumps(payload),
+                    content_type="application/json",
+                )
+
+                self.assertEqual(response.status_code, 200)
+                response_data = response.json()
+                self.assertEqual(response_data["status"], "success")
+                self.assertEqual(
+                    response_data["message"],
+                    "Event sent to Meta and Datalake successfully",
+                )
+
+                # Verify Meta API call
+                mock_post.assert_called_once()
+                meta_payload = mock_post.call_args[1]["json"]
+                meta_event = meta_payload["data"][0]
+
+                self.assertEqual(meta_event["event_name"], "AbandonedCart")
+                self.assertEqual(meta_event["value"], 249.90)
+                self.assertEqual(meta_event["currency"], "BRL")
+
+                # Verify Datalake API call
+                mock_send_event.assert_called_once()
+                event_data = mock_send_event.call_args[0][1]
+                self.assertEqual(event_data["event_name"], "conversion_abandoned_cart")
+                self.assertEqual(event_data["key"], "capi")
+                self.assertEqual(event_data["value"], "abandoned_cart")
+                self.assertEqual(event_data["value_type"], "string")
+                self.assertEqual(event_data["project"], str(self.org.proj_uuid))
+                self.assertEqual(event_data["contact_urn"], self.valid_payload["contact_urn"])
+                self.assertEqual(event_data["metadata"]["value"], "249.90")
+                self.assertEqual(event_data["metadata"]["currency"], "BRL")
+                self.assertEqual(event_data["metadata"]["cart_id"], "cart_abc_123")
+
+    def test_abandoned_cart_conversion_without_ctwa(self):
+        """Test abandoned_cart event is sent to Datalake only when no CTWA data exists"""
+        with patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
+            payload = self.valid_payload.copy()
+            payload["event_type"] = "abandoned_cart"
+            payload["contact_urn"] = "whatsapp:5511888888888"
+            payload["payload"] = {"value": "99.99", "currency": "BRL"}
+
+            response = self.client.post(
+                self.endpoint_url,
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
+
+            self.assertEqual(response.status_code, 200)
+            response_data = response.json()
+            self.assertEqual(response_data["status"], "success")
+            self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
+
+            mock_send_event.assert_called_once()
+            event_data = mock_send_event.call_args[0][1]
+            self.assertEqual(event_data["event_name"], "conversion_abandoned_cart")
+            self.assertEqual(event_data["metadata"]["value"], "99.99")
+            self.assertNotIn("ctwa_id", event_data["metadata"])
+
+    def test_abandoned_cart_conversion_invalid_value(self):
+        """Test abandoned_cart conversion with invalid value format"""
+        payload = self.valid_payload.copy()
+        payload["event_type"] = "abandoned_cart"
+        payload["payload"] = {"value": "not_a_number", "currency": "BRL"}
+
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"success": True}
+            mock_post.return_value = mock_response
+
+            self.org.proj_uuid = uuid4()
+            self.org.save(update_fields=["proj_uuid"])
+
+            with override_settings(
+                WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
+                WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
+            ):
+                response = self.client.post(
+                    self.endpoint_url,
+                    data=json.dumps(payload),
+                    content_type="application/json",
+                )
+                self.assertEqual(response.status_code, 200)
+
+                mock_post.assert_called_once()
+                meta_event = mock_post.call_args[1]["json"]["data"][0]
+
+                self.assertEqual(meta_event["event_name"], "AbandonedCart")
+                self.assertNotIn("value", meta_event)
+                self.assertNotIn("currency", meta_event)
+
+                mock_send_event.assert_called_once()
+                event_data = mock_send_event.call_args[0][1]
+                self.assertEqual(event_data["metadata"]["value"], "not_a_number")
+                self.assertEqual(event_data["metadata"]["currency"], "BRL")
 
 
 class CTWAModelTest(TembaTest):
