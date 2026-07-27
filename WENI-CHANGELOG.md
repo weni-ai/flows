@@ -1,3 +1,7 @@
+3.87.1
+----------
+* feat: create commando to inspect flows by org or flow ids
+
 3.87.0
 ----------
 * feat: implement template category update functionality in WhatsApp tasks
