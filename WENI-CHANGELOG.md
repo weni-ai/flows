@@ -1,3 +1,16 @@
+3.87.1
+----------
+* feat: create commando to inspect flows by org or flow ids
+
+3.87.0
+----------
+* feat: implement template category update functionality in WhatsApp tasks
+
+3.86.1
+----------
+* Add classifier, flow, global, and ticket permissions to Marketing group
+* Endpoint to update waba in WAC
+
 3.86.0
 ----------
 * feat: add marketing_opt_in field to contact updates
