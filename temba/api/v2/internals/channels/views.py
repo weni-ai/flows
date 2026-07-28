@@ -3,6 +3,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
+from weni.internal.permissions import CanCommunicateInternally
 
 from temba.api.auth.billing import (
     BillingFixedAccessTokenAuthentication,
@@ -14,11 +15,13 @@ from temba.api.v2.internals.channels.serializers import (
     ChannelElevenLabsApiKeySerializer,
     ChannelMarketingTagsSerializer,
     ChannelProjectSerializer,
+    ChannelWabaMigrationSerializer,
 )
 from temba.api.v2.internals.channels.usecases import GetChannelMarketingTagsUseCase, GetElevenLabsApiKeyUseCase
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel
+from temba.channels.types.whatsapp_cloud.usecases import UpdateWhatsAppCloudWabaUseCase, WabaChannelNotFound
 
 
 class ChannelProjectView(BillingFixedAccessTokenViewMixin, APIViewMixin, APIView):
@@ -139,3 +142,26 @@ class ChannelMarketingTagsView(APIViewMixin, APIView):
         marketing_tags = usecase.execute(serializer.validated_data["channel_uuid"])
 
         return Response({"marketing_tags": marketing_tags})
+
+
+class ChannelWabaMigrationView(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+
+    def post(self, request: Request):
+        serializer = ChannelWabaMigrationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        usecase = UpdateWhatsAppCloudWabaUseCase()
+        try:
+            results = usecase.execute(
+                old_waba_id=serializer.validated_data["old_waba_id"],
+                new_waba_id=serializer.validated_data["new_waba_id"],
+            )
+        except WabaChannelNotFound:
+            return Response(
+                {"detail": "No WhatsApp Cloud channel found for the provided WABA"},
+                status=404,
+            )
+
+        return Response({"results": results})

@@ -268,6 +268,12 @@ class TemplateTranslation(models.Model):
                     template_update_fields.append("category")
                 existing.template.save(update_fields=template_update_fields)
 
+            template = existing.template
+            if category and template.category != category:
+                template.category = category
+                template.modified_on = timezone.now()
+                template.save(update_fields=["category", "modified_on"])
+
         return existing
 
     def __str__(self):
