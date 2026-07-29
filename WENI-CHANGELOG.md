@@ -1,3 +1,7 @@
+3.88.0
+----------
+* feat: first api gateway implementation
+
 3.87.2
 ----------
 * feat: change header for import contacts spreadsheet to URN:whatsapp default

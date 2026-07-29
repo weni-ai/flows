@@ -1873,6 +1873,7 @@ class ClassifiersEndpoint(ListAPIMixin, BaseAPIView):
             ],
         }
 
+
 @api_gateway_expose(alias="contacts")
 class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView):
     """
