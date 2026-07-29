@@ -22,12 +22,12 @@ def get_or_create_user_by_email(email: str) -> tuple:  # pragma: no cover
 
 def update_project_status(project_uuid: str, status: str, user_email: str) -> Optional[Org]:
     """
-    Update project (Org) active status based on the received status.
+    Update project (Org) suspension status based on the received status.
 
     Status mapping:
-    - ACTIVE: Sets is_active to True
-    - IN_TEST: Sets is_active to True
-    - INACTIVE: Sets is_active to False (soft delete)
+    - ACTIVE: Sets is_suspended to False
+    - IN_TEST: Sets is_suspended to False
+    - INACTIVE: Sets is_suspended to True
 
     Args:
         project_uuid: UUID of the project (stored in Org.proj_uuid)
@@ -45,33 +45,33 @@ def update_project_status(project_uuid: str, status: str, user_email: str) -> Op
 
     user, _ = get_or_create_user_by_email(user_email)
 
-    # Map status to is_active field
+    # Map status to is_suspended field (is_active is reserved for org release/deletion)
     status_mapping = {
-        "ACTIVE": True,
-        "IN_TEST": True,
-        "INACTIVE": False,
+        "ACTIVE": False,
+        "IN_TEST": False,
+        "INACTIVE": True,
     }
 
     if status not in status_mapping:
         raise ValueError(f"Invalid status: {status}. Must be one of: ACTIVE, IN_TEST, INACTIVE")
 
-    new_is_active = status_mapping[status]
+    new_is_suspended = status_mapping[status]
 
     # Only update if the status is different
-    if org.is_active != new_is_active:
-        org.is_active = new_is_active
+    if org.is_suspended != new_is_suspended:
+        org.is_suspended = new_is_suspended
         org.modified_by = user
         org.modified_on = timezone.now()
-        org.save(update_fields=["is_active", "modified_by", "modified_on"])
+        org.save(update_fields=["is_suspended", "modified_by", "modified_on"])
 
         logger.info(
             f"Project '{org.name}' ({project_uuid}) status updated to {status} "
-            f"(is_active={new_is_active}) by {user_email}"
+            f"(is_suspended={new_is_suspended}) by {user_email}"
         )
     else:
         logger.info(
             f"Project '{org.name}' ({project_uuid}) already has status {status} "
-            f"(is_active={new_is_active}), no update needed"
+            f"(is_suspended={new_is_suspended}), no update needed"
         )
 
     return org

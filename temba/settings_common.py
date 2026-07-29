@@ -623,6 +623,11 @@ GROUP_PERMISSIONS = {
         "policies.policy_history",
     ),
     "Marketing": (
+        "classifiers.classifier_api",
+        "classifiers.classifier_read",
+        "classifiers.classifier_list",
+        "classifiers.classifier_menu",
+        "classifiers.intent_api",
         "contacts.contact_api",
         "contacts.contact_archive",
         "contacts.contact_archived",
@@ -647,6 +652,12 @@ GROUP_PERMISSIONS = {
         "contacts.contactfield.*",
         "contacts.contactgroup.*",
         "contacts.contactimport.*",
+        "flows.flow.*",
+        "flows.flowstart_api",
+        "flows.flowstart_list",
+        "flows.flowlabel.*",
+        "flows.ruleset.*",
+        "globals.global_api",
         "msgs.broadcast.*",
         "msgs.broadcastschedule.*",
         "msgs.label.*",
@@ -664,6 +675,9 @@ GROUP_PERMISSIONS = {
         "msgs.msg_outbox",
         "msgs.msg_sent",
         "msgs.msg_update",
+        "tickets.ticket.*",
+        "tickets.ticketer_api",
+        "tickets.topic_api",
     ),
     "Administrators": (
         "airtime.airtimetransfer_list",
@@ -1230,6 +1244,7 @@ TICKETER_TYPES = [
     "temba.tickets.types.wenichats.WeniChatsType",
     "temba.tickets.types.freshchat.FreshchatType",
     "temba.tickets.types.twilioflex2.TwilioFlex2Type",
+    "temba.tickets.types.generic.GenericType",
 ]
 
 CHANNEL_TYPES = [
@@ -1415,6 +1430,7 @@ ORG_LIMIT_DEFAULTS = {
 SQUASH_BATCH_SIZE = int(os.environ.get("SQUASH_BATCH_SIZE", 5000))
 
 FLOW_CATEGORY_COUNT_SQUASH_BATCH_SIZE = int(os.environ.get("FLOW_CATEGORY_COUNT_SQUASH_BATCH_SIZE", 100))
+FLOW_PATH_COUNT_SQUASH_BATCH_SIZE = int(os.environ.get("FLOW_PATH_COUNT_SQUASH_BATCH_SIZE", 5000))
 
 # -----------------------------------------------------------------------------------
 # Data retention periods - tasks trim away data older than these settings
@@ -1446,6 +1462,11 @@ MACHINE_HOSTNAME = socket.gethostname().split(".")[0]
 # ElasticSearch configuration (URL RFC-1738)
 ELASTICSEARCH_URL = os.environ.get("ELASTICSEARCH_URL", "http://localhost:9200")
 ELASTICSEARCH_TIMEOUT_REQUEST = os.environ.get("ELASTICSEARCH_TIMEOUT_REQUEST", default=10)
+
+# Contact number search (Brazilian 9th digit) configuration.
+# CONTACT_SEARCH_MIN_VARIANT_LEN: minimum digits the no-9 variant must keep to be searched,
+# avoiding overly broad short fragments (e.g. "9676" -> "676").
+CONTACT_SEARCH_MIN_VARIANT_LEN = int(os.environ.get("CONTACT_SEARCH_MIN_VARIANT_LEN", default=4))
 
 # SextenX url
 SENTENX_URL = os.environ.get("SENTENX_URL", default="")

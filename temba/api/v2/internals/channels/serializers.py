@@ -7,3 +7,12 @@ class ChannelProjectSerializer(serializers.Serializer):
 
 class ChannelElevenLabsApiKeySerializer(serializers.Serializer):
     channel_uuid = serializers.UUIDField(required=True)
+
+
+class ChannelMarketingTagsSerializer(serializers.Serializer):
+    channel_uuid = serializers.UUIDField(required=True)
+
+
+class ChannelWabaMigrationSerializer(serializers.Serializer):
+    old_waba_id = serializers.CharField(required=True, max_length=64)
+    new_waba_id = serializers.CharField(required=True, max_length=64)

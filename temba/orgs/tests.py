@@ -3842,12 +3842,12 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # create a new contact
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__tel__0="0788123123")
+            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__whatsapp__0="0788123123")
         )
         self.assertNoFormErrors(response)
 
         # make sure that contact's created on is our cs rep
-        contact = Contact.objects.get(urns__path="+250788123123", org=self.org)
+        contact = Contact.objects.get(name="Ben Haggerty", org=self.org)
         self.assertEqual(self.csrep, contact.created_by)
 
         # make sure we can manage topups as well

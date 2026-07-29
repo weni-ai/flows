@@ -1286,11 +1286,11 @@ class FlowTest(TembaTest):
         # check our count
         self.assertEqual(FlowStartCount.get_count(start), 10)
 
-    @override_settings(SQUASH_BATCH_SIZE=2, FLOW_PATH_COUNT_DELETE_BATCH_LIMIT=10000)
+    @override_settings(FLOW_PATH_COUNT_SQUASH_BATCH_SIZE=2, FLOW_PATH_COUNT_DELETE_BATCH_LIMIT=10000)
     def test_flow_pathcount_squash_respects_batch_size(self):
         """
-        Ensures FlowPathCount.squash processes at most SQUASH_BATCH_SIZE distinct keys per iteration,
-        covering the early-break path in the implementation.
+        Ensures FlowPathCount.squash processes at most FLOW_PATH_COUNT_SQUASH_BATCH_SIZE distinct keys
+        per iteration, covering the early-break path in the implementation.
         """
         flow = Flow.create(self.org, self.admin, "Squash Test")
         period = timezone.now().replace(minute=0, second=0, microsecond=0)
@@ -1323,6 +1323,26 @@ class FlowTest(TembaTest):
         # Second squash: completes the remaining key
         FlowPathCount.squash()
         self.assertEqual(3, FlowPathCount.objects.filter(flow=flow, is_squashed=True).count())
+        self.assertEqual(0, FlowPathCount.objects.filter(flow=flow, is_squashed=False).count())
+
+    @override_settings(FLOW_PATH_COUNT_DELETE_BATCH_LIMIT=10000)
+    def test_flow_pathcount_squash_truncates_period_to_hour(self):
+        """
+        Rows with different minutes within the same hour should squash into a single key.
+        """
+        flow = Flow.create(self.org, self.admin, "Squash Period Test")
+        base_period = timezone.now().replace(minute=0, second=0, microsecond=0)
+        from_uuid, to_uuid = uuid4(), uuid4()
+
+        for minute in (0, 15, 30):
+            period = base_period.replace(minute=minute)
+            FlowPathCount.objects.create(flow=flow, from_uuid=from_uuid, to_uuid=to_uuid, period=period, count=1)
+
+        FlowPathCount.squash()
+
+        squashed = FlowPathCount.objects.filter(flow=flow, is_squashed=True)
+        self.assertEqual(1, squashed.count())
+        self.assertEqual(3, squashed.first().count)
         self.assertEqual(0, FlowPathCount.objects.filter(flow=flow, is_squashed=False).count())
 
     def test_prune_recent_runs(self):

@@ -104,6 +104,97 @@ class TemplateTest(TembaTest):
         self.assertEqual(refreshed.body, "Body v2")
         self.assertEqual(refreshed.footer, "Foot v2")
 
+    def test_get_or_create_updates_category_when_null(self):
+        tt = TemplateTranslation.get_or_create(
+            self.channel,
+            "hello",
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "ext-cat-1",
+            "",
+            "AUTHENTICATION",
+        )
+        Template.objects.filter(id=tt.template_id).update(category=None)
+
+        TemplateTranslation.get_or_create(
+            self.channel,
+            "hello",
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "ext-cat-1",
+            "",
+            "MARKETING",
+        )
+
+        tt.template.refresh_from_db()
+        self.assertEqual("MARKETING", tt.template.category)
+
+    def test_get_or_create_updates_category_when_changed(self):
+        tt = TemplateTranslation.get_or_create(
+            self.channel,
+            "hello",
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "ext-cat-2",
+            "",
+            "AUTHENTICATION",
+        )
+
+        TemplateTranslation.get_or_create(
+            self.channel,
+            "hello",
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "ext-cat-2",
+            "",
+            "UTILITY",
+        )
+
+        tt.template.refresh_from_db()
+        self.assertEqual("UTILITY", tt.template.category)
+
+    def test_get_or_create_updates_category_without_translation_field_changes(self):
+        tt = TemplateTranslation.get_or_create(
+            self.channel,
+            "hello",
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "ext-cat-3",
+            "",
+            "AUTHENTICATION",
+        )
+
+        TemplateTranslation.get_or_create(
+            self.channel,
+            "hello",
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "ext-cat-3",
+            "",
+            "MARKETING",
+        )
+
+        tt.template.refresh_from_db()
+        self.assertEqual("MARKETING", tt.template.category)
+
 
 class TemplateViewSetTests(TembaTest):
     view_class = TemplateViewSet

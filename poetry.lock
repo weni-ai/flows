@@ -4808,14 +4808,14 @@ requests = ">=2.25.0,<3.0"
 
 [[package]]
 name = "weni-rp-apps"
-version = "2.10.9"
+version = "2.11.1"
 description = "Weni apps for Rapidpro Platform"
 optional = false
 python-versions = "<3.13,>=3.10"
 groups = ["main"]
 files = [
-    {file = "weni_rp_apps-2.10.9-py3-none-any.whl", hash = "sha256:d78ef452375bbf84949a8d62810e537295d41274cc7a0a024a398f890f54879a"},
-    {file = "weni_rp_apps-2.10.9.tar.gz", hash = "sha256:f8a78598492588c75f1cad3620eb667c46b25c16f8bca3cfa6cbb7d935f4de35"},
+    {file = "weni_rp_apps-2.11.1-py3-none-any.whl", hash = "sha256:7f50b434b13f27714f02e3a3af765854befa6c8c2de3acba876eae046858d265"},
+    {file = "weni_rp_apps-2.11.1.tar.gz", hash = "sha256:1f965010b114c76857b0184e5747c489b027e86001cd7f5dfa1c079df5c7c252"},
 ]
 
 [package.dependencies]
@@ -5142,4 +5142,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.12"
-content-hash = "0e8f01f2d2ee9ab4d4ac7e7d141825e545b4a673148c6c3eec0e70158b4a2af9"
+content-hash = "96ca0a254234ddaad9b1301e5f935e2b172ae9492fd7178e6fddcc0512181d98"

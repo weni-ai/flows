@@ -4,6 +4,7 @@ import requests
 from django_redis import get_redis_connection
 
 from django.conf import settings
+from django.test import override_settings
 from django.utils import timezone
 
 from temba.channels.models import Channel
@@ -20,8 +21,10 @@ from temba.tests.requests import MockResponse
 from temba.wpp_products.models import Catalog, Product
 
 from . import update_api_version
+from .ninth_digit import get_ninth_digit_variant, get_number_search_terms
 from .tasks import (
     _calculate_variable_count,
+    process_event,
     refresh_whatsapp_catalog_and_products,
     sent_products_to_sentenx,
     sent_trim_products_to_sentenx,
@@ -30,6 +33,8 @@ from .tasks import (
     update_local_products_non_vtex,
     update_local_products_vtex_task,
     update_local_templates,
+    update_template_category,
+    update_template_sync,
 )
 
 
@@ -38,6 +43,137 @@ class WhatsAppUtilsTest(TembaTest):
         self.assertEqual(2, _calculate_variable_count("Hi {{1}} how are you? {{2}}"))
         self.assertEqual(2, _calculate_variable_count("Hi {{1}} how are you? {{2}} {{1}}"))
         self.assertEqual(0, _calculate_variable_count("Hi there."))
+
+    def test_update_template_category_updates_when_previous_category_present(self):
+        template = Template.objects.create(
+            org=self.org,
+            name="order_update",
+            category="AUTHENTICATION",
+        )
+        modified_before = template.modified_on
+
+        update_template_category(
+            {"previous_category": "AUTHENTICATION", "new_category": "MARKETING"},
+            template.id,
+        )
+
+        template.refresh_from_db()
+        self.assertEqual("MARKETING", template.category)
+        self.assertGreater(template.modified_on, modified_before)
+
+    def test_update_template_category_skips_when_previous_category_missing(self):
+        template = Template.objects.create(
+            org=self.org,
+            name="order_update",
+            category="AUTHENTICATION",
+        )
+        modified_before = template.modified_on
+
+        update_template_category({"new_category": "MARKETING"}, template.id)
+
+        template.refresh_from_db()
+        self.assertEqual("AUTHENTICATION", template.category)
+        self.assertEqual(modified_before, template.modified_on)
+
+    def test_process_event_message_template_status_update(self):
+        tt = TemplateTranslation.get_or_create(
+            self.channel,
+            "status_tpl",
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "status-ext-1",
+            "",
+            "UTILITY",
+        )
+
+        process_event(
+            "message_template_status_update",
+            {"message_template_id": "status-ext-1", "event": "APPROVED"},
+            tt.template_id,
+        )
+
+        tt.refresh_from_db()
+        self.assertEqual(TemplateTranslation.STATUS_APPROVED, tt.status)
+
+    def test_process_event_template_category_update(self):
+        template = Template.objects.create(
+            org=self.org,
+            name="cat_tpl",
+            category="UTILITY",
+        )
+
+        process_event(
+            "template_category_update",
+            {"previous_category": "UTILITY", "new_category": "MARKETING"},
+            template.id,
+        )
+
+        template.refresh_from_db()
+        self.assertEqual("MARKETING", template.category)
+
+    def test_process_event_message_template_quality_update(self):
+        process_event("message_template_quality_update", {"score": "GREEN"}, 1)
+
+    @patch("temba.utils.whatsapp.tasks.process_event")
+    def test_update_template_sync_calls_process_event_for_allowed_fields(self, mock_process_event):
+        template = Template.objects.create(org=self.org, name="sync_tpl", category="UTILITY")
+        webhook = {
+            "entry": [
+                {
+                    "changes": [
+                        {
+                            "field": "message_template_status_update",
+                            "value": {"message_template_id": "1", "event": "APPROVED"},
+                        },
+                        {
+                            "field": "template_category_update",
+                            "value": {
+                                "previous_category": "UTILITY",
+                                "new_category": "MARKETING",
+                            },
+                        },
+                        {
+                            "field": "message_template_quality_update",
+                            "value": {"score": "GREEN"},
+                        },
+                    ]
+                }
+            ]
+        }
+
+        update_template_sync(template.id, webhook)
+
+        self.assertEqual(2, mock_process_event.call_count)
+        mock_process_event.assert_any_call(
+            "message_template_status_update",
+            {"message_template_id": "1", "event": "APPROVED"},
+            template.id,
+        )
+        mock_process_event.assert_any_call(
+            "template_category_update",
+            {"previous_category": "UTILITY", "new_category": "MARKETING"},
+            template.id,
+        )
+
+    @patch("temba.utils.whatsapp.tasks.logger")
+    def test_update_template_sync_logs_unmapped_event(self, mock_logger):
+        template = Template.objects.create(org=self.org, name="sync_tpl", category="UTILITY")
+        webhook = {
+            "entry": [
+                {
+                    "changes": [
+                        {"field": "phone_number_name_update", "value": {}},
+                    ]
+                }
+            ]
+        }
+
+        update_template_sync(template.id, webhook)
+
+        mock_logger.info.assert_called_once_with("Event: phone_number_name_update, not mapped to usage")
 
     def test_update_local_templates_whatsapp(self):
         # channel has namespace in the channel config
@@ -648,3 +784,78 @@ class SentenxTestCase(TembaTest):
             sent_trim_products_to_sentenx(self.catalog, self.products)
 
         self.assertEqual(str(context.exception), "Not found SENTENX_URL")
+
+
+class NinthDigitVariationsTest(TembaTest):
+    def test_full_number_with_country_code(self):
+        # DDI 55 + DDD + 9 + 8 digits -> literal (any scheme) + no-9 variant (whatsapp)
+        self.assertEqual(
+            get_number_search_terms("5584981204567"),
+            {"literal": "5584981204567", "whatsapp_variant": "558481204567"},
+        )
+
+    def test_full_number_with_ddd(self):
+        # DDD + 9 + 8 digits (11 digits) -> literal + no-9 variant
+        self.assertEqual(
+            get_number_search_terms("84981204567"),
+            {"literal": "84981204567", "whatsapp_variant": "8481204567"},
+        )
+
+    def test_fragment_starting_with_nine(self):
+        # fragment long enough that the stripped variant keeps >= 4 digits
+        self.assertEqual(
+            get_number_search_terms("99676"),
+            {"literal": "99676", "whatsapp_variant": "9676"},
+        )
+
+    def test_short_fragment_does_not_generate_broad_variant(self):
+        # "9676" -> "676" has only 3 digits, so the variant must not be generated
+        self.assertEqual(
+            get_number_search_terms("9676"),
+            {"literal": "9676", "whatsapp_variant": None},
+        )
+
+    def test_number_without_ninth_digit_has_no_variant(self):
+        # already without the extra 9 -> nothing to strip
+        self.assertEqual(
+            get_number_search_terms("558481204567"),
+            {"literal": "558481204567", "whatsapp_variant": None},
+        )
+
+    def test_non_digit_characters_are_stripped(self):
+        self.assertEqual(
+            get_number_search_terms("+55 84 98120-4567"),
+            {"literal": "5584981204567", "whatsapp_variant": "558481204567"},
+        )
+
+    def test_ninth_digit_variant_helper(self):
+        self.assertEqual(get_ninth_digit_variant("5584981204567"), "558481204567")
+        self.assertEqual(get_ninth_digit_variant("84981204567"), "8481204567")
+        self.assertEqual(get_ninth_digit_variant("99676"), "9676")
+        self.assertIsNone(get_ninth_digit_variant("9676"))
+        self.assertIsNone(get_ninth_digit_variant("558481204567"))
+
+    def test_uses_default_settings(self):
+        self.assertEqual(settings.CONTACT_SEARCH_MIN_VARIANT_LEN, 4)
+
+    @override_settings(CONTACT_SEARCH_MIN_VARIANT_LEN=5)
+    def test_variant_floor_is_configurable(self):
+        # with floor 5, "99676" -> "9676" (4 digits) is now too short for the variant
+        self.assertEqual(
+            get_number_search_terms("99676"),
+            {"literal": "99676", "whatsapp_variant": None},
+        )
+        self.assertIsNone(get_ninth_digit_variant("99676"))
+        # a longer number still produces the variant
+        self.assertEqual(
+            get_number_search_terms("84981204567"),
+            {"literal": "84981204567", "whatsapp_variant": "8481204567"},
+        )
+
+    @override_settings(CONTACT_SEARCH_MIN_VARIANT_LEN=3)
+    def test_lower_variant_floor_allows_shorter_fragments(self):
+        # with floor 3, "9676" -> "676" (3 digits) becomes a valid variant
+        self.assertEqual(
+            get_number_search_terms("9676"),
+            {"literal": "9676", "whatsapp_variant": "676"},
+        )
