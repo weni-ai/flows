@@ -1487,15 +1487,9 @@ INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
 WENI_SESSION_TOKEN_ORG_MODEL = "temba.orgs.models.Org"
 WENI_SESSION_TOKEN_ORG_FIELD = "proj_uuid"
 # Defaults match weni-commons (weni_commons.auth.constants); override per environment via env vars.
-WENI_SESSION_TOKEN_DYNAMODB_TABLE = os.environ.get(
-    "WENI_SESSION_TOKEN_DYNAMODB_TABLE", default="weni-session-tokens"
-)
-WENI_SESSION_TOKEN_DYNAMODB_REGION = os.environ.get(
-    "WENI_SESSION_TOKEN_DYNAMODB_REGION", default="sa-east-1"
-)
-WENI_SESSION_TOKEN_MAX_REDIS_TTL = int(
-    os.environ.get("WENI_SESSION_TOKEN_MAX_REDIS_TTL", default="3600")
-)
+WENI_SESSION_TOKEN_DYNAMODB_TABLE = os.environ.get("WENI_SESSION_TOKEN_DYNAMODB_TABLE", default="weni-session-tokens")
+WENI_SESSION_TOKEN_DYNAMODB_REGION = os.environ.get("WENI_SESSION_TOKEN_DYNAMODB_REGION", default="sa-east-1")
+WENI_SESSION_TOKEN_MAX_REDIS_TTL = int(os.environ.get("WENI_SESSION_TOKEN_MAX_REDIS_TTL", default="3600"))
 KONG_ADMIN_URL = os.environ.get("KONG_ADMIN_URL", default="http://kong-kong-admin.kong.svc:8001")
 KONG_URL_PREFIX = os.environ.get("KONG_URL_PREFIX", default="/flows")
 KONG_SERVICE = os.environ.get("KONG_SERVICE", default="flows-service")
