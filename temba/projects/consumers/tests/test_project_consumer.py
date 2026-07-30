@@ -95,9 +95,7 @@ class TestProjectConsumer(TembaTest):
     @patch("temba.projects.consumers.project_consumer.ProjectCreationUseCase")
     @patch("temba.projects.consumers.project_consumer.TemplateTypeIntegrationUseCase")
     @patch("temba.projects.consumers.project_consumer.FlowSetupHandlerUseCase")
-    def test_consume_ignores_unsupported_event_type(
-        self, mock_flow_uc, mock_template_uc, mock_project_creation_uc
-    ):
+    def test_consume_ignores_unsupported_event_type(self, mock_flow_uc, mock_template_uc, mock_project_creation_uc):
         mock_use_case = Mock()
         mock_project_creation_uc.return_value = mock_use_case
 
