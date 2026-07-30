@@ -35,8 +35,8 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
 
     permission_classes = (SSLPermission, HasValidJWT | APIPermission)
     authentication_classes = (
-        SessionTokenAuthentication,
         OptionalJWTAuthentication,
+        SessionTokenAuthentication,
         APISessionAuthentication,
         APITokenAuthentication,
         APIBasicAuthentication,
