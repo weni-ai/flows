@@ -307,6 +307,8 @@ INSTALLED_APPS = (
     "smartmin.users",
     # django-timezone-field
     "timezone_field",
+    # weni shared utilities
+    "weni_commons",
     # temba apps
     "temba.apks",
     "temba.archives",
@@ -1480,6 +1482,15 @@ BILLING_BASE_URL = os.environ.get("BILLING_BASE_URL", default="https://billing.s
 FLOWEDITOR_SENTRY_DSN = os.environ.get("FLOWEDITOR_SENTRY_DSN", default="")
 
 INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
+
+# Connect session tokens (weni_commons.auth.SessionTokenAuthentication) and API Gateway (weni_commons.kong.api_gateway_expose)
+WENI_SESSION_TOKEN_ORG_MODEL = "temba.orgs.models.Org"
+WENI_SESSION_TOKEN_ORG_FIELD = "proj_uuid"
+KONG_ADMIN_URL = os.environ.get("KONG_ADMIN_URL", default="http://kong-kong-admin.kong.svc:8001")
+KONG_URL_PREFIX = os.environ.get("KONG_URL_PREFIX", default="/flows")
+KONG_SERVICE = os.environ.get("KONG_SERVICE", default="flows-service")
+KONG_SERVICE_URL = os.environ.get("KONG_SERVICE_URL", default="https://flows.cloud.weni.ai")
+
 
 FLOW_PATH_RECENT_RUN_BATCH_SIZE = os.environ.get("FLOW_PATH_RECENT_RUN_BATCH_SIZE", default=50)
 

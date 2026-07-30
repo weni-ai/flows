@@ -11,6 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from smartmin.views import SmartFormView, SmartTemplateView
+from weni_commons.kong import api_gateway_expose
 from weni_datalake_sdk.clients.redshift.events import get_events as dl_get_events
 
 from django import forms
@@ -1873,6 +1874,7 @@ class ClassifiersEndpoint(ListAPIMixin, BaseAPIView):
         }
 
 
+@api_gateway_expose(alias="contacts")
 class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list, create, update and delete contacts in your account.
@@ -5506,6 +5508,7 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
         }
 
 
+@api_gateway_expose(alias="events")
 class EventsEndpoint(BaseAPIView):
     permission = "orgs.org_api"
 
