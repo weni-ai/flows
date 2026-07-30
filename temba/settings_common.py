@@ -1497,6 +1497,10 @@ DATALAKE_SERVER_ADDRESS = os.environ.get("DATALAKE_SERVER_ADDRESS", default="loc
 # Connect session tokens (weni_commons.auth.SessionTokenAuthentication)
 WENI_SESSION_TOKEN_ORG_MODEL = "temba.orgs.models.Org"
 WENI_SESSION_TOKEN_ORG_FIELD = "proj_uuid"
+KONG_ADMIN_URL = os.environ.get("KONG_ADMIN_URL", default="http://kong-kong-admin.kong.svc:8001")
+KONG_URL_PREFIX = os.environ.get("KONG_URL_PREFIX", default="/flows")
+KONG_SERVICE = os.environ.get("KONG_SERVICE", default="flows-service")
+KONG_SERVICE_URL = os.environ.get("KONG_SERVICE_URL", default="https://flows.cloud.weni.ai")
 
 
 FLOW_PATH_RECENT_RUN_BATCH_SIZE = os.environ.get("FLOW_PATH_RECENT_RUN_BATCH_SIZE", default=50)

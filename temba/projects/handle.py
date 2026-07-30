@@ -16,5 +16,5 @@ def handle_consumers(channel: Channel):
     channel.basic_consume("flows.project-events", callback=ProjectEventConsumer().handle)  # pragma: no cover
 
 
-def handle_project_creation_consumers(channel: Channel):  # pragma: no cover
+def handle_amq_consumers(channel: Channel):  # pragma: no cover
     channel.basic_consume("flows.projects.queue", callback=ProjectConsumer().handle)

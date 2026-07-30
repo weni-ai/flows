@@ -11,40 +11,64 @@ from ..usecases import FlowSetupHandlerUseCase, ProjectCreationDTO, TemplateType
 logger = logging.getLogger(__name__)
 
 
+class ProjectEventType:
+    CREATED = "project.created"
+
+
 class ProjectConsumer(EDAConsumer):
     def consume(self, message: Message):  # pragma: no cover
         try:
             logger.info("[ProjectConsumer] Received message")
-            body = message.json()
+            event = message.event()
             logger.info(
-                "[ProjectConsumer] Processing project uuid=%s name=%s user_email=%s",
-                body.get("uuid"),
-                body.get("name"),
-                body.get("user_email"),
-            )
-            project_dto = ProjectCreationDTO(
-                uuid=body.get("uuid"),
-                name=body.get("name"),
-                is_template=body.get("is_template"),
-                date_format=body.get("date_format"),
-                template_type_uuid=body.get("template_type_uuid"),
-                timezone=body.get("timezone"),
-                description=body.get("description"),
-                brain_on=body.get("brain_on", False),
-                language=body.get("language"),
-                inline_agent_switch=body.get("inline_agent_switch", True),
+                "[ProjectConsumer] Processing event_type=%s event_id=%s",
+                event.event_type,
+                event.event_id,
             )
 
-            flow_setup_handler = FlowSetupHandlerUseCase()
-            template_type_integration = TemplateTypeIntegrationUseCase(flow_setup_handler)
-            project_creation = ProjectCreationUseCase(template_type_integration)
-            project_creation.create_project(
-                project_dto, body.get("user_email"), body.get("extra_fields"), body.get("authorizations")
-            )
+            if event.event_type == ProjectEventType.CREATED:
+                self._handle_project_created(event.data)
+            else:
+                logger.warning(
+                    "[ProjectConsumer] Ignoring unsupported event_type=%s event_id=%s",
+                    event.event_type,
+                    event.event_id,
+                )
 
             self.ack()
-            logger.info("[ProjectConsumer] Message processed successfully project_uuid=%s", body.get("uuid"))
+            logger.info(
+                "[ProjectConsumer] Message processed successfully event_type=%s event_id=%s",
+                event.event_type,
+                event.event_id,
+            )
         except Exception as exception:
             logger.exception("[ProjectConsumer] Failed to process message")
             capture_exception(exception)
             raise
+
+    def _handle_project_created(self, body: dict):
+        logger.info(
+            "[ProjectConsumer] Processing project uuid=%s name=%s user_email=%s",
+            body.get("uuid"),
+            body.get("name"),
+            body.get("user_email"),
+        )
+        project_dto = ProjectCreationDTO(
+            uuid=body.get("uuid"),
+            name=body.get("name"),
+            is_template=body.get("is_template"),
+            date_format=body.get("date_format"),
+            template_type_uuid=body.get("template_type_uuid"),
+            timezone=body.get("timezone"),
+            description=body.get("description"),
+            brain_on=body.get("brain_on", False),
+            language=body.get("language"),
+            inline_agent_switch=body.get("inline_agent_switch", True),
+        )
+
+        flow_setup_handler = FlowSetupHandlerUseCase()
+        template_type_integration = TemplateTypeIntegrationUseCase(flow_setup_handler)
+        project_creation = ProjectCreationUseCase(template_type_integration)
+        project_creation.create_project(
+            project_dto, body.get("user_email"), body.get("extra_fields"), body.get("authorizations")
+        )

@@ -5,6 +5,7 @@ import iso8601
 from rest_framework import generics, mixins, status
 from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
+from weni_commons.auth import SessionTokenAuthentication
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -23,7 +24,6 @@ from temba.api.v2.permissions import HasValidJWT
 from temba.contacts.models import URN
 from temba.utils import str_to_bool
 from temba.utils.views import NonAtomicMixin
-from weni_commons.auth import SessionTokenAuthentication
 
 from .serializers import BulkActionFailure
 
@@ -35,8 +35,8 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
 
     permission_classes = (SSLPermission, HasValidJWT | APIPermission)
     authentication_classes = (
-        SessionTokenAuthentication,
         OptionalJWTAuthentication,
+        SessionTokenAuthentication,
         APISessionAuthentication,
         APITokenAuthentication,
         APIBasicAuthentication,
