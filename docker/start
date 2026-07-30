@@ -105,7 +105,7 @@ elif [[ "sqsconsume" == "$1" ]]; then
 elif [[ "edaconsume-amq" == "$1" ]]; then
     shift 1
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume \
-        --handle "temba.projects.handle.handle_project_creation_consumers" \
+        --handle "temba.projects.handle.handle_amq_consumers" \
         --params-class "weni.eda.django.AMQConnectionParamsFactory" \
         "$@"
 elif [[ "fastapi" == "$1" ]]; then

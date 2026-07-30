@@ -2,6 +2,7 @@ import json
 import uuid
 from unittest.mock import Mock, patch
 
+from weni.eda.events import Event
 from weni.eda.messages import Message
 
 from temba.projects.consumers.project_consumer import ProjectConsumer
@@ -9,11 +10,12 @@ from temba.tests.base import TembaTest
 
 
 class TestProjectConsumer(TembaTest):
-    def _create_message(self, body_dict):
+    def _create_message(self, body_dict, event_type="project.created"):
         """Build a weni.eda Message without going through handle() (avoids close_old_connections)."""
         channel = Mock()
+        envelope = Event.build(event_type, body_dict).to_dict()
         message = Message(
-            body=json.dumps(body_dict, default=str).encode(),
+            body=json.dumps(envelope, default=str).encode(),
             delivery_tag="test-delivery-tag",
             channel=channel,
         )
@@ -88,4 +90,23 @@ class TestProjectConsumer(TembaTest):
         project_dto = mock_use_case.create_project.call_args[0][0]
         self.assertTrue(project_dto.inline_agent_switch)
         self.assertFalse(project_dto.brain_on)
+        channel.basic_ack.assert_called_once_with(message.delivery_tag)
+
+    @patch("temba.projects.consumers.project_consumer.ProjectCreationUseCase")
+    @patch("temba.projects.consumers.project_consumer.TemplateTypeIntegrationUseCase")
+    @patch("temba.projects.consumers.project_consumer.FlowSetupHandlerUseCase")
+    def test_consume_ignores_unsupported_event_type(
+        self, mock_flow_uc, mock_template_uc, mock_project_creation_uc
+    ):
+        mock_use_case = Mock()
+        mock_project_creation_uc.return_value = mock_use_case
+
+        body = {"uuid": str(uuid.uuid4()), "name": "Test Project"}
+        message, channel = self._create_message(body, event_type="project.updated")
+        consumer = ProjectConsumer()
+        consumer._message = message
+
+        consumer.consume(message)
+
+        mock_use_case.create_project.assert_not_called()
         channel.basic_ack.assert_called_once_with(message.delivery_tag)
