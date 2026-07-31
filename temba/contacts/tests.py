@@ -5060,10 +5060,12 @@ class URNTest(TembaTest):
         self.assertTrue(URN.validate("whatsapp:12065551212"))
         self.assertFalse(URN.validate("whatsapp:+12065551212"))
 
-        # BSUID format: 2-letter country code + dot + numeric id
+        # BSUID format: 2-letter country code + dot + optional ENT segment + alphanumeric id
         self.assertTrue(URN.validate("whatsapp:BR.35029025746744354"))
         self.assertTrue(URN.validate("whatsapp:IN.35029025746744354"))
         self.assertTrue(URN.validate("whatsapp:US.12345678901234567"))
+        self.assertTrue(URN.validate("whatsapp:BR.abc123"))
+        self.assertTrue(URN.validate("whatsapp:US.ENT.11815799212886844830"))
 
         # invalid BSUID formats
         self.assertFalse(URN.validate("whatsapp:BR35029025746744354"))
@@ -5071,7 +5073,7 @@ class URNTest(TembaTest):
         self.assertFalse(URN.validate("whatsapp:br.35029025746744354"))
         self.assertFalse(URN.validate("whatsapp:.35029025746744354"))
         self.assertFalse(URN.validate("whatsapp:BR."))
-        self.assertFalse(URN.validate("whatsapp:BR.abc123"))
+        self.assertFalse(URN.validate("whatsapp:US.ENT."))
 
         # normalize preserves both formats
         self.assertEqual(URN.normalize("whatsapp:BR.35029025746744354"), "whatsapp:BR.35029025746744354")
@@ -5082,11 +5084,17 @@ class URNTest(TembaTest):
 
         # format returns BSUID path as-is (no phone formatting)
         self.assertEqual(URN.format("whatsapp:BR.35029025746744354"), "BR.35029025746744354")
+        self.assertEqual(URN.format("whatsapp:US.ENT.11815799212886844830"), "US.ENT.11815799212886844830")
+
+        self.assertTrue(URN.is_whatsapp_bsuid_path("BR.35029025746744354"))
+        self.assertTrue(URN.is_whatsapp_bsuid_path("US.ENT.11815799212886844830"))
+        self.assertFalse(URN.is_whatsapp_bsuid_path("5511987654321"))
 
     def test_phone_scheme_inference(self):
         self.assertFalse(URN.looks_like_phone(12065551212))
         self.assertTrue(URN.is_phone_based_path("11987654321"))
         self.assertFalse(URN.is_phone_based_path("BR.35029025746744354"))
+        self.assertFalse(URN.is_phone_based_path("US.ENT.11815799212886844830"))
         self.assertEqual(
             URN.paired_phone_urns("86982810225", "BR"),
             ["whatsapp:86982810225", "tel:+86982810225"],

@@ -235,9 +235,9 @@ class URN:
         elif scheme in [cls.TELEGRAM_SCHEME, cls.INSTAGRAM_SCHEME]:
             return regex.match(r"^[0-9]+$", path, regex.V0)
 
-        # whatsapp supports numeric ids (phone-based) and BSUIDs (e.g. BR.35029025746744354)
+        # whatsapp supports phone digits and Meta BSUID paths (portfolio and parent), aligned with gocommon
         elif scheme == cls.WHATSAPP_SCHEME:
-            return regex.match(r"^([0-9]+|[A-Z]{2}\.[0-9]+)$", path, regex.V0)
+            return regex.match(r"^([0-9]+|[A-Z]{2}\.(ENT\.)?[a-zA-Z0-9]+)$", path, regex.V0)
 
         # validate Viber URNS look right (this is a guess)
         elif scheme == cls.VIBER_SCHEME:  # pragma: needs cover
@@ -354,6 +354,13 @@ class URN:
     @classmethod
     def is_phone_based_path(cls, path):
         return bool(path) and path[0] in "+0123456789"
+
+    @classmethod
+    def is_whatsapp_bsuid_path(cls, path):
+        """
+        Returns whether the path is a Meta WhatsApp BSUID (portfolio or parent), not a phone number.
+        """
+        return bool(regex.match(r"^[A-Z]{2}\.(ENT\.)?[a-zA-Z0-9]+$", path, regex.V0))
 
     @classmethod
     def paired_phone_urns(cls, value, country_code=None):
