@@ -4,6 +4,7 @@ import requests
 from django_redis import get_redis_connection
 
 from django.conf import settings
+from django.db import DatabaseError
 from django.utils import timezone
 
 from celery import shared_task
@@ -13,6 +14,20 @@ from temba.request_logs.models import HTTPLog
 from temba.wpp_flows.models import WhatsappFlow
 
 logger = logging.getLogger(__name__)
+
+# Unpaired UTF-16 surrogates are valid in Python strings but rejected by PostgreSQL's JSON type.
+_SURROGATE_REPLACEMENT = "\ufffd"
+
+
+def _sanitize_json_for_postgres(value):
+    """Replace unpaired Unicode surrogates so the value can be stored in a JSONField."""
+    if isinstance(value, str):
+        return "".join(ch if not (0xD800 <= ord(ch) <= 0xDFFF) else _SURROGATE_REPLACEMENT for ch in value)
+    if isinstance(value, list):
+        return [_sanitize_json_for_postgres(item) for item in value]
+    if isinstance(value, dict):
+        return {_sanitize_json_for_postgres(key): _sanitize_json_for_postgres(item) for key, item in value.items()}
+    return value
 
 
 @shared_task(track_started=True, name="refresh_whatsapp_flows")
@@ -85,35 +100,41 @@ def update_whatsapp_flows(flows, channel):
     seen = []
 
     for obj in flows:
-        flow = WhatsappFlow.objects.filter(facebook_flow_id=obj.get("id"), channel=channel).first()
-        assets_data = get_assets_data(channel, obj.get("id"))
-        variables = extract_data_keys(assets_data)
+        facebook_flow_id = obj.get("id")
+        # Always mark as seen so a save failure does not deactivate a flow that still exists on Meta.
+        seen.append(facebook_flow_id)
+        try:
+            flow = WhatsappFlow.objects.filter(facebook_flow_id=facebook_flow_id, channel=channel).first()
+            assets_data = get_assets_data(channel, facebook_flow_id)
+            variables = extract_data_keys(assets_data)
 
-        if flow:
-            flow.category = obj.get("categories")
-            flow.status = obj.get("status")
-            flow.name = obj.get("name")
-            flow.validation_errors = obj.get("validation_errors")
-            flow.screens = assets_data
-            flow.variables = variables
-            flow.modified_on = timezone.now()
-            flow.save()
-
-        else:
-            WhatsappFlow.objects.create(
-                facebook_flow_id=obj.get("id"),
-                category=obj.get("categories"),
-                status=obj.get("status"),
-                name=obj.get("name"),
-                validation_errors=obj.get("validation_errors"),
-                screens=assets_data,
-                variables=variables,
-                org=channel.org,
-                channel=channel,
-                is_active=True,
+            if flow:
+                flow.category = obj.get("categories")
+                flow.status = obj.get("status")
+                flow.name = obj.get("name")
+                flow.validation_errors = obj.get("validation_errors")
+                flow.screens = assets_data
+                flow.variables = variables
+                flow.modified_on = timezone.now()
+                flow.save()
+            else:
+                WhatsappFlow.objects.create(
+                    facebook_flow_id=facebook_flow_id,
+                    category=obj.get("categories"),
+                    status=obj.get("status"),
+                    name=obj.get("name"),
+                    validation_errors=obj.get("validation_errors"),
+                    screens=assets_data,
+                    variables=variables,
+                    org=channel.org,
+                    channel=channel,
+                    is_active=True,
+                )
+        except DatabaseError:
+            logger.exception(
+                "failed to sync whatsapp flow",
+                extra={"facebook_flow_id": facebook_flow_id, "channel_id": channel.id},
             )
-
-        seen.append(obj.get("id"))
 
     WhatsappFlow.trim(channel, seen)
 
@@ -132,10 +153,16 @@ def get_assets_data(channel, facebook_flow_id):
                 download_url = assets_info[0]["download_url"]
                 # get JSON of download_url
                 json_data = requests.get(download_url).json()
-                return json_data
+                return _sanitize_json_for_postgres(json_data)
     except requests.RequestException as e:
         start = timezone.now()
         HTTPLog.create_from_exception(HTTPLog.WHATSAPP_FLOWS_SYNCED, url, e, start, channel=channel)
+    except ValueError:
+        # Covers JSONDecodeError from resp.json() / download payload parse failures.
+        logger.exception(
+            "failed to parse whatsapp flow assets",
+            extra={"facebook_flow_id": facebook_flow_id, "channel_id": channel.id},
+        )
 
     return {}
 
@@ -231,14 +258,21 @@ def refresh_whatsapp_flows_assets_for_a_flow(facebook_flow_id):
 
 
 def _update_assets(flow):
-    channel = flow.channel
+    try:
+        channel = flow.channel
 
-    assets_data = get_assets_data(channel, flow.facebook_flow_id)
-    variables = extract_data_keys(assets_data)
+        assets_data = get_assets_data(channel, flow.facebook_flow_id)
+        variables = extract_data_keys(assets_data)
 
-    flow.screens = assets_data
-    flow.variables = variables
-    flow.modified_on = timezone.now()
-    flow.save()
+        flow.screens = assets_data
+        flow.variables = variables
+        flow.modified_on = timezone.now()
+        flow.save()
+    except DatabaseError:
+        logger.exception(
+            "failed to sync whatsapp flow assets",
+            extra={"facebook_flow_id": flow.facebook_flow_id, "flow_id": flow.id},
+        )
+        return None
 
     return flow
