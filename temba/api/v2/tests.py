@@ -5440,7 +5440,7 @@ class APITest(APIJSONMixin, TembaTest):
         response = self.fetchJSON(url, readonly_models={FlowStart})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["next"], None)
-        self.assertResultsById(response, [start4, start3, start2, start1])
+        self.assertResultsById(response, [start4, start3, start2, start1, start_parent_bsuid, start_bsuid])
         self.assertEqual(
             response.json()["results"][1],
             {
