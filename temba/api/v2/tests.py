@@ -356,6 +356,9 @@ class APITest(APIJSONMixin, TembaTest):
                 "+250788123123": "whatsapp:250788123123",  # bare phone defaults to whatsapp
                 "0788 123 123": serializers.ValidationError,  # whatsapp paths are not tel-normalized
                 "whatsapp:6831234": serializers.ValidationError,  # too few digits
+                "whatsapp:BR.35029025746744354": "whatsapp:BR.35029025746744354",
+                "whatsapp:US.ENT.11815799212886844830": "whatsapp:US.ENT.11815799212886844830",
+                "BR.35029025746744354": serializers.ValidationError,  # BSUID requires explicit scheme
                 "12345": serializers.ValidationError,  # un-parseable
                 "tel:800-123-4567": serializers.ValidationError,  # no country code
                 18_001_234_567: serializers.ValidationError,  # non-string
@@ -1402,6 +1405,28 @@ class APITest(APIJSONMixin, TembaTest):
         # try to create new broadcast with no recipients
         response = self.postJSON(url, None, {"text": "Hello", "msg": {"text": "Test"}})
         self.assertResponseError(response, "non_field_errors", "Must provide either urns, contacts or groups")
+
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:BR.35029025746744354"],
+                "msg": {"text": "Send a message"},
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(["whatsapp:BR.35029025746744354"], response.json()["urns"])
+
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:US.ENT.11815799212886844830"],
+                "msg": {"text": "Send a message"},
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(["whatsapp:US.ENT.11815799212886844830"], response.json()["urns"])
 
         # try to create new broadcast with no recipients
         response = self.postJSON(url, None, {"text": "Hello"})
@@ -2930,6 +2955,31 @@ class APITest(APIJSONMixin, TembaTest):
         response = self.postJSON(url, None, {"name": "ExplicitWhats", "urns": ["whatsapp:250788777777"]})
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["urns"], ["whatsapp:250788777777"])
+
+        response = self.postJSON(
+            url, None, {"name": "BSUID Contact", "urns": ["whatsapp:BR.35029025746744354"]}
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["urns"], ["whatsapp:BR.35029025746744354"])
+
+        response = self.postJSON(
+            url,
+            None,
+            {"name": "Parent BSUID Contact", "urns": ["whatsapp:US.ENT.11815799212886844830"]},
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["urns"], ["whatsapp:US.ENT.11815799212886844830"])
+
+        response = self.postJSON(url, None, {"name": "Bare BSUID", "urns": ["BR.35029025746744354"]})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["urns"],
+            {
+                "0": [
+                    "Invalid URN: BR.35029025746744354. WhatsApp BSUID identifiers must include the whatsapp: scheme."
+                ]
+            },
+        )
 
         # try to create with group from other org
         response = self.postJSON(url, None, {"name": "Jim", "groups": [other_org_group.uuid]})
@@ -5182,6 +5232,29 @@ class APITest(APIJSONMixin, TembaTest):
         # try to create an empty flow start
         response = self.postJSON(url, None, {})
         self.assertResponseError(response, "flow", "This field is required.")
+
+        # start a flow with BSUID URN
+        response = self.postJSON(
+            url,
+            None,
+            {"flow": flow.uuid, "urns": ["whatsapp:BR.35029025746744354"]},
+        )
+        self.assertEqual(response.status_code, 201)
+        start_bsuid = flow.starts.get(pk=response.json()["id"])
+        self.assertEqual(["whatsapp:BR.35029025746744354"], start_bsuid.urns)
+        mock_async_start.assert_called_once()
+        mock_async_start.reset_mock()
+
+        response = self.postJSON(
+            url,
+            None,
+            {"flow": flow.uuid, "urns": ["whatsapp:US.ENT.11815799212886844830"]},
+        )
+        self.assertEqual(response.status_code, 201)
+        start_parent_bsuid = flow.starts.get(pk=response.json()["id"])
+        self.assertEqual(["whatsapp:US.ENT.11815799212886844830"], start_parent_bsuid.urns)
+        mock_async_start.assert_called_once()
+        mock_async_start.reset_mock()
 
         # start a flow with the minimum required parameters
         response = self.postJSON(url, None, {"flow": flow.uuid, "contacts": [self.joe.uuid]})
