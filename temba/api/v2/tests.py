@@ -358,6 +358,7 @@ class APITest(APIJSONMixin, TembaTest):
                 "whatsapp:6831234": serializers.ValidationError,  # too few digits
                 "whatsapp:BR.35029025746744354": "whatsapp:BR.35029025746744354",
                 "whatsapp:US.ENT.11815799212886844830": "whatsapp:US.ENT.11815799212886844830",
+                "whatsapp:BR35029025746744354": serializers.ValidationError,  # malformed whatsapp BSUID path
                 "BR.35029025746744354": serializers.ValidationError,  # BSUID requires explicit scheme
                 "12345": serializers.ValidationError,  # un-parseable
                 "tel:800-123-4567": serializers.ValidationError,  # no country code
