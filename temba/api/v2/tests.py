@@ -2956,9 +2956,7 @@ class APITest(APIJSONMixin, TembaTest):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["urns"], ["whatsapp:250788777777"])
 
-        response = self.postJSON(
-            url, None, {"name": "BSUID Contact", "urns": ["whatsapp:BR.35029025746744354"]}
-        )
+        response = self.postJSON(url, None, {"name": "BSUID Contact", "urns": ["whatsapp:BR.35029025746744354"]})
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["urns"], ["whatsapp:BR.35029025746744354"])
 
