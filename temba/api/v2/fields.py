@@ -43,11 +43,14 @@ def _invalid_urn_validation_error(value):
     path = value
     scheme = None
     if ":" in value:
-        scheme, path, _, _ = URN.to_parts(value)
+        try:
+            scheme, path, _, _ = URN.to_parts(value)
+        except ValueError:
+            scheme, path = value.split(":", 1)
 
     if scheme == URN.WHATSAPP_SCHEME and not URN.is_phone_based_path(path):
         return serializers.ValidationError("Invalid WhatsApp identifier: %s." % value)
-    if URN.is_whatsapp_bsuid_path(value) or regex.match(r"^[A-Z]{2}\.", value, regex.V0):
+    if URN.is_whatsapp_bsuid_path(path) or regex.match(r"^[A-Z]{2}\.", value, regex.V0):
         return serializers.ValidationError(
             "Invalid URN: %s. WhatsApp BSUID identifiers must include the whatsapp: scheme." % value
         )
