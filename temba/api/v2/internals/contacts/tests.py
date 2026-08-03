@@ -920,6 +920,56 @@ class UpdateContactFieldsViewTest(TembaTest):
     @mock_mailroom
     @override_settings(INTERNAL_USER_EMAIL="super@user.com")
     @patch.object(LambdaURLValidator, "protected_resource")
+    def test_fallback_creates_instagram_username_when_missing(self, mr_mocks, mock_protected_resource):
+        contact = self.create_contact("Instagram Username Test", urns=["instagram:123456789"])
+        self.assertFalse(ContactField.user_fields.filter(org=self.org, key="instagram_username").exists())
+
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/update_contacts_fields"
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "instagram:123456789",
+            "contact_fields": {"instagram_username": "janedoe"},
+        }
+
+        response = self.client.patch(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(ContactField.user_fields.filter(org=self.org, key="instagram_username").exists())
+
+        contact.refresh_from_db()
+        instagram_username_f = ContactField.get_by_key(self.org, "instagram_username")
+        self.assertEqual(contact.get_field_display(instagram_username_f), "janedoe")
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_fallback_creates_ctwa_clid_when_missing(self, mr_mocks, mock_protected_resource):
+        contact = self.create_contact("CTWA CLID Test", urns=["whatsapp:5511888888888"])
+        self.assertFalse(ContactField.user_fields.filter(org=self.org, key="ctwa_clid").exists())
+
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/update_contacts_fields"
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "whatsapp:5511888888888",
+            "contact_fields": {"ctwa_clid": "clid-abc123"},
+        }
+
+        response = self.client.patch(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(ContactField.user_fields.filter(org=self.org, key="ctwa_clid").exists())
+
+        contact.refresh_from_db()
+        ctwa_clid_f = ContactField.get_by_key(self.org, "ctwa_clid")
+        self.assertEqual(contact.get_field_display(ctwa_clid_f), "clid-abc123")
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    @patch.object(LambdaURLValidator, "protected_resource")
     def test_fallback_creates_marketing_opt_in_when_missing(self, mr_mocks, mock_protected_resource):
         contact = self.create_contact("Marketing Opt-in Test", urns=["twitterid:77777"])
         self.assertFalse(ContactField.user_fields.filter(org=self.org, key="marketing_opt_in").exists())
