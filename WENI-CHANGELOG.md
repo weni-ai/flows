@@ -1,3 +1,11 @@
+3.89.0
+----------
+* fix: Migrate project consumer to AmazonMQ
+
+3.88.1
+----------
+* fix: adding missing dynamodb ambiente variables
+
 3.88.0
 ----------
 * feat: first api gateway implementation

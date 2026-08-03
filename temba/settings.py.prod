@@ -261,6 +261,10 @@ sentry_sdk.init(dsn=env("SENTRY_DSN", default=""), integrations=[DjangoIntegrati
 
 # LOGGING
 # ------------------------------------------------------------------------------
+# Controls INFO/DEBUG logs from EDA consumers (temba.*.consumers) and weni.eda.
+# Examples: CONSUMERS_LOG_LEVEL=INFO | WARNING | DEBUG | ERROR
+CONSUMERS_LOG_LEVEL = env("CONSUMERS_LOG_LEVEL", default="WARNING")
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": env("DISABLE_LOG", default=True),
@@ -281,6 +285,13 @@ LOGGING = {
         # OIDC
         "mozilla_django_oidc": {"level": "DEBUG", "handlers": ["console"], "propagate": False},
         "weni_django_oidc": {"level": "DEBUG", "handlers": ["console"], "propagate": False},
+        # EDA consumers
+        "temba.projects.consumers": {"level": CONSUMERS_LOG_LEVEL, "handlers": ["console"], "propagate": False},
+        "temba.classifiers.consumers": {"level": CONSUMERS_LOG_LEVEL, "handlers": ["console"], "propagate": False},
+        "temba.tickets.consumers": {"level": CONSUMERS_LOG_LEVEL, "handlers": ["console"], "propagate": False},
+        "temba.features.consumers": {"level": CONSUMERS_LOG_LEVEL, "handlers": ["console"], "propagate": False},
+        "temba.templates.consumers": {"level": CONSUMERS_LOG_LEVEL, "handlers": ["console"], "propagate": False},
+        "weni.eda": {"level": CONSUMERS_LOG_LEVEL, "handlers": ["console"], "propagate": False},
     },
 }
 
