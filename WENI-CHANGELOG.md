@@ -1,3 +1,7 @@
+Unreleased
+----------
+* feat: make Sentry sample rates and ignored errors configurable via environment variables (CLOUDW-4325)
+
 3.89.0
 ----------
 * fix: Migrate project consumer to AmazonMQ

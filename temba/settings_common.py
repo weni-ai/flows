@@ -15,6 +15,8 @@ from django.utils.translation import ugettext_lazy as _
 
 from celery.schedules import crontab
 
+from .sentry_config import get_float_env, get_ignored_errors_from_env
+
 SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
 
 
@@ -23,7 +25,13 @@ if SENTRY_DSN:  # pragma: no cover
         dsn=SENTRY_DSN,
         integrations=[DjangoIntegration(), CeleryIntegration(), LoggingIntegration()],
         send_default_pii=True,
-        traces_sample_rate=0,
+        ignore_errors=get_ignored_errors_from_env(),
+        # Fraction of error events to send (1.0 = 100%). Override with SENTRY_SAMPLE_RATE.
+        sample_rate=get_float_env("SENTRY_SAMPLE_RATE", 1.0),
+        # Performance transactions. Default keeps previous behavior (disabled).
+        traces_sample_rate=get_float_env("SENTRY_TRACES_SAMPLE_RATE", 0.0),
+        # Profiling. Default disabled.
+        profiles_sample_rate=get_float_env("SENTRY_PROFILES_SAMPLE_RATE", 0.0),
     )
     ignore_logger("django.security.DisallowedHost")
 
