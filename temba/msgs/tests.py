@@ -2877,6 +2877,136 @@ class BroadcastStatisticsTest(TembaTest):
         self.assertEqual(rate, 0)
 
 
+class BroadcastStatisticsTriggerTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.joe = self.create_contact("Joe Blow", phone="123")
+        self.group = self.create_group("Group", contacts=[self.joe])
+        ContactGroupCount.populate_for_group(self.group)
+
+        with patch("temba.msgs.models.get_template_price_and_currency_from_api", return_value=(Decimal("0.50"), "USD")):
+            self.broadcast = Broadcast.create(
+                self.org,
+                self.user,
+                "Trigger test",
+                groups=[self.group],
+                is_bulk_send=True,
+            )
+
+        self.stats = BroadcastStatistics.objects.get(broadcast=self.broadcast)
+        self.stats.refresh_from_db()
+
+    def _create_broadcast_msg(self, status=Msg.STATUS_QUEUED):
+        return self.create_outgoing_msg(self.joe, "hello", status=status, broadcast=self.broadcast)
+
+    def _advance(self, msg, new_status):
+        msg.status = new_status
+        update_fields = ["status"]
+        if new_status in (Msg.STATUS_WIRED, Msg.STATUS_SENT, Msg.STATUS_DELIVERED):
+            if not msg.sent_on:
+                msg.sent_on = timezone.now()
+            update_fields.append("sent_on")
+        msg.save(update_fields=update_fields)
+        self.stats.refresh_from_db()
+
+    def _assert_stats(self, *, processed=0, sent=0, delivered=0, read=0, failed=0):
+        self.assertEqual(self.stats.processed, processed)
+        self.assertEqual(self.stats.sent, sent)
+        self.assertEqual(self.stats.delivered, delivered)
+        self.assertEqual(self.stats.read, read)
+        self.assertEqual(self.stats.failed, failed)
+
+    def test_normal_status_progression(self):
+        msg = self._create_broadcast_msg()
+
+        self._advance(msg, Msg.STATUS_WIRED)
+        self._assert_stats(processed=1)
+
+        self._advance(msg, Msg.STATUS_SENT)
+        self._assert_stats(processed=1, sent=1)
+
+        self._advance(msg, Msg.STATUS_DELIVERED)
+        self._assert_stats(processed=1, sent=1, delivered=1)
+
+        self._advance(msg, Msg.STATUS_READ)
+        self._assert_stats(processed=1, sent=1, delivered=1, read=1)
+
+    def test_out_of_order_delivered_sent_delivered_does_not_double_count(self):
+        """Regression: W -> D -> S -> D must stay at 1/1/1 (not 2/2)."""
+        msg = self._create_broadcast_msg()
+
+        self._advance(msg, Msg.STATUS_WIRED)
+        self._advance(msg, Msg.STATUS_DELIVERED)
+        self._advance(msg, Msg.STATUS_SENT)
+        self._advance(msg, Msg.STATUS_DELIVERED)
+
+        self._assert_stats(processed=1, sent=1, delivered=1)
+        msg.refresh_from_db()
+        self.assertEqual(msg.status, Msg.STATUS_DELIVERED)
+
+    def test_status_regression_to_sent_is_ignored(self):
+        msg = self._create_broadcast_msg()
+
+        self._advance(msg, Msg.STATUS_WIRED)
+        self._advance(msg, Msg.STATUS_SENT)
+        self._advance(msg, Msg.STATUS_DELIVERED)
+        self._advance(msg, Msg.STATUS_SENT)
+
+        self._assert_stats(processed=1, sent=1, delivered=1)
+        msg.refresh_from_db()
+        self.assertEqual(msg.status, Msg.STATUS_DELIVERED)
+
+    def test_skip_path_q_to_delivered(self):
+        msg = self._create_broadcast_msg()
+
+        self._advance(msg, Msg.STATUS_DELIVERED)
+
+        self._assert_stats(processed=1, sent=1, delivered=1)
+
+    def test_skip_path_q_to_read(self):
+        msg = self._create_broadcast_msg()
+
+        self._advance(msg, Msg.STATUS_READ)
+
+        self._assert_stats(processed=1, sent=1, delivered=1, read=1)
+
+    def test_read_not_double_counted_on_repeated_updates_to_v(self):
+        msg = self._create_broadcast_msg()
+
+        self._advance(msg, Msg.STATUS_WIRED)
+        self._advance(msg, Msg.STATUS_SENT)
+        self._advance(msg, Msg.STATUS_DELIVERED)
+        self._advance(msg, Msg.STATUS_READ)
+        self._advance(msg, Msg.STATUS_READ)
+
+        self._assert_stats(processed=1, sent=1, delivered=1, read=1)
+
+    def test_cost_incremented_once_on_first_sent(self):
+        msg = self._create_broadcast_msg()
+
+        self._advance(msg, Msg.STATUS_WIRED)
+        self._advance(msg, Msg.STATUS_SENT)
+        self.stats.refresh_from_db()
+        self.assertEqual(self.stats.cost, Decimal("0.50"))
+
+        self._advance(msg, Msg.STATUS_DELIVERED)
+        self._advance(msg, Msg.STATUS_SENT)
+        self.stats.refresh_from_db()
+        self.assertEqual(self.stats.cost, Decimal("0.50"))
+
+    def test_multiple_messages_aggregate_correctly(self):
+        msg_a = self._create_broadcast_msg()
+        msg_b = self._create_broadcast_msg()
+
+        for msg in (msg_a, msg_b):
+            self._advance(msg, Msg.STATUS_WIRED)
+            self._advance(msg, Msg.STATUS_DELIVERED)
+            self._advance(msg, Msg.STATUS_SENT)
+            self._advance(msg, Msg.STATUS_DELIVERED)
+
+        self._assert_stats(processed=2, sent=2, delivered=2)
+
+
 class BroadcastCreateWithGroupsTest(TembaTest):
     def setUp(self):
         super().setUp()
