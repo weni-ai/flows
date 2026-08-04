@@ -2884,7 +2884,9 @@ class BroadcastStatisticsTriggerTest(TembaTest):
         self.group = self.create_group("Group", contacts=[self.joe])
         ContactGroupCount.populate_for_group(self.group)
 
-        with patch("temba.msgs.models.get_template_price_and_currency_from_api", return_value=(Decimal("0.50"), "USD")):
+        with patch(
+            "temba.msgs.models.get_template_price_and_currency_from_api", return_value=(Decimal("0.50"), "USD")
+        ):
             self.broadcast = Broadcast.create(
                 self.org,
                 self.user,
@@ -2897,7 +2899,18 @@ class BroadcastStatisticsTriggerTest(TembaTest):
         self.stats.refresh_from_db()
 
     def _create_broadcast_msg(self, status=Msg.STATUS_QUEUED):
-        return self.create_outgoing_msg(self.joe, "hello", status=status, broadcast=self.broadcast)
+        return self._create_msg(
+            self.joe,
+            "hello",
+            Msg.DIRECTION_OUT,
+            self.channel,
+            Msg.TYPE_INBOX,
+            (),
+            status,
+            None,
+            None,
+            broadcast=self.broadcast,
+        )
 
     def _advance(self, msg, new_status):
         msg.status = new_status
