@@ -1,3 +1,7 @@
+3.90.1
+----------
+* fix: sanitize unpaired Unicode surrogates in WhatsApp Flow assets sync
+
 3.90.0
 ----------
 * feat: add whatsapp bsuid urn validation
