@@ -73,7 +73,8 @@ from .models import (
     ContactURN,
     ExportContactsTask,
 )
-from .search import SearchException, parse_query, search_contacts_resolving_phone
+from .search import SearchException, parse_query
+from .search.phone_search import search_contacts_resolving_phone
 from .search.omnibox import omnibox_query, omnibox_results_to_dict
 from .tasks import export_contacts_task
 

@@ -1,11 +1,16 @@
 from unittest.mock import patch
 
-from temba.contacts.models import URN
 from temba.mailroom import MailroomException
 from temba.tests import TembaTest, mock_mailroom
 
 from . import SearchException, SearchResults, elastic
-from .phone_search import build_phone_urn_query, is_bare_phone_search, search_contacts_resolving_phone
+from .phone_search import (
+    TEL_SCHEME,
+    WHATSAPP_SCHEME,
+    build_phone_urn_query,
+    is_bare_phone_search,
+    search_contacts_resolving_phone,
+)
 
 
 class PhoneSearchTest(TembaTest):
@@ -19,13 +24,13 @@ class PhoneSearchTest(TembaTest):
         self.assertFalse(is_bare_phone_search("BR.35029025746744354", self.org))
 
     def test_build_phone_urn_query(self):
-        self.assertEqual(build_phone_urn_query(URN.WHATSAPP_SCHEME, "987654321"), 'whatsapp ~ "987654321"')
-        self.assertEqual(build_phone_urn_query(URN.TEL_SCHEME, "987654321"), 'tel ~ "987654321"')
+        self.assertEqual(build_phone_urn_query(WHATSAPP_SCHEME, "987654321"), 'whatsapp ~ "987654321"')
+        self.assertEqual(build_phone_urn_query(TEL_SCHEME, "987654321"), 'tel ~ "987654321"')
 
     @patch("temba.contacts.search.phone_search.search_contacts")
     def test_search_contacts_resolving_phone(self, mock_search_contacts):
-        whatsapp_query = build_phone_urn_query(URN.WHATSAPP_SCHEME, "987654321")
-        tel_query = build_phone_urn_query(URN.TEL_SCHEME, "987654321")
+        whatsapp_query = build_phone_urn_query(WHATSAPP_SCHEME, "987654321")
+        tel_query = build_phone_urn_query(TEL_SCHEME, "987654321")
 
         mock_search_contacts.side_effect = [
             SearchResults(query=whatsapp_query, total=1, contact_ids=[1]),

@@ -1,10 +1,12 @@
 import json
 import re
 
-from temba.contacts.models import URN
 from temba.utils.whatsapp.ninth_digit import get_number_search_terms
 
 from .mailroom import SearchResults, search_contacts
+
+WHATSAPP_SCHEME = "whatsapp"
+TEL_SCHEME = "tel"
 
 _CONTACTQL_HINTS = re.compile(r"[~>=]|(?:^|\s)(?:and|or|not)\s", re.I)
 _SCHEME_HINTS = re.compile(r"(?:^|\s)(?:tel|whatsapp|twitter|email|facebook|instagram|telegram|discord)\s*[=~]", re.I)
@@ -30,6 +32,8 @@ def is_bare_phone_search(query: str, org) -> bool:
     if _IMPLICIT_PHONE.match(query):
         return True
 
+    from temba.contacts.models import URN
+
     return URN.looks_like_phone(query, org.default_country_code)
 
 
@@ -44,7 +48,7 @@ def build_phone_urn_query(scheme: str, raw_query: str) -> str:
 
     clauses = [f"{scheme} ~ {json.dumps(digits)}"]
 
-    if scheme == URN.WHATSAPP_SCHEME and terms["whatsapp_variant"]:
+    if scheme == WHATSAPP_SCHEME and terms["whatsapp_variant"]:
         clauses.append(f"{scheme} ~ {json.dumps(terms['whatsapp_variant'])}")
 
     if len(clauses) == 1:
@@ -66,11 +70,11 @@ def search_contacts_resolving_phone(
 
     search_kwargs = dict(group=group, sort=sort, offset=offset, exclude_ids=exclude_ids)
 
-    whatsapp_query = build_phone_urn_query(URN.WHATSAPP_SCHEME, query)
+    whatsapp_query = build_phone_urn_query(WHATSAPP_SCHEME, query)
     whatsapp_results = search_contacts(org, whatsapp_query, **search_kwargs)
     if whatsapp_results.total > 0:
         return ContactSearchOutcome(whatsapp_results)
 
-    tel_query = build_phone_urn_query(URN.TEL_SCHEME, query)
+    tel_query = build_phone_urn_query(TEL_SCHEME, query)
     tel_results = search_contacts(org, tel_query, **search_kwargs)
     return ContactSearchOutcome(tel_results, phone_fallback=True)

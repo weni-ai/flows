@@ -27,7 +27,7 @@ from temba.airtime.models import AirtimeTransfer
 from temba.campaigns.models import Campaign, CampaignEvent, EventFire
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
 from temba.contacts.search import SearchException, SearchResults, search_contacts
-from temba.contacts.search.phone_search import build_phone_urn_query
+from temba.contacts.search.phone_search import WHATSAPP_SCHEME, TEL_SCHEME, build_phone_urn_query
 from temba.contacts.views import ContactCRUDL, ContactListView
 from temba.flows.models import Flow, FlowSession, FlowStart
 from temba.ivr.models import IVRCall
@@ -183,7 +183,7 @@ class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
         self.assertEqual(response.context["save_dynamic_search"], True)
         self.assertIsNone(response.context["search_error"])
 
-        whatsapp_query = build_phone_urn_query(URN.WHATSAPP_SCHEME, "987654321")
+        whatsapp_query = build_phone_urn_query(WHATSAPP_SCHEME, "987654321")
         mr_mocks.contact_search(whatsapp_query, contacts=[joe], cleaned=whatsapp_query)
 
         response = self.client.get(list_url + "?search=987654321")
@@ -192,7 +192,7 @@ class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
         self.assertFalse(response.context["search_phone_fallback"])
         self.assertIsNone(response.context["search_error"])
 
-        tel_query = build_phone_urn_query(URN.TEL_SCHEME, "987654321")
+        tel_query = build_phone_urn_query(TEL_SCHEME, "987654321")
         mr_mocks.contact_search(whatsapp_query, contacts=[], total=0, cleaned=whatsapp_query)
         mr_mocks.contact_search(tel_query, contacts=[frank], cleaned=tel_query)
 
