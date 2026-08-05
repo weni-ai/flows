@@ -1,7 +1,64 @@
+from unittest.mock import patch
+
+from temba.contacts.models import URN
 from temba.mailroom import MailroomException
 from temba.tests import TembaTest, mock_mailroom
 
-from . import SearchException, elastic
+from . import SearchException, SearchResults, elastic
+from .phone_search import build_phone_urn_query, is_bare_phone_search, search_contacts_resolving_phone
+
+
+class PhoneSearchTest(TembaTest):
+    def test_is_bare_phone_search(self):
+        self.assertTrue(is_bare_phone_search("987654321", self.org))
+        self.assertTrue(is_bare_phone_search("+250781111111", self.org))
+        self.assertFalse(is_bare_phone_search("Joe", self.org))
+        self.assertFalse(is_bare_phone_search("age = 18", self.org))
+        self.assertFalse(is_bare_phone_search("tel ~ 1234", self.org))
+        self.assertFalse(is_bare_phone_search("whatsapp:5586987654321", self.org))
+        self.assertFalse(is_bare_phone_search("BR.35029025746744354", self.org))
+
+    def test_build_phone_urn_query(self):
+        self.assertEqual(build_phone_urn_query(URN.WHATSAPP_SCHEME, "987654321"), 'whatsapp ~ "987654321"')
+        self.assertEqual(build_phone_urn_query(URN.TEL_SCHEME, "987654321"), 'tel ~ "987654321"')
+
+    @patch("temba.contacts.search.phone_search.search_contacts")
+    def test_search_contacts_resolving_phone(self, mock_search_contacts):
+        whatsapp_query = build_phone_urn_query(URN.WHATSAPP_SCHEME, "987654321")
+        tel_query = build_phone_urn_query(URN.TEL_SCHEME, "987654321")
+
+        mock_search_contacts.side_effect = [
+            SearchResults(query=whatsapp_query, total=1, contact_ids=[1]),
+            SearchResults(query=tel_query, total=1, contact_ids=[2]),
+            SearchResults(query='name ~ "Joe"', total=1, contact_ids=[3]),
+        ]
+
+        outcome = search_contacts_resolving_phone(self.org, "987654321")
+        self.assertFalse(outcome.phone_fallback)
+        self.assertEqual(outcome.results.contact_ids, [1])
+        mock_search_contacts.assert_called_once_with(
+            self.org, whatsapp_query, group=None, sort=None, offset=None, exclude_ids=()
+        )
+
+        mock_search_contacts.reset_mock()
+        mock_search_contacts.side_effect = [
+            SearchResults(query=whatsapp_query, total=0, contact_ids=[]),
+            SearchResults(query=tel_query, total=1, contact_ids=[2]),
+        ]
+
+        outcome = search_contacts_resolving_phone(self.org, "987654321")
+        self.assertTrue(outcome.phone_fallback)
+        self.assertEqual(outcome.results.contact_ids, [2])
+        self.assertEqual(mock_search_contacts.call_count, 2)
+
+        mock_search_contacts.reset_mock()
+        mock_search_contacts.return_value = SearchResults(query='name ~ "Joe"', total=1, contact_ids=[3])
+
+        outcome = search_contacts_resolving_phone(self.org, "Joe")
+        self.assertFalse(outcome.phone_fallback)
+        mock_search_contacts.assert_called_once_with(
+            self.org, "Joe", group=None, sort=None, offset=None, exclude_ids=()
+        )
 
 
 class SearchExceptionTest(TembaTest):

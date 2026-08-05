@@ -73,7 +73,7 @@ from .models import (
     ContactURN,
     ExportContactsTask,
 )
-from .search import SearchException, parse_query, search_contacts
+from .search import SearchException, parse_query, search_contacts_resolving_phone
 from .search.omnibox import omnibox_query, omnibox_results_to_dict
 from .tasks import export_contacts_task
 
@@ -191,6 +191,7 @@ class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
 
     parsed_query = None
     save_dynamic_search = None
+    search_phone_fallback = False
 
     sort_field = None
     sort_direction = None
@@ -317,9 +318,11 @@ class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
                 exclude_ids = []
 
             try:
-                results = search_contacts(
+                outcome = search_contacts_resolving_phone(
                     org, search_query, group=self.group, sort=sort_on, offset=offset, exclude_ids=exclude_ids
                 )
+                results = outcome.results
+                self.search_phone_fallback = outcome.phone_fallback
                 self.parsed_query = results.query if len(results.query) > 0 else None
                 self.save_dynamic_search = results.metadata.allow_as_group
 
@@ -371,6 +374,7 @@ class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
         if self.parsed_query is not None:
             context["search"] = self.parsed_query
             context["save_dynamic_search"] = self.save_dynamic_search
+            context["search_phone_fallback"] = self.search_phone_fallback
 
         return context
 
@@ -1120,7 +1124,10 @@ class ContactCRUDL(SmartCRUDL):
                 return JsonResponse({"total": 0, "sample": [], "fields": {}})
 
             try:
-                results = search_contacts(org, query, group=org.active_contacts_group, sort="-created_on")
+                outcome = search_contacts_resolving_phone(
+                    org, query, group=org.active_contacts_group, sort="-created_on"
+                )
+                results = outcome.results
                 summary = {
                     "total": results.total,
                     "query": results.query,
