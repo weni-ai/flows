@@ -63,6 +63,9 @@ def search_contacts_resolving_phone(
     """
     Runs contact search, resolving bare phone numbers on WhatsApp URNs first and tel URNs second.
     """
+    if query is None:
+        query = ""
+
     if not is_bare_phone_search(query, org):
         return ContactSearchOutcome(
             search_contacts(org, query, group=group, sort=sort, offset=offset, exclude_ids=exclude_ids)

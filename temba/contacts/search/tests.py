@@ -24,21 +24,23 @@ class PhoneSearchTest(TembaTest):
         self.assertFalse(is_bare_phone_search("BR.35029025746744354", self.org))
 
     def test_build_phone_urn_query(self):
-        self.assertEqual(build_phone_urn_query(WHATSAPP_SCHEME, "987654321"), 'whatsapp ~ "987654321"')
-        self.assertEqual(build_phone_urn_query(TEL_SCHEME, "987654321"), 'tel ~ "987654321"')
+        self.assertEqual(build_phone_urn_query(WHATSAPP_SCHEME, "250781111"), 'whatsapp ~ "250781111"')
+        self.assertEqual(build_phone_urn_query(TEL_SCHEME, "250781111"), 'tel ~ "250781111"')
+        self.assertEqual(
+            build_phone_urn_query(WHATSAPP_SCHEME, "987654321"),
+            '(whatsapp ~ "987654321" OR whatsapp ~ "87654321")',
+        )
 
     @patch("temba.contacts.search.phone_search.search_contacts")
     def test_search_contacts_resolving_phone(self, mock_search_contacts):
-        whatsapp_query = build_phone_urn_query(WHATSAPP_SCHEME, "987654321")
-        tel_query = build_phone_urn_query(TEL_SCHEME, "987654321")
+        whatsapp_query = build_phone_urn_query(WHATSAPP_SCHEME, "250781111")
+        tel_query = build_phone_urn_query(TEL_SCHEME, "250781111")
 
         mock_search_contacts.side_effect = [
             SearchResults(query=whatsapp_query, total=1, contact_ids=[1]),
-            SearchResults(query=tel_query, total=1, contact_ids=[2]),
-            SearchResults(query='name ~ "Joe"', total=1, contact_ids=[3]),
         ]
 
-        outcome = search_contacts_resolving_phone(self.org, "987654321")
+        outcome = search_contacts_resolving_phone(self.org, "250781111")
         self.assertFalse(outcome.phone_fallback)
         self.assertEqual(outcome.results.contact_ids, [1])
         mock_search_contacts.assert_called_once_with(
@@ -51,12 +53,13 @@ class PhoneSearchTest(TembaTest):
             SearchResults(query=tel_query, total=1, contact_ids=[2]),
         ]
 
-        outcome = search_contacts_resolving_phone(self.org, "987654321")
+        outcome = search_contacts_resolving_phone(self.org, "250781111")
         self.assertTrue(outcome.phone_fallback)
         self.assertEqual(outcome.results.contact_ids, [2])
         self.assertEqual(mock_search_contacts.call_count, 2)
 
         mock_search_contacts.reset_mock()
+        mock_search_contacts.side_effect = None
         mock_search_contacts.return_value = SearchResults(query='name ~ "Joe"', total=1, contact_ids=[3])
 
         outcome = search_contacts_resolving_phone(self.org, "Joe")
