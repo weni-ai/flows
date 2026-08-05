@@ -27,6 +27,7 @@ from temba.airtime.models import AirtimeTransfer
 from temba.campaigns.models import Campaign, CampaignEvent, EventFire
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
 from temba.contacts.search import SearchException, SearchResults, search_contacts
+from temba.contacts.search.phone_search import TEL_SCHEME, WHATSAPP_SCHEME, ContactSearchOutcome, build_phone_urn_query
 from temba.contacts.views import ContactCRUDL, ContactListView
 from temba.flows.models import Flow, FlowSession, FlowStart
 from temba.ivr.models import IVRCall
@@ -180,6 +181,25 @@ class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
         self.assertEqual(list(response.context["object_list"]), [joe])
         self.assertEqual(response.context["search"], 'name ~ "Joe"')
         self.assertEqual(response.context["save_dynamic_search"], True)
+        self.assertIsNone(response.context["search_error"])
+
+        whatsapp_query = build_phone_urn_query(WHATSAPP_SCHEME, "250781111")
+        mr_mocks.contact_search(whatsapp_query, contacts=[joe], cleaned=whatsapp_query)
+
+        response = self.client.get(list_url + "?search=250781111")
+        self.assertEqual(list(response.context["object_list"]), [joe])
+        self.assertEqual(response.context["search"], whatsapp_query)
+        self.assertFalse(response.context["search_phone_fallback"])
+        self.assertIsNone(response.context["search_error"])
+
+        tel_query = build_phone_urn_query(TEL_SCHEME, "250781111")
+        mr_mocks.contact_search(whatsapp_query, contacts=[], total=0, cleaned=whatsapp_query)
+        mr_mocks.contact_search(tel_query, contacts=[frank], cleaned=tel_query)
+
+        response = self.client.get(list_url + "?search=250781111")
+        self.assertEqual(list(response.context["object_list"]), [frank])
+        self.assertEqual(response.context["search"], tel_query)
+        self.assertTrue(response.context["search_phone_fallback"])
         self.assertIsNone(response.context["search_error"])
 
         with AnonymousOrg(self.org):
@@ -1882,8 +1902,9 @@ class ContactTest(TembaTest):
             self.assertEqual([], [u.urn for u in self.billy.get_urns()])
 
     @patch("temba.contacts.search.omnibox.search_contacts")
+    @patch("temba.contacts.search.omnibox.search_contacts_resolving_phone")
     @mock_mailroom
-    def test_omnibox(self, mr_mocks, mock_search_contacts):
+    def test_omnibox(self, mr_mocks, mock_search_resolving_phone, mock_search_contacts):
         # add a group with members and an empty group
         self.create_field("gender", "Gender")
         joe_and_frank = self.create_group("Joe and Frank", [self.joe, self.frank])
@@ -1917,23 +1938,40 @@ class ContactTest(TembaTest):
             response = self.client.get(f"{path}?{query}&v={version}")
             return response.json()["results"]
 
+        def omnibox_search_results(results):
+            if isinstance(results, list):
+                return [ContactSearchOutcome(result) for result in results]
+            return ContactSearchOutcome(results)
+
+        def resolve_phone_search(org, query, **kwargs):
+            return ContactSearchOutcome(
+                search_contacts(org, query, group=kwargs.get("group"), sort=kwargs.get("sort"))
+            )
+
+        def set_contact_search_mocks(*results):
+            mock_search_resolving_phone.side_effect = omnibox_search_results(list(results))
+
+        def set_urn_search_mocks(*results):
+            mock_search_contacts.side_effect = list(results)
+
         # omnibox view will try to search it as a contact then as a URN so 2 calls to mailroom search endpoint
         mr_mocks.error("ooh that doesn't look right")
         mr_mocks.error("ooh that doesn't look right again")
 
         # for this one test we want to call the actual search method..
+        mock_search_resolving_phone.side_effect = resolve_phone_search
         mock_search_contacts.side_effect = search_contacts
 
         # error is swallowed and we show no results
         self.assertEqual([], omnibox_request("search=-123`213"))
 
         with self.assertNumQueries(17):
-            mock_search_contacts.side_effect = [
+            set_contact_search_mocks(
                 SearchResults(
                     query="", total=4, contact_ids=[self.billy.id, self.frank.id, self.joe.id, self.voldemort.id]
-                ),
-                SearchResults(query="", total=3, contact_ids=[]),
-            ]
+                )
+            )
+            set_urn_search_mocks(SearchResults(query="", total=3, contact_ids=[]))
 
             self.assertEqual(
                 [
@@ -1951,10 +1989,8 @@ class ContactTest(TembaTest):
             )
 
         with self.assertNumQueries(20):
-            mock_search_contacts.side_effect = [
-                SearchResults(query="", total=2, contact_ids=[self.billy.id, self.frank.id]),
-                SearchResults(query="", total=2, contact_ids=[self.voldemort.id, self.frank.id]),
-            ]
+            set_contact_search_mocks(SearchResults(query="", total=2, contact_ids=[self.billy.id, self.frank.id]))
+            set_urn_search_mocks(SearchResults(query="", total=2, contact_ids=[self.voldemort.id, self.frank.id]))
 
             self.assertEqual(
                 [
@@ -1981,10 +2017,8 @@ class ContactTest(TembaTest):
             )
 
         with self.assertNumQueries(17):
-            mock_search_contacts.side_effect = [
-                SearchResults(query="", total=2, contact_ids=[self.billy.id, self.frank.id]),
-                SearchResults(query="", total=0, contact_ids=[]),
-            ]
+            set_contact_search_mocks(SearchResults(query="", total=2, contact_ids=[self.billy.id, self.frank.id]))
+            set_urn_search_mocks(SearchResults(query="", total=0, contact_ids=[]))
 
             self.assertEqual(
                 [
@@ -2020,12 +2054,14 @@ class ContactTest(TembaTest):
             omnibox_request("types=s"),
         )
 
-        mock_search_contacts.side_effect = [
+        set_contact_search_mocks(
             SearchResults(
                 query="", total=4, contact_ids=[self.billy.id, self.frank.id, self.joe.id, self.voldemort.id]
-            ),
-            SearchResults(query="", total=3, contact_ids=[self.voldemort.id, self.joe.id, self.frank.id]),
-        ]
+            )
+        )
+        set_urn_search_mocks(
+            SearchResults(query="", total=3, contact_ids=[self.voldemort.id, self.joe.id, self.frank.id])
+        )
         self.assertEqual(
             [
                 {"id": f"c-{self.billy.uuid}", "text": "Billy Nophone", "extra": ""},
@@ -2040,10 +2076,8 @@ class ContactTest(TembaTest):
         )
 
         # search for Frank by phone
-        mock_search_contacts.side_effect = [
-            SearchResults(query="name ~ 222", total=0, contact_ids=[]),
-            SearchResults(query="urn ~ 222", total=1, contact_ids=[self.frank.id]),
-        ]
+        set_contact_search_mocks(SearchResults(query="name ~ 222", total=0, contact_ids=[]))
+        set_urn_search_mocks(SearchResults(query="urn ~ 222", total=1, contact_ids=[self.frank.id]))
         self.assertEqual(
             [{"id": f"u-{frank_tel.id}", "text": "250782222222", "extra": "Frank Smith", "scheme": "tel"}],
             omnibox_request("search=222"),
@@ -2056,10 +2090,8 @@ class ContactTest(TembaTest):
         Channel.create(self.org, self.user, "RW", "EX", schemes=[URN.TEL_SCHEME])
 
         # search for Joe - match on last name and twitter handle
-        mock_search_contacts.side_effect = [
-            SearchResults(query="name ~ blow", total=1, contact_ids=[self.joe.id]),
-            SearchResults(query="urn ~ blow", total=1, contact_ids=[self.joe.id]),
-        ]
+        set_contact_search_mocks(SearchResults(query="name ~ blow", total=1, contact_ids=[self.joe.id]))
+        set_urn_search_mocks(SearchResults(query="urn ~ blow", total=1, contact_ids=[self.joe.id]))
         self.assertEqual(
             [
                 dict(id="c-%s" % self.joe.uuid, text="Joe Blow", extra="blow80"),
@@ -2101,7 +2133,7 @@ class ContactTest(TembaTest):
         )
 
         with AnonymousOrg(self.org):
-            mock_search_contacts.side_effect = [SearchResults(query="", total=1, contact_ids=[self.billy.id])]
+            set_contact_search_mocks(SearchResults(query="", total=1, contact_ids=[self.billy.id]))
             self.assertEqual(
                 [
                     # all 3 groups...
@@ -2116,7 +2148,7 @@ class ContactTest(TembaTest):
             )
 
             # same search but with v2 format
-            mock_search_contacts.side_effect = [SearchResults(query="", total=1, contact_ids=[self.billy.id])]
+            set_contact_search_mocks(SearchResults(query="", total=1, contact_ids=[self.billy.id]))
             self.assertEqual(
                 [
                     # all 3 groups A-Z

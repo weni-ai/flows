@@ -73,8 +73,9 @@ from .models import (
     ContactURN,
     ExportContactsTask,
 )
-from .search import SearchException, parse_query, search_contacts
+from .search import SearchException, parse_query
 from .search.omnibox import omnibox_query, omnibox_results_to_dict
+from .search.phone_search import search_contacts_for_list
 from .tasks import export_contacts_task
 
 logger = logging.getLogger(__name__)
@@ -191,6 +192,7 @@ class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
 
     parsed_query = None
     save_dynamic_search = None
+    search_phone_fallback = False
 
     sort_field = None
     sort_direction = None
@@ -317,7 +319,7 @@ class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
                 exclude_ids = []
 
             try:
-                results = search_contacts(
+                results, self.search_phone_fallback = search_contacts_for_list(
                     org, search_query, group=self.group, sort=sort_on, offset=offset, exclude_ids=exclude_ids
                 )
                 self.parsed_query = results.query if len(results.query) > 0 else None
@@ -371,6 +373,7 @@ class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
         if self.parsed_query is not None:
             context["search"] = self.parsed_query
             context["save_dynamic_search"] = self.save_dynamic_search
+            context["search_phone_fallback"] = self.search_phone_fallback
 
         return context
 
@@ -1120,7 +1123,7 @@ class ContactCRUDL(SmartCRUDL):
                 return JsonResponse({"total": 0, "sample": [], "fields": {}})
 
             try:
-                results = search_contacts(org, query, group=org.active_contacts_group, sort="-created_on")
+                results, _ = search_contacts_for_list(org, query, group=org.active_contacts_group, sort="-created_on")
                 summary = {
                     "total": results.total,
                     "query": results.query,
