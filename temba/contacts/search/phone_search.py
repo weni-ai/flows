@@ -7,10 +7,11 @@ from .mailroom import SearchResults, search_contacts
 
 WHATSAPP_SCHEME = "whatsapp"
 TEL_SCHEME = "tel"
+MIN_IMPLICIT_PHONE_DIGITS = 4
 
 _CONTACTQL_HINTS = re.compile(r"[~>=]|(?:^|\s)(?:and|or|not)\s", re.I)
 _SCHEME_HINTS = re.compile(r"(?:^|\s)(?:tel|whatsapp|twitter|email|facebook|instagram|telegram|discord)\s*[=~]", re.I)
-_IMPLICIT_PHONE = re.compile(r"^\+?[-\d]{4,}$")
+_IMPLICIT_PHONE = re.compile(rf"^\+?[-\d]{{{MIN_IMPLICIT_PHONE_DIGITS},}}$")
 
 
 class ContactSearchOutcome:
@@ -81,3 +82,13 @@ def search_contacts_resolving_phone(
     tel_query = build_phone_urn_query(TEL_SCHEME, query)
     tel_results = search_contacts(org, tel_query, **search_kwargs)
     return ContactSearchOutcome(tel_results, phone_fallback=True)
+
+
+def search_contacts_for_list(org, query, *, group=None, sort=None, offset=None, exclude_ids=()):
+    """
+    Runs contact list search and returns the mailroom results with phone fallback metadata.
+    """
+    outcome = search_contacts_resolving_phone(
+        org, query, group=group, sort=sort, offset=offset, exclude_ids=exclude_ids
+    )
+    return outcome.results, outcome.phone_fallback

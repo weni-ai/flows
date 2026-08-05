@@ -7,8 +7,10 @@ from . import SearchException, SearchResults, elastic
 from .phone_search import (
     TEL_SCHEME,
     WHATSAPP_SCHEME,
+    ContactSearchOutcome,
     build_phone_urn_query,
     is_bare_phone_search,
+    search_contacts_for_list,
     search_contacts_resolving_phone,
 )
 
@@ -67,6 +69,16 @@ class PhoneSearchTest(TembaTest):
         mock_search_contacts.assert_called_once_with(
             self.org, "Joe", group=None, sort=None, offset=None, exclude_ids=()
         )
+
+    @patch("temba.contacts.search.phone_search.search_contacts_resolving_phone")
+    def test_search_contacts_for_list(self, mock_search_resolving_phone):
+        expected = SearchResults(query='name ~ "Joe"', total=1, contact_ids=[3])
+        mock_search_resolving_phone.return_value = ContactSearchOutcome(expected, phone_fallback=True)
+
+        results, phone_fallback = search_contacts_for_list(self.org, "Joe")
+
+        self.assertEqual(results, expected)
+        self.assertTrue(phone_fallback)
 
 
 class SearchExceptionTest(TembaTest):
