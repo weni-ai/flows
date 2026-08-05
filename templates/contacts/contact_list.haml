@@ -214,10 +214,16 @@
                     =search_error
               -elif search
                 .mb-4.ml-1.text-base.leading-relaxed
-                  -blocktrans with results_count=paginator.count|intcomma count cc=paginator.count
-                    Found {{ results_count }} contact matching <i>{{search}}</i>.
-                    -plural
-                      Found {{ results_count }} contacts matching <i>{{search}}</i>.
+                  -if search_phone_fallback
+                    -blocktrans with results_count=paginator.count|intcomma count cc=paginator.count
+                      Found {{ results_count }} contact matching <i>{{search}}</i> (phone after WhatsApp).
+                      -plural
+                        Found {{ results_count }} contacts matching <i>{{search}}</i> (phone after WhatsApp).
+                  -else
+                    -blocktrans with results_count=paginator.count|intcomma count cc=paginator.count
+                      Found {{ results_count }} contact matching <i>{{search}}</i>.
+                      -plural
+                        Found {{ results_count }} contacts matching <i>{{search}}</i>.
 
               .shadow.rounded-lg
                 -include "contacts/contact_list_include.haml"

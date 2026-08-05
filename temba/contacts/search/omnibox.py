@@ -11,6 +11,7 @@ from temba.msgs.models import Label
 from temba.utils.models import IDSliceQuerySet
 
 from . import SearchException, search_contacts
+from .phone_search import search_contacts_resolving_phone
 
 SEARCH_ALL_GROUPS = "g"
 SEARCH_STATIC_GROUPS = "s"
@@ -100,7 +101,9 @@ def omnibox_mixed_search(org, query, types):
     if SEARCH_CONTACTS in search_types:
         try:
             # query elastic search for contact ids, then fetch contacts from db
-            search_results = search_contacts(org, query, group=org.active_contacts_group, sort="name")
+            search_results = search_contacts_resolving_phone(
+                org, query, group=org.active_contacts_group, sort="name"
+            ).results
             contacts = IDSliceQuerySet(
                 Contact,
                 search_results.contact_ids,

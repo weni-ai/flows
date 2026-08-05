@@ -1,3 +1,7 @@
+3.90.0
+----------
+* feat: add whatsapp bsuid urn validation
+
 3.89.0
 ----------
 * fix: Migrate project consumer to AmazonMQ
