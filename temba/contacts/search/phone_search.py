@@ -71,7 +71,7 @@ def search_contacts_resolving_phone(
             search_contacts(org, query, group=group, sort=sort, offset=offset, exclude_ids=exclude_ids)
         )
 
-    search_kwargs = dict(group=group, sort=sort, offset=offset, exclude_ids=exclude_ids)
+    search_kwargs = {"group": group, "sort": sort, "offset": offset, "exclude_ids": exclude_ids}
 
     whatsapp_query = build_phone_urn_query(WHATSAPP_SCHEME, query)
     whatsapp_results = search_contacts(org, whatsapp_query, **search_kwargs)
