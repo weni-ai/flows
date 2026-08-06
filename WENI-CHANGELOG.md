@@ -1,3 +1,7 @@
+3.90.1
+----------
+* fix: guard broadcast statistics sent/delivered counters against out-of-order DLRs
+
 3.90.0
 ----------
 * feat: add whatsapp bsuid urn validation
