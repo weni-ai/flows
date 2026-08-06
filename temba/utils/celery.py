@@ -1,10 +1,14 @@
+import logging
 import threading
 import time
 from functools import wraps
 
 from django_redis import get_redis_connection
+from redis.exceptions import LockNotOwnedError
 
 from celery import shared_task
+
+logger = logging.getLogger(__name__)
 
 # for tasks using a redis lock to prevent overlapping this is the default timeout for the lock
 DEFAULT_TASK_LOCK_TIMEOUT = 900
@@ -28,6 +32,40 @@ def extend_lock(redis_client, lock_key, lock_timeout):
         time.sleep(LOCK_REFRESH_INTERVAL)
 
 
+def _resolve_lock_timeout(task_kwargs):
+    lock_timeout = task_kwargs.pop("lock_timeout", None)
+    if lock_timeout is not None:
+        return lock_timeout
+
+    return task_kwargs.get("time_limit", DEFAULT_TASK_LOCK_TIMEOUT)
+
+
+def _start_lock_watchdog(redis_client, lock_key, lock_timeout):
+    watchdog = threading.Thread(
+        target=extend_lock,
+        args=(redis_client, lock_key, lock_timeout),
+        daemon=True,
+    )
+    watchdog.start()
+
+
+def _run_with_task_lock(
+    redis_client, lock_key, lock_timeout, use_watchdog, task_name, task_func, exec_args, exec_kwargs
+):
+    try:
+        with redis_client.lock(lock_key, timeout=lock_timeout):
+            if use_watchdog:
+                _start_lock_watchdog(redis_client, lock_key, lock_timeout)
+
+            task_func(*exec_args, **exec_kwargs)
+    except LockNotOwnedError:
+        logger.warning(
+            "Lock %s expired before task %s finished releasing",
+            lock_key,
+            task_name,
+        )
+
+
 def nonoverlapping_task(*task_args, **task_kwargs):
     """
     Decorator to create a task whose executions are prevented from overlapping by a redis lock.
@@ -47,35 +85,15 @@ def nonoverlapping_task(*task_args, **task_kwargs):
 
             # lock key can be provided or defaults to celery-task-lock:<task_name>
             lock_key = task_kwargs.pop("lock_key", "celery-task-lock:" + task_name)
-
-            # lock timeout can be provided or defaults to task hard time limit
-            lock_timeout = task_kwargs.pop("lock_timeout", None)
-            if lock_timeout is None:
-                lock_timeout = task_kwargs.get("time_limit", DEFAULT_TASK_LOCK_TIMEOUT)
+            lock_timeout = _resolve_lock_timeout(task_kwargs)
 
             if r.get(lock_key):
-                print("Skipping task %s to prevent overlapping" % task_name)
-            else:
-                with r.lock(lock_key, timeout=lock_timeout):
-                    if use_watchdog:
-                        # Start watchdog thread to extend lock TTL
-                        watchdog = threading.Thread(
-                            target=extend_lock,
-                            args=(r, lock_key, lock_timeout),
-                            daemon=True,
-                        )
-                        watchdog.start()
+                logger.info("Skipping task %s to prevent overlapping", task_name)
+                return
 
-                        try:
-                            # Execute the actual task
-                            task_func(*exec_args, **exec_kwargs)
-                        finally:
-                            # The lock will be released by the context manager
-                            # The watchdog thread will stop when it can't find the lock
-                            pass
-                    else:
-                        # Execute without watchdog
-                        task_func(*exec_args, **exec_kwargs)
+            _run_with_task_lock(
+                r, lock_key, lock_timeout, use_watchdog, task_name, task_func, exec_args, exec_kwargs
+            )
 
         return shared_task(*task_args, **task_kwargs)(wrapper)
 
