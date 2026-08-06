@@ -36,6 +36,8 @@ from temba.utils.templatetags.temba import format_datetime
 
 from . import chunk_list, countries, format_number, languages, percentage, redact, sizeof_fmt, str_to_bool
 from .cache import get_cacheable_attr, get_cacheable_result, incrby_existing
+from redis.exceptions import LockNotOwnedError
+
 from .celery import nonoverlapping_task
 from .dates import datetime_to_str, datetime_to_timestamp, timestamp_to_datetime
 from .email import is_valid_address, send_simple_email
@@ -718,6 +720,27 @@ class CeleryTest(TembaTest):
         mock_redis_get.assert_called_once_with("celery-task-lock:test_task1")
         self.assertEqual(mock_redis_lock.call_count, 0)
         self.assertEqual(task_calls, ["1-11-12", "2-21-22", "3-31-32"])
+
+    @patch("redis.client.StrictRedis.lock")
+    @patch("redis.client.StrictRedis.get")
+    def test_nonoverlapping_task_lock_expired_on_release(self, mock_redis_get, mock_redis_lock):
+        mock_redis_get.return_value = None
+        task_calls = []
+
+        mock_lock = MagicMock()
+        mock_lock.__enter__ = MagicMock(return_value=mock_lock)
+        mock_lock.__exit__ = MagicMock(
+            side_effect=LockNotOwnedError("Cannot release a lock that's no longer owned")
+        )
+        mock_redis_lock.return_value = mock_lock
+
+        @nonoverlapping_task()
+        def test_task(foo, bar):
+            task_calls.append("called")
+
+        test_task(1, 2)
+
+        self.assertEqual(task_calls, ["called"])
 
 
 class ModelsTest(TembaTest):

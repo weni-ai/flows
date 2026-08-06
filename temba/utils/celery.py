@@ -1,10 +1,14 @@
+import logging
 import threading
 import time
 from functools import wraps
 
 from django_redis import get_redis_connection
+from redis.exceptions import LockNotOwnedError
 
 from celery import shared_task
+
+logger = logging.getLogger(__name__)
 
 # for tasks using a redis lock to prevent overlapping this is the default timeout for the lock
 DEFAULT_TASK_LOCK_TIMEOUT = 900
@@ -56,26 +60,33 @@ def nonoverlapping_task(*task_args, **task_kwargs):
             if r.get(lock_key):
                 print("Skipping task %s to prevent overlapping" % task_name)
             else:
-                with r.lock(lock_key, timeout=lock_timeout):
-                    if use_watchdog:
-                        # Start watchdog thread to extend lock TTL
-                        watchdog = threading.Thread(
-                            target=extend_lock,
-                            args=(r, lock_key, lock_timeout),
-                            daemon=True,
-                        )
-                        watchdog.start()
+                try:
+                    with r.lock(lock_key, timeout=lock_timeout):
+                        if use_watchdog:
+                            # Start watchdog thread to extend lock TTL
+                            watchdog = threading.Thread(
+                                target=extend_lock,
+                                args=(r, lock_key, lock_timeout),
+                                daemon=True,
+                            )
+                            watchdog.start()
 
-                        try:
-                            # Execute the actual task
+                            try:
+                                # Execute the actual task
+                                task_func(*exec_args, **exec_kwargs)
+                            finally:
+                                # The lock will be released by the context manager
+                                # The watchdog thread will stop when it can't find the lock
+                                pass
+                        else:
+                            # Execute without watchdog
                             task_func(*exec_args, **exec_kwargs)
-                        finally:
-                            # The lock will be released by the context manager
-                            # The watchdog thread will stop when it can't find the lock
-                            pass
-                    else:
-                        # Execute without watchdog
-                        task_func(*exec_args, **exec_kwargs)
+                except LockNotOwnedError:
+                    logger.warning(
+                        "Lock %s expired before task %s finished releasing",
+                        lock_key,
+                        task_name,
+                    )
 
         return shared_task(*task_args, **task_kwargs)(wrapper)
 
