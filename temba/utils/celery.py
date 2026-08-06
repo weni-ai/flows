@@ -88,7 +88,7 @@ def nonoverlapping_task(*task_args, **task_kwargs):
             lock_timeout = _resolve_lock_timeout(task_kwargs)
 
             if r.get(lock_key):
-                print("Skipping task %s to prevent overlapping" % task_name)
+                logger.info("Skipping task %s to prevent overlapping", task_name)
                 return
 
             _run_with_task_lock(
