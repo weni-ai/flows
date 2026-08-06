@@ -70,14 +70,7 @@ def nonoverlapping_task(*task_args, **task_kwargs):
                                 daemon=True,
                             )
                             watchdog.start()
-
-                            try:
-                                # Execute the actual task
-                                task_func(*exec_args, **exec_kwargs)
-                            finally:
-                                # The lock will be released by the context manager
-                                # The watchdog thread will stop when it can't find the lock
-                                pass
+                            task_func(*exec_args, **exec_kwargs)
                         else:
                             # Execute without watchdog
                             task_func(*exec_args, **exec_kwargs)
