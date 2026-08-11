@@ -1879,7 +1879,7 @@ class TemplateReadSerializer(ReadSerializer):
     def get_translations(self, obj):
         translations = []
         for translation in (
-            TemplateTranslation.objects.filter(template=obj, is_active=True)
+            TemplateTranslation.objects.filter(template=obj, is_active=True, channel__is_active=True)
             .order_by("language")
             .select_related("channel")
         ):
