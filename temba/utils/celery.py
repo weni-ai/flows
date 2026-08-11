@@ -91,9 +91,7 @@ def nonoverlapping_task(*task_args, **task_kwargs):
                 logger.info("Skipping task %s to prevent overlapping", task_name)
                 return
 
-            _run_with_task_lock(
-                r, lock_key, lock_timeout, use_watchdog, task_name, task_func, exec_args, exec_kwargs
-            )
+            _run_with_task_lock(r, lock_key, lock_timeout, use_watchdog, task_name, task_func, exec_args, exec_kwargs)
 
         return shared_task(*task_args, **task_kwargs)(wrapper)
 

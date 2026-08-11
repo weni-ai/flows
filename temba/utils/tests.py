@@ -13,6 +13,7 @@ import intercom.errors
 import pytz
 from django_redis import get_redis_connection
 from openpyxl import load_workbook
+from redis.exceptions import LockNotOwnedError
 from smartmin.tests import SmartminTest
 
 from django.conf import settings
@@ -36,8 +37,6 @@ from temba.utils.templatetags.temba import format_datetime
 
 from . import chunk_list, countries, format_number, languages, percentage, redact, sizeof_fmt, str_to_bool
 from .cache import get_cacheable_attr, get_cacheable_result, incrby_existing
-from redis.exceptions import LockNotOwnedError
-
 from .celery import nonoverlapping_task
 from .dates import datetime_to_str, datetime_to_timestamp, timestamp_to_datetime
 from .email import is_valid_address, send_simple_email
@@ -729,9 +728,7 @@ class CeleryTest(TembaTest):
 
         mock_lock = MagicMock()
         mock_lock.__enter__ = MagicMock(return_value=mock_lock)
-        mock_lock.__exit__ = MagicMock(
-            side_effect=LockNotOwnedError("Cannot release a lock that's no longer owned")
-        )
+        mock_lock.__exit__ = MagicMock(side_effect=LockNotOwnedError("Cannot release a lock that's no longer owned"))
         mock_redis_lock.return_value = mock_lock
 
         @nonoverlapping_task()
