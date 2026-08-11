@@ -5567,6 +5567,23 @@ class APITest(APIJSONMixin, TembaTest):
         tt.is_active = False
         tt.save()
 
+        # translation on an inactive channel should not be returned by the API
+        inactive_channel = self.create_channel("WA", "Inactive WA", "1111", config={"fb_namespace": "foo_namespace"})
+        TemplateTranslation.get_or_create(
+            inactive_channel,
+            "hello",
+            "spa",
+            "ES",
+            "Hola {{1}}",
+            1,
+            TemplateTranslation.STATUS_APPROVED,
+            "3456",
+            "foo_namespace",
+            "AUTHENTICATION",
+        )
+        inactive_channel.is_active = False
+        inactive_channel.save(update_fields=["is_active"])
+
         # templates on other org to test filtering
         TemplateTranslation.get_or_create(
             self.org2channel,
@@ -5600,6 +5617,12 @@ class APITest(APIJSONMixin, TembaTest):
         resp_json = response.json()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(resp_json["next"], None)
+        self.assertEqual(1, len(resp_json["results"]))
+        self.assertEqual("hello", resp_json["results"][0]["name"])
+        languages = {t["language"] for t in resp_json["results"][0]["translations"]}
+        self.assertEqual({"eng", "fra"}, languages)
+        self.assertNotIn("spa", languages)
+        self.assertNotIn("afr", languages)
 
     def test_classifiers(self):
         url = reverse("api.v2.classifiers")

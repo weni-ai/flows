@@ -370,6 +370,57 @@ class ChannelTest(TembaTest):
         self.assertEqual(1, channel2.triggers.filter(is_active=True).count())
 
     @mock_mailroom
+    def test_release_deactivates_template_translations(self, mr_mocks):
+        from temba.templates.models import TemplateTranslation
+
+        channel = self.create_channel("WA", "WhatsApp", "1234", config={"fb_namespace": "ns"})
+        other_channel = self.create_channel("WA", "WhatsApp 2", "5678", config={"fb_namespace": "ns"})
+
+        translation = TemplateTranslation.get_or_create(
+            channel,
+            "hello",
+            "eng",
+            "US",
+            "Hi {{1}}",
+            1,
+            TemplateTranslation.STATUS_APPROVED,
+            "ext-1",
+            "ns",
+            "UTILITY",
+        )
+        other_translation = TemplateTranslation.get_or_create(
+            other_channel,
+            "hello",
+            "fra",
+            "FR",
+            "Bonjour {{1}}",
+            1,
+            TemplateTranslation.STATUS_APPROVED,
+            "ext-2",
+            "ns",
+            "UTILITY",
+        )
+        template = translation.template
+
+        channel.release(self.admin)
+
+        translation.refresh_from_db()
+        other_translation.refresh_from_db()
+        template.refresh_from_db()
+
+        self.assertFalse(translation.is_active)
+        self.assertTrue(other_translation.is_active)
+        self.assertTrue(template.is_active)
+
+        other_channel.release(self.admin)
+
+        other_translation.refresh_from_db()
+        template.refresh_from_db()
+
+        self.assertFalse(other_translation.is_active)
+        self.assertFalse(template.is_active)
+
+    @mock_mailroom
     def test_release_android(self, mr_mocks):
         android = self.claim_new_android()
         self.assertEqual("FCM111", android.config.get(Channel.CONFIG_FCM_ID))
