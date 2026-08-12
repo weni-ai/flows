@@ -1,6 +1,15 @@
-3.90.1
+3.90.3
+----------
+* Avoid get template translations from a inactive channel
+* Handle lock not owned error in nonoverlapping tasks
+
+3.90.2
 ----------
 * fix: guard broadcast statistics sent/delivered counters against out-of-order DLRs
+
+3.90.1
+----------
+* fix: sanitize unpaired Unicode surrogates in WhatsApp Flow assets sync
 
 3.90.0
 ----------

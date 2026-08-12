@@ -70,7 +70,9 @@
               -if org_perms.contacts.contact_update
                 %th
               %th
+                -trans "Name"
               %th
+                -trans "URN"
               -for field in contact_fields
                 -if field.show_in_table
                   %th

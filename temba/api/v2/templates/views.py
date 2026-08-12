@@ -44,7 +44,12 @@ class TemplatesTranslationsEndpoint(APIViewMixin, APIView):
             return org
 
         queryset = (
-            TemplateTranslation.objects.filter(is_active=True, template__org=org, template__is_active=True)
+            TemplateTranslation.objects.filter(
+                is_active=True,
+                channel__is_active=True,
+                template__org=org,
+                template__is_active=True,
+            )
             .select_related("template")
             .prefetch_related("headers", "buttons")
         )
@@ -129,7 +134,7 @@ class TemplateByIdEndpoint(APIViewMixin, APIView):
             return Response({"error": "Template not found"}, status=404)
 
         language = request.query_params.get("language")
-        translations = TemplateTranslation.objects.filter(template=template, is_active=True)
+        translations = TemplateTranslation.objects.filter(template=template, is_active=True, channel__is_active=True)
         if language:
             translations = translations.filter(language__iexact=language)
 
