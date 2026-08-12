@@ -5,10 +5,11 @@ import iso8601
 from rest_framework import generics, mixins, status
 from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
-from weni_commons.auth import SessionTokenAuthentication
+from weni_commons.auth import SessionContext, SessionTokenAuthentication
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
@@ -51,6 +52,8 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
 
         if getattr(request, "jwt_payload", None):
             self._resolve_jwt_user(request)
+        elif isinstance(request.auth, SessionContext):
+            self._resolve_session_user(request)
         else:
             self.set_org_from_request(request)
 
@@ -120,6 +123,45 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
             user.set_org(org)
             user.using_token = True
             request.user = user
+
+    def _resolve_session_user(self, request):
+        """
+        When authenticated via Connect session token, resolve the org from
+        ``request.project_uuid`` and replace ``SessionUser`` with the matching
+        Django user so ``APIPermission`` can evaluate ``view.permission``.
+
+        Clears ``request.auth`` first: ``SessionContext`` is not an APIToken and
+        would break the ``request.auth.role`` branch in ``APIPermission``.
+        """
+        request.auth = None
+
+        project_uuid = getattr(request, "project_uuid", None)
+        if not project_uuid:
+            request.user = AnonymousUser()
+            return
+
+        org = self._resolve_org_from_params(project_uuid, None)
+        request._org = org
+
+        email = getattr(request.user, "email", None)
+        if not email:
+            request.user = AnonymousUser()
+            return
+
+        user_model = get_user_model()
+        try:
+            user = user_model.objects.get(email=email)
+        except user_model.DoesNotExist:
+            request.user = AnonymousUser()
+            return
+
+        if not org.has_user(user):
+            request.user = AnonymousUser()
+            return
+
+        user.set_org(org)
+        user.using_token = True
+        request.user = user
 
     def set_org_from_request(self, request):
         org = getattr(request, "_org", None)
