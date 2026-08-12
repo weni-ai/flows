@@ -1522,7 +1522,7 @@ class CampaignEventsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAP
             "params": [{"name": "uuid", "required": False, "help": "The UUID of the campaign event to delete"}],
         }
 
-
+@api_gateway_expose(alias="channels")
 class ChannelsEndpoint(ListAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list channels in your account.
@@ -5514,7 +5514,6 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
         }
 
 
-@api_gateway_expose(alias="events")
 class EventsEndpoint(BaseAPIView):
     permission = "orgs.org_api"
 
