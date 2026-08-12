@@ -27,7 +27,6 @@ from temba.airtime.models import AirtimeTransfer
 from temba.campaigns.models import Campaign, CampaignEvent, EventFire
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
 from temba.contacts.search import SearchException, SearchResults, search_contacts
-from temba.contacts.search.phone_search import TEL_SCHEME, WHATSAPP_SCHEME, ContactSearchOutcome, build_phone_urn_query
 from temba.contacts.views import ContactCRUDL, ContactGroupForm, ContactListView
 from temba.flows.models import Flow, FlowSession, FlowStart
 from temba.ivr.models import IVRCall
@@ -1257,6 +1256,7 @@ class ContactGroupCRUDLTest(TembaTest, CRUDLTestMixin):
         group = ContactGroup.get_whatsapp_contacts_without_phone(self.org)
         self.assertIsNotNone(group)
         self.assertEqual(ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME, group.name)
+        self.assertEqual('whatsapp_bsuid != "" AND whatsapp_phone = ""', group.query)
         self.assertEqual(ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY, group.query)
 
         # and is no longer offered once the group exists
@@ -1273,6 +1273,23 @@ class ContactGroupCRUDLTest(TembaTest, CRUDLTestMixin):
                 org=self.org, name=ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME, is_active=True
             ).count(),
         )
+
+        # opening Create Group refreshes an outdated query that still required tel = ""
+        old_query = 'whatsapp_bsuid != "" AND whatsapp_phone = "" AND tel = ""'
+        group.query = old_query
+        group.status = ContactGroup.STATUS_READY
+        group.save(update_fields=("query", "status"))
+
+        mr_mocks.parse_query(
+            ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY,
+            cleaned=ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY,
+        )
+        response = self.client.get(url)
+        self.assertNotIn(field, response.context["form"].fields)
+
+        group.refresh_from_db()
+        self.assertEqual('whatsapp_bsuid != "" AND whatsapp_phone = ""', group.query)
+        self.assertEqual(ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY, group.query)
 
     def test_create_disallow_duplicates(self):
         self.login(self.admin)

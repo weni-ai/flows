@@ -1744,7 +1744,15 @@ class ContactGroupCRUDL(SmartCRUDL):
 
         def offer_whatsapp_without_phone_group(self):
             org = self.request.user.get_org()
-            return bool(org) and not ContactGroup.get_whatsapp_contacts_without_phone(org)
+            if not org:
+                return False
+
+            # heal outdated query on existing groups (e.g. after adding whatsapp_phone)
+            if ContactGroup.get_whatsapp_contacts_without_phone(org):
+                ContactGroup.ensure_whatsapp_contacts_without_phone_query(org, self.request.user)
+                return False
+
+            return True
 
         def save(self, obj):
             org = self.request.user.get_org()
