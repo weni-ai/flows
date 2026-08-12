@@ -2733,6 +2733,9 @@ msgstr "Нэмэлт: бүлгийн гишүүнчлэл"
 msgid "Optional: Fields to include"
 msgstr "Нэмэлт: Оруулах талбарууд"
 
+msgid "URN"
+msgstr "URN"
+
 msgid "URNs"
 msgstr "URNs"
 

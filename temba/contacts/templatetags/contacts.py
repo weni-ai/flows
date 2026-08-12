@@ -1,5 +1,6 @@
 from django import template
 from django.utils.safestring import mark_safe
+from django.utils.translation import ugettext as _
 
 from temba.campaigns.models import EventFire
 from temba.channels.models import ChannelEvent
@@ -139,6 +140,15 @@ def format_contact(contact, org):  # pragma: needs cover
 @register.filter
 def urn_icon(urn):
     return URN_SCHEME_ICONS.get(urn.scheme, "")
+
+
+@register.filter
+def urn_scheme_label(urn):
+    if urn.scheme == URN.EMAIL_SCHEME:
+        return _("Email")
+    if urn.scheme == URN.WHATSAPP_SCHEME and URN.is_whatsapp_bsuid_path(urn.path):
+        return "BSUID"
+    return urn.scheme
 
 
 @register.filter
