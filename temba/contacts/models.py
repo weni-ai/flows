@@ -1629,6 +1629,11 @@ class ContactGroup(TembaModel, DependencyMixin):
 
     MAX_NAME_LEN = 64
 
+    # Smart group for WhatsApp BSUID contacts that do not yet have a phone-number WhatsApp URN.
+    # Uses goflow: has a BSUID WhatsApp URN and no phone-number WhatsApp URN (whatsapp:5561…).
+    WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME = "WhatsApp contacts without phone"
+    WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY = 'whatsapp_bsuid != "" AND whatsapp_phone = ""'
+
     TYPE_ACTIVE = "A"
     TYPE_BLOCKED = "B"
     TYPE_STOPPED = "S"
@@ -1720,6 +1725,43 @@ class ContactGroup(TembaModel, DependencyMixin):
         Returns the user group with the passed in name
         """
         return cls.user_groups.filter(name__iexact=cls.clean_name(name), org=org, is_active=True).first()
+
+    @classmethod
+    def get_whatsapp_contacts_without_phone(cls, org):
+        """
+        Returns the org's WhatsApp contacts without phone smart group, if it exists.
+        """
+        return cls.get_user_group_by_name(org, cls.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME)
+
+    @classmethod
+    def ensure_whatsapp_contacts_without_phone_query(cls, org, user=None):
+        """
+        If the smart group exists with an outdated query, update it and re-evaluate membership.
+        """
+        group = cls.get_whatsapp_contacts_without_phone(org)
+        if not group:
+            return None
+
+        if group.query != cls.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY:
+            if group.status == cls.STATUS_EVALUATING:
+                return group
+            group.update_query(cls.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY)
+
+        return group
+
+    @classmethod
+    def create_whatsapp_contacts_without_phone(cls, org, user):
+        """
+        Creates the WhatsApp contacts without phone smart group for the org,
+        or refreshes its query if it already exists.
+        """
+        existing = cls.get_whatsapp_contacts_without_phone(org)
+        if existing:
+            return cls.ensure_whatsapp_contacts_without_phone_query(org, user)
+
+        return cls.create_dynamic(
+            org, user, cls.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME, cls.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY
+        )
 
     @classmethod
     def get_user_groups(cls, org, dynamic=None, ready_only=True):

@@ -1,7 +1,8 @@
-3.90.4
+3.91.0
 ----------
 * feat: add URN support in multiple languages and update contact templates
 * chore: remove structured logging from EDA consumers
+* feat: Add whatsapp contacts without numbers dynamic group
 
 3.90.3
 ----------
