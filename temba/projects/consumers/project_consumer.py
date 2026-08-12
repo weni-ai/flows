@@ -1,5 +1,3 @@
-import logging
-
 from sentry_sdk import capture_exception
 from weni.eda.django.consumers import EDAConsumer
 from weni.eda.messages import Message
@@ -7,8 +5,6 @@ from weni.eda.messages import Message
 from temba.projects.usecases.project_creation import ProjectCreationUseCase
 
 from ..usecases import FlowSetupHandlerUseCase, ProjectCreationDTO, TemplateTypeIntegrationUseCase
-
-logger = logging.getLogger(__name__)
 
 
 class ProjectEventType:
@@ -18,41 +14,17 @@ class ProjectEventType:
 class ProjectConsumer(EDAConsumer):
     def consume(self, message: Message):  # pragma: no cover
         try:
-            logger.info("[ProjectConsumer] Received message")
             event = message.event()
-            logger.info(
-                "[ProjectConsumer] Processing event_type=%s event_id=%s",
-                event.event_type,
-                event.event_id,
-            )
 
             if event.event_type == ProjectEventType.CREATED:
                 self._handle_project_created(event.data)
-            else:
-                logger.warning(
-                    "[ProjectConsumer] Ignoring unsupported event_type=%s event_id=%s",
-                    event.event_type,
-                    event.event_id,
-                )
 
             self.ack()
-            logger.info(
-                "[ProjectConsumer] Message processed successfully event_type=%s event_id=%s",
-                event.event_type,
-                event.event_id,
-            )
         except Exception as exception:
-            logger.exception("[ProjectConsumer] Failed to process message")
             capture_exception(exception)
             raise
 
     def _handle_project_created(self, body: dict):
-        logger.info(
-            "[ProjectConsumer] Processing project uuid=%s name=%s user_email=%s",
-            body.get("uuid"),
-            body.get("name"),
-            body.get("user_email"),
-        )
         project_dto = ProjectCreationDTO(
             uuid=body.get("uuid"),
             name=body.get("name"),

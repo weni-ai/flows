@@ -65,7 +65,7 @@ class TestProjectEventConsumer(TembaTest):
         self.assertEqual(reloaded_org.timezone, pytz.timezone("America/Sao_Paulo"))
 
     def test_consume_update_action_when_usecase_returns_none_acknowledges(self):
-        """update_project_config may return None; consumer acks and logs not found."""
+        """update_project_config may return None; consumer still acks."""
         body = {
             "project_uuid": self.project_uuid,
             "user_email": self.user.email,
@@ -161,7 +161,7 @@ class TestProjectEventConsumer(TembaTest):
         self.assertTrue(reloaded_org.config.get("is_multi_agents"))
 
     def test_consume_project_type_update_when_usecase_returns_none_acknowledges(self):
-        """update_project_type may return None; consumer acks and logs not found."""
+        """update_project_type may return None; consumer still acks."""
         body = {
             "project_uuid": self.project_uuid,
             "user_email": self.user.email,

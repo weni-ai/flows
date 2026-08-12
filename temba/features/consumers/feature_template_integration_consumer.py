@@ -1,25 +1,14 @@
-import logging
-
 from sentry_sdk import capture_exception
 from weni.eda.django.consumers import EDAConsumer
 from weni.eda.messages import Message
 
 from temba.features.usecases.feature_template_integration import integrate_feature_template_consumer
 
-logger = logging.getLogger(__name__)
-
 
 class IntegrateFeatureTemplateConsumer(EDAConsumer):
     def consume(self, message: Message):  # pragma: no cover
         try:
-            logger.info("[IntegrateFeatureTemplateConsumer] Received message")
             body = message.json()
-            logger.info(
-                "[IntegrateFeatureTemplateConsumer] Processing project_uuid=%s feature_uuid=%s user_email=%s",
-                body.get("project_uuid"),
-                body.get("feature_uuid"),
-                body.get("user_email"),
-            )
             integrate_feature_template_consumer(
                 project_uuid=body.get("project_uuid"),
                 feature_uuid=body.get("feature_uuid"),
@@ -30,12 +19,6 @@ class IntegrateFeatureTemplateConsumer(EDAConsumer):
             )
 
             self.ack()
-            logger.info(
-                "[IntegrateFeatureTemplateConsumer] Message processed successfully project_uuid=%s feature_uuid=%s",
-                body.get("project_uuid"),
-                body.get("feature_uuid"),
-            )
         except Exception as exception:
-            logger.exception("[IntegrateFeatureTemplateConsumer] Failed to process message")
             capture_exception(exception)
             raise
