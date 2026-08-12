@@ -55,18 +55,17 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             ctwa_data = self._get_ctwa_data(channel_uuid, contact_urn)
             meta_success = None
             meta_error = None
+            dataset_id = None
 
-            # If we have CTWA data, try to send to Meta
-            if ctwa_data:
+            # Meta CAPI requires ctwa_clid; Status ads may omit it
+            if ctwa_data and ctwa_data.ctwa_clid:
                 dataset_id = self._get_channel_dataset_id(channel_uuid)
                 if dataset_id:
-                    # Build payload for Meta Conversion API
                     meta_payload = self._build_meta_payload(
                         event_type,
                         ctwa_data,
                         payload,
                     )
-                    # Send to Meta
                     meta_success, meta_error = self._send_to_meta(meta_payload, dataset_id)
 
             # Always send to Datalake regardless of CTWA status
@@ -91,7 +90,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                     status=200,
                 )
             elif datalake_success:  # If Datalake succeeds but Meta failed or wasn't attempted
-                if ctwa_data and dataset_id:  # Meta was attempted but failed
+                if ctwa_data and ctwa_data.ctwa_clid and dataset_id:  # Meta was attempted but failed
                     logger.warning(
                         f"[PARTIAL] Datalake succeeded but Meta failed for event {event_type} on channel {channel_uuid}. Meta error: {meta_error}"
                     )
@@ -107,7 +106,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                     status=200,
                 )
             else:  # Datalake failed
-                if ctwa_data and dataset_id:  # Both services failed
+                if ctwa_data and ctwa_data.ctwa_clid and dataset_id:  # Both services failed
                     logger.error(
                         f"[FAILURE] Both services failed for event {event_type} on channel {channel_uuid}. "
                         f"Meta error: {meta_error}, Datalake error: {datalake_error}"
@@ -147,10 +146,12 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
     def _get_ctwa_data(self, channel_uuid, contact_urn):
         """Get CTWA data for lookup using both channel_uuid and contact_urn"""
         try:
+            base_qs = CTWA.objects.select_related("referral_source")
+
             # If it's not a WhatsApp URN, just do a normal lookup
             if not contact_urn.startswith("whatsapp:"):
                 return (
-                    CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn=contact_urn)
+                    base_qs.filter(channel_uuid=channel_uuid, contact_urn=contact_urn)
                     .order_by("-timestamp")
                     .first()
                 )
@@ -179,12 +180,12 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
 
                 # Try to find CTWA data for either URN
                 return (
-                    CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn__in=urns).order_by("-timestamp").first()
+                    base_qs.filter(channel_uuid=channel_uuid, contact_urn__in=urns).order_by("-timestamp").first()
                 )
 
             # For non-BR numbers or if we can't handle the number format, just do a normal lookup
             return (
-                CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).order_by("-timestamp").first()
+                base_qs.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).order_by("-timestamp").first()
             )
 
         except Exception as e:
@@ -305,9 +306,15 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             if channel.config and "wa_waba_id" in channel.config:
                 metadata["waba_id"] = channel.config["wa_waba_id"]
 
-            # Add CTWA ID only if available
+            # Add CTWA metadata when available
             if ctwa_data:
-                metadata["ctwa_id"] = ctwa_data.ctwa_clid
+                if ctwa_data.ctwa_clid:
+                    metadata["ctwa_id"] = ctwa_data.ctwa_clid
+                if ctwa_data.referral_source:
+                    metadata["referral_source_id"] = ctwa_data.referral_source.source_id
+                    metadata["referral_source_type"] = ctwa_data.referral_source.source_type
+                if ctwa_data.message_id:
+                    metadata["message_id"] = ctwa_data.message_id
 
             data = {
                 "event_name": f"conversion_{event_type}",

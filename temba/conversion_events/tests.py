@@ -9,12 +9,28 @@ from rest_framework.test import APIRequestFactory
 
 from django.contrib.auth.models import AnonymousUser
 from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from temba.channels.types.whatsapp_cloud.type import WhatsAppCloudType
 from temba.conversion_events.jwt_auth import JWTModuleAuthentication, JWTModuleAuthMixin
-from temba.conversion_events.models import CTWA
+from temba.conversion_events.models import CTWA, CtwaReferralSource
 from temba.conversion_events.serializers import ConversionEventSerializer
 from temba.tests import TembaTest
+
+
+def create_test_ctwa(**kwargs):
+    referral_source = kwargs.pop("referral_source", None)
+    if referral_source is None:
+        source_id = kwargs.pop("source_id", f"test-source-{uuid4()}")
+        source_type = kwargs.pop("source_type", CtwaReferralSource.SOURCE_TYPE_AD)
+        referral_source, _ = CtwaReferralSource.objects.get_or_create(
+            source_id=source_id,
+            source_type=source_type,
+        )
+
+    defaults = {"timestamp": timezone.now()}
+    defaults.update(kwargs)
+    return CTWA.objects.create(referral_source=referral_source, **defaults)
 
 
 class ConversionEventSerializerTest(TembaTest):
@@ -139,7 +155,7 @@ class ConversionEventAPITest(TembaTest):
             config={"meta_dataset_id": "test_dataset_123", "wa_waba_id": "test_waba_123"},
         )
         # Create CTWA data for testing
-        self.ctwa_data = CTWA.objects.create(
+        self.ctwa_data = create_test_ctwa(
             ctwa_clid="test_clid_123",
             channel_uuid=self.channel.uuid,
             waba="test_waba_123",
@@ -435,7 +451,7 @@ class ConversionEventAPITest(TembaTest):
             self.org.save(update_fields=["proj_uuid"])
 
             channel_without_dataset = self.create_channel("WAC", "No Dataset Channel", "12065551213", config={})
-            CTWA.objects.create(
+            create_test_ctwa(
                 ctwa_clid="test_clid_456",
                 channel_uuid=channel_without_dataset.uuid,
                 waba="test_waba_456",
@@ -627,7 +643,7 @@ class ConversionEventAPITest(TembaTest):
             )
 
             # Create CTWA data for this channel
-            ctwa = CTWA.objects.create(
+            ctwa = create_test_ctwa(
                 ctwa_clid="test_clid_456",
                 channel_uuid=channel_without_dataset.uuid,
                 waba="test_waba_456",
@@ -810,7 +826,7 @@ class CTWAModelTest(TembaTest):
 
     def test_ctwa_creation(self):
         """Test basic CTWA model creation and fields"""
-        ctwa = CTWA.objects.create(
+        ctwa = create_test_ctwa(
             ctwa_clid="test_clid",
             channel_uuid=self.channel.uuid,
             waba="test_waba",
@@ -822,10 +838,21 @@ class CTWAModelTest(TembaTest):
         self.assertEqual(ctwa.waba, "test_waba")
         self.assertEqual(ctwa.contact_urn, "whatsapp:1234567890")
         self.assertIsNotNone(ctwa.timestamp)
+        self.assertIsNotNone(ctwa.referral_source)
+
+    def test_ctwa_without_clid(self):
+        ctwa = create_test_ctwa(
+            ctwa_clid=None,
+            channel_uuid=self.channel.uuid,
+            waba="test_waba",
+            contact_urn="whatsapp:9999999999",
+        )
+        self.assertIsNone(ctwa.ctwa_clid)
+        self.assertEqual(str(ctwa), f"CTWA Data - CLID: no-clid, Channel: {self.channel.uuid}")
 
     def test_ctwa_str_method(self):
         """Test CTWA string representation"""
-        ctwa = CTWA.objects.create(
+        ctwa = create_test_ctwa(
             ctwa_clid="test_clid",
             channel_uuid=self.channel.uuid,
             waba="test_waba",
@@ -838,13 +865,13 @@ class CTWAModelTest(TembaTest):
     def test_ctwa_filtering_and_queries(self):
         """Test CTWA filtering capabilities"""
         # Create multiple CTWA records
-        ctwa1 = CTWA.objects.create(
+        ctwa1 = create_test_ctwa(
             ctwa_clid="clid1",
             channel_uuid=self.channel.uuid,
             waba="waba1",
             contact_urn="whatsapp:1111111111",
         )
-        ctwa2 = CTWA.objects.create(
+        ctwa2 = create_test_ctwa(
             ctwa_clid="clid2",
             channel_uuid=self.channel.uuid,
             waba="waba2",
@@ -870,7 +897,7 @@ class CTWAModelTest(TembaTest):
         view = ConversionEventView()
 
         # Create CTWA with number containing extra 9
-        ctwa_with_9 = CTWA.objects.create(
+        ctwa_with_9 = create_test_ctwa(
             ctwa_clid="clid_with_9",
             channel_uuid=self.channel.uuid,
             waba="waba_test",
@@ -886,7 +913,7 @@ class CTWAModelTest(TembaTest):
         self.assertEqual(result, ctwa_with_9)
 
         # Create CTWA with number without extra 9
-        ctwa_without_9 = CTWA.objects.create(
+        ctwa_without_9 = create_test_ctwa(
             ctwa_clid="clid_without_9",
             channel_uuid=self.channel.uuid,
             waba="waba_test2",
@@ -899,7 +926,7 @@ class CTWAModelTest(TembaTest):
         self.assertEqual(result, ctwa_without_9)
 
         # Test with non-WhatsApp URN (should use exact match)
-        ctwa_other = CTWA.objects.create(
+        ctwa_other = create_test_ctwa(
             ctwa_clid="clid_other", channel_uuid=self.channel.uuid, waba="waba_test3", contact_urn="tel:1234567890"
         )
 
