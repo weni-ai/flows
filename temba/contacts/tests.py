@@ -63,7 +63,7 @@ from .models import (
     ExportContactsTask,
 )
 from .tasks import check_elasticsearch_lag, squash_contactgroupcounts
-from .templatetags.contacts import contact_field, history_class, history_icon
+from .templatetags.contacts import contact_field, history_class, history_icon, urn_scheme_label
 
 
 class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
@@ -2582,6 +2582,22 @@ class ContactTest(TembaTest):
         item = {"type": "product_sent"}
         self.assertEqual(history_icon(item), '<span class="material-symbols-outlined fill">storefront</span>')
         self.assertEqual(history_class(item), "msg detail-event")
+
+    def test_urn_scheme_label(self):
+        whatsapp_phone = ContactURN(scheme=URN.WHATSAPP_SCHEME, path="5511987654321")
+        self.assertEqual(urn_scheme_label(whatsapp_phone), "whatsapp")
+
+        whatsapp_bsuid = ContactURN(scheme=URN.WHATSAPP_SCHEME, path="BR.35029025746744354")
+        self.assertEqual(urn_scheme_label(whatsapp_bsuid), "BSUID")
+
+        whatsapp_parent_bsuid = ContactURN(scheme=URN.WHATSAPP_SCHEME, path="US.ENT.11815799212886844830")
+        self.assertEqual(urn_scheme_label(whatsapp_parent_bsuid), "BSUID")
+
+        email = ContactURN(scheme=URN.EMAIL_SCHEME, path="joe@nyaruka.com")
+        self.assertEqual(urn_scheme_label(email), "Email")
+
+        tel = ContactURN(scheme=URN.TEL_SCHEME, path="+5511987654321")
+        self.assertEqual(urn_scheme_label(tel), "tel")
 
     def test_get_scheduled_messages(self):
         self.just_joe = self.create_group("Just Joe", [self.joe])

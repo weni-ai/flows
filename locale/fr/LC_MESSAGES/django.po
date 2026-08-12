@@ -2734,6 +2734,9 @@ msgstr "Facultatif: appartenances aux groupes"
 msgid "Optional: Fields to include"
 msgstr "Facultatif: champs à inclure"
 
+msgid "URN"
+msgstr "URN"
+
 msgid "URNs"
 msgstr "URNs"
 

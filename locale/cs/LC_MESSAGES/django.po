@@ -2749,6 +2749,9 @@ msgstr "Volitelně: Členství ve skupině"
 msgid "Optional: Fields to include"
 msgstr "Volitelně: Pole, která je třeba zahrnout"
 
+msgid "URN"
+msgstr "URN"
+
 msgid "URNs"
 msgstr "URNs"
 
