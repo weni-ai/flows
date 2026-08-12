@@ -1494,17 +1494,23 @@ INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
 
 DATALAKE_SERVER_ADDRESS = os.environ.get("DATALAKE_SERVER_ADDRESS", default="localhost:50051")
 
-# Connect session tokens (weni_commons.auth.SessionTokenAuthentication)
-WENI_SESSION_TOKEN_ORG_MODEL = "temba.orgs.models.Org"
-WENI_SESSION_TOKEN_ORG_FIELD = "proj_uuid"
-# Defaults match weni-commons (weni_commons.auth.constants); override per environment via env vars.
-WENI_SESSION_TOKEN_DYNAMODB_TABLE = os.environ.get("WENI_SESSION_TOKEN_DYNAMODB_TABLE", default="weni-session-tokens")
+# Override per environment via env vars — DynamoDB table/region differ between staging and production.
+WENI_SESSION_TOKEN_DYNAMODB_TABLE = os.environ.get("WENI_SESSION_TOKEN_DYNAMODB_TABLE", default="arn:aws:dynamodb:sa-east-1:739649339569:table/weni-session-tokens")
 WENI_SESSION_TOKEN_DYNAMODB_REGION = os.environ.get("WENI_SESSION_TOKEN_DYNAMODB_REGION", default="sa-east-1")
 WENI_SESSION_TOKEN_MAX_REDIS_TTL = int(os.environ.get("WENI_SESSION_TOKEN_MAX_REDIS_TTL", default="3600"))
+WENI_SESSION_TOKEN_REDIS_ALIAS = os.environ.get("WENI_SESSION_TOKEN_REDIS_ALIAS", default="default")
+
+# Connect project authorization (weni_commons.auth.ConnectProjectAuthorization).
+# Without WENI_CONNECT_API_URL the permission class denies every request.
+WENI_CONNECT_API_URL = os.environ.get("WENI_CONNECT_API_URL", default="")
+WENI_CONNECT_AUTHORIZATION_TIMEOUT = int(os.environ.get("WENI_CONNECT_AUTHORIZATION_TIMEOUT", default="5"))
+
+# Kong API Gateway (weni_commons.kong) — used by kong_sync / kong_ensure_service.
+# Resolved from Django settings first, then env; no CLI flags needed when these are set.
 KONG_ADMIN_URL = os.environ.get("KONG_ADMIN_URL", default="http://kong-kong-admin.kong.svc:8001")
 KONG_URL_PREFIX = os.environ.get("KONG_URL_PREFIX", default="/flows")
 KONG_SERVICE = os.environ.get("KONG_SERVICE", default="flows-service")
-KONG_SERVICE_URL = os.environ.get("KONG_SERVICE_URL", default="https://flows.cloud.weni.ai")
+KONG_SERVICE_URL = os.environ.get("KONG_SERVICE_URL", default="https://flows.weni.ai")
 
 
 FLOW_PATH_RECENT_RUN_BATCH_SIZE = os.environ.get("FLOW_PATH_RECENT_RUN_BATCH_SIZE", default=50)
