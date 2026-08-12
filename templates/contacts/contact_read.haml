@@ -137,10 +137,7 @@
               .whitespace-nowrap.pr-12.contact-field
                 .contact-field-value.uppercase.tracking-wider.font-normal.text-xs
                   .mr-1.leading-none.text-gray-500{class:"glyph {{urn|urn_icon}}", style:"margin-top: -1px; font-size:14px"}
-                  -if urn.scheme == 'mailto'
-                    -trans "Email"
-                  -else
-                    {{urn.scheme}}
+                  {{urn|urn_scheme_label}}
             %td.w-full
               .contact-field-value
                 -if urn.scheme == 'mailto'

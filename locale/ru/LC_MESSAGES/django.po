@@ -2750,6 +2750,9 @@ msgstr ""
 msgid "Optional: Fields to include"
 msgstr ""
 
+msgid "URN"
+msgstr "URN"
+
 msgid "URNs"
 msgstr "Названия URN"
 
