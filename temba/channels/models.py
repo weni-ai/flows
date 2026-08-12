@@ -923,6 +923,12 @@ class Channel(TembaModel, DependencyMixin):
         self.is_active = False
         self.save(update_fields=("is_active", "config", "modified_by", "modified_on"))
 
+        # deactivate any template translations associated with this channel
+        from temba.templates.models import Template, TemplateTranslation
+
+        TemplateTranslation.trim(self, [])
+        Template.trim(self)
+
         # mark any messages in sending mode as failed for this channel asynchronously
         from temba.msgs.tasks import fail_channel_outgoing_messages
 

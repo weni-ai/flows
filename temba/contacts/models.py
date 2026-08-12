@@ -1629,6 +1629,12 @@ class ContactGroup(TembaModel, DependencyMixin):
 
     MAX_NAME_LEN = 64
 
+    # Smart group for WhatsApp BSUID contacts that do not yet have a phone number.
+    # Uses the goflow whatsapp_bsuid attribute (Meta BSUID paths for any country)
+    # combined with absence of a tel URN.
+    WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME = "WhatsApp contacts without phone"
+    WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY = 'whatsapp_bsuid != "" AND tel = ""'
+
     TYPE_ACTIVE = "A"
     TYPE_BLOCKED = "B"
     TYPE_STOPPED = "S"
@@ -1720,6 +1726,22 @@ class ContactGroup(TembaModel, DependencyMixin):
         Returns the user group with the passed in name
         """
         return cls.user_groups.filter(name__iexact=cls.clean_name(name), org=org, is_active=True).first()
+
+    @classmethod
+    def get_whatsapp_contacts_without_phone(cls, org):
+        """
+        Returns the org's WhatsApp contacts without phone smart group, if it exists.
+        """
+        return cls.get_user_group_by_name(org, cls.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME)
+
+    @classmethod
+    def create_whatsapp_contacts_without_phone(cls, org, user):
+        """
+        Creates the WhatsApp contacts without phone smart group for the org.
+        """
+        return cls.create_dynamic(
+            org, user, cls.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME, cls.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY
+        )
 
     @classmethod
     def get_user_groups(cls, org, dynamic=None, ready_only=True):

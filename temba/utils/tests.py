@@ -13,6 +13,7 @@ import intercom.errors
 import pytz
 from django_redis import get_redis_connection
 from openpyxl import load_workbook
+from redis.exceptions import LockNotOwnedError
 from smartmin.tests import SmartminTest
 
 from django.conf import settings
@@ -718,6 +719,25 @@ class CeleryTest(TembaTest):
         mock_redis_get.assert_called_once_with("celery-task-lock:test_task1")
         self.assertEqual(mock_redis_lock.call_count, 0)
         self.assertEqual(task_calls, ["1-11-12", "2-21-22", "3-31-32"])
+
+    @patch("redis.client.StrictRedis.lock")
+    @patch("redis.client.StrictRedis.get")
+    def test_nonoverlapping_task_lock_expired_on_release(self, mock_redis_get, mock_redis_lock):
+        mock_redis_get.return_value = None
+        task_calls = []
+
+        mock_lock = MagicMock()
+        mock_lock.__enter__ = MagicMock(return_value=mock_lock)
+        mock_lock.__exit__ = MagicMock(side_effect=LockNotOwnedError("Cannot release a lock that's no longer owned"))
+        mock_redis_lock.return_value = mock_lock
+
+        @nonoverlapping_task()
+        def test_task(foo, bar):
+            task_calls.append("called")
+
+        test_task(1, 2)
+
+        self.assertEqual(task_calls, ["called"])
 
 
 class ModelsTest(TembaTest):

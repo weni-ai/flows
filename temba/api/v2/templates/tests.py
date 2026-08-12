@@ -113,6 +113,45 @@ class TemplatesTranslationsEndpointTests(TembaTest):
 
     @patch("temba.api.v2.templates.views.TemplatesTranslationsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.templates.views.TemplatesTranslationsEndpoint.permission_classes", [])
+    def test_excludes_inactive_channel_translations(self):
+        self.login(self.admin)
+
+        template = Template.objects.create(org=self.org, name="welcome_message")
+        TemplateTranslation.objects.create(
+            template=template,
+            channel=self.channel,
+            content="Hello {{1}}",
+            body="Hello {{1}}",
+            variable_count=1,
+            status=TemplateTranslation.STATUS_APPROVED,
+            language="eng",
+            external_id="id-active-channel",
+        )
+
+        inactive_channel = self.create_channel("WA", "Inactive WA", "9999")
+        TemplateTranslation.objects.create(
+            template=template,
+            channel=inactive_channel,
+            content="Hola {{1}}",
+            body="Hola {{1}}",
+            variable_count=1,
+            status=TemplateTranslation.STATUS_APPROVED,
+            language="spa",
+            external_id="id-inactive-channel",
+        )
+        inactive_channel.is_active = False
+        inactive_channel.save(update_fields=["is_active"])
+
+        url = self._url({"project_uuid": str(self.org.proj_uuid)})
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+
+        results = resp.json()["results"]
+        self.assertEqual(1, len(results))
+        self.assertEqual("eng", results[0]["language"])
+
+    @patch("temba.api.v2.templates.views.TemplatesTranslationsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.templates.views.TemplatesTranslationsEndpoint.permission_classes", [])
     def test_filter_by_category(self):
         self.login(self.admin)
 
