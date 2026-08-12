@@ -2740,6 +2740,9 @@ msgstr "Opcional: Participação em grupos"
 msgid "Optional: Fields to include"
 msgstr "Opcional: Campos para incluir"
 
+msgid "URN"
+msgstr "URN"
+
 msgid "URNs"
 msgstr "URNs"
 
