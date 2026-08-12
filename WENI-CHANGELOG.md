@@ -1,3 +1,8 @@
+3.90.4
+----------
+* feat: add URN support in multiple languages and update contact templates
+* chore: remove structured logging from EDA consumers
+
 3.90.3
 ----------
 * Avoid get template translations from a inactive channel

@@ -260,10 +260,6 @@ sentry_sdk.init(dsn=env("SENTRY_DSN", default=""), integrations=[DjangoIntegrati
 
 # LOGGING
 # ------------------------------------------------------------------------------
-# Controls INFO/DEBUG logs from EDA consumers (temba.*.consumers) and weni.eda.
-# Examples: CONSUMERS_LOG_LEVEL=INFO | WARNING | DEBUG | ERROR
-CONSUMERS_LOG_LEVEL = env("CONSUMERS_LOG_LEVEL", default="WARNING")
-
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": env("DISABLE_LOG", default=True),
@@ -284,13 +280,6 @@ LOGGING = {
         # OIDC
         "mozilla_django_oidc": {"level": "DEBUG", "handlers": ["console"], "propagate": False},
         "weni_django_oidc": {"level": "DEBUG", "handlers": ["console"], "propagate": False},
-        # EDA consumers
-        "temba.projects.consumers": {"level": CONSUMERS_LOG_LEVEL, "handlers": ["console"], "propagate": False},
-        "temba.classifiers.consumers": {"level": CONSUMERS_LOG_LEVEL, "handlers": ["console"], "propagate": False},
-        "temba.tickets.consumers": {"level": CONSUMERS_LOG_LEVEL, "handlers": ["console"], "propagate": False},
-        "temba.features.consumers": {"level": CONSUMERS_LOG_LEVEL, "handlers": ["console"], "propagate": False},
-        "temba.templates.consumers": {"level": CONSUMERS_LOG_LEVEL, "handlers": ["console"], "propagate": False},
-        "weni.eda": {"level": CONSUMERS_LOG_LEVEL, "handlers": ["console"], "propagate": False},
     },
 }
 
@@ -445,9 +434,7 @@ OLD_DESIGN_EXCLUDED_CHANNELS_CODES = env.list("OLD_DESIGN_EXCLUDED_CHANNELS_CODE
 # ------------------------------------------------------------------------------------------
 DISABLE_OIDC = env.bool("DISABLE_OIDC", default=False)
 if DISABLE_OIDC:
-    REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"].remove(
-        "mozilla_django_oidc.contrib.drf.OIDCAuthentication"
-    )
+    REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"].remove("mozilla_django_oidc.contrib.drf.OIDCAuthentication")
 
     installed_apps_list = list(INSTALLED_APPS)
     installed_apps_list.remove("mozilla_django_oidc")
@@ -466,7 +453,7 @@ if DISABLE_OIDC:
 CONNECT_BASE_URL = env("CONNECT_BASE_URL", default="https://api.dev.cloud.weni.ai")
 
 # ----------------------------------------------------------------------------------------
-# Option to enable redirect all routes (except api), to redirect view 
+# Option to enable redirect all routes (except api), to redirect view
 # ----------------------------------------------------------------------------------------
 WENI_REDIRECT_DEPRECATED_DOMAIN = env.bool("WENI_REDIRECT_DEPRECATED_DOMAIN", default=False)
 if WENI_REDIRECT_DEPRECATED_DOMAIN:
@@ -524,4 +511,6 @@ MUTABLE_EDITOR_DOMAINS = env.tuple("MUTABLE_EDITOR_DOMAINS", default=("@inspiria
 LAMBDA_ALLOWED_ROLES = env.list("LAMBDA_ALLOWED_ROLES", default=[])
 
 # Lambda permitted urls
-LAMBDA_VALIDATION_URL = env.list("LAMBDA_VALIDATION_URL", default=["https://sts.amazonaws.com/?Action=GetCallerIdentity&"])
+LAMBDA_VALIDATION_URL = env.list(
+    "LAMBDA_VALIDATION_URL", default=["https://sts.amazonaws.com/?Action=GetCallerIdentity&"]
+)
