@@ -33,8 +33,8 @@ class CtwaReferralSource(models.Model):
             ),
         ]
         indexes = [
-            models.Index(fields=["source_id"], name="idx_ctwa_referral_sources_source_id"),
-            models.Index(fields=["-last_seen_at"], name="idx_ctwa_referral_sources_last_seen"),
+            models.Index(fields=["source_id"], name="idx_ctwa_ref_src_source_id"),
+            models.Index(fields=["-last_seen_at"], name="idx_ctwa_ref_src_last_seen"),
         ]
 
     def __str__(self):
@@ -72,10 +72,10 @@ class CTWA(models.Model):
         indexes = [
             models.Index(
                 fields=["channel_uuid", "contact_urn", "-timestamp"],
-                name="idx_conversion_events_ctwa_lookup",
+                name="idx_conv_ev_ctwa_lookup",
             ),
-            models.Index(fields=["referral_source"], name="idx_conversion_events_ctwa_referral_source"),
-            models.Index(fields=["waba", "-timestamp"], name="idx_conversion_events_ctwa_waba"),
+            models.Index(fields=["referral_source"], name="idx_conv_ev_ctwa_ref"),
+            models.Index(fields=["waba", "-timestamp"], name="idx_conv_ev_ctwa_waba"),
         ]
 
     def __str__(self):
