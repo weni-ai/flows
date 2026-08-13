@@ -1,3 +1,7 @@
+3.92.0
+----------
+* feat: add CtwaReferralSource model and enhance CTWA with new fields
+
 3.91.0
 ----------
 * feat: add URN support in multiple languages and update contact templates
