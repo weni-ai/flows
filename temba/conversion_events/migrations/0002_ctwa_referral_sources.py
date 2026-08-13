@@ -2,19 +2,59 @@
 
 import django.db.models.deletion
 import django.utils.timezone
-from django.db import migrations, models
+from django.db import migrations, models, transaction
+from django.db.models import Case, IntegerField, When
+
+BATCH_SIZE = 1000
 
 
 def backfill_ctwa_referral_sources(apps, schema_editor):
     CTWA = apps.get_model("conversion_events", "CTWA")
     CtwaReferralSource = apps.get_model("conversion_events", "CtwaReferralSource")
 
-    for ctwa in CTWA.objects.filter(referral_source_id__isnull=True).iterator():
-        source, _ = CtwaReferralSource.objects.get_or_create(
-            source_id=f"legacy-{ctwa.id}",
-            source_type="ad",
+    now = django.utils.timezone.now()
+    max_id = 0
+
+    while True:
+        batch_ids = list(
+            CTWA.objects.filter(referral_source_id__isnull=True, id__gt=max_id)
+            .values_list("id", flat=True)
+            .order_by("id")[:BATCH_SIZE]
         )
-        CTWA.objects.filter(id=ctwa.id).update(referral_source_id=source.id)
+        if not batch_ids:
+            break
+
+        with transaction.atomic():
+            CtwaReferralSource.objects.bulk_create(
+                [
+                    CtwaReferralSource(
+                        source_id=f"legacy-{ctwa_id}",
+                        source_type="ad",
+                        first_seen_at=now,
+                        last_seen_at=now,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    for ctwa_id in batch_ids
+                ],
+                ignore_conflicts=True,
+            )
+
+            source_map = {
+                src.source_id: src.id
+                for src in CtwaReferralSource.objects.filter(
+                    source_id__in=[f"legacy-{ctwa_id}" for ctwa_id in batch_ids]
+                ).only("id", "source_id")
+            }
+
+            CTWA.objects.filter(id__in=batch_ids).update(
+                referral_source_id=Case(
+                    *[When(id=ctwa_id, then=source_map[f"legacy-{ctwa_id}"]) for ctwa_id in batch_ids],
+                    output_field=IntegerField(),
+                )
+            )
+
+        max_id = batch_ids[-1]
 
 
 class Migration(migrations.Migration):
