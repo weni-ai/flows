@@ -70,7 +70,6 @@ class CTWA(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "conversion_events_ctwa"
         indexes = [
             models.Index(
                 fields=["channel_uuid", "contact_urn", "-timestamp"],

@@ -1,8 +1,8 @@
 # Generated manually for CTWA referral sources and expanded conversion events
 
-from django.db import migrations, models
 import django.db.models.deletion
 import django.utils.timezone
+from django.db import migrations, models
 
 
 def backfill_ctwa_referral_sources(apps, schema_editor):
