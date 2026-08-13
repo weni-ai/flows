@@ -70,7 +70,9 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="ctwa",
             name="phone_number_id",
-            field=models.CharField(blank=True, help_text="Phone number ID from webhook metadata", max_length=64, null=True),
+            field=models.CharField(
+                blank=True, help_text="Phone number ID from webhook metadata", max_length=64, null=True
+            ),
         ),
         migrations.AddField(
             model_name="ctwa",

@@ -57,7 +57,9 @@ class CTWA(models.Model):
     timestamp = models.DateTimeField(help_text="Event timestamp from the webhook")
     channel_uuid = models.UUIDField(help_text="Channel UUID")
     waba = models.CharField(max_length=255, help_text="WhatsApp Business Account ID")
-    phone_number_id = models.CharField(max_length=64, null=True, blank=True, help_text="Phone number ID from webhook metadata")
+    phone_number_id = models.CharField(
+        max_length=64, null=True, blank=True, help_text="Phone number ID from webhook metadata"
+    )
     referral_source = models.ForeignKey(
         CtwaReferralSource,
         on_delete=models.PROTECT,

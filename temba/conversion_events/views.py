@@ -151,9 +151,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             # If it's not a WhatsApp URN, just do a normal lookup
             if not contact_urn.startswith("whatsapp:"):
                 return (
-                    base_qs.filter(channel_uuid=channel_uuid, contact_urn=contact_urn)
-                    .order_by("-timestamp")
-                    .first()
+                    base_qs.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).order_by("-timestamp").first()
                 )
 
             # For WhatsApp URNs, try both with and without the extra 9 if it's a Brazilian number
@@ -179,14 +177,10 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                 urns = [f"{prefix}:{num}" for num in numbers]
 
                 # Try to find CTWA data for either URN
-                return (
-                    base_qs.filter(channel_uuid=channel_uuid, contact_urn__in=urns).order_by("-timestamp").first()
-                )
+                return base_qs.filter(channel_uuid=channel_uuid, contact_urn__in=urns).order_by("-timestamp").first()
 
             # For non-BR numbers or if we can't handle the number format, just do a normal lookup
-            return (
-                base_qs.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).order_by("-timestamp").first()
-            )
+            return base_qs.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).order_by("-timestamp").first()
 
         except Exception as e:
             logger.error(f"Error fetching CTWA data: {str(e)}")
