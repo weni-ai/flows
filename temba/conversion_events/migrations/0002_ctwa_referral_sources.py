@@ -55,11 +55,11 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="ctwareferralsource",
-            index=models.Index(fields=["source_id"], name="idx_ctwa_referral_sources_source_id"),
+            index=models.Index(fields=["source_id"], name="idx_ctwa_ref_src_source_id"),
         ),
         migrations.AddIndex(
             model_name="ctwareferralsource",
-            index=models.Index(fields=["-last_seen_at"], name="idx_ctwa_referral_sources_last_seen"),
+            index=models.Index(fields=["-last_seen_at"], name="idx_ctwa_ref_src_last_seen"),
         ),
         migrations.AddField(
             model_name="ctwa",
@@ -125,23 +125,23 @@ class Migration(migrations.Migration):
             model_name="ctwa",
             index=models.Index(
                 fields=["channel_uuid", "contact_urn", "-timestamp"],
-                name="idx_conversion_events_ctwa_lookup",
+                name="idx_conv_ev_ctwa_lookup",
             ),
         ),
         migrations.AddIndex(
             model_name="ctwa",
-            index=models.Index(fields=["referral_source"], name="idx_conversion_events_ctwa_referral_source"),
+            index=models.Index(fields=["referral_source"], name="idx_conv_ev_ctwa_ref"),
         ),
         migrations.AddIndex(
             model_name="ctwa",
-            index=models.Index(fields=["waba", "-timestamp"], name="idx_conversion_events_ctwa_waba"),
+            index=models.Index(fields=["waba", "-timestamp"], name="idx_conv_ev_ctwa_waba"),
         ),
         migrations.RunSQL(
             sql="""
-                CREATE INDEX idx_conversion_events_ctwa_clid
+                CREATE INDEX idx_conv_ev_ctwa_clid
                 ON conversion_events_ctwa (ctwa_clid)
                 WHERE ctwa_clid IS NOT NULL;
             """,
-            reverse_sql="DROP INDEX IF EXISTS idx_conversion_events_ctwa_clid;",
+            reverse_sql="DROP INDEX IF EXISTS idx_conv_ev_ctwa_clid;",
         ),
     ]
