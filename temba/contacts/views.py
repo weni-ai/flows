@@ -121,16 +121,40 @@ class RemoveFromGroupForm(forms.Form):
 
 
 class ContactGroupForm(forms.ModelForm):
+    WHATSAPP_WITHOUT_PHONE_FIELD = "create_whatsapp_without_phone_group"
+
     preselected_contacts = forms.CharField(required=False, widget=forms.HiddenInput)
     group_query = forms.CharField(required=False, widget=forms.HiddenInput)
 
     def __init__(self, user, *args, **kwargs):
         self.user = user
         self.org = user.get_org()
+        offer_whatsapp_without_phone_group = kwargs.pop("offer_whatsapp_without_phone_group", False)
         super().__init__(*args, **kwargs)
 
+        if offer_whatsapp_without_phone_group and not ContactGroup.get_whatsapp_contacts_without_phone(self.org):
+            self.fields[self.WHATSAPP_WITHOUT_PHONE_FIELD] = forms.BooleanField(
+                required=False,
+                label=_("WhatsApp contacts without phone"),
+                help_text=_("Create a smart group with WhatsApp contacts that have a BSUID and no phone number"),
+                widget=CheckboxWidget(),
+            )
+
+        # this group has a fixed name and query, so nothing else needs to be filled in
+        if self.creating_whatsapp_without_phone_group:
+            self.fields["name"].required = False
+
+    @property
+    def creating_whatsapp_without_phone_group(self):
+        return self.WHATSAPP_WITHOUT_PHONE_FIELD in self.fields and bool(
+            self.data.get(self.WHATSAPP_WITHOUT_PHONE_FIELD)
+        )
+
     def clean_name(self):
-        name = self.cleaned_data["name"].strip()
+        if self.creating_whatsapp_without_phone_group:
+            name = ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME
+        else:
+            name = self.cleaned_data["name"].strip()
 
         # make sure the name isn't already taken
         existing = ContactGroup.get_user_group_by_name(self.org, name)
@@ -1375,9 +1399,6 @@ class ContactCRUDL(SmartCRUDL):
             form_kwargs["user"] = self.request.user
             return form_kwargs
 
-        def get_form(self):
-            return super().get_form()
-
         def pre_save(self, obj):
             obj = super().pre_save(obj)
             obj.org = self.request.user.get_org()
@@ -1705,6 +1726,24 @@ class ContactGroupCRUDL(SmartCRUDL):
         success_message = ""
         submit_button_name = _("Create")
 
+        def derive_fields(self):
+            fields = list(self.fields)
+            if self.offer_whatsapp_without_phone_group():
+                fields.append(ContactGroupForm.WHATSAPP_WITHOUT_PHONE_FIELD)
+            return fields
+
+        def offer_whatsapp_without_phone_group(self):
+            org = self.request.user.get_org()
+            if not org:
+                return False
+
+            # heal outdated query on existing groups (e.g. after adding whatsapp_phone)
+            if ContactGroup.get_whatsapp_contacts_without_phone(org):
+                ContactGroup.ensure_whatsapp_contacts_without_phone_query(org, self.request.user)
+                return False
+
+            return True
+
         def save(self, obj):
             org = self.request.user.get_org()
             user = self.request.user
@@ -1712,7 +1751,9 @@ class ContactGroupCRUDL(SmartCRUDL):
             query = self.form.cleaned_data.get("group_query")
             preselected_contacts = self.form.cleaned_data.get("preselected_contacts")
 
-            if query:
+            if self.form.cleaned_data.get(ContactGroupForm.WHATSAPP_WITHOUT_PHONE_FIELD):
+                self.object = ContactGroup.create_whatsapp_contacts_without_phone(org, user)
+            elif query:
                 self.object = ContactGroup.create_dynamic(org, user, name, query)
             else:
                 self.object = ContactGroup.create_static(org, user, name)
@@ -1731,6 +1772,7 @@ class ContactGroupCRUDL(SmartCRUDL):
         def get_form_kwargs(self):
             kwargs = super().get_form_kwargs()
             kwargs["user"] = self.request.user
+            kwargs["offer_whatsapp_without_phone_group"] = self.offer_whatsapp_without_phone_group()
             return kwargs
 
     class Update(ComponentFormMixin, ModalMixin, OrgObjPermsMixin, SmartUpdateView):

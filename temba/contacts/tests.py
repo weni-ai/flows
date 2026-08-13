@@ -27,7 +27,7 @@ from temba.airtime.models import AirtimeTransfer
 from temba.campaigns.models import Campaign, CampaignEvent, EventFire
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
 from temba.contacts.search import SearchException, SearchResults, search_contacts
-from temba.contacts.views import ContactCRUDL, ContactListView
+from temba.contacts.views import ContactCRUDL, ContactGroupCRUDL, ContactGroupForm, ContactListView
 from temba.flows.models import Flow, FlowSession, FlowStart
 from temba.ivr.models import IVRCall
 from temba.locations.models import AdminBoundary
@@ -63,7 +63,7 @@ from .models import (
     ExportContactsTask,
 )
 from .tasks import check_elasticsearch_lag, squash_contactgroupcounts
-from .templatetags.contacts import contact_field, history_class, history_icon
+from .templatetags.contacts import contact_field, history_class, history_icon, urn_scheme_label
 
 
 class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
@@ -761,6 +761,47 @@ class ContactGroupTest(TembaTest):
         with self.assertRaises(ValueError):
             group.update_query("age = 18")
 
+    @mock_mailroom
+    def test_whatsapp_contacts_without_phone(self, mr_mocks):
+        query = ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY
+        outdated = 'whatsapp_bsuid != "" AND whatsapp_phone = "" AND tel = ""'
+        mr_mocks.parse_query(query, cleaned=query)
+
+        # there's nothing to ensure while the org doesn't have the group
+        self.assertIsNone(ContactGroup.get_whatsapp_contacts_without_phone(self.org))
+        self.assertIsNone(ContactGroup.ensure_whatsapp_contacts_without_phone_query(self.org, self.admin))
+
+        group = ContactGroup.create_whatsapp_contacts_without_phone(self.org, self.admin)
+
+        self.assertEqual(ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME, group.name)
+        self.assertEqual(query, group.query)
+
+        # creating it again returns the existing group instead of a duplicate
+        self.assertEqual(group, ContactGroup.create_whatsapp_contacts_without_phone(self.org, self.admin))
+        self.assertEqual(1, ContactGroup.user_groups.filter(org=self.org, name=group.name).count())
+
+        # an outdated query is updated and the group re-evaluated
+        group.query = outdated
+        group.status = ContactGroup.STATUS_READY
+        group.save(update_fields=("query", "status"))
+
+        self.assertEqual(group, ContactGroup.ensure_whatsapp_contacts_without_phone_query(self.org, self.admin))
+
+        group.refresh_from_db()
+        self.assertEqual(query, group.query)
+        self.assertEqual(ContactGroup.STATUS_INITIALIZING, group.status)
+
+        # but is left alone while the group is still evaluating
+        group.query = outdated
+        group.status = ContactGroup.STATUS_EVALUATING
+        group.save(update_fields=("query", "status"))
+
+        self.assertEqual(group, ContactGroup.ensure_whatsapp_contacts_without_phone_query(self.org, self.admin))
+
+        group.refresh_from_db()
+        self.assertEqual(outdated, group.query)
+        self.assertEqual(ContactGroup.STATUS_EVALUATING, group.status)
+
     def test_get_or_create(self):
         group = ContactGroup.get_or_create(self.org, self.user, " first ")
         self.assertEqual(group.name, "first")
@@ -1214,6 +1255,71 @@ class ContactGroupCRUDLTest(TembaTest, CRUDLTestMixin):
             "This org has 10 groups and the limit is 10. "
             "You must delete existing ones before you can create new ones.",
         )
+
+    @mock_mailroom
+    def test_create_whatsapp_contacts_without_phone(self, mr_mocks):
+        url = reverse("contacts.contactgroup_create")
+        field = ContactGroupForm.WHATSAPP_WITHOUT_PHONE_FIELD
+
+        self.login(self.admin)
+
+        # the checkbox is offered while the org doesn't have the group
+        response = self.client.get(url)
+        self.assertIn(field, response.context["form"].fields)
+
+        # checking it creates the smart group with its fixed name and query, without needing a name
+        mr_mocks.parse_query(
+            ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY,
+            cleaned=ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY,
+        )
+        response = self.client.post(url, {"name": "", field: "on"})
+        self.assertNoFormErrors(response)
+
+        group = ContactGroup.get_whatsapp_contacts_without_phone(self.org)
+        self.assertIsNotNone(group)
+        self.assertEqual(ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME, group.name)
+        self.assertEqual('whatsapp_bsuid != "" AND whatsapp_phone = ""', group.query)
+        self.assertEqual(ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY, group.query)
+
+        # and is no longer offered once the group exists
+        response = self.client.get(url)
+        self.assertNotIn(field, response.context["form"].fields)
+
+        # so posting the flag again creates a regular group instead of a duplicate
+        response = self.client.post(url, {"name": "Others", field: "on"})
+        self.assertNoFormErrors(response)
+        ContactGroup.user_groups.get(org=self.org, name="Others")
+        self.assertEqual(
+            1,
+            ContactGroup.user_groups.filter(
+                org=self.org, name=ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME, is_active=True
+            ).count(),
+        )
+
+        # opening Create Group refreshes an outdated query that still required tel = ""
+        old_query = 'whatsapp_bsuid != "" AND whatsapp_phone = "" AND tel = ""'
+        group.query = old_query
+        group.status = ContactGroup.STATUS_READY
+        group.save(update_fields=("query", "status"))
+
+        mr_mocks.parse_query(
+            ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY,
+            cleaned=ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY,
+        )
+        response = self.client.get(url)
+        self.assertNotIn(field, response.context["form"].fields)
+
+        group.refresh_from_db()
+        self.assertEqual('whatsapp_bsuid != "" AND whatsapp_phone = ""', group.query)
+        self.assertEqual(ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY, group.query)
+
+    def test_create_whatsapp_contacts_without_phone_needs_org(self):
+        view = ContactGroupCRUDL.Create()
+        view.request = RequestFactory().get(reverse("contacts.contactgroup_create"))
+        view.request.user = self.non_org_user
+
+        self.assertFalse(view.offer_whatsapp_without_phone_group())
+        self.assertNotIn(ContactGroupForm.WHATSAPP_WITHOUT_PHONE_FIELD, view.derive_fields())
 
     def test_create_disallow_duplicates(self):
         self.login(self.admin)
@@ -2582,6 +2688,22 @@ class ContactTest(TembaTest):
         item = {"type": "product_sent"}
         self.assertEqual(history_icon(item), '<span class="material-symbols-outlined fill">storefront</span>')
         self.assertEqual(history_class(item), "msg detail-event")
+
+    def test_urn_scheme_label(self):
+        whatsapp_phone = ContactURN(scheme=URN.WHATSAPP_SCHEME, path="5511987654321")
+        self.assertEqual(urn_scheme_label(whatsapp_phone), "whatsapp")
+
+        whatsapp_bsuid = ContactURN(scheme=URN.WHATSAPP_SCHEME, path="BR.35029025746744354")
+        self.assertEqual(urn_scheme_label(whatsapp_bsuid), "BSUID")
+
+        whatsapp_parent_bsuid = ContactURN(scheme=URN.WHATSAPP_SCHEME, path="US.ENT.11815799212886844830")
+        self.assertEqual(urn_scheme_label(whatsapp_parent_bsuid), "BSUID")
+
+        email = ContactURN(scheme=URN.EMAIL_SCHEME, path="joe@nyaruka.com")
+        self.assertEqual(urn_scheme_label(email), "Email")
+
+        tel = ContactURN(scheme=URN.TEL_SCHEME, path="+5511987654321")
+        self.assertEqual(urn_scheme_label(tel), "tel")
 
     def test_get_scheduled_messages(self):
         self.just_joe = self.create_group("Just Joe", [self.joe])
