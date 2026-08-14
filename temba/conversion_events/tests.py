@@ -126,6 +126,16 @@ class ConversionEventSerializerTest(TembaTest):
         self.assertIn("payload", serializer.errors)
         self.assertIn("must be a valid JSON object", str(serializer.errors["payload"]))
 
+    def test_valid_conversation_started_data(self):
+        data = {
+            "event_type": "conversation_started",
+            "channel_uuid": str(uuid4()),
+            "contact_urn": "whatsapp:5511999999999",
+            "payload": {"message_id": "wamid.test"},
+        }
+        serializer = ConversionEventSerializer(data=data)
+        self.assertTrue(serializer.is_valid())
+
 
 MOCK_PUBLIC_KEY = """-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuQw1Qw1Qw1Qw1Qw1Qw1Qw1Q\nw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw\n1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1QwIDAQAB\n-----END PUBLIC KEY-----"""
 
@@ -940,6 +950,103 @@ class CTWAModelTest(TembaTest):
         # Test with empty URN
         result = view._get_ctwa_data(self.channel.uuid, "")
         self.assertIsNone(result)
+
+
+class ConversationStartedConversionEventAPITest(TembaTest):
+    """Tests for conversation_started events triggered by Courier fixed token auth"""
+
+    def setUp(self):
+        super().setUp()
+        self.activate_patcher = patch.object(WhatsAppCloudType, "activate", return_value=None)
+        self.activate_patcher.start()
+        self.addCleanup(self.activate_patcher.stop)
+        self.channel = self.create_channel(
+            "WAC",
+            "Test WhatsApp Channel",
+            "12065551212",
+            country="US",
+            config={"meta_dataset_id": "test_dataset_123", "wa_waba_id": "test_waba_123"},
+        )
+        self.ctwa_data = create_test_ctwa(
+            ctwa_clid="test_clid_conv_started",
+            channel_uuid=self.channel.uuid,
+            waba="test_waba_123",
+            contact_urn="whatsapp:5511999999999",
+        )
+        self.org.proj_uuid = uuid4()
+        self.org.save(update_fields=["proj_uuid"])
+        self.endpoint_url = "/conversion/"
+        self.courier_token = "courier-test-token"
+
+    def test_conversation_started_with_courier_token_sends_datalake_only(self):
+        payload = {
+            "event_type": "conversation_started",
+            "channel_uuid": str(self.channel.uuid),
+            "contact_urn": "whatsapp:5511999999999",
+            "payload": {
+                "message_id": "wamid.test",
+                "source_id": "ad_source_1",
+                "source_type": "ad",
+            },
+        }
+
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event, override_settings(COURIER_FIXED_ACCESS_TOKEN=self.courier_token):
+            response = self.client.post(
+                f"{self.endpoint_url}?token={self.courier_token}",
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
+
+            self.assertEqual(response.status_code, 200)
+            response_data = response.json()
+            self.assertEqual(response_data["status"], "success")
+            self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
+
+            mock_post.assert_not_called()
+            mock_send_event.assert_called_once()
+            event_data = mock_send_event.call_args[0][1]
+            self.assertEqual(event_data["event_name"], "conversion_conversation_started")
+            self.assertEqual(event_data["value"], "conversation_started")
+            self.assertEqual(event_data["metadata"]["ctwa_id"], "test_clid_conv_started")
+            self.assertEqual(event_data["metadata"]["message_id"], "wamid.test")
+            self.assertEqual(event_data["metadata"]["referral_source_id"], self.ctwa_data.referral_source.source_id)
+
+    def test_courier_token_rejects_lead_event(self):
+        payload = {
+            "event_type": "lead",
+            "channel_uuid": str(self.channel.uuid),
+            "contact_urn": "whatsapp:5511999999999",
+            "payload": {},
+        }
+
+        with override_settings(COURIER_FIXED_ACCESS_TOKEN=self.courier_token):
+            response = self.client.post(
+                f"{self.endpoint_url}?token={self.courier_token}",
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
+
+            self.assertEqual(response.status_code, 403)
+            self.assertEqual(response.json()["error"], "Forbidden")
+
+    def test_courier_token_invalid(self):
+        payload = {
+            "event_type": "conversation_started",
+            "channel_uuid": str(self.channel.uuid),
+            "contact_urn": "whatsapp:5511999999999",
+            "payload": {},
+        }
+
+        with override_settings(COURIER_FIXED_ACCESS_TOKEN=self.courier_token):
+            response = self.client.post(
+                f"{self.endpoint_url}?token=wrong-token",
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
+
+            self.assertEqual(response.status_code, 403)
 
 
 class JWTModuleAuthenticationTestCase(TestCase):

@@ -9,14 +9,16 @@ from weni_datalake_sdk.paths.events_path import EventPath
 from django.conf import settings
 from django.http import JsonResponse
 
-from .jwt_auth import JWTModuleAuthMixin
+from .courier_auth import ConversionEventAuthMixin
 from .models import CTWA
 from .serializers import ConversionEventSerializer
+
+COURIER_ONLY_EVENT_TYPES = {"conversation_started"}
 
 logger = logging.getLogger(__name__)
 
 
-class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
+class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
     """
     API endpoint to receive conversion events (lead/purchase)
     and send to Meta Conversion API and/or Weni Datalake
@@ -51,14 +53,23 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             contact_urn = validated_data["contact_urn"]
             payload = validated_data.get("payload", {})
 
+            if self.courier_authenticated and event_type not in COURIER_ONLY_EVENT_TYPES:
+                return JsonResponse(
+                    {
+                        "error": "Forbidden",
+                        "detail": "Fixed token authentication is only allowed for conversation_started events",
+                    },
+                    status=403,
+                )
+
             # Get CTWA data for Meta sending
             ctwa_data = self._get_ctwa_data(channel_uuid, contact_urn)
             meta_success = None
             meta_error = None
             dataset_id = None
 
-            # Meta CAPI requires ctwa_clid; Status ads may omit it
-            if ctwa_data and ctwa_data.ctwa_clid:
+            # Meta CAPI requires ctwa_clid; conversation_started is Datalake-only
+            if event_type != "conversation_started" and ctwa_data and ctwa_data.ctwa_clid:
                 dataset_id = self._get_channel_dataset_id(channel_uuid)
                 if dataset_id:
                     meta_payload = self._build_meta_payload(
