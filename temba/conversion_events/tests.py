@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone as dt_timezone
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -950,6 +951,212 @@ class CTWAModelTest(TembaTest):
         # Test with empty URN
         result = view._get_ctwa_data(self.channel.uuid, "")
         self.assertIsNone(result)
+
+
+class CtwaDatalakeDualWriteTest(TembaTest):
+    """Tests for dual-write to legacy and CTWA Datalake tables."""
+
+    def setUp(self):
+        super().setUp()
+        self.jwt_auth_patcher = patch(
+            "temba.conversion_events.jwt_auth.JWTModuleAuthentication.authenticate",
+            return_value=(AnonymousUser(), None),
+        )
+        self.jwt_auth_patcher.start()
+        self.addCleanup(self.jwt_auth_patcher.stop)
+        self.activate_patcher = patch.object(WhatsAppCloudType, "activate", return_value=None)
+        self.activate_patcher.start()
+        self.addCleanup(self.activate_patcher.stop)
+        self.channel = self.create_channel(
+            "WAC",
+            "Test WhatsApp Channel",
+            "12065551212",
+            country="US",
+            config={"meta_dataset_id": "test_dataset_123", "wa_waba_id": "test_waba_123"},
+        )
+        self.org.proj_uuid = uuid4()
+        self.org.save(update_fields=["proj_uuid"])
+        self.endpoint_url = "/conversion/"
+        self.ctwa_timestamp = datetime(2026, 1, 15, 12, 30, 0, tzinfo=dt_timezone.utc)
+        self.ctwa_data = create_test_ctwa(
+            ctwa_clid="test_clid_dual_write",
+            channel_uuid=self.channel.uuid,
+            waba="test_waba_123",
+            contact_urn="whatsapp:5511999999999",
+            message_id="wamid.dual.write",
+            timestamp=self.ctwa_timestamp,
+        )
+        self.valid_payload = {
+            "event_type": "lead",
+            "channel_uuid": str(self.channel.uuid),
+            "contact_urn": "whatsapp:5511999999999",
+            "payload": {"custom_field": "custom_value"},
+        }
+
+    def test_dual_write_lead_with_complete_ctwa(self):
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event, patch("temba.conversion_events.views.datetime") as mock_datetime:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"success": True}
+            mock_post.return_value = mock_response
+            mock_datetime.now.return_value.timestamp.return_value = 1700000000.0
+
+            with override_settings(
+                WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
+                WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
+                META_PARTNER_AGENT="Weni by VTEX",
+            ):
+                response = self.client.post(
+                    self.endpoint_url,
+                    data=json.dumps(self.valid_payload),
+                    content_type="application/json",
+                )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(mock_send_event.call_count, 2)
+
+            legacy_event = mock_send_event.call_args_list[0][0][1]
+            ctwa_event = mock_send_event.call_args_list[1][0][1]
+
+            self.assertEqual(legacy_event["event_name"], "conversion_lead")
+            self.assertEqual(legacy_event["value"], "lead")
+            self.assertEqual(legacy_event["date"], 1700000000.0)
+            self.assertEqual(legacy_event["metadata"]["message_id"], "wamid.dual.write")
+
+            self.assertEqual(ctwa_event["event_name"], "ctwa")
+            self.assertEqual(ctwa_event["value"], "lead_qualified")
+            self.assertEqual(ctwa_event["date"], self.ctwa_timestamp.timestamp())
+            self.assertEqual(ctwa_event["metadata"]["external_msg_id"], "wamid.dual.write")
+            self.assertEqual(ctwa_event["metadata"]["campaign_source"], self.ctwa_data.referral_source.source_id)
+            self.assertNotIn("referral_source_id", ctwa_event["metadata"])
+            self.assertNotIn("message_id", ctwa_event["metadata"])
+
+    def test_dual_write_purchase_includes_order_value(self):
+        payload = self.valid_payload.copy()
+        payload["event_type"] = "purchase"
+        payload["payload"] = {"value": "456.78", "currency": "BRL"}
+
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"success": True}
+            mock_post.return_value = mock_response
+
+            with override_settings(
+                WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
+                WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
+                META_PARTNER_AGENT="Weni by VTEX",
+            ):
+                response = self.client.post(
+                    self.endpoint_url,
+                    data=json.dumps(payload),
+                    content_type="application/json",
+                )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(mock_send_event.call_count, 2)
+
+            ctwa_event = mock_send_event.call_args_list[1][0][1]
+            self.assertEqual(ctwa_event["value"], "purchase_completed")
+            self.assertEqual(ctwa_event["metadata"]["order_value"], 456.78)
+
+    def test_lead_without_ctwa_sends_legacy_only(self):
+        payload = self.valid_payload.copy()
+        payload["contact_urn"] = "whatsapp:5511888888888"
+
+        with patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+            response = self.client.post(
+                self.endpoint_url,
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
+
+            self.assertEqual(response.status_code, 200)
+            mock_send_event.assert_called_once()
+            event_data = mock_send_event.call_args[0][1]
+            self.assertEqual(event_data["event_name"], "conversion_lead")
+            self.assertNotIn("ctwa_id", event_data["metadata"])
+
+    def test_ctwa_without_message_id_sends_legacy_only(self):
+        create_test_ctwa(
+            ctwa_clid="test_clid_no_message",
+            channel_uuid=self.channel.uuid,
+            waba="test_waba_123",
+            contact_urn="whatsapp:5511777777777",
+            message_id=None,
+        )
+        payload = self.valid_payload.copy()
+        payload["contact_urn"] = "whatsapp:5511777777777"
+
+        with patch("temba.conversion_events.views.send_event_data") as mock_send_event:
+            response = self.client.post(
+                self.endpoint_url,
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
+
+            self.assertEqual(response.status_code, 200)
+            mock_send_event.assert_called_once()
+            event_data = mock_send_event.call_args[0][1]
+            self.assertEqual(event_data["event_name"], "conversion_lead")
+
+    def test_ctwa_datalake_failure_does_not_fail_request(self):
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"success": True}
+            mock_post.return_value = mock_response
+            mock_send_event.side_effect = [None, Exception("CTWA table unavailable")]
+
+            with override_settings(
+                WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
+                WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
+                META_PARTNER_AGENT="Weni by VTEX",
+            ):
+                response = self.client.post(
+                    self.endpoint_url,
+                    data=json.dumps(self.valid_payload),
+                    content_type="application/json",
+                )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(mock_send_event.call_count, 2)
+
+
+    def test_dual_write_conversation_started(self):
+        payload = {
+            "event_type": "conversation_started",
+            "channel_uuid": str(self.channel.uuid),
+            "contact_urn": "whatsapp:5511999999999",
+            "payload": {},
+        }
+
+        with patch("temba.conversion_events.views.send_event_data") as mock_send_event, patch(
+            "temba.conversion_events.views.datetime"
+        ) as mock_datetime:
+            mock_datetime.now.return_value.timestamp.return_value = 1700000000.0
+
+            response = self.client.post(
+                self.endpoint_url,
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(mock_send_event.call_count, 2)
+
+            legacy_event = mock_send_event.call_args_list[0][0][1]
+            ctwa_event = mock_send_event.call_args_list[1][0][1]
+
+            self.assertEqual(legacy_event["event_name"], "conversion_conversation_started")
+            self.assertEqual(ctwa_event["event_name"], "ctwa")
+            self.assertEqual(ctwa_event["value"], "conversation_started")
 
 
 class ConversationStartedConversionEventAPITest(TembaTest):

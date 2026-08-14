@@ -15,6 +15,12 @@ from .serializers import ConversionEventSerializer
 
 COURIER_ONLY_EVENT_TYPES = {"conversation_started"}
 
+CTWA_DATALAKE_VALUE_MAP = {
+    "conversation_started": "conversation_started",
+    "lead": "lead_qualified",
+    "purchase": "purchase_completed",
+}
+
 logger = logging.getLogger(__name__)
 
 
@@ -280,38 +286,77 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
         except Exception as e:
             return False, f"Error sending to Meta: {str(e)}"
 
-    def _send_to_datalake(self, event_type, channel_uuid, contact_urn, ctwa_data, payload):
-        """Send event to Weni Datalake"""
+    def _get_channel_and_org(self, channel_uuid):
+        from temba.channels.models import Channel
+        from temba.orgs.models import Org
+
         try:
-            # Get channel and org data
-            from temba.channels.models import Channel
-            from temba.orgs.models import Org
+            channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only("org_id", "config").first()
+            if not channel:
+                return None, None, "Channel not found"
+        except Exception:
+            return None, None, "Channel not found"
 
-            try:
-                channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only("org_id", "config").first()
-                if not channel:
-                    return False, "Channel not found"
-            except Exception:
-                return False, "Channel not found"
+        try:
+            org = Org.objects.filter(id=channel.org_id).only("proj_uuid").first()
+            if not org or not org.proj_uuid:
+                return None, None, "Organization not found"
+        except Exception:
+            return None, None, "Organization not found"
 
-            try:
-                org = Org.objects.filter(id=channel.org_id).only("proj_uuid").first()
-                if not org or not org.proj_uuid:
-                    return False, "Organization not found"
-            except Exception:
-                return False, "Organization not found"
+        return channel, org, None
 
-            # Start with all payload data in metadata
+    def _resolve_waba_id(self, ctwa_data, channel):
+        if ctwa_data and ctwa_data.waba:
+            return ctwa_data.waba
+        if channel.config and channel.config.get("wa_waba_id"):
+            return channel.config["wa_waba_id"]
+        return None
+
+    def _send_to_datalake(self, event_type, channel_uuid, contact_urn, ctwa_data, payload):
+        """Send event to Weni Datalake (legacy table + best-effort CTWA table)."""
+        channel, org, lookup_error = self._get_channel_and_org(channel_uuid)
+        if lookup_error:
+            return False, lookup_error
+
+        legacy_success, legacy_error = self._send_legacy_datalake(
+            event_type=event_type,
+            channel_uuid=channel_uuid,
+            contact_urn=contact_urn,
+            ctwa_data=ctwa_data,
+            payload=payload,
+            channel=channel,
+            org=org,
+        )
+        if not legacy_success:
+            return legacy_success, legacy_error
+
+        ctwa_success, ctwa_error = self._send_ctwa_datalake(
+            event_type=event_type,
+            channel_uuid=channel_uuid,
+            contact_urn=contact_urn,
+            ctwa_data=ctwa_data,
+            payload=payload,
+            channel=channel,
+            org=org,
+        )
+        if not ctwa_success and ctwa_error:
+            logger.warning(
+                f"[PARTIAL] Legacy Datalake succeeded but CTWA table failed for event {event_type} "
+                f"on channel {channel_uuid}. CTWA error: {ctwa_error}"
+            )
+
+        return True, None
+
+    def _send_legacy_datalake(self, event_type, channel_uuid, contact_urn, ctwa_data, payload, channel, org):
+        """Send event to the legacy Weni Datalake table."""
+        try:
             metadata = payload.copy() if payload else {}
-
-            # Add required fields to metadata
             metadata["channel"] = str(channel_uuid)
 
-            # Add waba_id from channel config if available
             if channel.config and "wa_waba_id" in channel.config:
                 metadata["waba_id"] = channel.config["wa_waba_id"]
 
-            # Add CTWA metadata when available
             if ctwa_data:
                 if ctwa_data.ctwa_clid:
                     metadata["ctwa_id"] = ctwa_data.ctwa_clid
@@ -324,10 +369,10 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
             data = {
                 "event_name": f"conversion_{event_type}",
                 "key": "capi",
-                "value": event_type,  # "lead" or "purchase"
+                "value": event_type,
                 "value_type": "string",
                 "date": datetime.now().timestamp(),
-                "project": str(org.proj_uuid),  # Using org proj_uuid as project identifier
+                "project": str(org.proj_uuid),
                 "contact_urn": contact_urn,
                 "metadata": metadata,
             }
@@ -337,5 +382,86 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
 
         except Exception as e:
             error_msg = f"Error sending to Datalake: {str(e)}"
+            logger.error(error_msg)
+            return False, error_msg
+
+    def _can_send_ctwa_datalake(self, ctwa_data, channel, channel_uuid):
+        if not ctwa_data:
+            return False
+
+        waba_id = self._resolve_waba_id(ctwa_data, channel)
+        referral_source = ctwa_data.referral_source
+
+        required_fields = {
+            "ctwa_clid": ctwa_data.ctwa_clid,
+            "message_id": ctwa_data.message_id,
+            "campaign_source": referral_source.source_id if referral_source else None,
+            "waba_id": waba_id,
+            "channel": str(channel_uuid),
+        }
+        missing = [field for field, value in required_fields.items() if not value]
+        if missing:
+            logger.warning(
+                f"Skipping CTWA Datalake event due to missing required fields: {', '.join(missing)}"
+            )
+            return False
+
+        return True
+
+    def _build_ctwa_datalake_payload(self, event_type, channel_uuid, contact_urn, ctwa_data, channel, org, payload):
+        ctwa_value = CTWA_DATALAKE_VALUE_MAP.get(event_type)
+        if not ctwa_value:
+            return None
+
+        waba_id = self._resolve_waba_id(ctwa_data, channel)
+        metadata = {
+            "external_msg_id": ctwa_data.message_id,
+            "ctwa_id": ctwa_data.ctwa_clid,
+            "campaign_source": ctwa_data.referral_source.source_id,
+            "waba_id": waba_id,
+            "channel": str(channel_uuid),
+        }
+
+        if event_type == "purchase" and payload:
+            value = payload.get("value")
+            if value is not None:
+                try:
+                    metadata["order_value"] = float(value)
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid order_value format in purchase event: {value}")
+
+        return {
+            "event_name": "ctwa",
+            "key": "capi",
+            "value": ctwa_value,
+            "contact_urn": contact_urn,
+            "project": str(org.proj_uuid),
+            "date": ctwa_data.timestamp.timestamp(),
+            "metadata": metadata,
+        }
+
+    def _send_ctwa_datalake(self, event_type, channel_uuid, contact_urn, ctwa_data, payload, channel, org):
+        """Send event to the CTWA Weni Datalake table when required fields are available."""
+        if not self._can_send_ctwa_datalake(ctwa_data, channel, channel_uuid):
+            return True, None
+
+        try:
+            data = self._build_ctwa_datalake_payload(
+                event_type=event_type,
+                channel_uuid=channel_uuid,
+                contact_urn=contact_urn,
+                ctwa_data=ctwa_data,
+                channel=channel,
+                org=org,
+                payload=payload,
+            )
+            if not data:
+                return True, None
+
+            send_event_data(EventPath, data)
+            return True, None
+
+        except Exception as e:
+            error_msg = f"Error sending to CTWA Datalake: {str(e)}"
             logger.error(error_msg)
             return False, error_msg
