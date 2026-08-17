@@ -35,8 +35,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="ctwareferralsource",
-            index=models.Index(
-                fields=["org", "-last_seen_at"], name="idx_ctwa_ref_src_org_last_seen"
-            ),
+            index=models.Index(fields=["org", "-last_seen_at"], name="idx_ctwa_ref_src_org_last_seen"),
         ),
     ]

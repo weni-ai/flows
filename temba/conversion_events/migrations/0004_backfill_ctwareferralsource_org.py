@@ -21,9 +21,9 @@ def org_ids_by_source_id(source_ids, CTWA, Channel):
     channel_uuids = {str(channel_uuid) for _, channel_uuid in ctwa_rows}
     org_by_channel = {
         str(uuid): org_id
-        for uuid, org_id in Channel.objects.filter(
-            uuid__in=channel_uuids, org_id__isnull=False
-        ).values_list("uuid", "org_id")
+        for uuid, org_id in Channel.objects.filter(uuid__in=channel_uuids, org_id__isnull=False).values_list(
+            "uuid", "org_id"
+        )
     }
 
     orgs = defaultdict(set)
@@ -57,17 +57,13 @@ def apply_orgs_to_source(source, org_ids, CtwaReferralSource, CTWA, Channel):
             },
         )
 
-        channel_uuids = list(
-            Channel.objects.filter(org_id=extra_org_id).values_list("uuid", flat=True)
+        channel_uuids = list(Channel.objects.filter(org_id=extra_org_id).values_list("uuid", flat=True))
+        CTWA.objects.filter(referral_source_id=source.id, channel_uuid__in=channel_uuids).update(
+            referral_source_id=clone.id
         )
-        CTWA.objects.filter(
-            referral_source_id=source.id, channel_uuid__in=channel_uuids
-        ).update(referral_source_id=clone.id)
 
 
-def backfill_ctwa_referral_source_org(
-    CtwaReferralSource, CTWA, Channel, batch_size=BATCH_SIZE, source_ids=None
-):
+def backfill_ctwa_referral_source_org(CtwaReferralSource, CTWA, Channel, batch_size=BATCH_SIZE, source_ids=None):
     max_id = 0
     while True:
         queryset = CtwaReferralSource.objects.filter(id__gt=max_id).order_by("id")
@@ -81,9 +77,7 @@ def backfill_ctwa_referral_source_org(
             break
 
         with transaction.atomic():
-            org_map = org_ids_by_source_id(
-                [source.id for source in batch], CTWA, Channel
-            )
+            org_map = org_ids_by_source_id([source.id for source in batch], CTWA, Channel)
             for source in batch:
                 org_ids = org_map.get(source.id, [])
                 if not org_ids:

@@ -15,9 +15,7 @@ class CtwaReferralSource(models.Model):
         (SOURCE_TYPE_POST, "Post"),
     )
 
-    org = models.ForeignKey(
-        Org, on_delete=models.PROTECT, related_name="ctwa_referral_sources"
-    )
+    org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="ctwa_referral_sources")
     source_id = models.CharField(max_length=64)
     source_type = models.CharField(max_length=16, choices=SOURCE_TYPE_CHOICES)
     source_url = models.TextField(null=True, blank=True)
@@ -43,9 +41,7 @@ class CtwaReferralSource(models.Model):
         indexes = [
             models.Index(fields=["source_id"], name="idx_ctwa_ref_src_source_id"),
             models.Index(fields=["-last_seen_at"], name="idx_ctwa_ref_src_last_seen"),
-            models.Index(
-                fields=["org", "-last_seen_at"], name="idx_ctwa_ref_src_org_last_seen"
-            ),
+            models.Index(fields=["org", "-last_seen_at"], name="idx_ctwa_ref_src_org_last_seen"),
         ]
 
     def __str__(self):
@@ -91,9 +87,7 @@ class CTWA(models.Model):
         related_name="conversion_events",
         db_column="referral_source_id",
     )
-    message_id = models.CharField(
-        max_length=255, null=True, blank=True, help_text="WhatsApp message ID (wamid)"
-    )
+    message_id = models.CharField(max_length=255, null=True, blank=True, help_text="WhatsApp message ID (wamid)")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

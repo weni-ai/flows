@@ -20,9 +20,7 @@ from temba.conversion_events.models import CTWA, CtwaReferralSource
 from temba.conversion_events.serializers import ConversionEventSerializer
 from temba.tests import TembaTest
 
-_backfill = import_module(
-    "temba.conversion_events.migrations.0004_backfill_ctwareferralsource_org"
-)
+_backfill = import_module("temba.conversion_events.migrations.0004_backfill_ctwareferralsource_org")
 apply_orgs_to_source = _backfill.apply_orgs_to_source
 backfill_ctwa_referral_source_org = _backfill.backfill_ctwa_referral_source_org
 org_ids_by_source_id = _backfill.org_ids_by_source_id
@@ -37,16 +35,10 @@ def create_test_ctwa(**kwargs):
         if org is None:
             channel_uuid = kwargs.get("channel_uuid")
             if channel_uuid is not None:
-                channel = (
-                    Channel.objects.filter(uuid=str(channel_uuid))
-                    .select_related("org")
-                    .first()
-                )
+                channel = Channel.objects.filter(uuid=str(channel_uuid)).select_related("org").first()
                 if channel is not None:
                     org = channel.org
-        referral_source, _ = CtwaReferralSource.get_or_create_for_org(
-            org, source_id, source_type
-        )
+        referral_source, _ = CtwaReferralSource.get_or_create_for_org(org, source_id, source_type)
 
     defaults = {"timestamp": timezone.now()}
     defaults.update(kwargs)
@@ -163,9 +155,7 @@ class ConversionEventAPITest(TembaTest):
         self.jwt_auth_patcher.start()
         self.addCleanup(self.jwt_auth_patcher.stop)
         # Patch WhatsAppCloudType.activate para evitar erro de configuração obrigatória
-        self.activate_patcher = patch.object(
-            WhatsAppCloudType, "activate", return_value=None
-        )
+        self.activate_patcher = patch.object(WhatsAppCloudType, "activate", return_value=None)
         self.activate_patcher.start()
         self.addCleanup(self.activate_patcher.stop)
         # Create test channel with Meta configuration
@@ -251,20 +241,14 @@ class ConversionEventAPITest(TembaTest):
                 self.assertEqual(event_data["project"], str(self.org.proj_uuid))
 
                 # Verify all payload data is in metadata
-                self.assertEqual(
-                    event_data["metadata"]["channel"], str(self.channel.uuid)
-                )
+                self.assertEqual(event_data["metadata"]["channel"], str(self.channel.uuid))
                 self.assertEqual(event_data["metadata"]["ctwa_id"], "test_clid_123")
                 self.assertEqual(event_data["metadata"]["waba_id"], "test_waba_123")
                 self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
                 self.assertEqual(event_data["metadata"]["order_form_id"], "12345")
                 self.assertEqual(event_data["metadata"]["value"], "100.00")
-                self.assertEqual(
-                    event_data["metadata"]["another_field"], "another_value"
-                )
-                self.assertNotIn(
-                    "ctwa_id", event_data
-                )  # Verify ctwa_id is not in main payload
+                self.assertEqual(event_data["metadata"]["another_field"], "another_value")
+                self.assertNotIn("ctwa_id", event_data)  # Verify ctwa_id is not in main payload
 
     def test_successful_conversion_without_ctwa(self):
         """Test successful conversion event without CTWA data - should only send to Datalake"""
@@ -291,9 +275,7 @@ class ConversionEventAPITest(TembaTest):
             self.assertEqual(response.status_code, 200)
             response_data = response.json()
             self.assertEqual(response_data["status"], "success")
-            self.assertEqual(
-                response_data["message"], "Event sent to Datalake successfully"
-            )
+            self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
 
             # Verify Datalake call
             mock_send_event.assert_called_once()
@@ -307,9 +289,7 @@ class ConversionEventAPITest(TembaTest):
             self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
             self.assertEqual(event_data["metadata"]["order_form_id"], "12345")
             self.assertEqual(event_data["metadata"]["value"], "100.00")
-            self.assertNotIn(
-                "ctwa_id", event_data
-            )  # Verify ctwa_id is not in main payload
+            self.assertNotIn("ctwa_id", event_data)  # Verify ctwa_id is not in main payload
 
     def test_datalake_error_handling(self):
         """Test handling of Datalake API errors"""
@@ -395,9 +375,7 @@ class ConversionEventAPITest(TembaTest):
                 self.assertEqual(event_data["value"], "purchase")
                 self.assertEqual(event_data["value_type"], "string")
                 self.assertEqual(event_data["project"], str(self.org.proj_uuid))
-                self.assertEqual(
-                    event_data["contact_urn"], self.valid_payload["contact_urn"]
-                )
+                self.assertEqual(event_data["contact_urn"], self.valid_payload["contact_urn"])
                 self.assertEqual(event_data["metadata"]["value"], "123.45")
                 self.assertEqual(event_data["metadata"]["currency"], "USD")
                 self.assertEqual(event_data["metadata"]["custom_field"], "custom_value")
@@ -472,9 +450,7 @@ class ConversionEventAPITest(TembaTest):
             self.assertEqual(response.status_code, 200)
             response_data = response.json()
             self.assertEqual(response_data["status"], "success")
-            self.assertEqual(
-                response_data["message"], "Event sent to Datalake successfully"
-            )
+            self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
 
             # Verify Datalake call
             mock_send_event.assert_called_once()
@@ -489,9 +465,7 @@ class ConversionEventAPITest(TembaTest):
             self.org.proj_uuid = uuid4()
             self.org.save(update_fields=["proj_uuid"])
 
-            channel_without_dataset = self.create_channel(
-                "WAC", "No Dataset Channel", "12065551213", config={}
-            )
+            channel_without_dataset = self.create_channel("WAC", "No Dataset Channel", "12065551213", config={})
             create_test_ctwa(
                 ctwa_clid="test_clid_456",
                 channel_uuid=channel_without_dataset.uuid,
@@ -511,17 +485,13 @@ class ConversionEventAPITest(TembaTest):
             self.assertEqual(response.status_code, 200)
             response_data = response.json()
             self.assertEqual(response_data["status"], "success")
-            self.assertEqual(
-                response_data["message"], "Event sent to Datalake successfully"
-            )
+            self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
 
             # Verify Datalake call
             mock_send_event.assert_called_once()
             datalake_call = mock_send_event.call_args
             event_data = datalake_call[0][1]
-            self.assertEqual(
-                event_data["metadata"]["channel"], str(channel_without_dataset.uuid)
-            )
+            self.assertEqual(event_data["metadata"]["channel"], str(channel_without_dataset.uuid))
 
     def test_missing_access_token(self):
         with override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN=""):
@@ -533,9 +503,7 @@ class ConversionEventAPITest(TembaTest):
             self.assertEqual(response.status_code, 500)
             response_data = response.json()
             self.assertEqual(response_data["error"], "Meta and Datalake Error")
-            self.assertIn(
-                "Meta: Meta access token not configured", response_data["detail"]
-            )
+            self.assertIn("Meta: Meta access token not configured", response_data["detail"])
 
     def test_meta_api_error_handling(self):
         with patch("temba.conversion_events.views.requests.post") as mock_post:
@@ -628,9 +596,7 @@ class ConversionEventAPITest(TembaTest):
             self.assertEqual(response.status_code, 200)
             response_data = response.json()
             self.assertEqual(response_data["status"], "success")
-            self.assertEqual(
-                response_data["message"], "Event sent to Datalake successfully"
-            )
+            self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
 
             # Verify Datalake call
             mock_send_event.assert_called_once()
@@ -662,9 +628,7 @@ class ConversionEventAPITest(TembaTest):
 
     def test_unexpected_error(self):
         """Test handling of unexpected errors in the main try-except block"""
-        with patch(
-            "temba.conversion_events.views.ConversionEventSerializer"
-        ) as mock_serializer:
+        with patch("temba.conversion_events.views.ConversionEventSerializer") as mock_serializer:
             # Simulate an unexpected error that's not JSON related
             mock_serializer.side_effect = Exception("Unexpected internal error")
 
@@ -723,9 +687,7 @@ class ConversionEventAPITest(TembaTest):
                 self.assertEqual(response.status_code, 200)
                 response_data = response.json()
                 self.assertEqual(response_data["status"], "success")
-                self.assertEqual(
-                    response_data["message"], "Event sent to Datalake successfully"
-                )
+                self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
 
                 # Verify Meta API was not called
                 mock_post.assert_not_called()
@@ -780,9 +742,7 @@ class ConversionEventAPITest(TembaTest):
                 success, error = view._send_to_meta({}, "test_dataset")
 
                 self.assertFalse(success)
-                self.assertEqual(
-                    error, "Network error sending to Meta: Network timeout"
-                )
+                self.assertEqual(error, "Network error sending to Meta: Network timeout")
 
     def test_channel_and_org_not_found_direct(self):
         """Test _send_to_datalake when channel and org are not found"""
@@ -792,25 +752,17 @@ class ConversionEventAPITest(TembaTest):
         view = ConversionEventView()
 
         # Test with non-existent channel
-        success, error = view._send_to_datalake(
-            "lead", "non-existent-uuid", "whatsapp:1234567890", None, {}
-        )
+        success, error = view._send_to_datalake("lead", "non-existent-uuid", "whatsapp:1234567890", None, {})
         self.assertFalse(success)
         self.assertEqual(error, "Channel not found")
 
         # Test with non-existent org
-        with patch(
-            "temba.channels.models.Channel.objects.filter"
-        ) as mock_channel_filter:
+        with patch("temba.channels.models.Channel.objects.filter") as mock_channel_filter:
             mock_channel = Mock()
             mock_channel.org_id = 999999  # Non-existent org ID
-            mock_channel_filter.return_value.only.return_value.first.return_value = (
-                mock_channel
-            )
+            mock_channel_filter.return_value.only.return_value.first.return_value = mock_channel
 
-            success, error = view._send_to_datalake(
-                "lead", "some-uuid", "whatsapp:1234567890", None, {}
-            )
+            success, error = view._send_to_datalake("lead", "some-uuid", "whatsapp:1234567890", None, {})
             self.assertFalse(success)
             self.assertEqual(error, "Organization not found")
 
@@ -820,24 +772,18 @@ class ConversionEventAPITest(TembaTest):
 
         view = ConversionEventView()
 
-        with patch(
-            "temba.channels.models.Channel.objects.filter"
-        ) as mock_channel_filter, patch(
+        with patch("temba.channels.models.Channel.objects.filter") as mock_channel_filter, patch(
             "temba.orgs.models.Org.objects.filter"
         ) as mock_org_filter:
             # Setup channel mock to return a valid channel
             mock_channel = Mock()
             mock_channel.org_id = 123
-            mock_channel_filter.return_value.only.return_value.first.return_value = (
-                mock_channel
-            )
+            mock_channel_filter.return_value.only.return_value.first.return_value = mock_channel
 
             # Setup org filter to raise an exception
             mock_org_filter.side_effect = Exception("Database error during org lookup")
 
-            success, error = view._send_to_datalake(
-                "lead", "some-uuid", "whatsapp:1234567890", None, {}
-            )
+            success, error = view._send_to_datalake("lead", "some-uuid", "whatsapp:1234567890", None, {})
             self.assertFalse(success)
             self.assertEqual(error, "Organization not found")
 
@@ -876,9 +822,7 @@ class ConversionEventAPITest(TembaTest):
                 self.assertEqual(response.status_code, 200)
                 response_data = response.json()
                 self.assertEqual(response_data["status"], "success")
-                self.assertEqual(
-                    response_data["message"], "Event sent to Datalake successfully"
-                )
+                self.assertEqual(response_data["message"], "Event sent to Datalake successfully")
 
                 # Verify Meta API was called and failed
                 mock_post.assert_called_once()
@@ -923,9 +867,7 @@ class CTWAModelTest(TembaTest):
             contact_urn="whatsapp:9999999999",
         )
         self.assertIsNone(ctwa.ctwa_clid)
-        self.assertEqual(
-            str(ctwa), f"CTWA Data - CLID: no-clid, Channel: {self.channel.uuid}"
-        )
+        self.assertEqual(str(ctwa), f"CTWA Data - CLID: no-clid, Channel: {self.channel.uuid}")
 
     def test_ctwa_str_method(self):
         """Test CTWA string representation"""
@@ -964,9 +906,7 @@ class CTWAModelTest(TembaTest):
         self.assertEqual(specific_ctwa, ctwa1)
 
         # Test combined filter (as used in the view)
-        lookup_ctwa = CTWA.objects.filter(
-            channel_uuid=self.channel.uuid, contact_urn="whatsapp:2222222222"
-        ).first()
+        lookup_ctwa = CTWA.objects.filter(channel_uuid=self.channel.uuid, contact_urn="whatsapp:2222222222").first()
         self.assertEqual(lookup_ctwa, ctwa2)
 
     def test_whatsapp_urn_format_handling(self):
@@ -1028,7 +968,9 @@ class JWTModuleAuthenticationTestCase(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
         self.auth = JWTModuleAuthentication()
-        self.mock_public_key = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...\n-----END PUBLIC KEY-----"
+        self.mock_public_key = (
+            "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...\n-----END PUBLIC KEY-----"
+        )
         self.sample_payload = {
             "project_uuid": "test-project-123",
             "exp": 9999999999,
@@ -1050,9 +992,7 @@ class JWTModuleAuthenticationTestCase(TestCase):
             request.headers = {}
             with self.assertRaises(AuthenticationFailed) as context:
                 self.auth.authenticate(request)
-            self.assertIn(
-                "Missing or invalid Authorization header", str(context.exception)
-            )
+            self.assertIn("Missing or invalid Authorization header", str(context.exception))
 
     def test_authenticate_invalid_authorization_header(self):
         with patch("temba.conversion_events.jwt_auth.settings") as mock_settings:
@@ -1061,9 +1001,7 @@ class JWTModuleAuthenticationTestCase(TestCase):
             request.headers = {"Authorization": "InvalidFormat"}
             with self.assertRaises(AuthenticationFailed) as context:
                 self.auth.authenticate(request)
-            self.assertIn(
-                "Missing or invalid Authorization header", str(context.exception)
-            )
+            self.assertIn("Missing or invalid Authorization header", str(context.exception))
 
     @patch("temba.conversion_events.jwt_auth.jwt.decode")
     @patch("temba.conversion_events.jwt_auth.settings")
@@ -1116,9 +1054,7 @@ class JWTModuleAuthenticationTestCase(TestCase):
         self.assertIn("Invalid token", str(context.exception))
 
     def test_authenticate_verify_jwt_decode_called_correctly(self):
-        with patch(
-            "temba.conversion_events.jwt_auth.jwt.decode"
-        ) as mock_jwt_decode, patch(
+        with patch("temba.conversion_events.jwt_auth.jwt.decode") as mock_jwt_decode, patch(
             "temba.conversion_events.jwt_auth.settings"
         ) as mock_settings:
             mock_settings.JWT_PUBLIC_KEY = self.mock_public_key
@@ -1177,9 +1113,7 @@ class CtwaReferralSourceModelTest(TembaTest):
 
     def test_get_or_create_for_org_requires_org(self):
         with self.assertRaises(ValueError):
-            CtwaReferralSource.get_or_create_for_org(
-                None, "ad-1", CtwaReferralSource.SOURCE_TYPE_AD
-            )
+            CtwaReferralSource.get_or_create_for_org(None, "ad-1", CtwaReferralSource.SOURCE_TYPE_AD)
 
     def test_same_source_allowed_for_different_orgs(self):
         source_id = "shared-ad"
@@ -1199,9 +1133,7 @@ class CtwaReferralSourceModelTest(TembaTest):
 
     def test_same_org_source_id_and_type_is_rejected(self):
         source_id = "dup-ad"
-        CtwaReferralSource.get_or_create_for_org(
-            self.org, source_id, CtwaReferralSource.SOURCE_TYPE_AD
-        )
+        CtwaReferralSource.get_or_create_for_org(self.org, source_id, CtwaReferralSource.SOURCE_TYPE_AD)
 
         with transaction.atomic():
             with self.assertRaises(IntegrityError):
@@ -1228,9 +1160,7 @@ class CtwaReferralSourceBackfillTest(TembaTest):
     def setUp(self):
         super().setUp()
         self.channel = self.create_channel("WAC", "Org1 Channel", "1111111111")
-        self.channel2 = self.create_channel(
-            "WAC", "Org2 Channel", "2222222222", org=self.org2
-        )
+        self.channel2 = self.create_channel("WAC", "Org2 Channel", "2222222222", org=self.org2)
 
     def test_org_ids_resolved_from_ctwa_channel(self):
         source, _ = CtwaReferralSource.get_or_create_for_org(
@@ -1247,9 +1177,7 @@ class CtwaReferralSourceBackfillTest(TembaTest):
         org_map = org_ids_by_source_id([source.id], CTWA, Channel)
         self.assertEqual(org_map[source.id], [self.org.id])
 
-        apply_orgs_to_source(
-            source, org_map[source.id], CtwaReferralSource, CTWA, Channel
-        )
+        apply_orgs_to_source(source, org_map[source.id], CtwaReferralSource, CTWA, Channel)
         source.refresh_from_db()
         self.assertEqual(source.org_id, self.org.id)
 
@@ -1275,9 +1203,7 @@ class CtwaReferralSourceBackfillTest(TembaTest):
         org_map = org_ids_by_source_id([source.id], CTWA, Channel)
         self.assertEqual(set(org_map[source.id]), {self.org.id, self.org2.id})
 
-        apply_orgs_to_source(
-            source, org_map[source.id], CtwaReferralSource, CTWA, Channel
-        )
+        apply_orgs_to_source(source, org_map[source.id], CtwaReferralSource, CTWA, Channel)
 
         source.refresh_from_db()
         ctwa_org1.refresh_from_db()
@@ -1300,9 +1226,7 @@ class CtwaReferralSourceBackfillTest(TembaTest):
         self.assertNotEqual(ctwa_org1.referral_source_id, ctwa_org2.referral_source_id)
 
     def test_backfill_processes_sources_and_clones_shared_orgs(self):
-        source, _ = CtwaReferralSource.get_or_create_for_org(
-            self.org, "batched-ad", CtwaReferralSource.SOURCE_TYPE_AD
-        )
+        source, _ = CtwaReferralSource.get_or_create_for_org(self.org, "batched-ad", CtwaReferralSource.SOURCE_TYPE_AD)
         create_test_ctwa(
             ctwa_clid="clid-batch-1",
             channel_uuid=self.channel.uuid,
@@ -1318,49 +1242,35 @@ class CtwaReferralSourceBackfillTest(TembaTest):
             referral_source=source,
         )
 
-        backfill_ctwa_referral_source_org(
-            CtwaReferralSource, CTWA, Channel, source_ids=[source.id]
-        )
+        backfill_ctwa_referral_source_org(CtwaReferralSource, CTWA, Channel, source_ids=[source.id])
 
         self.assertEqual(
             CtwaReferralSource.objects.filter(source_id="batched-ad").count(),
             2,
         )
         self.assertEqual(
-            set(
-                CtwaReferralSource.objects.filter(source_id="batched-ad").values_list(
-                    "org_id", flat=True
-                )
-            ),
+            set(CtwaReferralSource.objects.filter(source_id="batched-ad").values_list("org_id", flat=True)),
             {self.org.id, self.org2.id},
         )
 
     def test_backfill_logs_when_org_cannot_be_resolved(self):
-        source, _ = CtwaReferralSource.get_or_create_for_org(
-            self.org, "orphan-ad", CtwaReferralSource.SOURCE_TYPE_AD
-        )
+        source, _ = CtwaReferralSource.get_or_create_for_org(self.org, "orphan-ad", CtwaReferralSource.SOURCE_TYPE_AD)
 
         with self.assertLogs(
             "temba.conversion_events.migrations.0004_backfill_ctwareferralsource_org",
             level="WARNING",
         ) as logs:
-            backfill_ctwa_referral_source_org(
-                CtwaReferralSource, CTWA, Channel, source_ids=[source.id]
-            )
+            backfill_ctwa_referral_source_org(CtwaReferralSource, CTWA, Channel, source_ids=[source.id])
 
         self.assertTrue(any(f"id={source.id}" in message for message in logs.output))
         source.refresh_from_db()
         self.assertEqual(source.org_id, self.org.id)
 
     def test_backfill_is_noop_when_all_sources_have_org(self):
-        CtwaReferralSource.get_or_create_for_org(
-            self.org, "has-org", CtwaReferralSource.SOURCE_TYPE_AD
-        )
+        CtwaReferralSource.get_or_create_for_org(self.org, "has-org", CtwaReferralSource.SOURCE_TYPE_AD)
         backfill_ctwa_referral_source_org(CtwaReferralSource, CTWA, Channel)
         self.assertEqual(
-            CtwaReferralSource.objects.filter(
-                source_id="has-org", org=self.org
-            ).count(),
+            CtwaReferralSource.objects.filter(source_id="has-org", org=self.org).count(),
             1,
         )
 
