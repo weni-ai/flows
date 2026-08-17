@@ -12,6 +12,7 @@ class ConversionEventSerializer(serializers.Serializer):
         ("lead", "LeadSubmitted"),
         ("purchase", "Purchase"),
         ("abandoned_cart", "AbandonedCart"),
+        ("conversation_started", "ConversationStarted"),
     ]
 
     event_type = serializers.ChoiceField(choices=EVENT_TYPE_CHOICES, required=True)

@@ -1,4 +1,3 @@
-import logging
 from enum import StrEnum
 
 from sentry_sdk import capture_exception
@@ -9,8 +8,6 @@ from temba.projects.usecases.project_delete import delete_project
 from temba.projects.usecases.project_status_update import update_project_status
 from temba.projects.usecases.project_type_update import update_project_type
 from temba.projects.usecases.project_update import update_project_config
-
-logger = logging.getLogger(__name__)
 
 
 class EventAction(StrEnum):
@@ -39,7 +36,6 @@ class ProjectEventConsumer(EDAConsumer):
 
     def consume(self, message: Message):  # pragma: no cover
         try:
-            logger.info("[ProjectEventConsumer] Received message")
             body = message.json()
 
             self._validate_message(body)
@@ -48,23 +44,10 @@ class ProjectEventConsumer(EDAConsumer):
             user_email = body.get("user_email")
             action = body.get("action")
 
-            logger.info(
-                "[ProjectEventConsumer] Processing project_uuid=%s action=%s user_email=%s",
-                project_uuid,
-                action,
-                user_email,
-            )
-
             self._process_event(project_uuid, user_email, action, body)
 
             self.ack()
-            logger.info(
-                "[ProjectEventConsumer] Message processed successfully project_uuid=%s action=%s",
-                project_uuid,
-                action,
-            )
         except Exception as exception:
-            logger.exception("[ProjectEventConsumer] Failed to process message")
             capture_exception(exception)
             raise
 
@@ -104,22 +87,13 @@ class ProjectEventConsumer(EDAConsumer):
             body: Full message body
         """
         if action == EventAction.DELETED:
-            org = delete_project(
+            delete_project(
                 project_uuid=project_uuid,
                 user_email=user_email,
             )
 
-            if org:
-                logger.info(
-                    "[ProjectEventConsumer] Successfully deleted project name=%s project_uuid=%s",
-                    org.name,
-                    project_uuid,
-                )
-            else:
-                logger.info("[ProjectEventConsumer] Project %s not found for deletion", project_uuid)
-
         elif action == EventAction.UPDATED:
-            org = update_project_config(
+            update_project_config(
                 project_uuid=project_uuid,
                 user_email=user_email,
                 name=body.get("name"),
@@ -128,52 +102,20 @@ class ProjectEventConsumer(EDAConsumer):
                 timezone_location=body.get("timezone"),
             )
 
-            if org:
-                logger.info(
-                    "[ProjectEventConsumer] Successfully updated project name=%s project_uuid=%s",
-                    org.name,
-                    project_uuid,
-                )
-            else:
-                logger.info("[ProjectEventConsumer] Project %s not found for update", project_uuid)
-
         elif action == EventAction.STATUS_UPDATED:
             status = body.get("status")
-            org = update_project_status(
+            update_project_status(
                 project_uuid=project_uuid,
                 status=status,
                 user_email=user_email,
             )
 
-            if org:
-                logger.info(
-                    "[ProjectEventConsumer] Successfully updated project name=%s project_uuid=%s "
-                    "status=%s is_suspended=%s",
-                    org.name,
-                    project_uuid,
-                    status,
-                    org.is_suspended,
-                )
-            else:
-                logger.info("[ProjectEventConsumer] Project %s not found for status update", project_uuid)
-
         elif action == EventAction.PROJECT_TYPE_UPDATED:
             is_multi_agents = bool(body.get("is_multi_agents"))
-            org = update_project_type(
+            update_project_type(
                 project_uuid=project_uuid,
                 is_multi_agents=is_multi_agents,
                 user_email=user_email,
             )
-
-            if org:
-                logger.info(
-                    "[ProjectEventConsumer] Successfully updated project name=%s project_uuid=%s "
-                    "is_multi_agents=%s",
-                    org.name,
-                    project_uuid,
-                    is_multi_agents,
-                )
-            else:
-                logger.info("[ProjectEventConsumer] Project %s not found for project type update", project_uuid)
         else:
             raise ValueError(f"Unknown action: {action}")
