@@ -65,6 +65,43 @@ def apply_orgs_to_source(source, channels_by_org, CtwaReferralSource, CTWA):
         )
 
 
+def resolve_batch_orgs(batch, org_map, CtwaReferralSource, CTWA):
+    """Attribute each source in the batch, returning the ids that stayed unresolved."""
+    unresolved_ids = []
+    for source in batch:
+        channels_by_org = org_map.get(source.id, {})
+        if not channels_by_org:
+            logger.warning(
+                f"Could not resolve org for CtwaReferralSource id={source.id} "
+                f"source_id={source.source_id} source_type={source.source_type}"
+            )
+            if source.org_id is None:
+                unresolved_ids.append(source.id)
+            continue
+        if source.org_id is not None and source.org_id not in channels_by_org:
+            logger.warning(
+                f"CtwaReferralSource id={source.id} has org_id={source.org_id} "
+                f"but its CTWAs resolve to org_ids={list(channels_by_org)}"
+            )
+        apply_orgs_to_source(source, channels_by_org, CtwaReferralSource, CTWA)
+    return unresolved_ids
+
+
+def delete_unresolved_sources(source_ids, CtwaReferralSource, CTWA):
+    """Drop sources that map to no org, together with their CTWAs.
+
+    0005 makes org NOT NULL, so rows left with a null org would break it. Their
+    events are already unusable: attribution needs an existing channel with an org.
+    CTWAs are deleted first because they protect the source.
+    """
+    if not source_ids:
+        return
+
+    logger.warning(f"Deleting CtwaReferralSource rows with no resolvable org: {source_ids}")
+    CTWA.objects.filter(referral_source_id__in=source_ids).delete()
+    CtwaReferralSource.objects.filter(id__in=source_ids).delete()
+
+
 def backfill_ctwa_referral_source_org(CtwaReferralSource, CTWA, Channel, batch_size=BATCH_SIZE, source_ids=None):
     max_id = 0
     while True:
@@ -80,20 +117,8 @@ def backfill_ctwa_referral_source_org(CtwaReferralSource, CTWA, Channel, batch_s
 
         with transaction.atomic():
             org_map = org_channels_by_source_id([source.id for source in batch], CTWA, Channel)
-            for source in batch:
-                channels_by_org = org_map.get(source.id, {})
-                if not channels_by_org:
-                    logger.warning(
-                        f"Could not resolve org for CtwaReferralSource id={source.id} "
-                        f"source_id={source.source_id} source_type={source.source_type}"
-                    )
-                    continue
-                if source.org_id is not None and source.org_id not in channels_by_org:
-                    logger.warning(
-                        f"CtwaReferralSource id={source.id} has org_id={source.org_id} "
-                        f"but its CTWAs resolve to org_ids={list(channels_by_org)}"
-                    )
-                apply_orgs_to_source(source, channels_by_org, CtwaReferralSource, CTWA)
+            unresolved_ids = resolve_batch_orgs(batch, org_map, CtwaReferralSource, CTWA)
+            delete_unresolved_sources(unresolved_ids, CtwaReferralSource, CTWA)
 
         max_id = batch[-1].id
 

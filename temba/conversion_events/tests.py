@@ -25,7 +25,9 @@ from temba.tests import TembaTest
 _backfill = import_module("temba.conversion_events.migrations.0004_backfill_ctwareferralsource_org")
 apply_orgs_to_source = _backfill.apply_orgs_to_source
 backfill_ctwa_referral_source_org = _backfill.backfill_ctwa_referral_source_org
+delete_unresolved_sources = _backfill.delete_unresolved_sources
 org_channels_by_source_id = _backfill.org_channels_by_source_id
+resolve_batch_orgs = _backfill.resolve_batch_orgs
 
 
 def create_test_ctwa(**kwargs):
@@ -1319,6 +1321,7 @@ class CtwaReferralSourceBackfillTest(TembaTest):
         self.assertIn(f"id={source.id}", mock_warning.call_args[0][0])
         source.refresh_from_db()
         self.assertEqual(source.org_id, self.org.id)
+        self.assertTrue(CtwaReferralSource.objects.filter(id=source.id).exists())
 
     def test_backfill_is_noop_when_all_sources_have_org(self):
         CtwaReferralSource.get_or_create_for_org(self.org, "has-org", CtwaReferralSource.SOURCE_TYPE_AD)
@@ -1338,6 +1341,36 @@ class CtwaReferralSourceBackfillTest(TembaTest):
         apply_orgs_to_source(source, {}, CtwaReferralSource, CTWA)
         source.refresh_from_db()
         self.assertEqual(source.org_id, self.org.id)
+
+    def test_resolve_batch_orgs_reports_unresolved_null_org_sources(self):
+        source, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org, "unresolved-null-org", CtwaReferralSource.SOURCE_TYPE_AD
+        )
+        standin = self._null_org_standin(source)
+
+        with patch.object(_backfill.logger, "warning") as mock_warning:
+            unresolved_ids = resolve_batch_orgs([standin], {}, CtwaReferralSource, CTWA)
+
+        self.assertEqual(unresolved_ids, [source.id])
+        mock_warning.assert_called_once()
+        self.assertIn(f"id={source.id}", mock_warning.call_args[0][0])
+
+    def test_delete_unresolved_sources_removes_source_and_its_ctwas(self):
+        source, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org, "deletable-ad", CtwaReferralSource.SOURCE_TYPE_AD
+        )
+        ctwa = create_test_ctwa(
+            ctwa_clid="clid-deletable",
+            channel_uuid=self.channel.uuid,
+            waba="waba",
+            contact_urn="whatsapp:1111111111",
+            referral_source=source,
+        )
+
+        delete_unresolved_sources([source.id], CtwaReferralSource, CTWA)
+
+        self.assertFalse(CtwaReferralSource.objects.filter(id=source.id).exists())
+        self.assertFalse(CTWA.objects.filter(id=ctwa.id).exists())
 
     def test_forwards_loads_models_and_runs_backfill(self):
         apps = Mock()
