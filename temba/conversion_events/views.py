@@ -299,7 +299,6 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
             logger.error("Channel lookup failed: %s", e)
             return None, None, "Channel not found"
 
-
         try:
             org = Org.objects.filter(id=channel.org_id).only("proj_uuid").first()
             if not org or not org.proj_uuid:
