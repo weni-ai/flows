@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 BATCH_SIZE = 1000
 
 
-def org_ids_by_source_id(source_ids, CTWA, Channel):
-    """Map each referral source id to the distinct org ids of its CTWA channels."""
+def org_channels_by_source_id(source_ids, CTWA, Channel):
+    """Map each referral source id to {org_id: [channel_uuid, ...]} of its CTWA channels."""
     if not source_ids:
         return {}
 
@@ -26,28 +26,32 @@ def org_ids_by_source_id(source_ids, CTWA, Channel):
         )
     }
 
-    orgs = defaultdict(set)
+    channels_by_source_org = defaultdict(lambda: defaultdict(list))
     for source_id, channel_uuid in ctwa_rows:
         org_id = org_by_channel.get(str(channel_uuid))
         if org_id is not None:
-            orgs[source_id].add(org_id)
+            channels_by_source_org[source_id][org_id].append(channel_uuid)
 
-    return {source_id: sorted(org_id_set) for source_id, org_id_set in orgs.items()}
+    return {
+        source_id: dict(sorted(org_channels.items())) for source_id, org_channels in channels_by_source_org.items()
+    }
 
 
-def apply_orgs_to_source(source, org_ids, CtwaReferralSource, CTWA, Channel):
-    """Assign the first org to source and clone it for each extra org, retargeting CTWAs."""
-    if not org_ids:
+def apply_orgs_to_source(source, channels_by_org, CtwaReferralSource, CTWA):
+    """Assign the anchor org to source and clone it for each extra org, retargeting CTWAs."""
+    if not channels_by_org:
         return
 
-    first_org_id, *extra_org_ids = org_ids
-    if source.org_id != first_org_id:
-        CtwaReferralSource.objects.filter(id=source.id).update(org_id=first_org_id)
-        source.org_id = first_org_id
+    anchor_org_id = source.org_id or next(iter(channels_by_org))
+    if source.org_id != anchor_org_id:
+        CtwaReferralSource.objects.filter(id=source.id).update(org_id=anchor_org_id)
+        source.org_id = anchor_org_id
 
-    for extra_org_id in extra_org_ids:
+    for org_id, channel_uuids in channels_by_org.items():
+        if org_id == anchor_org_id:
+            continue
         clone, _ = CtwaReferralSource.objects.get_or_create(
-            org_id=extra_org_id,
+            org_id=org_id,
             source_id=source.source_id,
             source_type=source.source_type,
             defaults={
@@ -56,11 +60,46 @@ def apply_orgs_to_source(source, org_ids, CtwaReferralSource, CTWA, Channel):
                 "body": source.body,
             },
         )
-
-        channel_uuids = list(Channel.objects.filter(org_id=extra_org_id).values_list("uuid", flat=True))
         CTWA.objects.filter(referral_source_id=source.id, channel_uuid__in=channel_uuids).update(
             referral_source_id=clone.id
         )
+
+
+def resolve_batch_orgs(batch, org_map, CtwaReferralSource, CTWA):
+    """Attribute each source in the batch, returning the ids that stayed unresolved."""
+    unresolved_ids = []
+    for source in batch:
+        channels_by_org = org_map.get(source.id, {})
+        if not channels_by_org:
+            logger.warning(
+                f"Could not resolve org for CtwaReferralSource id={source.id} "
+                f"source_id={source.source_id} source_type={source.source_type}"
+            )
+            if source.org_id is None:
+                unresolved_ids.append(source.id)
+            continue
+        if source.org_id is not None and source.org_id not in channels_by_org:
+            logger.warning(
+                f"CtwaReferralSource id={source.id} has org_id={source.org_id} "
+                f"but its CTWAs resolve to org_ids={list(channels_by_org)}"
+            )
+        apply_orgs_to_source(source, channels_by_org, CtwaReferralSource, CTWA)
+    return unresolved_ids
+
+
+def delete_unresolved_sources(source_ids, CtwaReferralSource, CTWA):
+    """Drop sources that map to no org, together with their CTWAs.
+
+    0005 makes org NOT NULL, so rows left with a null org would break it. Their
+    events are already unusable: attribution needs an existing channel with an org.
+    CTWAs are deleted first because they protect the source.
+    """
+    if not source_ids:
+        return
+
+    logger.warning(f"Deleting CtwaReferralSource rows with no resolvable org: {source_ids}")
+    CTWA.objects.filter(referral_source_id__in=source_ids).delete()
+    CtwaReferralSource.objects.filter(id__in=source_ids).delete()
 
 
 def backfill_ctwa_referral_source_org(CtwaReferralSource, CTWA, Channel, batch_size=BATCH_SIZE, source_ids=None):
@@ -77,16 +116,9 @@ def backfill_ctwa_referral_source_org(CtwaReferralSource, CTWA, Channel, batch_s
             break
 
         with transaction.atomic():
-            org_map = org_ids_by_source_id([source.id for source in batch], CTWA, Channel)
-            for source in batch:
-                org_ids = org_map.get(source.id, [])
-                if not org_ids:
-                    logger.warning(
-                        f"Could not resolve org for CtwaReferralSource id={source.id} "
-                        f"source_id={source.source_id} source_type={source.source_type}"
-                    )
-                    continue
-                apply_orgs_to_source(source, org_ids, CtwaReferralSource, CTWA, Channel)
+            org_map = org_channels_by_source_id([source.id for source in batch], CTWA, Channel)
+            unresolved_ids = resolve_batch_orgs(batch, org_map, CtwaReferralSource, CTWA)
+            delete_unresolved_sources(unresolved_ids, CtwaReferralSource, CTWA)
 
         max_id = batch[-1].id
 
