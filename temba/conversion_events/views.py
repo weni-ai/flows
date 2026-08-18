@@ -461,7 +461,9 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
             send_event_data(EventPath, data)
             return True, None
 
+
         except Exception as e:
             error_msg = f"Error sending to CTWA Datalake: {str(e)}"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             return False, error_msg
+
