@@ -26,9 +26,9 @@ from django.utils import timezone
 from temba.airtime.models import AirtimeTransfer
 from temba.campaigns.models import Campaign, CampaignEvent, EventFire
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
-from temba.conversion_events.models import CTWA, CtwaReferralSource
 from temba.contacts.search import SearchException, SearchResults, search_contacts
 from temba.contacts.views import ContactCRUDL, ContactGroupCRUDL, ContactGroupForm, ContactListView
+from temba.conversion_events.models import CTWA, CtwaReferralSource
 from temba.flows.models import Flow, FlowSession, FlowStart
 from temba.ivr.models import IVRCall
 from temba.locations.models import AdminBoundary
