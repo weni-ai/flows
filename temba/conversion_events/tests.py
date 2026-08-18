@@ -1,5 +1,6 @@
 import json
 from importlib import import_module
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -9,8 +10,9 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.test import APIRequestFactory
 
 from django.contrib.auth.models import AnonymousUser
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from temba.channels.models import Channel
@@ -23,7 +25,7 @@ from temba.tests import TembaTest
 _backfill = import_module("temba.conversion_events.migrations.0004_backfill_ctwareferralsource_org")
 apply_orgs_to_source = _backfill.apply_orgs_to_source
 backfill_ctwa_referral_source_org = _backfill.backfill_ctwa_referral_source_org
-org_ids_by_source_id = _backfill.org_ids_by_source_id
+org_channels_by_source_id = _backfill.org_channels_by_source_id
 
 
 def create_test_ctwa(**kwargs):
@@ -1162,7 +1164,18 @@ class CtwaReferralSourceBackfillTest(TembaTest):
         self.channel = self.create_channel("WAC", "Org1 Channel", "1111111111")
         self.channel2 = self.create_channel("WAC", "Org2 Channel", "2222222222", org=self.org2)
 
-    def test_org_ids_resolved_from_ctwa_channel(self):
+    def _null_org_standin(self, source):
+        return SimpleNamespace(
+            id=source.id,
+            org_id=None,
+            source_id=source.source_id,
+            source_type=source.source_type,
+            source_url=source.source_url,
+            headline=source.headline,
+            body=source.body,
+        )
+
+    def test_null_org_source_is_assigned_from_ctwa_channel(self):
         source, _ = CtwaReferralSource.get_or_create_for_org(
             self.org2, "ad-from-channel", CtwaReferralSource.SOURCE_TYPE_AD
         )
@@ -1174,10 +1187,10 @@ class CtwaReferralSourceBackfillTest(TembaTest):
             referral_source=source,
         )
 
-        org_map = org_ids_by_source_id([source.id], CTWA, Channel)
-        self.assertEqual(org_map[source.id], [self.org.id])
+        org_map = org_channels_by_source_id([source.id], CTWA, Channel)
+        self.assertEqual(list(org_map[source.id]), [self.org.id])
 
-        apply_orgs_to_source(source, org_map[source.id], CtwaReferralSource, CTWA, Channel)
+        apply_orgs_to_source(self._null_org_standin(source), org_map[source.id], CtwaReferralSource, CTWA)
         source.refresh_from_db()
         self.assertEqual(source.org_id, self.org.id)
 
@@ -1200,10 +1213,10 @@ class CtwaReferralSourceBackfillTest(TembaTest):
             referral_source=source,
         )
 
-        org_map = org_ids_by_source_id([source.id], CTWA, Channel)
+        org_map = org_channels_by_source_id([source.id], CTWA, Channel)
         self.assertEqual(set(org_map[source.id]), {self.org.id, self.org2.id})
 
-        apply_orgs_to_source(source, org_map[source.id], CtwaReferralSource, CTWA, Channel)
+        apply_orgs_to_source(source, org_map[source.id], CtwaReferralSource, CTWA)
 
         source.refresh_from_db()
         ctwa_org1.refresh_from_db()
@@ -1212,18 +1225,59 @@ class CtwaReferralSourceBackfillTest(TembaTest):
         clone = CtwaReferralSource.objects.exclude(id=source.id).get(
             source_id="shared-ad", source_type=CtwaReferralSource.SOURCE_TYPE_AD
         )
-        self.assertEqual(source.org_id, org_map[source.id][0])
-        self.assertEqual(clone.org_id, org_map[source.id][1])
+        self.assertEqual(source.org_id, self.org.id)
+        self.assertEqual(clone.org_id, self.org2.id)
         self.assertEqual(clone.headline, "Hello")
-        self.assertEqual(
-            ctwa_org1.referral_source_id,
-            source.id if source.org_id == self.org.id else clone.id,
+        self.assertEqual(ctwa_org1.referral_source_id, source.id)
+        self.assertEqual(ctwa_org2.referral_source_id, clone.id)
+
+    def test_existing_org_is_preserved_when_ctwas_resolve_to_a_different_org(self):
+        source, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org, "mismatch-ad", CtwaReferralSource.SOURCE_TYPE_AD
         )
-        self.assertEqual(
-            ctwa_org2.referral_source_id,
-            clone.id if source.org_id == self.org.id else source.id,
+        ctwa = create_test_ctwa(
+            ctwa_clid="clid-mismatch",
+            channel_uuid=self.channel2.uuid,
+            waba="waba2",
+            contact_urn="whatsapp:2222222222",
+            referral_source=source,
         )
-        self.assertNotEqual(ctwa_org1.referral_source_id, ctwa_org2.referral_source_id)
+
+        with patch.object(_backfill.logger, "warning") as mock_warning:
+            backfill_ctwa_referral_source_org(CtwaReferralSource, CTWA, Channel, source_ids=[source.id])
+
+        mock_warning.assert_called_once()
+        warning = mock_warning.call_args[0][0]
+        self.assertIn(f"id={source.id}", warning)
+        self.assertIn(f"org_id={self.org.id}", warning)
+
+        source.refresh_from_db()
+        ctwa.refresh_from_db()
+        clone = CtwaReferralSource.objects.exclude(id=source.id).get(
+            source_id="mismatch-ad", source_type=CtwaReferralSource.SOURCE_TYPE_AD
+        )
+        self.assertEqual(source.org_id, self.org.id)
+        self.assertEqual(clone.org_id, self.org2.id)
+        self.assertEqual(ctwa.referral_source_id, clone.id)
+
+    def test_apply_orgs_to_source_does_not_query_channels(self):
+        source, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org, "no-channel-query-ad", CtwaReferralSource.SOURCE_TYPE_AD
+        )
+        create_test_ctwa(
+            ctwa_clid="clid-no-channel-query",
+            channel_uuid=self.channel2.uuid,
+            waba="waba2",
+            contact_urn="whatsapp:2222222222",
+            referral_source=source,
+        )
+        org_map = org_channels_by_source_id([source.id], CTWA, Channel)
+
+        with CaptureQueriesContext(connection) as captured:
+            apply_orgs_to_source(source, org_map[source.id], CtwaReferralSource, CTWA)
+
+        channel_queries = [query["sql"] for query in captured.captured_queries if "channels_channel" in query["sql"]]
+        self.assertEqual(channel_queries, [])
 
     def test_backfill_processes_sources_and_clones_shared_orgs(self):
         source, _ = CtwaReferralSource.get_or_create_for_org(self.org, "batched-ad", CtwaReferralSource.SOURCE_TYPE_AD)
@@ -1274,13 +1328,27 @@ class CtwaReferralSourceBackfillTest(TembaTest):
             1,
         )
 
-    def test_org_ids_by_source_id_returns_empty_for_no_ids(self):
-        self.assertEqual(org_ids_by_source_id([], CTWA, Channel), {})
+    def test_org_channels_by_source_id_returns_empty_for_no_ids(self):
+        self.assertEqual(org_channels_by_source_id([], CTWA, Channel), {})
 
     def test_apply_orgs_to_source_skips_empty_org_ids(self):
         source, _ = CtwaReferralSource.get_or_create_for_org(
             self.org, "unchanged-ad", CtwaReferralSource.SOURCE_TYPE_AD
         )
-        apply_orgs_to_source(source, [], CtwaReferralSource, CTWA, Channel)
+        apply_orgs_to_source(source, {}, CtwaReferralSource, CTWA)
         source.refresh_from_db()
         self.assertEqual(source.org_id, self.org.id)
+
+    def test_forwards_loads_models_and_runs_backfill(self):
+        apps = Mock()
+        models = {
+            ("conversion_events", "CtwaReferralSource"): CtwaReferralSource,
+            ("conversion_events", "CTWA"): CTWA,
+            ("channels", "Channel"): Channel,
+        }
+        apps.get_model.side_effect = lambda app, model: models[(app, model)]
+
+        with patch.object(_backfill, "backfill_ctwa_referral_source_org") as mock_backfill:
+            _backfill.forwards(apps, schema_editor=None)
+
+        mock_backfill.assert_called_once_with(CtwaReferralSource, CTWA, Channel)
