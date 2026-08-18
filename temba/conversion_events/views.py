@@ -295,8 +295,8 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
             if not channel:
                 return None, None, "Channel not found"
 
-        except Exception as e:
-            logger.error("Channel lookup failed: %s", e)
+        except Exception:
+            logger.exception("Channel lookup failed")
             return None, None, "Channel not found"
 
         try:
