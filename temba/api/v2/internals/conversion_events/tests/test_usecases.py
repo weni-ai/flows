@@ -52,12 +52,8 @@ class ListCtwaReferralSourcesUseCaseTest(TembaTest):
         self.assertEqual(results, [own])
 
     def test_execute_orders_by_last_seen_at_descending(self):
-        older = self._create_source(
-            self.org, "older", last_seen_at=timezone.now() - timedelta(days=2)
-        )
-        newer = self._create_source(
-            self.org, "newer", last_seen_at=timezone.now() - timedelta(days=1)
-        )
+        older = self._create_source(self.org, "older", last_seen_at=timezone.now() - timedelta(days=2))
+        newer = self._create_source(self.org, "newer", last_seen_at=timezone.now() - timedelta(days=1))
 
         dto = ListCtwaReferralSourcesDTO(project_uuid=str(self.org.proj_uuid))
         results = list(self.usecase.execute(dto))
@@ -78,13 +74,9 @@ class ListCtwaReferralSourcesUseCaseTest(TembaTest):
 
     def test_execute_filters_by_last_seen_at_date_range(self):
         noon_utc = pytz.UTC.localize(datetime(2026, 1, 15, 12, 0, 0))
-        before_range = self._create_source(
-            self.org, "before", last_seen_at=noon_utc - timedelta(days=5)
-        )
+        before_range = self._create_source(self.org, "before", last_seen_at=noon_utc - timedelta(days=5))
         inside = self._create_source(self.org, "inside", last_seen_at=noon_utc)
-        after_range = self._create_source(
-            self.org, "after", last_seen_at=noon_utc + timedelta(days=5)
-        )
+        after_range = self._create_source(self.org, "after", last_seen_at=noon_utc + timedelta(days=5))
 
         dto = ListCtwaReferralSourcesDTO(
             project_uuid=str(self.org.proj_uuid),

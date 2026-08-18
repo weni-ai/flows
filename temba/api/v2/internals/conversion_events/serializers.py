@@ -6,17 +6,13 @@ from temba.conversion_events.models import CtwaReferralSource
 
 class ListCtwaReferralSourceQuerySerializer(serializers.Serializer):
     project_uuid = serializers.UUIDField(required=True)
-    source_type = serializers.ChoiceField(
-        choices=CtwaReferralSource.SOURCE_TYPE_CHOICES, required=False
-    )
+    source_type = serializers.ChoiceField(choices=CtwaReferralSource.SOURCE_TYPE_CHOICES, required=False)
     after = serializers.CharField(required=False, allow_blank=True)
     before = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         errors = {}
-        after_date = self._parse_iso_date(
-            attrs.get("after"), "after", "Invalid after, expected ISO-8601 date", errors
-        )
+        after_date = self._parse_iso_date(attrs.get("after"), "after", "Invalid after, expected ISO-8601 date", errors)
         before_date = self._parse_iso_date(
             attrs.get("before"), "before", "Invalid before, expected ISO-8601 date", errors
         )
