@@ -2,6 +2,8 @@ from django.db import models
 
 from temba.orgs.models import Org
 
+from .urns import whatsapp_urn_variants
+
 
 class CtwaReferralSource(models.Model):
     """
@@ -59,10 +61,29 @@ class CtwaReferralSource(models.Model):
         )
 
 
+class CTWAManager(models.Manager):
+    def latest_for_urns(self, *, channel_uuids, contact_urns):
+        return (
+            self.select_related("referral_source")
+            .filter(channel_uuid__in=channel_uuids, contact_urn__in=contact_urns)
+            .order_by("-timestamp")
+            .first()
+        )
+
+    def latest_for_contact(self, contact):
+        channel_uuids = list(contact.org.channels.filter(is_active=True).values_list("uuid", flat=True))
+        contact_urns = [variant for urn in contact.get_urns() for variant in whatsapp_urn_variants(urn.identity)]
+        if not channel_uuids or not contact_urns:
+            return None
+        return self.latest_for_urns(channel_uuids=channel_uuids, contact_urns=contact_urns)
+
+
 class CTWA(models.Model):
     """
     Click/conversation event with operational context for CTWA conversion lookup.
     """
+
+    objects = CTWAManager()
 
     ctwa_clid = models.CharField(
         max_length=512,

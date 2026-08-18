@@ -12,6 +12,7 @@ from django.http import JsonResponse
 from .jwt_auth import JWTModuleAuthMixin
 from .models import CTWA
 from .serializers import ConversionEventSerializer
+from .urns import whatsapp_urn_variants
 
 logger = logging.getLogger(__name__)
 
@@ -146,42 +147,10 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
     def _get_ctwa_data(self, channel_uuid, contact_urn):
         """Get CTWA data for lookup using both channel_uuid and contact_urn"""
         try:
-            base_qs = CTWA.objects.select_related("referral_source")
-
-            # If it's not a WhatsApp URN, just do a normal lookup
-            if not contact_urn.startswith("whatsapp:"):
-                return (
-                    base_qs.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).order_by("-timestamp").first()
-                )
-
-            # For WhatsApp URNs, try both with and without the extra 9 if it's a Brazilian number
-            # Split the URN into prefix and number
-            prefix, number = contact_urn.split(":", 1)
-
-            # Only handle the extra 9 for Brazilian numbers
-            if number.startswith("55"):
-                # Remove country code (55) and DDD (2 digits) to check remaining length
-                remaining_digits = number[4:]  # After 55 + DDD
-
-                # If we have more than 8 digits after DDD, it means we have the extra 9
-                if len(remaining_digits) > 8:  # Has the extra 9
-                    # Generate version without the extra 9
-                    other_number = number[:4] + remaining_digits[1:]  # Remove first digit after DDD (the 9)
-                    numbers = [number, other_number]
-                else:  # Doesn't have the extra 9
-                    # Generate version with the extra 9
-                    other_number = number[:4] + "9" + remaining_digits  # Add 9 after DDD
-                    numbers = [number, other_number]
-
-                # Create both URNs for lookup
-                urns = [f"{prefix}:{num}" for num in numbers]
-
-                # Try to find CTWA data for either URN
-                return base_qs.filter(channel_uuid=channel_uuid, contact_urn__in=urns).order_by("-timestamp").first()
-
-            # For non-BR numbers or if we can't handle the number format, just do a normal lookup
-            return base_qs.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).order_by("-timestamp").first()
-
+            return CTWA.objects.latest_for_urns(
+                channel_uuids=[channel_uuid],
+                contact_urns=whatsapp_urn_variants(contact_urn),
+            )
         except Exception as e:
             logger.error(f"Error fetching CTWA data: {str(e)}")
             return None
