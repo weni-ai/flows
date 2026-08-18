@@ -23,23 +23,17 @@ class ListCtwaReferralSourceQuerySerializerTest(SimpleTestCase):
         self.assertIn("project_uuid", serializer.errors)
 
     def test_rejects_invalid_source_type(self):
-        serializer = ListCtwaReferralSourceQuerySerializer(
-            data={"project_uuid": str(uuid4()), "source_type": "story"}
-        )
+        serializer = ListCtwaReferralSourceQuerySerializer(data={"project_uuid": str(uuid4()), "source_type": "story"})
         self.assertFalse(serializer.is_valid())
         self.assertIn("source_type", serializer.errors)
 
     def test_rejects_invalid_after_date(self):
-        serializer = ListCtwaReferralSourceQuerySerializer(
-            data={"project_uuid": str(uuid4()), "after": "not-a-date"}
-        )
+        serializer = ListCtwaReferralSourceQuerySerializer(data={"project_uuid": str(uuid4()), "after": "not-a-date"})
         self.assertFalse(serializer.is_valid())
         self.assertIn("after", serializer.errors)
 
     def test_rejects_invalid_before_date(self):
-        serializer = ListCtwaReferralSourceQuerySerializer(
-            data={"project_uuid": str(uuid4()), "before": "not-a-date"}
-        )
+        serializer = ListCtwaReferralSourceQuerySerializer(data={"project_uuid": str(uuid4()), "before": "not-a-date"})
         self.assertFalse(serializer.is_valid())
         self.assertIn("before", serializer.errors)
 
