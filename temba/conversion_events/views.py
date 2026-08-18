@@ -401,9 +401,7 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
         }
         missing = [field for field, value in required_fields.items() if not value]
         if missing:
-            logger.warning(
-                f"Skipping CTWA Datalake event due to missing required fields: {', '.join(missing)}"
-            )
+            logger.warning(f"Skipping CTWA Datalake event due to missing required fields: {', '.join(missing)}")
             return False
 
         return True

@@ -1128,7 +1128,6 @@ class CtwaDatalakeDualWriteTest(TembaTest):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(mock_send_event.call_count, 2)
 
-
     def test_dual_write_conversation_started(self):
         payload = {
             "event_type": "conversation_started",
