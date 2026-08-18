@@ -1254,15 +1254,15 @@ class CtwaReferralSourceBackfillTest(TembaTest):
         )
 
     def test_backfill_logs_when_org_cannot_be_resolved(self):
-        source, _ = CtwaReferralSource.get_or_create_for_org(self.org, "orphan-ad", CtwaReferralSource.SOURCE_TYPE_AD)
+        source, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org, f"orphan-ad-{uuid4()}", CtwaReferralSource.SOURCE_TYPE_AD
+        )
 
-        with self.assertLogs(
-            "temba.conversion_events.migrations.0004_backfill_ctwareferralsource_org",
-            level="WARNING",
-        ) as logs:
+        with patch.object(_backfill.logger, "warning") as mock_warning:
             backfill_ctwa_referral_source_org(CtwaReferralSource, CTWA, Channel, source_ids=[source.id])
 
-        self.assertTrue(any(f"id={source.id}" in message for message in logs.output))
+        mock_warning.assert_called_once()
+        self.assertIn(f"id={source.id}", mock_warning.call_args[0][0])
         source.refresh_from_db()
         self.assertEqual(source.org_id, self.org.id)
 
