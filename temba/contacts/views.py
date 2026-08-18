@@ -37,6 +37,7 @@ from temba.archives.models import Archive
 from temba.channels.models import Channel
 from temba.contacts.templatetags.contacts import MISSING_VALUE
 from temba.contacts.validators import clean_contact_name, validate_contact_phone
+from temba.conversion_events.models import CTWA
 from temba.flows.models import Flow, FlowStart
 from temba.mailroom.events import Event
 from temba.notifications.views import NotificationTargetMixin
@@ -902,6 +903,8 @@ class ContactCRUDL(SmartCRUDL):
             context["open_tickets"] = list(
                 contact.tickets.filter(status=Ticket.STATUS_OPEN).select_related("ticketer").order_by("-opened_on")
             )
+
+            context["latest_ctwa_event"] = CTWA.objects.latest_for_contact(contact)
 
             # divide contact's URNs into those we can send to, and those we can't
             sendable_schemes = contact.org.get_schemes(Channel.ROLE_SEND)

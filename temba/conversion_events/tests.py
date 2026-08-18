@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
 from importlib import import_module
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -21,6 +21,7 @@ from temba.channels.types.whatsapp_cloud.type import WhatsAppCloudType
 from temba.conversion_events.jwt_auth import JWTModuleAuthentication, JWTModuleAuthMixin
 from temba.conversion_events.models import CTWA, CtwaReferralSource
 from temba.conversion_events.serializers import ConversionEventSerializer
+from temba.conversion_events.urns import whatsapp_urn_variants
 from temba.tests import TembaTest
 
 _backfill = import_module("temba.conversion_events.migrations.0004_backfill_ctwareferralsource_org")
@@ -849,6 +850,26 @@ class ConversionEventAPITest(TembaTest):
                 mock_send_event.assert_called_once()
 
 
+class WhatsappUrnVariantsTest(TestCase):
+    def test_brazilian_with_extra_nine(self):
+        self.assertEqual(
+            whatsapp_urn_variants("whatsapp:5511912345678"),
+            ["whatsapp:5511912345678", "whatsapp:551112345678"],
+        )
+
+    def test_brazilian_without_extra_nine(self):
+        self.assertEqual(
+            whatsapp_urn_variants("whatsapp:551112345678"),
+            ["whatsapp:551112345678", "whatsapp:5511912345678"],
+        )
+
+    def test_non_brazilian_whatsapp(self):
+        self.assertEqual(whatsapp_urn_variants("whatsapp:14155551212"), ["whatsapp:14155551212"])
+
+    def test_non_whatsapp(self):
+        self.assertEqual(whatsapp_urn_variants("tel:+250781111111"), ["tel:+250781111111"])
+
+
 class CTWAModelTest(TembaTest):
     """Test the CTWA model"""
 
@@ -977,6 +998,65 @@ class CTWAModelTest(TembaTest):
         # Test with empty URN
         result = view._get_ctwa_data(self.channel.uuid, "")
         self.assertIsNone(result)
+
+    def test_latest_for_contact_returns_newest_event(self):
+        contact = self.create_contact(name="WA", urns=["whatsapp:5511912345678"])
+        create_test_ctwa(
+            ctwa_clid="old-clid",
+            channel_uuid=self.channel.uuid,
+            waba="waba",
+            contact_urn="whatsapp:5511912345678",
+            timestamp=timezone.now() - timedelta(hours=1),
+        )
+        newer = create_test_ctwa(
+            ctwa_clid="new-clid",
+            channel_uuid=self.channel.uuid,
+            waba="waba",
+            contact_urn="whatsapp:5511912345678",
+            timestamp=timezone.now(),
+        )
+
+        self.assertEqual(CTWA.objects.latest_for_contact(contact), newer)
+
+    def test_latest_for_contact_matches_brazilian_urn_variant(self):
+        contact = self.create_contact(name="WA", urns=["whatsapp:5511912345678"])
+        ctwa = create_test_ctwa(
+            ctwa_clid="br-clid",
+            channel_uuid=self.channel.uuid,
+            waba="waba",
+            contact_urn="whatsapp:551112345678",
+        )
+
+        self.assertEqual(CTWA.objects.latest_for_contact(contact), ctwa)
+
+    def test_latest_for_contact_returns_none_without_urns(self):
+        contact = self.create_contact(name="No URN")
+        self.assertIsNone(CTWA.objects.latest_for_contact(contact))
+
+    def test_latest_for_contact_returns_none_without_channels(self):
+        contact = self.create_contact(name="Org2", urns=["whatsapp:5511999999999"], org=self.org2)
+        create_test_ctwa(
+            org=self.org2,
+            ctwa_clid="org2-clid",
+            channel_uuid=uuid4(),
+            waba="waba",
+            contact_urn="whatsapp:5511999999999",
+        )
+
+        self.assertIsNone(CTWA.objects.latest_for_contact(contact))
+
+    def test_latest_for_contact_does_not_return_other_org_event(self):
+        contact = self.create_contact(name="WA", urns=["whatsapp:5511912345678"])
+        channel2 = self.create_channel("WAC", "Org2 Channel", "9999999999", org=self.org2)
+        create_test_ctwa(
+            org=self.org2,
+            ctwa_clid="other-org",
+            channel_uuid=channel2.uuid,
+            waba="waba",
+            contact_urn="whatsapp:5511912345678",
+        )
+
+        self.assertIsNone(CTWA.objects.latest_for_contact(contact))
 
 
 class CtwaDatalakeDualWriteTest(TembaTest):

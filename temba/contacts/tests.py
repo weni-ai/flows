@@ -28,6 +28,7 @@ from temba.campaigns.models import Campaign, CampaignEvent, EventFire
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
 from temba.contacts.search import SearchException, SearchResults, search_contacts
 from temba.contacts.views import ContactCRUDL, ContactGroupCRUDL, ContactGroupForm, ContactListView
+from temba.conversion_events.models import CTWA, CtwaReferralSource
 from temba.flows.models import Flow, FlowSession, FlowStart
 from temba.ivr.models import IVRCall
 from temba.locations.models import AdminBoundary
@@ -2802,6 +2803,8 @@ class ContactTest(TembaTest):
         # visit a contact detail page as a manager within the organization
         response = self.fetch_protected(read_url, self.admin)
         self.assertEqual(self.joe, response.context["object"])
+        self.assertIsNone(response.context["latest_ctwa_event"])
+        self.assertNotContains(response, 'id="contact-ctwa"')
 
         with patch("temba.orgs.models.Org.get_schemes") as mock_get_schemes:
             mock_get_schemes.return_value = []
@@ -2911,6 +2914,34 @@ class ContactTest(TembaTest):
             reverse("contacts.contact_read", args=[self.other_org_contact.uuid]), self.superuser
         )
         self.assertEqual(response.status_code, 200)
+
+    def test_read_latest_ctwa_event(self):
+        read_url = reverse("contacts.contact_read", args=[self.joe.uuid])
+        response = self.fetch_protected(read_url, self.admin)
+        self.assertIsNone(response.context["latest_ctwa_event"])
+        self.assertNotContains(response, 'id="contact-ctwa"')
+
+        source, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org,
+            "120226305854810726",
+            CtwaReferralSource.SOURCE_TYPE_AD,
+            headline="Carrossel Tênis Running 30% OFF",
+            source_url="https://fb.me/2aBcDeFgHiJ",
+        )
+        CTWA.objects.create(
+            referral_source=source,
+            ctwa_clid="clid-joe",
+            channel_uuid=self.channel.uuid,
+            waba="waba-test",
+            contact_urn=self.joe.get_urn(URN.TEL_SCHEME).identity,
+            timestamp=timezone.now(),
+        )
+
+        response = self.fetch_protected(read_url, self.admin)
+        self.assertEqual(response.context["latest_ctwa_event"].ctwa_clid, "clid-joe")
+        self.assertContains(response, "Carrossel Tênis Running 30% OFF")
+        self.assertContains(response, "120226305854810726")
+        self.assertContains(response, "clid-joe")
 
     def test_read_with_customer_support(self):
         self.customer_support.is_staff = True
