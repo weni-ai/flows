@@ -1,12 +1,10 @@
-from typing import Protocol, Optional
+from typing import Optional, Protocol
 
 
 class JWTInterface(Protocol):
     """Interface for JWT token generation."""
 
-    def generate_jwt_token(
-        self, project_uuid: str, expiration_minutes: Optional[int] = None
-    ) -> str:
+    def generate_jwt_token(self, project_uuid: str, expiration_minutes: Optional[int] = None) -> str:
         """
         Generate JWT token for project UUID.
 

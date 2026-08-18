@@ -18,9 +18,7 @@ class ClientTest(TembaTest):
         client = Client("acme")
 
         with patch("requests.post") as mock_post:
-            mock_post.return_value = MockResponse(
-                200, '{"access_token": "987654321", "refresh_token": "refresh123"}'
-            )
+            mock_post.return_value = MockResponse(200, '{"access_token": "987654321", "refresh_token": "refresh123"}')
 
             access_token, refresh_token = client.get_oauth_token("123-abc", "sesame", "mycode", "http://backhere.com")
 

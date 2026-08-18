@@ -4,9 +4,7 @@ from functools import wraps
 from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
-import uuid
 
-from django.conf import settings
 from openpyxl import load_workbook
 from rest_framework import status
 from rest_framework.response import Response

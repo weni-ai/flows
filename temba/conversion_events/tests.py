@@ -1,5 +1,6 @@
 import json
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
+from importlib import import_module
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -9,27 +10,37 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.test import APIRequestFactory
 
 from django.contrib.auth.models import AnonymousUser
+from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
+from temba.channels.models import Channel
 from temba.channels.types.whatsapp_cloud.type import WhatsAppCloudType
 from temba.conversion_events.jwt_auth import JWTModuleAuthentication, JWTModuleAuthMixin
 from temba.conversion_events.models import CTWA, CtwaReferralSource
 from temba.conversion_events.serializers import ConversionEventSerializer
+from temba.conversion_events.urns import whatsapp_urn_variants
 from temba.tests import TembaTest
 
-import requests
+_backfill = import_module("temba.conversion_events.migrations.0004_backfill_ctwareferralsource_org")
+apply_orgs_to_source = _backfill.apply_orgs_to_source
+backfill_ctwa_referral_source_org = _backfill.backfill_ctwa_referral_source_org
+org_ids_by_source_id = _backfill.org_ids_by_source_id
 
 
 def create_test_ctwa(**kwargs):
     referral_source = kwargs.pop("referral_source", None)
+    org = kwargs.pop("org", None)
     if referral_source is None:
         source_id = kwargs.pop("source_id", f"test-source-{uuid4()}")
         source_type = kwargs.pop("source_type", CtwaReferralSource.SOURCE_TYPE_AD)
-        referral_source, _ = CtwaReferralSource.objects.get_or_create(
-            source_id=source_id,
-            source_type=source_type,
-        )
+        if org is None:
+            channel_uuid = kwargs.get("channel_uuid")
+            if channel_uuid is not None:
+                channel = Channel.objects.filter(uuid=str(channel_uuid)).select_related("org").first()
+                if channel is not None:
+                    org = channel.org
+        referral_source, _ = CtwaReferralSource.get_or_create_for_org(org, source_id, source_type)
 
     defaults = {"timestamp": timezone.now()}
     defaults.update(kwargs)
@@ -176,7 +187,10 @@ class ConversionEventAPITest(TembaTest):
             "Test WhatsApp Channel",
             "12065551212",
             country="US",
-            config={"meta_dataset_id": "test_dataset_123", "wa_waba_id": "test_waba_123"},
+            config={
+                "meta_dataset_id": "test_dataset_123",
+                "wa_waba_id": "test_waba_123",
+            },
         )
         # Create CTWA data for testing
         self.ctwa_data = create_test_ctwa(
@@ -542,7 +556,10 @@ class ConversionEventAPITest(TembaTest):
                 self.assertEqual(response.status_code, 500)
                 response_data = response.json()
                 self.assertEqual(response_data["error"], "Meta and Datalake Error")
-                self.assertIn("Meta: Error sending to Meta: Network error", response_data["detail"])
+                self.assertIn(
+                    "Meta: Error sending to Meta: Network error",
+                    response_data["detail"],
+                )
 
     def test_invalid_json_handling(self):
         response = self.client.post(
@@ -966,6 +983,26 @@ class ConversionEventAPITest(TembaTest):
                 self.assertEqual(event_data["metadata"]["currency"], "BRL")
 
 
+class WhatsappUrnVariantsTest(TestCase):
+    def test_brazilian_with_extra_nine(self):
+        self.assertEqual(
+            whatsapp_urn_variants("whatsapp:5511912345678"),
+            ["whatsapp:5511912345678", "whatsapp:551112345678"],
+        )
+
+    def test_brazilian_without_extra_nine(self):
+        self.assertEqual(
+            whatsapp_urn_variants("whatsapp:551112345678"),
+            ["whatsapp:551112345678", "whatsapp:5511912345678"],
+        )
+
+    def test_non_brazilian_whatsapp(self):
+        self.assertEqual(whatsapp_urn_variants("whatsapp:14155551212"), ["whatsapp:14155551212"])
+
+    def test_non_whatsapp(self):
+        self.assertEqual(whatsapp_urn_variants("tel:+250781111111"), ["tel:+250781111111"])
+
+
 class CTWAModelTest(TembaTest):
     """Test the CTWA model"""
 
@@ -989,6 +1026,7 @@ class CTWAModelTest(TembaTest):
         self.assertEqual(ctwa.contact_urn, "whatsapp:1234567890")
         self.assertIsNotNone(ctwa.timestamp)
         self.assertIsNotNone(ctwa.referral_source)
+        self.assertEqual(ctwa.referral_source.org, self.org)
 
     def test_ctwa_without_clid(self):
         ctwa = create_test_ctwa(
@@ -1077,7 +1115,10 @@ class CTWAModelTest(TembaTest):
 
         # Test with non-WhatsApp URN (should use exact match)
         ctwa_other = create_test_ctwa(
-            ctwa_clid="clid_other", channel_uuid=self.channel.uuid, waba="waba_test3", contact_urn="tel:1234567890"
+            ctwa_clid="clid_other",
+            channel_uuid=self.channel.uuid,
+            waba="waba_test3",
+            contact_urn="tel:1234567890",
         )
 
         result = view._get_ctwa_data(self.channel.uuid, "tel:1234567890")
@@ -1090,6 +1131,65 @@ class CTWAModelTest(TembaTest):
         # Test with empty URN
         result = view._get_ctwa_data(self.channel.uuid, "")
         self.assertIsNone(result)
+
+    def test_latest_for_contact_returns_newest_event(self):
+        contact = self.create_contact(name="WA", urns=["whatsapp:5511912345678"])
+        create_test_ctwa(
+            ctwa_clid="old-clid",
+            channel_uuid=self.channel.uuid,
+            waba="waba",
+            contact_urn="whatsapp:5511912345678",
+            timestamp=timezone.now() - timedelta(hours=1),
+        )
+        newer = create_test_ctwa(
+            ctwa_clid="new-clid",
+            channel_uuid=self.channel.uuid,
+            waba="waba",
+            contact_urn="whatsapp:5511912345678",
+            timestamp=timezone.now(),
+        )
+
+        self.assertEqual(CTWA.objects.latest_for_contact(contact), newer)
+
+    def test_latest_for_contact_matches_brazilian_urn_variant(self):
+        contact = self.create_contact(name="WA", urns=["whatsapp:5511912345678"])
+        ctwa = create_test_ctwa(
+            ctwa_clid="br-clid",
+            channel_uuid=self.channel.uuid,
+            waba="waba",
+            contact_urn="whatsapp:551112345678",
+        )
+
+        self.assertEqual(CTWA.objects.latest_for_contact(contact), ctwa)
+
+    def test_latest_for_contact_returns_none_without_urns(self):
+        contact = self.create_contact(name="No URN")
+        self.assertIsNone(CTWA.objects.latest_for_contact(contact))
+
+    def test_latest_for_contact_returns_none_without_channels(self):
+        contact = self.create_contact(name="Org2", urns=["whatsapp:5511999999999"], org=self.org2)
+        create_test_ctwa(
+            org=self.org2,
+            ctwa_clid="org2-clid",
+            channel_uuid=uuid4(),
+            waba="waba",
+            contact_urn="whatsapp:5511999999999",
+        )
+
+        self.assertIsNone(CTWA.objects.latest_for_contact(contact))
+
+    def test_latest_for_contact_does_not_return_other_org_event(self):
+        contact = self.create_contact(name="WA", urns=["whatsapp:5511912345678"])
+        channel2 = self.create_channel("WAC", "Org2 Channel", "9999999999", org=self.org2)
+        create_test_ctwa(
+            org=self.org2,
+            ctwa_clid="other-org",
+            channel_uuid=channel2.uuid,
+            waba="waba",
+            contact_urn="whatsapp:5511912345678",
+        )
+
+        self.assertIsNone(CTWA.objects.latest_for_contact(contact))
 
 
 class CtwaDatalakeDualWriteTest(TembaTest):
@@ -1267,7 +1367,6 @@ class CtwaDatalakeDualWriteTest(TembaTest):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(mock_send_event.call_count, 2)
 
-
     def test_dual_write_conversation_started(self):
         payload = {
             "event_type": "conversation_started",
@@ -1443,7 +1542,10 @@ class JWTModuleAuthenticationTestCase(TestCase):
         request.headers = {"Authorization": "Bearer valid-token"}
         with self.assertRaises(AuthenticationFailed) as context:
             self.auth.authenticate(request)
-        self.assertIn("project_uuid or channel_uuid must be present in token payload.", str(context.exception))
+        self.assertIn(
+            "project_uuid or channel_uuid must be present in token payload.",
+            str(context.exception),
+        )
 
     @patch("temba.conversion_events.jwt_auth.jwt.decode")
     @patch("temba.conversion_events.jwt_auth.settings")
@@ -1528,3 +1630,187 @@ class JWTModuleAuthMixinTestCase(TestCase):
         request = self.factory.get("/")
         view = DummyView(request)
         self.assertIsNone(view.jwt_payload)
+
+
+class CtwaReferralSourceModelTest(TembaTest):
+    def test_create_without_org_raises_integrity_error(self):
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                CtwaReferralSource.objects.create(
+                    source_id="no-org",
+                    source_type=CtwaReferralSource.SOURCE_TYPE_AD,
+                )
+
+    def test_get_or_create_for_org_requires_org(self):
+        with self.assertRaises(ValueError):
+            CtwaReferralSource.get_or_create_for_org(None, "ad-1", CtwaReferralSource.SOURCE_TYPE_AD)
+
+    def test_same_source_allowed_for_different_orgs(self):
+        source_id = "shared-ad"
+        source_a, created_a = CtwaReferralSource.get_or_create_for_org(
+            self.org, source_id, CtwaReferralSource.SOURCE_TYPE_AD
+        )
+        source_b, created_b = CtwaReferralSource.get_or_create_for_org(
+            self.org2, source_id, CtwaReferralSource.SOURCE_TYPE_AD
+        )
+
+        self.assertTrue(created_a)
+        self.assertTrue(created_b)
+        self.assertNotEqual(source_a.id, source_b.id)
+        self.assertEqual(source_a.source_id, source_b.source_id)
+        self.assertEqual(source_a.org, self.org)
+        self.assertEqual(source_b.org, self.org2)
+
+    def test_same_org_source_id_and_type_is_rejected(self):
+        source_id = "dup-ad"
+        CtwaReferralSource.get_or_create_for_org(self.org, source_id, CtwaReferralSource.SOURCE_TYPE_AD)
+
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                CtwaReferralSource.objects.create(
+                    org=self.org,
+                    source_id=source_id,
+                    source_type=CtwaReferralSource.SOURCE_TYPE_AD,
+                )
+
+    def test_get_or_create_for_org_returns_existing(self):
+        source, created = CtwaReferralSource.get_or_create_for_org(
+            self.org, "existing-ad", CtwaReferralSource.SOURCE_TYPE_POST
+        )
+        again, created_again = CtwaReferralSource.get_or_create_for_org(
+            self.org, "existing-ad", CtwaReferralSource.SOURCE_TYPE_POST
+        )
+
+        self.assertTrue(created)
+        self.assertFalse(created_again)
+        self.assertEqual(source.id, again.id)
+
+
+class CtwaReferralSourceBackfillTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.channel = self.create_channel("WAC", "Org1 Channel", "1111111111")
+        self.channel2 = self.create_channel("WAC", "Org2 Channel", "2222222222", org=self.org2)
+
+    def test_org_ids_resolved_from_ctwa_channel(self):
+        source, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org2, "ad-from-channel", CtwaReferralSource.SOURCE_TYPE_AD
+        )
+        create_test_ctwa(
+            ctwa_clid="clid-inherit",
+            channel_uuid=self.channel.uuid,
+            waba="waba",
+            contact_urn="whatsapp:1111111111",
+            referral_source=source,
+        )
+
+        org_map = org_ids_by_source_id([source.id], CTWA, Channel)
+        self.assertEqual(org_map[source.id], [self.org.id])
+
+        apply_orgs_to_source(source, org_map[source.id], CtwaReferralSource, CTWA, Channel)
+        source.refresh_from_db()
+        self.assertEqual(source.org_id, self.org.id)
+
+    def test_shared_source_is_cloned_and_ctwas_retargeted(self):
+        source, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org, "shared-ad", CtwaReferralSource.SOURCE_TYPE_AD, headline="Hello"
+        )
+        ctwa_org1 = create_test_ctwa(
+            ctwa_clid="clid-org1",
+            channel_uuid=self.channel.uuid,
+            waba="waba1",
+            contact_urn="whatsapp:1111111111",
+            referral_source=source,
+        )
+        ctwa_org2 = create_test_ctwa(
+            ctwa_clid="clid-org2",
+            channel_uuid=self.channel2.uuid,
+            waba="waba2",
+            contact_urn="whatsapp:2222222222",
+            referral_source=source,
+        )
+
+        org_map = org_ids_by_source_id([source.id], CTWA, Channel)
+        self.assertEqual(set(org_map[source.id]), {self.org.id, self.org2.id})
+
+        apply_orgs_to_source(source, org_map[source.id], CtwaReferralSource, CTWA, Channel)
+
+        source.refresh_from_db()
+        ctwa_org1.refresh_from_db()
+        ctwa_org2.refresh_from_db()
+
+        clone = CtwaReferralSource.objects.exclude(id=source.id).get(
+            source_id="shared-ad", source_type=CtwaReferralSource.SOURCE_TYPE_AD
+        )
+        self.assertEqual(source.org_id, org_map[source.id][0])
+        self.assertEqual(clone.org_id, org_map[source.id][1])
+        self.assertEqual(clone.headline, "Hello")
+        self.assertEqual(
+            ctwa_org1.referral_source_id,
+            source.id if source.org_id == self.org.id else clone.id,
+        )
+        self.assertEqual(
+            ctwa_org2.referral_source_id,
+            clone.id if source.org_id == self.org.id else source.id,
+        )
+        self.assertNotEqual(ctwa_org1.referral_source_id, ctwa_org2.referral_source_id)
+
+    def test_backfill_processes_sources_and_clones_shared_orgs(self):
+        source, _ = CtwaReferralSource.get_or_create_for_org(self.org, "batched-ad", CtwaReferralSource.SOURCE_TYPE_AD)
+        create_test_ctwa(
+            ctwa_clid="clid-batch-1",
+            channel_uuid=self.channel.uuid,
+            waba="waba1",
+            contact_urn="whatsapp:1111111111",
+            referral_source=source,
+        )
+        create_test_ctwa(
+            ctwa_clid="clid-batch-2",
+            channel_uuid=self.channel2.uuid,
+            waba="waba2",
+            contact_urn="whatsapp:2222222222",
+            referral_source=source,
+        )
+
+        backfill_ctwa_referral_source_org(CtwaReferralSource, CTWA, Channel, source_ids=[source.id])
+
+        self.assertEqual(
+            CtwaReferralSource.objects.filter(source_id="batched-ad").count(),
+            2,
+        )
+        self.assertEqual(
+            set(CtwaReferralSource.objects.filter(source_id="batched-ad").values_list("org_id", flat=True)),
+            {self.org.id, self.org2.id},
+        )
+
+    def test_backfill_logs_when_org_cannot_be_resolved(self):
+        source, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org, f"orphan-ad-{uuid4()}", CtwaReferralSource.SOURCE_TYPE_AD
+        )
+
+        with patch.object(_backfill.logger, "warning") as mock_warning:
+            backfill_ctwa_referral_source_org(CtwaReferralSource, CTWA, Channel, source_ids=[source.id])
+
+        mock_warning.assert_called_once()
+        self.assertIn(f"id={source.id}", mock_warning.call_args[0][0])
+        source.refresh_from_db()
+        self.assertEqual(source.org_id, self.org.id)
+
+    def test_backfill_is_noop_when_all_sources_have_org(self):
+        CtwaReferralSource.get_or_create_for_org(self.org, "has-org", CtwaReferralSource.SOURCE_TYPE_AD)
+        backfill_ctwa_referral_source_org(CtwaReferralSource, CTWA, Channel)
+        self.assertEqual(
+            CtwaReferralSource.objects.filter(source_id="has-org", org=self.org).count(),
+            1,
+        )
+
+    def test_org_ids_by_source_id_returns_empty_for_no_ids(self):
+        self.assertEqual(org_ids_by_source_id([], CTWA, Channel), {})
+
+    def test_apply_orgs_to_source_skips_empty_org_ids(self):
+        source, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org, "unchanged-ad", CtwaReferralSource.SOURCE_TYPE_AD
+        )
+        apply_orgs_to_source(source, [], CtwaReferralSource, CTWA, Channel)
+        source.refresh_from_db()
+        self.assertEqual(source.org_id, self.org.id)

@@ -190,7 +190,6 @@ class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
             if validation_response.status_code != 200:  # pragma: no cover
                 return validation_response
 
-
         project_uuid = (
             request.data.get("project_uuid") or request.data.get("project") or getattr(request, "project_uuid", None)
         )

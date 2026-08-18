@@ -49,4 +49,3 @@ class InternalTokenAuthV2Test(APITest):
             HTTP_AUTHORIZATION=f"Token {token.key}",
         )
         self.assertEqual(response.status_code, 200)
-

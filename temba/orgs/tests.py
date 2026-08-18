@@ -10,7 +10,6 @@ import pytz
 import stripe
 import stripe.error
 from bs4 import BeautifulSoup
-from django.core.files.uploadedfile import SimpleUploadedFile
 from smartmin.users.models import FailedLogin, RecoveryToken
 
 from django.conf import settings
@@ -1028,17 +1027,17 @@ class OrgTest(TembaTest):
         Test that save_export correctly saves a file using private storage
         """
         test_file = SimpleUploadedFile("test.txt", b"test content", content_type="text/plain")
-        
+
         # save the file
         path = self.org.save_export("my_export", test_file)
-        
+
         # check that path is correct format
         self.assertTrue(path.startswith("exports/"))
         self.assertTrue(path.endswith("/test.txt"))
-        
+
         # check that file was saved with private storage
         self.assertTrue(private_file_storage.exists(path))
-        
+
         # check that file content is correct
         with private_file_storage.open(path) as f:
             self.assertEqual(f.read(), b"test content")

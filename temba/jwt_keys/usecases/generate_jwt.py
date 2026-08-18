@@ -1,19 +1,17 @@
-import jwt
-
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from django.conf import settings
-from temba.interfaces.jwt import JWTInterface
+import jwt
 
+from django.conf import settings
+
+from temba.interfaces.jwt import JWTInterface
 
 DEFAULT_EXPIRATION_MINUTES = 60
 
 
 class JWTUsecase(JWTInterface):
-    def generate_jwt_token(
-        self, project_uuid: str, expiration_minutes: Optional[int] = None
-    ) -> str:
+    def generate_jwt_token(self, project_uuid: str, expiration_minutes: Optional[int] = None) -> str:
         """
         Generate JWT token for project UUID.
 

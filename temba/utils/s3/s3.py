@@ -4,8 +4,8 @@ from urllib.parse import urlparse
 import boto3
 from botocore.config import Config
 
-from django.core.files.storage import DefaultStorage
 from django.conf import settings
+from django.core.files.storage import DefaultStorage
 
 from temba.utils import json
 

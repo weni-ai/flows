@@ -11,11 +11,10 @@ import iso8601
 import pytz
 from django_redis import get_redis_connection
 from openpyxl import load_workbook
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.files.storage import default_storage, private_file_storage
 
 from django.conf import settings
 from django.contrib.auth.models import Group
+from django.core.files.storage import private_file_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models.functions import TruncDate
 from django.test.utils import override_settings

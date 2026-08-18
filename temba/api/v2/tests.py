@@ -12,6 +12,7 @@ import iso8601
 import pytz
 from rest_framework import serializers
 from rest_framework.test import APIClient, APIRequestFactory
+from weni_commons.auth import SessionContext, SessionUser
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, Group, User
@@ -22,8 +23,6 @@ from django.db import connection
 from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
-
-from weni_commons.auth import SessionContext, SessionUser
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.models import APIPermission, APIToken, Resthook, WebHookEvent

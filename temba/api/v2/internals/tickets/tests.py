@@ -12,7 +12,6 @@ from temba.api.v2.validators import LambdaURLValidator
 from temba.mailroom.client import MailroomException
 from temba.tests import TembaTest
 from temba.tickets.models import Ticket, Ticketer
-from temba.mailroom.client import MailroomException
 
 
 class TicketAssigneeViewTest(TembaTest):

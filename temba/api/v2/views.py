@@ -1522,6 +1522,7 @@ class CampaignEventsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAP
             "params": [{"name": "uuid", "required": False, "help": "The UUID of the campaign event to delete"}],
         }
 
+
 @api_gateway_expose(alias="channels")
 class ChannelsEndpoint(ListAPIMixin, BaseAPIView):
     """

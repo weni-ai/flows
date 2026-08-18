@@ -1496,7 +1496,9 @@ DATALAKE_SERVER_ADDRESS = os.environ.get("DATALAKE_SERVER_ADDRESS", default="loc
 
 # Connect session tokens (weni_commons.auth.SessionTokenAuthentication).
 # Override per environment via env vars — DynamoDB table/region differ between staging and production.
-WENI_SESSION_TOKEN_DYNAMODB_TABLE = os.environ.get("WENI_SESSION_TOKEN_DYNAMODB_TABLE", default="arn:aws:dynamodb:sa-east-1:739649339569:table/weni-session-tokens")
+WENI_SESSION_TOKEN_DYNAMODB_TABLE = os.environ.get(
+    "WENI_SESSION_TOKEN_DYNAMODB_TABLE", default="arn:aws:dynamodb:sa-east-1:739649339569:table/weni-session-tokens"
+)
 WENI_SESSION_TOKEN_DYNAMODB_REGION = os.environ.get("WENI_SESSION_TOKEN_DYNAMODB_REGION", default="sa-east-1")
 WENI_SESSION_TOKEN_MAX_REDIS_TTL = int(os.environ.get("WENI_SESSION_TOKEN_MAX_REDIS_TTL", default="3600"))
 WENI_SESSION_TOKEN_REDIS_ALIAS = os.environ.get("WENI_SESSION_TOKEN_REDIS_ALIAS", default="default")
