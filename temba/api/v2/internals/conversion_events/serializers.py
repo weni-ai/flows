@@ -32,7 +32,7 @@ class ListCtwaReferralSourceQuerySerializer(serializers.Serializer):
             return None
         try:
             return iso8601.parse_date(value).date()
-        except Exception:
+        except iso8601.ParseError:
             errors[field_name] = error_message
             return None
 
