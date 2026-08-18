@@ -1,7 +1,7 @@
 import json
+from datetime import datetime, timezone as dt_timezone
 from importlib import import_module
 from types import SimpleNamespace
-from datetime import datetime, timezone as dt_timezone
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
