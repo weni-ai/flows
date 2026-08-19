@@ -3,7 +3,7 @@
 import logging
 
 from django.db import migrations, transaction
-from django.db.models import Max, Min
+from django.db.models import Count, Max, Min
 
 logger = logging.getLogger(__name__)
 
@@ -54,28 +54,32 @@ def collapse_org_legacy_sources(org_id, CtwaReferralSource, CTWA, batch_size):
     leftover source rows can be deleted.
     """
     sources_qs = legacy_sources(CtwaReferralSource).filter(org_id=org_id)
-    if not sources_qs.exists():
+    window = sources_qs.aggregate(
+        Min("first_seen_at"),
+        Max("last_seen_at"),
+        Count("id"),
+    )
+    collapsed_count = window["id__count"]
+    if not collapsed_count:
         return
 
-    window = sources_qs.aggregate(Min("first_seen_at"), Max("last_seen_at"))
-    collapsed_count = sources_qs.count()
+    with transaction.atomic():
+        canonical, created = CtwaReferralSource.objects.get_or_create(
+            org_id=org_id,
+            source_id=LEGACY_SOURCE_ID,
+            source_type=LEGACY_SOURCE_TYPE,
+            defaults={
+                "source_url": None,
+                "headline": None,
+                "body": None,
+            },
+        )
 
-    canonical, created = CtwaReferralSource.objects.get_or_create(
-        org_id=org_id,
-        source_id=LEGACY_SOURCE_ID,
-        source_type=LEGACY_SOURCE_TYPE,
-        defaults={
-            "source_url": None,
-            "headline": None,
-            "body": None,
-        },
-    )
-
-    first_seen_at = window["first_seen_at__min"]
-    last_seen_at = window["last_seen_at__max"]
-    if not created:
-        first_seen_at, last_seen_at = _merged_seen_window(canonical, first_seen_at, last_seen_at)
-    preserve_seen_window(canonical.id, first_seen_at, last_seen_at, CtwaReferralSource)
+        first_seen_at = window["first_seen_at__min"]
+        last_seen_at = window["last_seen_at__max"]
+        if not created:
+            first_seen_at, last_seen_at = _merged_seen_window(canonical, first_seen_at, last_seen_at)
+        preserve_seen_window(canonical.id, first_seen_at, last_seen_at, CtwaReferralSource)
 
     repointed = 0
     max_id = 0
