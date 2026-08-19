@@ -31,6 +31,13 @@ delete_unresolved_sources = _backfill.delete_unresolved_sources
 org_channels_by_source_id = _backfill.org_channels_by_source_id
 resolve_batch_orgs = _backfill.resolve_batch_orgs
 
+_collapse = import_module("temba.conversion_events.migrations.0006_collapse_legacy_ctwa_referral_sources")
+collapse_legacy_sources_per_org = _collapse.collapse_legacy_sources_per_org
+collapse_org_legacy_sources = _collapse.collapse_org_legacy_sources
+legacy_sources = _collapse.legacy_sources
+org_ids_with_legacy_sources = _collapse.org_ids_with_legacy_sources
+preserve_seen_window = _collapse.preserve_seen_window
+
 
 def create_test_ctwa(**kwargs):
     referral_source = kwargs.pop("referral_source", None)
@@ -1778,3 +1785,268 @@ class CtwaReferralSourceBackfillTest(TembaTest):
             _backfill.forwards(apps, schema_editor=None)
 
         mock_backfill.assert_called_once_with(CtwaReferralSource, CTWA, Channel)
+
+
+class CtwaReferralSourceCollapseTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.channel = self.create_channel("WAC", "Org1 Channel", "1111111111")
+        self.channel2 = self.create_channel("WAC", "Org2 Channel", "2222222222", org=self.org2)
+
+    def _create_legacy_source(self, org, ctwa_id, first_seen_at=None, last_seen_at=None):
+        source = CtwaReferralSource.objects.create(
+            org=org,
+            source_id=f"legacy-{ctwa_id}",
+            source_type=CtwaReferralSource.SOURCE_TYPE_AD,
+        )
+        updates = {}
+        if first_seen_at is not None:
+            updates["first_seen_at"] = first_seen_at
+        if last_seen_at is not None:
+            updates["last_seen_at"] = last_seen_at
+        if updates:
+            CtwaReferralSource.objects.filter(id=source.id).update(**updates)
+            source.refresh_from_db()
+        return source
+
+    def _create_legacy_ctwa(self, *, org, channel, ctwa_id, clid):
+        source = self._create_legacy_source(org, ctwa_id)
+        ctwa = create_test_ctwa(
+            ctwa_clid=clid,
+            channel_uuid=channel.uuid,
+            waba="waba",
+            contact_urn="whatsapp:1111111111",
+            referral_source=source,
+        )
+        return source, ctwa
+
+    def test_collapse_merges_legacy_sources_in_one_org(self):
+        source_a, ctwa_a = self._create_legacy_ctwa(org=self.org, channel=self.channel, ctwa_id=11, clid="clid-a")
+        source_b, ctwa_b = self._create_legacy_ctwa(org=self.org, channel=self.channel, ctwa_id=12, clid="clid-b")
+
+        collapse_legacy_sources_per_org(CtwaReferralSource, CTWA)
+
+        canonical = CtwaReferralSource.objects.get(
+            org=self.org, source_id="legacy", source_type=CtwaReferralSource.SOURCE_TYPE_AD
+        )
+        ctwa_a.refresh_from_db()
+        ctwa_b.refresh_from_db()
+
+        self.assertEqual(ctwa_a.referral_source_id, canonical.id)
+        self.assertEqual(ctwa_b.referral_source_id, canonical.id)
+        self.assertFalse(CtwaReferralSource.objects.filter(id__in=[source_a.id, source_b.id]).exists())
+        self.assertEqual(
+            CtwaReferralSource.objects.filter(org=self.org, source_id="legacy").count(),
+            1,
+        )
+
+    def test_collapse_keeps_a_canonical_source_per_org(self):
+        _, ctwa_org1 = self._create_legacy_ctwa(org=self.org, channel=self.channel, ctwa_id=21, clid="clid-org1")
+        _, ctwa_org2 = self._create_legacy_ctwa(org=self.org2, channel=self.channel2, ctwa_id=22, clid="clid-org2")
+
+        collapse_legacy_sources_per_org(CtwaReferralSource, CTWA)
+
+        canonical_org1 = CtwaReferralSource.objects.get(org=self.org, source_id="legacy")
+        canonical_org2 = CtwaReferralSource.objects.get(org=self.org2, source_id="legacy")
+        ctwa_org1.refresh_from_db()
+        ctwa_org2.refresh_from_db()
+
+        self.assertNotEqual(canonical_org1.id, canonical_org2.id)
+        self.assertEqual(ctwa_org1.referral_source_id, canonical_org1.id)
+        self.assertEqual(ctwa_org2.referral_source_id, canonical_org2.id)
+
+    def test_collapse_leaves_non_legacy_and_near_miss_sources(self):
+        real, _ = CtwaReferralSource.get_or_create_for_org(self.org, "real-ad-123", CtwaReferralSource.SOURCE_TYPE_AD)
+        near_miss, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org, "legacy-abc", CtwaReferralSource.SOURCE_TYPE_AD
+        )
+        post_legacy, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org, "legacy-99", CtwaReferralSource.SOURCE_TYPE_POST
+        )
+        self._create_legacy_ctwa(org=self.org, channel=self.channel, ctwa_id=31, clid="clid-keep")
+
+        collapse_legacy_sources_per_org(CtwaReferralSource, CTWA)
+
+        self.assertTrue(CtwaReferralSource.objects.filter(id=real.id).exists())
+        self.assertTrue(CtwaReferralSource.objects.filter(id=near_miss.id).exists())
+        self.assertTrue(CtwaReferralSource.objects.filter(id=post_legacy.id).exists())
+        self.assertTrue(
+            CtwaReferralSource.objects.filter(org=self.org, source_id="legacy", source_type="ad").exists()
+        )
+
+    def test_canonical_inherits_earliest_first_seen_and_latest_last_seen(self):
+        early = timezone.now() - timedelta(days=10)
+        middle = timezone.now() - timedelta(days=5)
+        late = timezone.now() - timedelta(days=1)
+
+        source_early = self._create_legacy_source(self.org, 41, first_seen_at=early, last_seen_at=middle)
+        source_late = self._create_legacy_source(self.org, 42, first_seen_at=middle, last_seen_at=late)
+        create_test_ctwa(
+            ctwa_clid="clid-window-early",
+            channel_uuid=self.channel.uuid,
+            waba="waba",
+            contact_urn="whatsapp:1111111111",
+            referral_source=source_early,
+        )
+        create_test_ctwa(
+            ctwa_clid="clid-window-late",
+            channel_uuid=self.channel.uuid,
+            waba="waba",
+            contact_urn="whatsapp:1111111111",
+            referral_source=source_late,
+        )
+
+        collapse_legacy_sources_per_org(CtwaReferralSource, CTWA)
+
+        canonical = CtwaReferralSource.objects.get(org=self.org, source_id="legacy")
+        self.assertEqual(canonical.first_seen_at, early)
+        self.assertEqual(canonical.last_seen_at, late)
+
+    def test_collapse_merges_window_into_existing_canonical(self):
+        existing_first = timezone.now() - timedelta(days=20)
+        existing_last = timezone.now() - timedelta(days=8)
+        leftover_first = timezone.now() - timedelta(days=3)
+        leftover_last = timezone.now() - timedelta(days=1)
+
+        canonical, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org, "legacy", CtwaReferralSource.SOURCE_TYPE_AD
+        )
+        CtwaReferralSource.objects.filter(id=canonical.id).update(
+            first_seen_at=existing_first, last_seen_at=existing_last
+        )
+
+        leftover = self._create_legacy_source(
+            self.org, 51, first_seen_at=leftover_first, last_seen_at=leftover_last
+        )
+        create_test_ctwa(
+            ctwa_clid="clid-existing-canonical",
+            channel_uuid=self.channel.uuid,
+            waba="waba",
+            contact_urn="whatsapp:1111111111",
+            referral_source=leftover,
+        )
+
+        collapse_legacy_sources_per_org(CtwaReferralSource, CTWA, org_ids=[self.org.id])
+
+        canonical.refresh_from_db()
+        self.assertEqual(canonical.first_seen_at, existing_first)
+        self.assertEqual(canonical.last_seen_at, leftover_last)
+
+    def test_collapse_is_idempotent(self):
+        _, ctwa = self._create_legacy_ctwa(org=self.org, channel=self.channel, ctwa_id=61, clid="clid-once")
+
+        collapse_legacy_sources_per_org(CtwaReferralSource, CTWA)
+        canonical_id = CtwaReferralSource.objects.get(org=self.org, source_id="legacy").id
+        collapse_legacy_sources_per_org(CtwaReferralSource, CTWA)
+
+        ctwa.refresh_from_db()
+        self.assertEqual(
+            CtwaReferralSource.objects.filter(org=self.org, source_id="legacy").count(),
+            1,
+        )
+        self.assertEqual(ctwa.referral_source_id, canonical_id)
+
+    def test_collapse_with_batch_size_one_processes_all_chunks(self):
+        created = [
+            self._create_legacy_ctwa(org=self.org, channel=self.channel, ctwa_id=ctwa_id, clid=f"clid-batch-{ctwa_id}")
+            for ctwa_id in (71, 72, 73)
+        ]
+
+        collapse_legacy_sources_per_org(CtwaReferralSource, CTWA, batch_size=1)
+
+        canonical = CtwaReferralSource.objects.get(org=self.org, source_id="legacy")
+        for source, ctwa in created:
+            ctwa.refresh_from_db()
+            self.assertEqual(ctwa.referral_source_id, canonical.id)
+            self.assertFalse(CtwaReferralSource.objects.filter(id=source.id).exists())
+
+    def test_collapse_skips_org_without_legacy_sources(self):
+        collapse_org_legacy_sources(self.org.id, CtwaReferralSource, CTWA, batch_size=1000)
+        self.assertFalse(CtwaReferralSource.objects.filter(org=self.org, source_id="legacy").exists())
+
+    def test_org_ids_narrowing_collapses_only_the_requested_org(self):
+        self._create_legacy_ctwa(org=self.org, channel=self.channel, ctwa_id=81, clid="clid-narrow-1")
+        source_org2, _ = self._create_legacy_ctwa(
+            org=self.org2, channel=self.channel2, ctwa_id=82, clid="clid-narrow-2"
+        )
+
+        collapse_legacy_sources_per_org(CtwaReferralSource, CTWA, org_ids=[self.org.id])
+
+        self.assertTrue(CtwaReferralSource.objects.filter(org=self.org, source_id="legacy").exists())
+        self.assertTrue(CtwaReferralSource.objects.filter(id=source_org2.id).exists())
+        self.assertFalse(CtwaReferralSource.objects.filter(org=self.org2, source_id="legacy").exists())
+
+    def test_preserve_seen_window_skips_when_both_values_are_none(self):
+        canonical, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org, "legacy", CtwaReferralSource.SOURCE_TYPE_AD
+        )
+        original_first = canonical.first_seen_at
+        original_last = canonical.last_seen_at
+
+        preserve_seen_window(canonical.id, None, None, CtwaReferralSource)
+
+        canonical.refresh_from_db()
+        self.assertEqual(canonical.first_seen_at, original_first)
+        self.assertEqual(canonical.last_seen_at, original_last)
+
+    def test_preserve_seen_window_updates_only_provided_fields(self):
+        canonical, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org, "legacy", CtwaReferralSource.SOURCE_TYPE_AD
+        )
+        original_last = canonical.last_seen_at
+        new_first = timezone.now() - timedelta(days=15)
+
+        preserve_seen_window(canonical.id, new_first, None, CtwaReferralSource)
+
+        canonical.refresh_from_db()
+        self.assertEqual(canonical.first_seen_at, new_first)
+        self.assertEqual(canonical.last_seen_at, original_last)
+
+    def test_merged_seen_window_picks_earliest_first_and_latest_last(self):
+        earlier = timezone.now() - timedelta(days=10)
+        later = timezone.now() - timedelta(days=1)
+        canonical = SimpleNamespace(first_seen_at=earlier, last_seen_at=later)
+
+        first_seen_at, last_seen_at = _collapse._merged_seen_window(canonical, later, earlier)
+
+        self.assertEqual(first_seen_at, earlier)
+        self.assertEqual(last_seen_at, later)
+
+    def test_merged_seen_window_keeps_aggregated_values_when_canonical_has_none(self):
+        stamp = timezone.now() - timedelta(days=2)
+        canonical = SimpleNamespace(first_seen_at=None, last_seen_at=None)
+
+        first_seen_at, last_seen_at = _collapse._merged_seen_window(canonical, stamp, stamp)
+
+        self.assertEqual(first_seen_at, stamp)
+        self.assertEqual(last_seen_at, stamp)
+
+    def test_merged_seen_window_uses_canonical_when_aggregated_is_none(self):
+        stamp = timezone.now() - timedelta(days=2)
+        canonical = SimpleNamespace(first_seen_at=stamp, last_seen_at=stamp)
+
+        first_seen_at, last_seen_at = _collapse._merged_seen_window(canonical, None, None)
+
+        self.assertEqual(first_seen_at, stamp)
+        self.assertEqual(last_seen_at, stamp)
+
+    def test_org_ids_with_legacy_sources_returns_distinct_orgs(self):
+        self._create_legacy_source(self.org, 91)
+        self._create_legacy_source(self.org, 92)
+        self._create_legacy_source(self.org2, 93)
+
+        self.assertEqual(org_ids_with_legacy_sources(CtwaReferralSource), [self.org.id, self.org2.id])
+        self.assertEqual(legacy_sources(CtwaReferralSource).count(), 3)
+
+    def test_forwards_loads_models_and_runs_collapse(self):
+        apps = Mock()
+        models = {
+            ("conversion_events", "CtwaReferralSource"): CtwaReferralSource,
+            ("conversion_events", "CTWA"): CTWA,
+        }
+        apps.get_model.side_effect = lambda app, model: models[(app, model)]
+
+        with patch.object(_collapse, "collapse_legacy_sources_per_org") as mock_collapse:
+            _collapse.forwards(apps, schema_editor=None)
+
+        mock_collapse.assert_called_once_with(CtwaReferralSource, CTWA)
