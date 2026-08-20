@@ -70,6 +70,23 @@ class ListCtwaReferralSourceQuerySerializerTest(SimpleTestCase):
         self.assertTrue(serializer.is_valid(), serializer.errors)
         self.assertEqual(serializer.validated_data["source_type"], CtwaReferralSource.SOURCE_TYPE_POST)
 
+    def test_accepts_search(self):
+        serializer = ListCtwaReferralSourceQuerySerializer(
+            data={"project_uuid": str(uuid4()), "search": "  Summer sale  "}
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertEqual(serializer.validated_data["search"], "Summer sale")
+
+    def test_blank_search_normalizes_to_none(self):
+        serializer = ListCtwaReferralSourceQuerySerializer(data={"project_uuid": str(uuid4()), "search": ""})
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertIsNone(serializer.validated_data["search"])
+
+    def test_whitespace_search_normalizes_to_none(self):
+        serializer = ListCtwaReferralSourceQuerySerializer(data={"project_uuid": str(uuid4()), "search": "   "})
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertIsNone(serializer.validated_data["search"])
+
 
 class CtwaReferralSourceSerializerTest(TembaTest):
     def setUp(self):

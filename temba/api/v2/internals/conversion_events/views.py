@@ -27,6 +27,7 @@ class CtwaReferralSourceListView(APIViewMixin, APIView):
             source_type=serializer.validated_data.get("source_type"),
             after=serializer.validated_data.get("after"),
             before=serializer.validated_data.get("before"),
+            search=serializer.validated_data.get("search"),
         )
 
         try:
