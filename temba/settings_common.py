@@ -1480,6 +1480,8 @@ NEXUS_BASE_URL = os.environ.get("NEXUS_BASE_URL", default="https://nexus.dev.clo
 
 BILLING_BASE_URL = os.environ.get("BILLING_BASE_URL", default="https://billing.stg.cloud.weni.ai")
 
+INTEGRATIONS_BASE_URL = os.environ.get("INTEGRATIONS_BASE_URL", default="")
+
 FLOWEDITOR_SENTRY_DSN = os.environ.get("FLOWEDITOR_SENTRY_DSN", default="")
 
 INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")

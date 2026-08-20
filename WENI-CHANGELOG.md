@@ -1,3 +1,7 @@
+3.94.0
+----------
+* feat: Add channel migration consumer for integrations.channel.migrated events
+
 3.93.0
 ----------
 * feat: integrate CTWA events into contact detail view
