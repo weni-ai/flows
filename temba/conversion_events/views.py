@@ -263,7 +263,9 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
             channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only("org_id", "config").first()
             if not channel:
                 return None, None, "Channel not found"
+
         except Exception:
+            logger.exception("Channel lookup failed")
             return None, None, "Channel not found"
 
         try:
@@ -430,5 +432,5 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
 
         except Exception as e:
             error_msg = f"Error sending to CTWA Datalake: {str(e)}"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             return False, error_msg

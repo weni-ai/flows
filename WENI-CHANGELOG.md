@@ -1,3 +1,10 @@
+3.93.0
+----------
+* feat: integrate CTWA events into contact detail view
+* feat: Add CTWA referral sources internal API endpoint
+* feat: enhance CtwaReferralSource model with org field and backfill functionality
+* feat: implement Courier fixed access token authentication and add conversation_started event type
+
 3.92.0
 ----------
 * feat: add CtwaReferralSource model and enhance CTWA with new fields
