@@ -12,6 +12,7 @@ import iso8601
 import pytz
 from rest_framework import serializers
 from rest_framework.test import APIClient, APIRequestFactory
+from weni_commons.auth import SessionContext, SessionUser
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, Group, User
@@ -880,13 +881,109 @@ class APITest(APIJSONMixin, TembaTest):
         view = BaseAPIView()
         view.format_kwarg = None
         request = view.initialize_request(django_request)
-        request.user = SimpleNamespace(set_org=Mock(), is_anonymous=False)
+        request.user = SimpleNamespace(set_org=Mock(), is_anonymous=False, is_active=True)
+        request.auth = None
         view.request = request
 
         view.perform_authentication(request)
 
         self.assertEqual(request._org, self.org)
         request.user.set_org.assert_called_once_with(self.org)
+
+    def _make_session_auth_request(self, *, email, project_uuid=None, auth=True):
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = SessionUser(email=email)
+        if project_uuid is not None:
+            request.project_uuid = project_uuid
+        if auth:
+            request.auth = SessionContext(
+                project=project_uuid or "unused",
+                user=email,
+                expire_at="2026-12-31T00:00:00+00:00",
+            )
+        else:
+            request.auth = None
+        view.request = request
+        return view, request
+
+    def test_resolve_session_user_with_org_member(self):
+        """_resolve_session_user replaces SessionUser with the Django member and clears auth."""
+        view, request = self._make_session_auth_request(
+            email=self.admin.email,
+            project_uuid=str(self.org.proj_uuid),
+        )
+
+        view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user, self.admin)
+        self.assertEqual(request.user.get_org(), self.org)
+        self.assertTrue(request.user.using_token)
+
+    def test_resolve_session_user_unknown_email_becomes_anonymous(self):
+        """_resolve_session_user denies when the session email has no Django user."""
+        view, request = self._make_session_auth_request(
+            email="missing@example.com",
+            project_uuid=str(self.org.proj_uuid),
+        )
+
+        view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+        self.assertTrue(request.user.is_anonymous)
+
+    def test_resolve_session_user_non_member_becomes_anonymous(self):
+        """_resolve_session_user denies when the Django user is not in the org."""
+        view, request = self._make_session_auth_request(
+            email=self.admin2.email,
+            project_uuid=str(self.org.proj_uuid),
+        )
+
+        view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+        self.assertTrue(request.user.is_anonymous)
+
+    def test_resolve_session_user_without_project_uuid_becomes_anonymous(self):
+        """_resolve_session_user clears auth and anonymizes when project_uuid is missing."""
+        view, request = self._make_session_auth_request(email=self.admin.email, project_uuid=None)
+
+        view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+        self.assertTrue(request.user.is_anonymous)
+        self.assertFalse(hasattr(request, "_org"))
+
+    def test_resolve_session_user_invalid_project_raises(self):
+        """_resolve_session_user raises InvalidQueryError for an unknown project_uuid."""
+        view, request = self._make_session_auth_request(
+            email=self.admin.email,
+            project_uuid=str(uuid.uuid4()),
+        )
+
+        with self.assertRaises(InvalidQueryError):
+            view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+
+    def test_perform_authentication_routes_session_to_resolve_session_user(self):
+        """perform_authentication calls _resolve_session_user when auth is SessionContext."""
+        view, request = self._make_session_auth_request(
+            email=self.admin.email,
+            project_uuid=str(self.org.proj_uuid),
+        )
+
+        view.perform_authentication(request)
+
+        self.assertIsNone(request.auth)
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user, self.admin)
+        self.assertTrue(request.user.using_token)
 
     def test_permission_classes_allow_jwt_without_api_token(self):
         """HasValidJWT | APIPermission allows access with valid JWT even without API token."""

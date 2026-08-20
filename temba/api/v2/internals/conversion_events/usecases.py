@@ -32,7 +32,14 @@ class ListCtwaReferralSourcesUseCase:
             f"source_type={dto.source_type} after={dto.after} before={dto.before} search={dto.search}"
         )
         org = self._get_org(dto.project_uuid)
-        queryset = CtwaReferralSource.objects.filter(org=org).select_related("org")
+        queryset = (
+            CtwaReferralSource.objects.filter(org=org)
+            .exclude(
+                source_id=CtwaReferralSource.LEGACY_SOURCE_ID,
+                source_type=CtwaReferralSource.SOURCE_TYPE_AD,
+            )
+            .select_related("org")
+        )
 
         if dto.source_type:
             queryset = queryset.filter(source_type=dto.source_type)
