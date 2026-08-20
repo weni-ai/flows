@@ -184,3 +184,13 @@ class CtwaReferralSourceListViewTest(TembaTest):
         self.assertEqual(len(payload["results"]), 2)
         self.assertEqual(payload["results"][0]["id"], sources[2].id)
         self.assertIsNotNone(payload["previous"])
+
+    @skip_auth_and_permissions
+    def test_filters_by_headline_search(self):
+        matching = self._create_source(self.org, "sale-ad", headline="Summer sale")
+        self._create_source(self.org, "other-ad", headline="Winter promo")
+        self._create_source(self.org, "no-headline")
+
+        resp = self._get(project_uuid=str(self.org.proj_uuid), search="sale")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual([item["id"] for item in resp.json()["results"]], [matching.id])
