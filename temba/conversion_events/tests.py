@@ -22,6 +22,7 @@ from temba.conversion_events.jwt_auth import JWTModuleAuthentication, JWTModuleA
 from temba.conversion_events.models import CTWA, CtwaReferralSource
 from temba.conversion_events.serializers import ConversionEventSerializer
 from temba.conversion_events.urns import whatsapp_urn_variants
+from temba.conversion_events.views import format_datalake_event_date
 from temba.tests import TembaTest
 
 _backfill = import_module("temba.conversion_events.migrations.0004_backfill_ctwareferralsource_org")
@@ -30,6 +31,16 @@ backfill_ctwa_referral_source_org = _backfill.backfill_ctwa_referral_source_org
 delete_unresolved_sources = _backfill.delete_unresolved_sources
 org_channels_by_source_id = _backfill.org_channels_by_source_id
 resolve_batch_orgs = _backfill.resolve_batch_orgs
+
+
+class FormatDatalakeEventDateTest(TestCase):
+    def test_formats_aware_datetime_as_utc_z_suffix(self):
+        dt = datetime(2026, 1, 15, 12, 30, 0, tzinfo=dt_timezone.utc)
+        self.assertEqual(format_datalake_event_date(dt), "2026-01-15T12:30:00Z")
+
+    def test_formats_naive_datetime_as_utc(self):
+        dt = datetime(2026, 1, 15, 12, 30, 0)
+        self.assertEqual(format_datalake_event_date(dt), "2026-01-15T12:30:00Z")
 
 
 def create_test_ctwa(**kwargs):
@@ -1107,7 +1118,7 @@ class CtwaDatalakeDualWriteTest(TembaTest):
             mock_response.status_code = 200
             mock_response.json.return_value = {"success": True}
             mock_post.return_value = mock_response
-            mock_datetime.now.return_value.timestamp.return_value = 1700000000.0
+            mock_datetime.now.return_value = datetime(2023, 11, 14, 22, 13, 20, tzinfo=dt_timezone.utc)
 
             with override_settings(
                 WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
@@ -1128,12 +1139,12 @@ class CtwaDatalakeDualWriteTest(TembaTest):
 
             self.assertEqual(legacy_event["event_name"], "conversion_lead")
             self.assertEqual(legacy_event["value"], "lead")
-            self.assertEqual(legacy_event["date"], 1700000000.0)
+            self.assertEqual(legacy_event["date"], "2023-11-14T22:13:20Z")
             self.assertEqual(legacy_event["metadata"]["message_id"], "wamid.dual.write")
 
             self.assertEqual(ctwa_event["event_name"], "ctwa")
             self.assertEqual(ctwa_event["value"], "lead_qualified")
-            self.assertEqual(ctwa_event["date"], self.ctwa_timestamp.timestamp())
+            self.assertEqual(ctwa_event["date"], "2026-01-15T12:30:00Z")
             self.assertEqual(ctwa_event["metadata"]["external_msg_id"], "wamid.dual.write")
             self.assertEqual(ctwa_event["metadata"]["campaign_source"], self.ctwa_data.referral_source.source_id)
             self.assertNotIn("referral_source_id", ctwa_event["metadata"])
@@ -1245,7 +1256,7 @@ class CtwaDatalakeDualWriteTest(TembaTest):
         with patch("temba.conversion_events.views.send_event_data") as mock_send_event, patch(
             "temba.conversion_events.views.datetime"
         ) as mock_datetime:
-            mock_datetime.now.return_value.timestamp.return_value = 1700000000.0
+            mock_datetime.now.return_value = datetime(2023, 11, 14, 22, 13, 20, tzinfo=dt_timezone.utc)
 
             response = self.client.post(
                 self.endpoint_url,
@@ -1260,8 +1271,10 @@ class CtwaDatalakeDualWriteTest(TembaTest):
             ctwa_event = mock_send_event.call_args_list[1][0][1]
 
             self.assertEqual(legacy_event["event_name"], "conversion_conversation_started")
+            self.assertEqual(legacy_event["date"], "2023-11-14T22:13:20Z")
             self.assertEqual(ctwa_event["event_name"], "ctwa")
             self.assertEqual(ctwa_event["value"], "conversation_started")
+            self.assertEqual(ctwa_event["date"], "2026-01-15T12:30:00Z")
 
 
 class ConversationStartedConversionEventAPITest(TembaTest):
