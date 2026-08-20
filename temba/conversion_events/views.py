@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 
 import requests
 from rest_framework import viewsets
@@ -23,6 +23,15 @@ CTWA_DATALAKE_VALUE_MAP = {
 }
 
 logger = logging.getLogger(__name__)
+
+
+def format_datalake_event_date(dt):
+    """Return an ISO-8601 UTC string for weni_datalake_sdk send_event_data."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=dt_timezone.utc)
+    else:
+        dt = dt.astimezone(dt_timezone.utc)
+    return dt.isoformat().replace("+00:00", "Z")
 
 
 class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
@@ -342,7 +351,7 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
                 "key": "capi",
                 "value": event_type,
                 "value_type": "string",
-                "date": datetime.now().timestamp(),
+                "date": format_datalake_event_date(datetime.now()),
                 "project": str(org.proj_uuid),
                 "contact_urn": contact_urn,
                 "metadata": metadata,
@@ -405,7 +414,7 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
             "value": ctwa_value,
             "contact_urn": contact_urn,
             "project": str(org.proj_uuid),
-            "date": ctwa_data.timestamp.timestamp(),
+            "date": format_datalake_event_date(ctwa_data.timestamp),
             "metadata": metadata,
         }
 

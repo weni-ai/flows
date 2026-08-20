@@ -1,3 +1,9 @@
+3.94.0
+----------
+* feat: add search functionality to ListCtwaReferralSource API
+* feat: collapse legacy CTWA referral sources into single canonical row per org
+* feat: add date formatting utility for Datalake events
+
 3.93.1
 ----------
 * feat: refactored api gateway implementation
