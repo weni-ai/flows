@@ -22,9 +22,7 @@ def legacy_sources(CtwaReferralSource):
 
 
 def org_ids_with_legacy_sources(CtwaReferralSource):
-    return list(
-        legacy_sources(CtwaReferralSource).values_list("org_id", flat=True).distinct().order_by("org_id")
-    )
+    return list(legacy_sources(CtwaReferralSource).values_list("org_id", flat=True).distinct().order_by("org_id"))
 
 
 def preserve_seen_window(canonical_id, first_seen_at, last_seen_at, CtwaReferralSource):
@@ -84,16 +82,12 @@ def collapse_org_legacy_sources(org_id, CtwaReferralSource, CTWA, batch_size):
     repointed = 0
     max_id = 0
     while True:
-        chunk = list(
-            sources_qs.filter(id__gt=max_id).order_by("id").values_list("id", flat=True)[:batch_size]
-        )
+        chunk = list(sources_qs.filter(id__gt=max_id).order_by("id").values_list("id", flat=True)[:batch_size])
         if not chunk:
             break
 
         with transaction.atomic():
-            repointed += CTWA.objects.filter(referral_source_id__in=chunk).update(
-                referral_source_id=canonical.id
-            )
+            repointed += CTWA.objects.filter(referral_source_id__in=chunk).update(referral_source_id=canonical.id)
             CtwaReferralSource.objects.filter(id__in=chunk).delete()
 
         max_id = chunk[-1]

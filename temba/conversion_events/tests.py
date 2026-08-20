@@ -1870,9 +1870,7 @@ class CtwaReferralSourceCollapseTest(TembaTest):
         self.assertTrue(CtwaReferralSource.objects.filter(id=real.id).exists())
         self.assertTrue(CtwaReferralSource.objects.filter(id=near_miss.id).exists())
         self.assertTrue(CtwaReferralSource.objects.filter(id=post_legacy.id).exists())
-        self.assertTrue(
-            CtwaReferralSource.objects.filter(org=self.org, source_id="legacy", source_type="ad").exists()
-        )
+        self.assertTrue(CtwaReferralSource.objects.filter(org=self.org, source_id="legacy", source_type="ad").exists())
 
     def test_canonical_inherits_earliest_first_seen_and_latest_last_seen(self):
         early = timezone.now() - timedelta(days=10)
@@ -1908,16 +1906,12 @@ class CtwaReferralSourceCollapseTest(TembaTest):
         leftover_first = timezone.now() - timedelta(days=3)
         leftover_last = timezone.now() - timedelta(days=1)
 
-        canonical, _ = CtwaReferralSource.get_or_create_for_org(
-            self.org, "legacy", CtwaReferralSource.SOURCE_TYPE_AD
-        )
+        canonical, _ = CtwaReferralSource.get_or_create_for_org(self.org, "legacy", CtwaReferralSource.SOURCE_TYPE_AD)
         CtwaReferralSource.objects.filter(id=canonical.id).update(
             first_seen_at=existing_first, last_seen_at=existing_last
         )
 
-        leftover = self._create_legacy_source(
-            self.org, 51, first_seen_at=leftover_first, last_seen_at=leftover_last
-        )
+        leftover = self._create_legacy_source(self.org, 51, first_seen_at=leftover_first, last_seen_at=leftover_last)
         create_test_ctwa(
             ctwa_clid="clid-existing-canonical",
             channel_uuid=self.channel.uuid,
@@ -1977,9 +1971,7 @@ class CtwaReferralSourceCollapseTest(TembaTest):
         self.assertFalse(CtwaReferralSource.objects.filter(org=self.org2, source_id="legacy").exists())
 
     def test_preserve_seen_window_skips_when_both_values_are_none(self):
-        canonical, _ = CtwaReferralSource.get_or_create_for_org(
-            self.org, "legacy", CtwaReferralSource.SOURCE_TYPE_AD
-        )
+        canonical, _ = CtwaReferralSource.get_or_create_for_org(self.org, "legacy", CtwaReferralSource.SOURCE_TYPE_AD)
         original_first = canonical.first_seen_at
         original_last = canonical.last_seen_at
 
@@ -1990,9 +1982,7 @@ class CtwaReferralSourceCollapseTest(TembaTest):
         self.assertEqual(canonical.last_seen_at, original_last)
 
     def test_preserve_seen_window_updates_only_provided_fields(self):
-        canonical, _ = CtwaReferralSource.get_or_create_for_org(
-            self.org, "legacy", CtwaReferralSource.SOURCE_TYPE_AD
-        )
+        canonical, _ = CtwaReferralSource.get_or_create_for_org(self.org, "legacy", CtwaReferralSource.SOURCE_TYPE_AD)
         original_last = canonical.last_seen_at
         new_first = timezone.now() - timedelta(days=15)
 

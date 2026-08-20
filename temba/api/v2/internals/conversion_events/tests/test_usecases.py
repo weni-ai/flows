@@ -99,9 +99,7 @@ class ListCtwaReferralSourcesUseCaseTest(TembaTest):
         self.assertEqual(results, [valid])
 
     def test_execute_includes_legacy_source_id_when_type_is_post(self):
-        post = self._create_source(
-            self.org, CtwaReferralSource.LEGACY_SOURCE_ID, CtwaReferralSource.SOURCE_TYPE_POST
-        )
+        post = self._create_source(self.org, CtwaReferralSource.LEGACY_SOURCE_ID, CtwaReferralSource.SOURCE_TYPE_POST)
 
         dto = ListCtwaReferralSourcesDTO(project_uuid=str(self.org.proj_uuid))
         results = list(self.usecase.execute(dto))
