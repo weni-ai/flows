@@ -52,10 +52,15 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
 
         if getattr(request, "jwt_payload", None):
             self._resolve_jwt_user(request)
-        elif isinstance(request.auth, SessionContext):
+            return
+
+        # Read `_auth` instead of `request.auth` so DRF does not re-run
+        # authenticators when the user was already injected.
+        if isinstance(getattr(request, "_auth", None), SessionContext):
             self._resolve_session_user(request)
-        else:
-            self.set_org_from_request(request)
+            return
+
+        self.set_org_from_request(request)
 
     def _extract_uuid_params(self, request):
         """Extracts project_uuid and channel_uuid from request attributes and query params."""

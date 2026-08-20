@@ -881,7 +881,8 @@ class APITest(APIJSONMixin, TembaTest):
         view = BaseAPIView()
         view.format_kwarg = None
         request = view.initialize_request(django_request)
-        request.user = SimpleNamespace(set_org=Mock(), is_anonymous=False)
+        request.user = SimpleNamespace(set_org=Mock(), is_anonymous=False, is_active=True)
+        request.auth = None
         view.request = request
 
         view.perform_authentication(request)
