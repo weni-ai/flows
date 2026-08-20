@@ -9,6 +9,7 @@ class ListCtwaReferralSourceQuerySerializer(serializers.Serializer):
     source_type = serializers.ChoiceField(choices=CtwaReferralSource.SOURCE_TYPE_CHOICES, required=False)
     after = serializers.CharField(required=False, allow_blank=True)
     before = serializers.CharField(required=False, allow_blank=True)
+    search = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         errors = {}
@@ -25,7 +26,13 @@ class ListCtwaReferralSourceQuerySerializer(serializers.Serializer):
 
         attrs["after"] = after_date
         attrs["before"] = before_date
+        attrs["search"] = self._normalize_search(attrs.get("search"))
         return attrs
+
+    def _normalize_search(self, value):
+        if not value:
+            return None
+        return value.strip() or None
 
     def _parse_iso_date(self, value, field_name, error_message, errors):
         if not value:

@@ -1,3 +1,7 @@
+3.93.1
+----------
+* feat: refactored api gateway implementation
+
 3.93.0
 ----------
 * feat: integrate CTWA events into contact detail view
