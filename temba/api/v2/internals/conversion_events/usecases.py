@@ -22,13 +22,14 @@ class ListCtwaReferralSourcesDTO:
     source_type: Optional[str] = None
     after: Optional[date] = None
     before: Optional[date] = None
+    search: Optional[str] = None
 
 
 class ListCtwaReferralSourcesUseCase:
     def execute(self, dto: ListCtwaReferralSourcesDTO):
         logger.info(
             f"Listing CTWA referral sources for project_uuid={dto.project_uuid} "
-            f"source_type={dto.source_type} after={dto.after} before={dto.before}"
+            f"source_type={dto.source_type} after={dto.after} before={dto.before} search={dto.search}"
         )
         org = self._get_org(dto.project_uuid)
         queryset = (
@@ -46,6 +47,8 @@ class ListCtwaReferralSourcesUseCase:
             queryset = queryset.filter(last_seen_at__gte=self._inclusive_start(dto.after))
         if dto.before:
             queryset = queryset.filter(last_seen_at__lt=self._exclusive_end(dto.before))
+        if dto.search:
+            queryset = queryset.filter(headline__icontains=dto.search)
 
         return queryset.order_by("-last_seen_at", "-id")
 

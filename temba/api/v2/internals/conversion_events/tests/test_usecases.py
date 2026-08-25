@@ -89,6 +89,25 @@ class ListCtwaReferralSourcesUseCaseTest(TembaTest):
         self.assertNotIn(before_range, results)
         self.assertNotIn(after_range, results)
 
+    def test_execute_filters_by_headline_search(self):
+        matching = self._create_source(self.org, "sale-ad", headline="Summer sale")
+        self._create_source(self.org, "other-ad", headline="Winter promo")
+        self._create_source(self.org, "no-headline")
+
+        dto = ListCtwaReferralSourcesDTO(project_uuid=str(self.org.proj_uuid), search="SALE")
+        results = list(self.usecase.execute(dto))
+
+        self.assertEqual(results, [matching])
+
+    def test_execute_without_search_returns_all_project_sources(self):
+        with_headline = self._create_source(self.org, "sale-ad", headline="Summer sale")
+        without_headline = self._create_source(self.org, "no-headline")
+
+        dto = ListCtwaReferralSourcesDTO(project_uuid=str(self.org.proj_uuid))
+        results = list(self.usecase.execute(dto))
+
+        self.assertCountEqual(results, [with_headline, without_headline])
+
     def test_execute_excludes_legacy_ad_placeholder(self):
         valid = self._create_source(self.org, "real-ad")
         self._create_source(self.org, CtwaReferralSource.LEGACY_SOURCE_ID, CtwaReferralSource.SOURCE_TYPE_AD)
@@ -99,9 +118,7 @@ class ListCtwaReferralSourcesUseCaseTest(TembaTest):
         self.assertEqual(results, [valid])
 
     def test_execute_includes_legacy_source_id_when_type_is_post(self):
-        post = self._create_source(
-            self.org, CtwaReferralSource.LEGACY_SOURCE_ID, CtwaReferralSource.SOURCE_TYPE_POST
-        )
+        post = self._create_source(self.org, CtwaReferralSource.LEGACY_SOURCE_ID, CtwaReferralSource.SOURCE_TYPE_POST)
 
         dto = ListCtwaReferralSourcesDTO(project_uuid=str(self.org.proj_uuid))
         results = list(self.usecase.execute(dto))
