@@ -422,7 +422,7 @@ class APITest(APIJSONMixin, TembaTest):
             serializers.ValidationError, field.to_internal_value, {"eng": "HelloHello1"}
         )  # base lang not provided
 
-    @override_settings(FLOW_START_PARAMS_SIZE=4)
+    @override_settings(FLOW_START_PARAMS_SIZE=4, FLOW_START_PARAM_VALUE_SIZE=640)
     def test_normalize_extra(self):
         self.assertEqual(OrderedDict(), normalize_extra({}))
         self.assertEqual(
@@ -438,6 +438,12 @@ class APITest(APIJSONMixin, TembaTest):
             normalize_extra({"a": 1, "b": 2, "c": 3, "d": 4, "e": 5}),
         )
         self.assertEqual(OrderedDict([("a", "x" * 640)]), normalize_extra({"a": "x" * 641}))
+
+    def test_normalize_extra_param_value_size_default(self):
+        size = settings.FLOW_START_PARAM_VALUE_SIZE
+        self.assertEqual(4096, size)
+        self.assertEqual(OrderedDict([("a", "x" * size)]), normalize_extra({"a": "x" * size}))
+        self.assertEqual(OrderedDict([("a", "x" * size)]), normalize_extra({"a": "x" * (size + 1)}))
 
     def test_authentication(self):
         def request(endpoint, **headers):

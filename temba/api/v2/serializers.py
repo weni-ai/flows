@@ -65,7 +65,7 @@ def _normalize_extra(extra, count):
         return INVALID_EXTRA_KEY_CHARS.sub("_", key)[:255]
 
     if isinstance(extra, str):
-        return extra[:640], count + 1
+        return extra[: settings.FLOW_START_PARAM_VALUE_SIZE], count + 1
 
     elif isinstance(extra, numbers.Number) or isinstance(extra, bool):
         return extra, count + 1

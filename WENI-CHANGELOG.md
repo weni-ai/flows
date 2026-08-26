@@ -1,3 +1,8 @@
+3.94.1
+----------
+* feat: increase flow start params string limit from 640 to 4096
+* fix: add break-all to CTWA contact fields to prevent overflow
+
 3.94.0
 ----------
 * feat: add search functionality to ListCtwaReferralSource API
