@@ -6,15 +6,23 @@ import pytz
 from django.conf import settings
 
 from temba.channels.models import Channel
-from temba.projects.usecases.channel_creation import DEFAULT_WWC_CHANNEL_NAME
-from temba.projects.usecases.project_creation import ProjectCreationDTO, ProjectCreationUseCase
+from temba.projects.usecases.channel_creation import (
+    COPILOT_WWC_CHANNEL_NAME,
+    DEFAULT_WWC_CHANNEL_NAME,
+)
+from temba.projects.usecases.project_creation import (
+    ProjectCreationDTO,
+    ProjectCreationUseCase,
+)
 from temba.tests.base import TembaTest
 
 
 class ProjectCreationUseCaseTest(TembaTest):
     @patch("temba.projects.usecases.project_creation.ConnectInternalClient")
     @patch("temba.projects.usecases.channel_creation.publish_channel_event")
-    def test_create_project_creates_default_wwc_channel(self, mock_publish_channel_event, mock_connect_client):
+    def test_create_project_creates_default_wwc_channel(
+        self, mock_publish_channel_event, mock_connect_client
+    ):
         user_email = "new-project-admin@example.com"
         project_uuid = uuid.uuid4()
         project_dto = ProjectCreationDTO(
@@ -30,7 +38,9 @@ class ProjectCreationUseCaseTest(TembaTest):
 
         use_case = ProjectCreationUseCase(template_type_integration=Mock())
 
-        use_case.create_project(project_dto, user_email, extra_fields={}, authorizations=[])
+        use_case.create_project(
+            project_dto, user_email, extra_fields={}, authorizations=[]
+        )
 
         project = self.project.__class__.objects.get(project_uuid=project_uuid)
         channel = Channel.objects.get(org=project.org, channel_type="WWC")
@@ -80,9 +90,13 @@ class ProjectCreationUseCaseTest(TembaTest):
 
         use_case = ProjectCreationUseCase(template_type_integration=Mock())
 
-        use_case.create_project(project_dto, self.user.email, extra_fields={}, authorizations=[])
+        use_case.create_project(
+            project_dto, self.user.email, extra_fields={}, authorizations=[]
+        )
 
-        channels = Channel.objects.filter(org=project.org, channel_type="WWC").order_by("created_on")
+        channels = Channel.objects.filter(org=project.org, channel_type="WWC").order_by(
+            "created_on"
+        )
         new_channel = channels.last()
 
         self.assertEqual(channels.count(), 2)
@@ -130,10 +144,16 @@ class ProjectCreationUseCaseTest(TembaTest):
 
         use_case = ProjectCreationUseCase(template_type_integration=Mock())
 
-        use_case.create_project(project_dto, self.user.email, extra_fields={}, authorizations=[])
+        use_case.create_project(
+            project_dto, self.user.email, extra_fields={}, authorizations=[]
+        )
 
-        self.assertEqual(Channel.objects.filter(org=project.org, channel_type="WWC").count(), 1)
-        self.assertEqual(Channel.objects.get(org=project.org, channel_type="WWC"), existing_channel)
+        self.assertEqual(
+            Channel.objects.filter(org=project.org, channel_type="WWC").count(), 1
+        )
+        self.assertEqual(
+            Channel.objects.get(org=project.org, channel_type="WWC"), existing_channel
+        )
         mock_connect_client.return_value.update_project.assert_called_once()
         mock_publish_channel_event.assert_not_called()
 
@@ -158,7 +178,170 @@ class ProjectCreationUseCaseTest(TembaTest):
 
         use_case = ProjectCreationUseCase(template_type_integration=Mock())
 
-        use_case.create_project(project_dto, user_email, extra_fields={}, authorizations=[])
+        use_case.create_project(
+            project_dto, user_email, extra_fields={}, authorizations=[]
+        )
 
         project = self.project.__class__.objects.get(project_uuid=project_uuid)
         self.assertTrue(project.config.get("is_multi_agents"))
+
+    @patch("temba.projects.usecases.project_creation.ConnectInternalClient")
+    @patch("temba.projects.usecases.channel_creation.publish_channel_event")
+    def test_create_project_creates_copilot_wwc_channel_when_live_desk_copilot(
+        self, mock_publish_channel_event, mock_connect_client
+    ):
+        user_email = "copilot-admin@example.com"
+        project_uuid = uuid.uuid4()
+        project_dto = ProjectCreationDTO(
+            uuid=str(project_uuid),
+            name="Projeto Copilot",
+            is_template=False,
+            date_format="D",
+            timezone=pytz.timezone("Africa/Kigali"),
+            template_type_uuid="",
+            description="Projeto Copilot",
+            brain_on=False,
+            is_live_desk_copilot=True,
+        )
+
+        use_case = ProjectCreationUseCase(template_type_integration=Mock())
+
+        use_case.create_project(
+            project_dto, user_email, extra_fields={}, authorizations=[]
+        )
+
+        project = self.project.__class__.objects.get(project_uuid=project_uuid)
+        channels = Channel.objects.filter(org=project.org, channel_type="WWC").order_by(
+            "created_on"
+        )
+
+        self.assertEqual(channels.count(), 2)
+
+        preview_channel = next(
+            channel for channel in channels if channel.config.get("preview")
+        )
+        copilot_channel = next(
+            channel
+            for channel in channels
+            if channel.config.get("is_live_desk_copilot")
+        )
+
+        self.assertIsNotNone(preview_channel)
+        self.assertEqual(preview_channel.name, DEFAULT_WWC_CHANNEL_NAME)
+        self.assertTrue(preview_channel.config["preview"])
+
+        self.assertIsNotNone(copilot_channel)
+        self.assertEqual(copilot_channel.name, COPILOT_WWC_CHANNEL_NAME)
+        self.assertTrue(copilot_channel.config["is_live_desk_copilot"])
+        self.assertFalse(copilot_channel.config.get("preview"))
+
+        self.assertEqual(mock_publish_channel_event.call_count, 2)
+        mock_publish_channel_event.assert_any_call(preview_channel, action="create")
+        mock_publish_channel_event.assert_any_call(copilot_channel, action="create")
+
+    @patch("temba.projects.usecases.project_creation.ConnectInternalClient")
+    @patch("temba.projects.usecases.channel_creation.publish_channel_event")
+    def test_create_project_reuses_existing_copilot_channel(
+        self, mock_publish_channel_event, mock_connect_client
+    ):
+        project_uuid = uuid.uuid4()
+        project = self.project.__class__.objects.create(
+            project_uuid=project_uuid,
+            name="Projeto com Copilot existente",
+            timezone=pytz.timezone("Africa/Kigali"),
+            brand=settings.DEFAULT_BRAND,
+            created_by=self.user,
+            modified_by=self.user,
+        )
+
+        existing_copilot = Channel.create(
+            org=project.org,
+            user=self.user,
+            country=None,
+            channel_type="WWC",
+            name=COPILOT_WWC_CHANNEL_NAME,
+            address=f"{project.project_uuid}-copilot",
+            config={"is_live_desk_copilot": True},
+        )
+
+        project_dto = ProjectCreationDTO(
+            uuid=str(project_uuid),
+            name="Projeto com Copilot existente",
+            is_template=False,
+            date_format="D",
+            timezone=pytz.timezone("Africa/Kigali"),
+            template_type_uuid="",
+            description="Projeto existente",
+            brain_on=False,
+            is_live_desk_copilot=True,
+        )
+
+        use_case = ProjectCreationUseCase(template_type_integration=Mock())
+
+        use_case.create_project(
+            project_dto, self.user.email, extra_fields={}, authorizations=[]
+        )
+
+        copilot_channels = [
+            channel
+            for channel in Channel.objects.filter(org=project.org, channel_type="WWC")
+            if channel.config.get("is_live_desk_copilot")
+        ]
+
+        self.assertEqual(len(copilot_channels), 1)
+        self.assertEqual(copilot_channels[0], existing_copilot)
+        mock_publish_channel_event.assert_called_once()
+
+    @patch("temba.projects.usecases.project_creation.ConnectInternalClient")
+    @patch("temba.projects.usecases.channel_creation.publish_channel_event")
+    def test_create_project_creates_preview_when_copilot_exists(
+        self, mock_publish_channel_event, mock_connect_client
+    ):
+        project_uuid = uuid.uuid4()
+        project = self.project.__class__.objects.create(
+            project_uuid=project_uuid,
+            name="Projeto só Copilot",
+            timezone=pytz.timezone("Africa/Kigali"),
+            brand=settings.DEFAULT_BRAND,
+            created_by=self.user,
+            modified_by=self.user,
+        )
+
+        Channel.create(
+            org=project.org,
+            user=self.user,
+            country=None,
+            channel_type="WWC",
+            name=COPILOT_WWC_CHANNEL_NAME,
+            address=f"{project.project_uuid}-copilot",
+            config={"is_live_desk_copilot": True},
+        )
+
+        project_dto = ProjectCreationDTO(
+            uuid=str(project_uuid),
+            name="Projeto só Copilot",
+            is_template=False,
+            date_format="D",
+            timezone=pytz.timezone("Africa/Kigali"),
+            template_type_uuid="",
+            description="Projeto existente",
+            brain_on=False,
+        )
+
+        use_case = ProjectCreationUseCase(template_type_integration=Mock())
+
+        use_case.create_project(
+            project_dto, self.user.email, extra_fields={}, authorizations=[]
+        )
+
+        preview_channels = [
+            channel
+            for channel in Channel.objects.filter(org=project.org, channel_type="WWC")
+            if channel.config.get("preview")
+        ]
+
+        self.assertEqual(len(preview_channels), 1)
+        self.assertEqual(preview_channels[0].name, DEFAULT_WWC_CHANNEL_NAME)
+        mock_publish_channel_event.assert_called_once_with(
+            preview_channels[0], action="create"
+        )

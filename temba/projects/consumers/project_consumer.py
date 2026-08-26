@@ -4,7 +4,11 @@ from weni.eda.messages import Message
 
 from temba.projects.usecases.project_creation import ProjectCreationUseCase
 
-from ..usecases import FlowSetupHandlerUseCase, ProjectCreationDTO, TemplateTypeIntegrationUseCase
+from ..usecases import (
+    FlowSetupHandlerUseCase,
+    ProjectCreationDTO,
+    TemplateTypeIntegrationUseCase,
+)
 
 
 class ProjectEventType:
@@ -36,11 +40,15 @@ class ProjectConsumer(EDAConsumer):
             brain_on=body.get("brain_on", False),
             language=body.get("language"),
             inline_agent_switch=body.get("inline_agent_switch", True),
+            is_live_desk_copilot=body.get("is_live_desk_copilot", False),
         )
 
         flow_setup_handler = FlowSetupHandlerUseCase()
         template_type_integration = TemplateTypeIntegrationUseCase(flow_setup_handler)
         project_creation = ProjectCreationUseCase(template_type_integration)
         project_creation.create_project(
-            project_dto, body.get("user_email"), body.get("extra_fields"), body.get("authorizations")
+            project_dto,
+            body.get("user_email"),
+            body.get("extra_fields"),
+            body.get("authorizations"),
         )
