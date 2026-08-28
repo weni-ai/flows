@@ -59,6 +59,7 @@ from django.views.generic import View
 from temba.api.models import APIToken, Resthook
 from temba.campaigns.models import Campaign
 from temba.channels.models import Channel
+from temba.projects.usecases.channel_creation import is_hidden_from_ui
 from temba.classifiers.models import Classifier
 from temba.contacts.models import ContactGroupCount
 from temba.flows.models import Flow
@@ -3253,7 +3254,7 @@ class OrgCRUDL(SmartCRUDL):
                 # get any channel thats not a delegate
                 channels = Channel.objects.filter(org=org, is_active=True, parent=None).order_by("-role")
                 for channel in channels:
-                    if channel.config.get("preview") is True:
+                    if is_hidden_from_ui(channel):
                         continue
                     self.add_channel_section(formax, channel)
 

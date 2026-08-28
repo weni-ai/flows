@@ -1624,6 +1624,25 @@ class ChannelCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.assertDeleteSubmit(delete_url, object_deactivated=vonage, success_status=200)
         self.assertEqual(f"/channels/channel/read/{android.uuid}/", response["Temba-Success"])
 
+    def test_update_and_delete_hidden_copilot_channel(self):
+        copilot_channel = self.create_channel(
+            "WWC",
+            "Weni Web Chat - Copilot",
+            "copilot-address",
+            config={"is_live_desk_copilot": True},
+        )
+
+        update_url = reverse("channels.channel_update", args=[copilot_channel.id])
+        delete_url = reverse("channels.channel_delete", args=[copilot_channel.uuid])
+
+        self.login(self.admin)
+
+        response = self.client.get(update_url)
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.get(delete_url)
+        self.assertEqual(response.status_code, 404)
+
 
 class ChannelEventCRUDLTest(TembaTest):
     def test_calls(self):
