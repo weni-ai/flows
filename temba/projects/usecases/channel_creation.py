@@ -19,9 +19,7 @@ def _get_wwc_channel_by_config_flag(org, flag_key: str) -> Channel | None:
     return None
 
 
-def _build_default_wwc_config(
-    preview: bool = False, is_live_desk_copilot: bool = False
-) -> dict:
+def _build_default_wwc_config(preview: bool = False, is_live_desk_copilot: bool = False) -> dict:
     config = {
         "version": 2,
         "allowed_domains": settings.WENI_WEBCHAT_ALLOWED_DOMAINS,
@@ -54,6 +52,24 @@ def create_default_wwc_channel(project, user) -> Channel:
         name=DEFAULT_WWC_CHANNEL_NAME,
         address=str(project.project_uuid),
         config=_build_default_wwc_config(preview=True),
+    )
+    publish_channel_event(channel, action="create")
+    return channel
+
+
+def create_live_desk_copilot_channel(project, user) -> Channel:
+    existing_channel = _get_wwc_channel_by_config_flag(project.org, "is_live_desk_copilot")
+    if existing_channel:
+        return existing_channel
+
+    channel = Channel.create(
+        org=project.org,
+        user=user,
+        country=None,
+        channel_type="WWC",
+        name=COPILOT_WWC_CHANNEL_NAME,
+        address=f"{project.project_uuid}-copilot",
+        config=_build_default_wwc_config(is_live_desk_copilot=True),
     )
     publish_channel_event(channel, action="create")
     return channel

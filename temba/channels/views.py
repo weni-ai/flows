@@ -41,6 +41,7 @@ from temba.msgs.models import Msg, SystemLabel
 from temba.msgs.views import InboxView
 from temba.orgs.models import Org
 from temba.orgs.views import AnonMixin, DependencyDeleteModal, MenuMixin, ModalMixin, OrgObjPermsMixin, OrgPermsMixin
+from temba.projects.usecases.channel_creation import is_hidden_from_ui
 from temba.utils import analytics, countries, json
 from temba.utils.fields import SelectWidget
 from temba.utils.models import patch_queryset_count

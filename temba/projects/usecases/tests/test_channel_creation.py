@@ -4,9 +4,7 @@ from temba.tests.base import TembaTest
 
 class ChannelCreationTestCase(TembaTest):
     def test_is_hidden_from_ui_for_preview_channel(self):
-        channel = self.create_channel(
-            "WWC", "Weni Web Chat - Preview", "preview", config={"preview": True}
-        )
+        channel = self.create_channel("WWC", "Weni Web Chat - Preview", "preview", config={"preview": True})
 
         self.assertTrue(is_hidden_from_ui(channel))
 

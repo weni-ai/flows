@@ -29,9 +29,7 @@ class ChannelPublisherTestCase(TembaTest):
         )
 
     @patch("temba.projects.usecases.channel_publisher.RabbitmqPublisher")
-    def test_publish_channel_event_with_live_desk_copilot(
-        self, mock_rabbitmq_publisher
-    ):
+    def test_publish_channel_event_with_live_desk_copilot(self, mock_rabbitmq_publisher):
         channel = self.create_channel(
             "WWC",
             "Weni Web Chat - Copilot",
