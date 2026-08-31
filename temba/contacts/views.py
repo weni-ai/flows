@@ -33,6 +33,7 @@ from django.utils.http import is_safe_url, urlquote_plus
 from django.utils.translation import ugettext_lazy as _
 from django.views import View
 
+from temba import mailroom
 from temba.archives.models import Archive
 from temba.channels.models import Channel
 from temba.contacts.templatetags.contacts import MISSING_VALUE
@@ -1408,15 +1409,21 @@ class ContactCRUDL(SmartCRUDL):
             return obj
 
         def save(self, obj):
+            country = obj.org.default_country_code
             urns = []
             for field_key, value in self.form.cleaned_data.items():
                 if field_key.startswith("urn__") and value:
                     scheme = field_key.split("__")[1]
-                    urns.append(URN.from_parts(scheme, value))
                     if scheme == URN.WHATSAPP_SCHEME and URN.is_phone_based_path(value):
-                        urns.append(URN.from_parts(URN.TEL_SCHEME, value))
+                        phone_digits = "".join(c for c in value.strip().lstrip("+") if c.isdigit())
+                        urns.extend(URN.paired_phone_urns(phone_digits, country))
+                    else:
+                        urns.append(URN.normalize(URN.from_parts(scheme, value), country))
 
-            Contact.create(obj.org, self.request.user, obj.name, language="", urns=urns, fields={}, groups=[])
+            try:
+                Contact.create(obj.org, self.request.user, obj.name, language="", urns=urns, fields={}, groups=[])
+            except mailroom.MailroomException:
+                raise ValidationError(_("An error occurred creating your contact. Please try again later."))
 
     class Update(NonAtomicMixin, ModalMixin, OrgObjPermsMixin, SmartUpdateView):
         form_class = UpdateContactForm
@@ -1458,6 +1465,7 @@ class ContactCRUDL(SmartCRUDL):
                 mods += obj.update_static_groups(new_groups)
 
             if not self.org.is_anon:
+                country = obj.org.default_country_code
                 urns = []
 
                 for field_key, value in self.form.data.items():
@@ -1466,13 +1474,13 @@ class ContactCRUDL(SmartCRUDL):
                         scheme = parts[1]
 
                         order = int(self.form.data.get("order__" + field_key, "0"))
-                        urns.append((order, URN.from_parts(scheme, value)))
+                        urns.append((order, URN.normalize(URN.from_parts(scheme, value), country)))
 
                 new_scheme = data.get("new_scheme", None)
                 new_path = data.get("new_path", None)
 
                 if new_scheme and new_path:
-                    urns.append((len(urns), URN.from_parts(new_scheme, new_path)))
+                    urns.append((len(urns), URN.normalize(URN.from_parts(new_scheme, new_path), country)))
 
                 # sort our urns by the supplied order
                 urns = [urn[1] for urn in sorted(urns, key=lambda x: x[0])]
