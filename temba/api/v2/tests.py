@@ -355,7 +355,7 @@ class APITest(APIJSONMixin, TembaTest):
                 "tel:0788 123 123": "tel:+250788123123",  # using org country
                 "tel:(078) 812-3123": "tel:+250788123123",
                 "+250788123123": "whatsapp:250788123123",  # bare phone defaults to whatsapp
-                "0788 123 123": serializers.ValidationError,  # whatsapp paths are not tel-normalized
+                "0788 123 123": "whatsapp:250788123123",  # whatsapp phone paths are tel-normalized without +
                 "whatsapp:6831234": serializers.ValidationError,  # too few digits
                 "whatsapp:BR.35029025746744354": "whatsapp:BR.35029025746744354",
                 "whatsapp:US.ENT.11815799212886844830": "whatsapp:US.ENT.11815799212886844830",
