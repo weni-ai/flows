@@ -8,6 +8,10 @@ import colorama
 parser = argparse.ArgumentParser(description="Code checks")
 parser.add_argument("--skip-flake", action="store_true")
 parser.add_argument("--debug", action="store_true")
+parser.add_argument("--fix", action="store_true", help="Apply fixes instead of check-only")
+parser.add_argument(
+    "--skip-migrations", action="store_true", help="Skip migration checks"
+)
 args = parser.parse_args()
 
 DEBUG = args.debug
@@ -33,18 +37,33 @@ def status(line):
 if __name__ == "__main__":
     colorama.init()
 
-    status("Make any missing migrations")
-    cmd("python manage.py makemigrations")
+    if not args.skip_migrations:
+        if args.fix:
+            status("Making any missing migrations")
+            cmd("python manage.py makemigrations")
+        else:
+            status("Checking for missing migrations")
+            # Use check-only to avoid creating files locally
+            cmd("python manage.py makemigrations --check --dry-run")
 
-    status("Running black")
-    cmd("black --line-length=119 temba")
+    if args.fix:
+        status("Running black (fix)")
+        cmd("black --line-length=119 temba")
+    else:
+        status("Running black (check)")
+        cmd("black --check --diff --line-length=119 temba")
 
     if not args.skip_flake:
         status("Running flake8")
-        cmd("flake8")
+        cmd("flake8 temba")
 
-    status("Running isort")
-    cmd("isort -rc temba")
+    if args.fix:
+        status("Running isort (fix)")
+        cmd("isort -rc temba")
+    else:
+        status("Running isort (check)")
+        # -c/--check-only returns non-zero if changes would be made; --diff shows what
+        cmd("isort -rc -c --diff temba")
 
     # if any code changes were made, exit with error
     if cmd("git diff temba locale"):
