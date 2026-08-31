@@ -9,12 +9,11 @@ from django.core.files.storage import DefaultStorage
 from temba.utils import json
 
 
-class PublicFileStorage(DefaultStorage):
-    default_acl = "public-read"
+class PrivateFileStorage(DefaultStorage):
+    default_acl = "private"
 
 
-public_file_storage = PublicFileStorage()
-public_file_storage.default_acl = "public-read"
+private_file_storage = PrivateFileStorage()
 
 _s3_client = None
 
