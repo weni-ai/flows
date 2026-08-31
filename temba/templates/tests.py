@@ -62,6 +62,70 @@ class TemplateTest(TembaTest):
         # trim them
         TemplateTranslation.trim(self.channel, [tt1])
 
+    def test_get_or_create_updates_category_on_existing_translation(self):
+        tt = TemplateTranslation.get_or_create(
+            self.channel,
+            "hello",
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "1234",
+            "",
+            "UTILITY",
+        )
+        self.assertEqual(tt.template.category, "UTILITY")
+
+        tt_updated = TemplateTranslation.get_or_create(
+            self.channel,
+            "hello",
+            "eng",
+            "US",
+            "Hello {{1}}",
+            1,
+            TemplateTranslation.STATUS_PENDING,
+            "1234",
+            "",
+            "MARKETING",
+        )
+
+        self.assertEqual(tt.id, tt_updated.id)
+        tt_updated.template.refresh_from_db()
+        self.assertEqual(tt_updated.template.category, "MARKETING")
+
+    def test_get_or_create_category_only_change_triggers_update(self):
+        tt = TemplateTranslation.get_or_create(
+            self.channel,
+            "promo",
+            "eng",
+            "US",
+            "Buy now {{1}}",
+            1,
+            TemplateTranslation.STATUS_APPROVED,
+            "cat-only-1",
+            "",
+            "UTILITY",
+        )
+        original_modified_on = tt.template.modified_on
+
+        tt_updated = TemplateTranslation.get_or_create(
+            self.channel,
+            "promo",
+            "eng",
+            "US",
+            "Buy now {{1}}",
+            1,
+            TemplateTranslation.STATUS_APPROVED,
+            "cat-only-1",
+            "",
+            "MARKETING",
+        )
+
+        tt_updated.template.refresh_from_db()
+        self.assertEqual(tt_updated.template.category, "MARKETING")
+        self.assertTrue(tt_updated.template.modified_on > original_modified_on)
+
     def test_get_or_create_updates_body_and_footer(self):
         # create initial translation with body and footer
         tt = TemplateTranslation.get_or_create(
