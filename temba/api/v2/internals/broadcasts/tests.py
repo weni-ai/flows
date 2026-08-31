@@ -8,9 +8,12 @@ from django.test import override_settings
 from django.utils import timezone
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
+from temba.contacts.models import Contact
 from temba.flows.models import Flow
-from temba.msgs.models import Broadcast, BroadcastStatistics
+from temba.msgs.models import Broadcast, BroadcastStatistics, ManagedTriggerGroup
 from temba.tests.base import TembaTest
+from temba.tests.mailroom import mock_mailroom
+from temba.triggers.models import Trigger
 
 User = get_user_model()
 
@@ -171,26 +174,137 @@ class TestInternalWhatsappBroadcast(TembaTest):
 
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
-    def test_trigger_flow_uuid_only_for_template_batch(self):
+    @mock_mailroom
+    def test_trigger_flow_uuid_with_urns_creates_managed_group(self, mocks):
         mock_user = MagicMock(spec=User)
         mock_user.is_authenticated = True
         mock_user.email = "mockuser@example.com"
 
         with patch("rest_framework.request.Request.user", mock_user):
+            flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
             url = "/api/v2/internals/whatsapp_broadcasts"
             body = {
                 "project": self.org.proj_uuid,
-                "queue": "wpp_broadcast_batch",
-                "trigger_flow_uuid": str(uuid.uuid4()),
+                "trigger_flow_uuid": str(flow.uuid),
                 "msg": {"text": "hello"},
-                "urns": ["whatsapp:5561912345678"],
+                "urns": ["whatsapp:5511999999999", "whatsapp:5511888888888"],
             }
             response = self.client.post(url, data=body, content_type="application/json")
-            self.assertEqual(response.status_code, 400)
-            self.assertIn(
-                "trigger_flow_uuid is only allowed when queue is template_batch",
-                response.json()["non_field_errors"][0],
+
+            self.assertEqual(response.status_code, 201)
+            data = response.json()
+            self.assertEqual(data["groups"], [])
+            self.assertIn("trigger_group", data["metadata"])
+            trigger_group = data["metadata"]["trigger_group"]
+            self.assertIn("uuid", trigger_group)
+            self.assertTrue(trigger_group["name"].startswith("Trigger · "))
+
+            association = ManagedTriggerGroup.objects.get(org=self.org, flow=flow)
+            self.assertEqual(str(association.group.uuid), trigger_group["uuid"])
+            self.assertEqual(association.group.contacts.count(), 2)
+            self.assertEqual(
+                Trigger.objects.filter(
+                    org=self.org,
+                    flow=flow,
+                    trigger_type=Trigger.TYPE_CATCH_ALL,
+                    is_archived=False,
+                    groups=association.group,
+                ).count(),
+                1,
             )
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    @mock_mailroom
+    def test_trigger_flow_uuid_most_recent_campaign_wins(self, mocks):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            flow_a = self.create_flow(name="Flow A", flow_type=Flow.TYPE_MESSAGE)
+            flow_b = self.create_flow(name="Flow B", flow_type=Flow.TYPE_MESSAGE)
+            url = "/api/v2/internals/whatsapp_broadcasts"
+            urn = "whatsapp:5511999999999"
+
+            self.client.post(
+                url,
+                data={
+                    "project": self.org.proj_uuid,
+                    "trigger_flow_uuid": str(flow_a.uuid),
+                    "msg": {"text": "hello A"},
+                    "urns": [urn],
+                },
+                content_type="application/json",
+            )
+            response = self.client.post(
+                url,
+                data={
+                    "project": self.org.proj_uuid,
+                    "trigger_flow_uuid": str(flow_b.uuid),
+                    "msg": {"text": "hello B"},
+                    "urns": [urn],
+                },
+                content_type="application/json",
+            )
+            self.assertEqual(response.status_code, 201)
+
+            group_a = ManagedTriggerGroup.objects.get(org=self.org, flow=flow_a).group
+            group_b = ManagedTriggerGroup.objects.get(org=self.org, flow=flow_b).group
+            contact = Contact.from_urn(self.org, urn)
+            self.assertTrue(group_b.contacts.filter(id=contact.id).exists())
+            self.assertFalse(group_a.contacts.filter(id=contact.id).exists())
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_trigger_flow_uuid_groups_only_does_not_create_managed_group(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
+            group = self.create_group("Segment", contacts=[])
+            url = "/api/v2/internals/whatsapp_broadcasts"
+            body = {
+                "project": self.org.proj_uuid,
+                "groups": [str(group.uuid)],
+                "trigger_flow_uuid": str(flow.uuid),
+                "msg": {"text": "hello"},
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+            self.assertEqual(response.status_code, 201)
+            data = response.json()
+            self.assertNotIn("trigger_group", data["metadata"])
+            self.assertFalse(ManagedTriggerGroup.objects.filter(org=self.org).exists())
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    @mock_mailroom
+    def test_trigger_flow_uuid_mixed_audience_does_not_copy_group_members(self, mocks):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
+            segment_contact = self.create_contact("Segment", urns=["whatsapp:5511555555555"])
+            segment = self.create_group("Segment", contacts=[segment_contact])
+            url = "/api/v2/internals/whatsapp_broadcasts"
+            body = {
+                "project": self.org.proj_uuid,
+                "groups": [str(segment.uuid)],
+                "urns": ["whatsapp:5511999999999"],
+                "trigger_flow_uuid": str(flow.uuid),
+                "msg": {"text": "hello"},
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+            self.assertEqual(response.status_code, 201)
+
+            managed = ManagedTriggerGroup.objects.get(org=self.org, flow=flow).group
+            self.assertEqual(managed.contacts.count(), 1)
+            self.assertFalse(managed.contacts.filter(id=segment_contact.id).exists())
 
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
