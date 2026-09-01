@@ -11,6 +11,8 @@ from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.contacts.models import Contact
 from temba.flows.models import Flow
 from temba.msgs.models import Broadcast, BroadcastStatistics, ManagedTriggerGroup
+from temba.msgs.usecases.managed_trigger_group import resolve_or_create_managed_trigger_group
+from temba.orgs.models import Org
 from temba.tests.base import TembaTest
 from temba.tests.mailroom import mock_mailroom
 from temba.triggers.models import Trigger
@@ -305,6 +307,56 @@ class TestInternalWhatsappBroadcast(TembaTest):
             managed = ManagedTriggerGroup.objects.get(org=self.org, flow=flow).group
             self.assertEqual(managed.contacts.count(), 1)
             self.assertFalse(managed.contacts.filter(id=segment_contact.id).exists())
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    @mock_mailroom
+    def test_trigger_flow_uuid_group_quota_exceeded(self, mocks):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            self.org.limits = {Org.LIMIT_GROUPS: 0}
+            self.org.save(update_fields=("limits",))
+            flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
+            response = self.client.post(
+                "/api/v2/internals/whatsapp_broadcasts",
+                data={
+                    "project": self.org.proj_uuid,
+                    "trigger_flow_uuid": str(flow.uuid),
+                    "msg": {"text": "hello"},
+                    "urns": ["whatsapp:5511999999999"],
+                },
+                content_type="application/json",
+            )
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("the limit is", str(response.json()))
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    @mock_mailroom
+    def test_trigger_flow_uuid_contact_resolution_error(self, mocks):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
+            resolve_or_create_managed_trigger_group(self.org, self.admin, flow)
+            mocks.error("boom")
+            response = self.client.post(
+                "/api/v2/internals/whatsapp_broadcasts",
+                data={
+                    "project": self.org.proj_uuid,
+                    "trigger_flow_uuid": str(flow.uuid),
+                    "msg": {"text": "hello"},
+                    "urns": ["whatsapp:5511777777777"],
+                },
+                content_type="application/json",
+            )
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("Couldn't resolve or create a contact", str(response.json()))
 
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
