@@ -440,6 +440,10 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 raise serializers.ValidationError(str(e))
             except ContactResolutionError as e:
                 raise serializers.ValidationError(str(e))
+            except MailroomException:
+                raise serializers.ValidationError(
+                    "Contact group membership couldn't be updated due to a technical issue"
+                )
             msg["trigger_group"] = {"uuid": str(managed_group.uuid), "name": managed_group.name}
 
         # create the broadcast
