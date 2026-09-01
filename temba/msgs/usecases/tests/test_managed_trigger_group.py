@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from temba.contacts.models import ContactGroup
 from temba.flows.models import Flow
 from temba.msgs.models import ManagedTriggerGroup
@@ -17,7 +19,8 @@ from temba.triggers.models import Trigger
 
 class ManagedTriggerGroupUseCaseTest(TembaTest):
     def test_display_name_truncates_and_stays_valid(self):
-        flow = self.create_flow(name="x" * 80)
+        # Flow.name is varchar(64); truncation must still work for longer product names.
+        flow = SimpleNamespace(name="x" * 80)
         name = managed_trigger_group_display_name(flow)
         self.assertTrue(ContactGroup.is_valid_name(name))
         self.assertLessEqual(len(name), ContactGroup.MAX_NAME_LEN)
