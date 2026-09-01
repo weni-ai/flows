@@ -355,7 +355,7 @@ class APITest(APIJSONMixin, TembaTest):
                 "tel:0788 123 123": "tel:+250788123123",  # using org country
                 "tel:(078) 812-3123": "tel:+250788123123",
                 "+250788123123": "whatsapp:250788123123",  # bare phone defaults to whatsapp
-                "0788 123 123": serializers.ValidationError,  # whatsapp paths are not tel-normalized
+                "0788 123 123": "whatsapp:250788123123",  # whatsapp phone paths are tel-normalized without +
                 "whatsapp:6831234": serializers.ValidationError,  # too few digits
                 "whatsapp:BR.35029025746744354": "whatsapp:BR.35029025746744354",
                 "whatsapp:US.ENT.11815799212886844830": "whatsapp:US.ENT.11815799212886844830",
@@ -440,9 +440,10 @@ class APITest(APIJSONMixin, TembaTest):
         self.assertEqual(OrderedDict([("a", "x" * 640)]), normalize_extra({"a": "x" * 641}))
 
     def test_normalize_extra_param_value_size_default(self):
-        self.assertEqual(4096, settings.FLOW_START_PARAM_VALUE_SIZE)
-        self.assertEqual(OrderedDict([("a", "x" * 4096)]), normalize_extra({"a": "x" * 4096}))
-        self.assertEqual(OrderedDict([("a", "x" * 4096)]), normalize_extra({"a": "x" * 4097}))
+        size = settings.FLOW_START_PARAM_VALUE_SIZE
+        self.assertEqual(4096, size)
+        self.assertEqual(OrderedDict([("a", "x" * size)]), normalize_extra({"a": "x" * size}))
+        self.assertEqual(OrderedDict([("a", "x" * size)]), normalize_extra({"a": "x" * (size + 1)}))
 
     def test_authentication(self):
         def request(endpoint, **headers):
