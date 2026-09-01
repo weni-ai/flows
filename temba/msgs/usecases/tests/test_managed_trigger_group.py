@@ -11,6 +11,7 @@ from temba.msgs.models import ManagedTriggerGroup
 from temba.msgs.usecases.managed_trigger_group import (
     ContactResolutionError,
     GroupQuotaExceeded,
+    _create_contact_in_thread,
     assign_exclusive_membership,
     managed_trigger_group_display_name,
     prepare_trigger_group_for_broadcast,
@@ -236,15 +237,30 @@ class ManagedTriggerGroupUseCaseTest(TembaTest):
         self.assertTrue(group_a.contacts.filter(id=contact.id).exists())
 
     @mock_mailroom
+    def test_create_contact_in_thread_does_not_close_test_connection(self, mocks):
+        # close_old_connections would drop the TestCase transaction connection.
+        with patch("temba.msgs.usecases.managed_trigger_group.close_old_connections") as mock_close:
+            contact = _create_contact_in_thread(self.org, self.admin, "whatsapp:5511333333333")
+        self.assertEqual(mock_close.call_count, 2)
+        self.assertEqual(contact.get_urn("whatsapp").identity, "whatsapp:5511333333333")
+
+    @mock_mailroom
     @override_settings(WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY=2)
     def test_create_contacts_concurrent_path(self, mocks):
+        contact_a = MagicMock()
+        contact_b = MagicMock()
         with patch("temba.msgs.usecases.managed_trigger_group.connection") as mock_conn:
             mock_conn.in_atomic_block = False
             with patch("temba.msgs.usecases.managed_trigger_group.ThreadPoolExecutor", ImmediateExecutor):
-                contacts = resolve_contacts_for_urns(
-                    self.org, self.admin, ["whatsapp:5511111111111", "whatsapp:5511222222222"]
-                )
+                with patch(
+                    "temba.msgs.usecases.managed_trigger_group._create_contact_in_thread",
+                    side_effect=[contact_a, contact_b],
+                ):
+                    contacts = resolve_contacts_for_urns(
+                        self.org, self.admin, ["whatsapp:5511111111111", "whatsapp:5511222222222"]
+                    )
         self.assertEqual(len(contacts), 2)
+        self.assertCountEqual(contacts, [contact_a, contact_b])
 
     @mock_mailroom
     @override_settings(WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY=2)
