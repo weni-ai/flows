@@ -322,6 +322,14 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 raise serializers.ValidationError("ttl_seconds must be a non-negative integer")
         if "direct_send_template_name" in value and not isinstance(value["direct_send_template_name"], str):
             raise serializers.ValidationError("direct_send_template_name must be a string")
+        if "ig_comment_id" in value and not isinstance(value["ig_comment_id"], str):
+            raise serializers.ValidationError("ig_comment_id must be a string")
+        if "ig_response_type" in value and value["ig_response_type"] not in ("comment", "dm_comment"):
+            raise serializers.ValidationError("ig_response_type must be either comment or dm_comment")
+        if value.get("ig_comment_id") and not value.get("ig_response_type"):
+            raise serializers.ValidationError("ig_response_type is required when ig_comment_id is provided")
+        if value.get("ig_response_type") and not value.get("ig_comment_id"):
+            raise serializers.ValidationError("ig_comment_id is required when ig_response_type is provided")
         return value
 
     def validate(self, data):
@@ -329,11 +337,15 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             raise serializers.ValidationError("Must provide either urns, contacts or groups")
 
         channel_data = data.get("channel", None)
+        ig_comment_id = data.get("msg", {}).get("ig_comment_id")
         if channel_data:
             try:
                 channel = Channel.objects.get(uuid=channel_data)
                 data["channel"] = channel
-                if channel.channel_type not in ["WAC", "WWC"]:
+                allowed_channel_types = ["WAC", "WWC"]
+                if ig_comment_id:
+                    allowed_channel_types.append("IG")
+                if channel.channel_type not in allowed_channel_types:
                     raise serializers.ValidationError("Invalid channel type")
             except Channel.DoesNotExist:
                 raise serializers.ValidationError("Channel not found")

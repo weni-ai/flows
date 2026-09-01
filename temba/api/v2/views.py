@@ -839,6 +839,8 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                 ],
                 "direct_send": True,
                 "ttl_seconds": 3600,
+                "ig_comment_id": "30065218",
+                "ig_response_type": "comment | dm_comment",
                 "order_details": {
                     "reference_id": "unique-reference-id-123",
                     "payment_settings": {
@@ -1000,6 +1002,8 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                 ],
                 "direct_send": True,
                 "ttl_seconds": 3600,
+                "ig_comment_id": "30065218",
+                "ig_response_type": "comment | dm_comment",
                 "order_details": {
                     "reference_id": "unique-reference-id-123",
                     "payment_settings": {

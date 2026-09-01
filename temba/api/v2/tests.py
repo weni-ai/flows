@@ -1926,6 +1926,45 @@ class APITest(APIJSONMixin, TembaTest):
         )
         self.assertResponseError(response, "non_field_errors", "Template with name Away not found.")
 
+        ig_channel = self.create_channel("IG", "Instagram: Demo", "12345", org=self.org)
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["instagram:5678"],
+                "channel": str(ig_channel.uuid),
+                "msg": {
+                    "text": "Thanks for your comment!",
+                    "ig_comment_id": "30065218",
+                    "ig_response_type": "comment",
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+        self.assertEqual(
+            {
+                "text": "Thanks for your comment!",
+                "ig_comment_id": "30065218",
+                "ig_response_type": "comment",
+            },
+            broadcast.metadata,
+        )
+
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["instagram:5678"],
+                "channel": str(ig_channel.uuid),
+                "msg": {
+                    "text": "Thanks for your comment!",
+                    "ig_comment_id": "30065218",
+                },
+            },
+        )
+        self.assertResponseError(response, "msg", "ig_response_type is required when ig_comment_id is provided")
+
         # urns and contacts accept up to 1000 items per request (see WhatsappBroadcastWriteSerializer)
         many_urns = [f"whatsapp:556199{str(i).zfill(7)}" for i in range(1000)]
         response = self.postJSON(url, None, {"urns": many_urns, "msg": {"text": "Bulk"}})
