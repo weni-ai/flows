@@ -11,6 +11,8 @@ from weni.internal.views import InternalGenericViewSet
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction
+from django.utils.decorators import method_decorator
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.v2.internals.broadcasts.context import resolve_org_and_user_internal_whatsapp
@@ -68,6 +70,7 @@ class BroadcastsViewSet(CreateModelMixin, InternalGenericViewSet):
         return super().create(request, *args, **kwargs)
 
 
+@method_decorator(transaction.non_atomic_requests, name="dispatch")
 class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
     # Try JWT first; if not applicable, fall back to OIDC
     authentication_classes = [OptionalJWTAuthentication, InternalOIDCAuthentication]
