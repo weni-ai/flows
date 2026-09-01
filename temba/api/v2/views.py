@@ -17,12 +17,11 @@ from weni_datalake_sdk.clients.redshift.events import get_events as dl_get_event
 from django import forms
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
-from django.db import connection, transaction
+from django.db import connection
 from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.utils.decorators import method_decorator
 from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 
@@ -707,7 +706,6 @@ class BroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
         }
 
 
-@method_decorator(transaction.non_atomic_requests, name="dispatch")
 class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     """
     This endpoint allows you to send new whatsapp message broadcasts and list existing broadcasts in your account.
@@ -1087,8 +1085,6 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     model = Broadcast
     serializer_class = WhatsappBroadcastReadSerializer
     write_serializer_class = WhatsappBroadcastWriteSerializer
-    # Mailroom must see the managed group committed before contact_modify (ATOMIC_REQUESTS would hide it).
-    write_with_transaction = False
     pagination_class = CreatedOnCursorPagination
     throttle_scope = "v2.broadcasts"
 
