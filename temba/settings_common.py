@@ -344,6 +344,7 @@ INSTALLED_APPS = (
     "temba.event_driven",
     "weni.eda.django.eda_app",
     "temba.conversion_events",
+    "temba.wa_conversation_handovers",
 )
 
 # the last installed app that uses smartmin permissions
