@@ -316,6 +316,12 @@ class InternalChannelViewTest(TembaTest):
         self.assertFalse(wac["config"]["is_demo"])
 
 
+@override_settings(
+    OIDC_OP_TOKEN_ENDPOINT="https://example.com/token",
+    OIDC_OP_USER_ENDPOINT="https://example.com/user",
+    OIDC_RP_CLIENT_ID="test-client-id",
+    OIDC_RP_CLIENT_SECRET="test-client-secret",
+)
 class InternalChannelViewJWTTest(WeniJWTTestMixin, TembaTest):
     def setUp(self):
         super().setUp()

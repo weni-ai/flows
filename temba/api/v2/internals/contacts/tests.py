@@ -147,7 +147,7 @@ class InternalContactViewTest(WeniJWTTestMixin, TembaTest):
         url = "/api/v2/internals/contacts"
         response = self.client.post(url)
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
 
     def test_request_with_invalid_token(self):
         url = "/api/v2/internals/contacts"
@@ -191,15 +191,14 @@ class InternalContactViewTest(WeniJWTTestMixin, TembaTest):
         self.assertEqual(response.status_code, 400)
 
     def test_get_contacts(self):
-        project = Project.objects.create(name="Test project", created_by=self.user, modified_by=self.user)
-        contact1 = self.create_contact("Magnus", urns=["twitterid:123456"], org=project.org)
-        contact2 = self.create_contact("Nakamura", urns=["whatsapp:5561123456789"], org=project.org)
+        contact1 = self.create_contact("Magnus", urns=["twitterid:123456"])
+        contact2 = self.create_contact("Nakamura", urns=["whatsapp:5561123456789"])
 
         response = self.client.post(
             "/api/v2/internals/contacts",
             data={"contacts": [str(contact1.uuid), str(contact2.uuid)]},
             content_type="application/json",
-            **self.jwt_headers(project_uuid=str(project.project_uuid)),
+            **self.jwt_headers(project_uuid=str(self.project.project_uuid)),
         )
         data = response.json()
 
@@ -209,9 +208,8 @@ class InternalContactViewTest(WeniJWTTestMixin, TembaTest):
         self.assertContains(response, str(contact1.uuid))
 
     def test_rejects_contact_from_other_project(self):
-        project = Project.objects.create(name="Test project", created_by=self.user, modified_by=self.user)
         other_project = Project.objects.create(name="Other project", created_by=self.user, modified_by=self.user)
-        contact = self.create_contact("Magnus", urns=["twitterid:123456"], org=project.org)
+        contact = self.create_contact("Magnus", urns=["twitterid:123456"])
 
         response = self.client.post(
             "/api/v2/internals/contacts",
