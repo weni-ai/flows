@@ -9,6 +9,7 @@ from openpyxl import load_workbook
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APIClient
+from weni.internal.models import Project
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -26,6 +27,7 @@ from temba.api.v2.internals.contacts.services import (
 from temba.api.v2.internals.helpers import get_object_or_404
 from temba.api.v2.internals.views import JWTAuthMockMixin
 from temba.api.v2.validators import LambdaURLValidator
+from temba.api.weni_jwt_test_utils import WeniJWTTestMixin
 from temba.channels.models import Channel
 from temba.contacts.models import ContactField
 from temba.msgs.models import Msg
@@ -140,7 +142,7 @@ def create_failing_fake_s3_classes():
     return FakeS3Client, FakeBoto3
 
 
-class InternalContactViewTest(TembaTest):
+class InternalContactViewTest(WeniJWTTestMixin, TembaTest):
     def test_request_without_token(self):
         url = "/api/v2/internals/contacts"
         response = self.client.post(url)
@@ -148,36 +150,77 @@ class InternalContactViewTest(TembaTest):
         self.assertEqual(response.status_code, 403)
 
     def test_request_with_invalid_token(self):
-        url = "/api/v2/internals/contacts?token=invalidtoken"
-        response = self.client.post(url)
+        url = "/api/v2/internals/contacts"
+        response = self.client.post(url, HTTP_X_WENI_AUTH="invalidtoken")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_request_without_internal_claim(self):
+        project = Project.objects.create(name="Test project", created_by=self.user, modified_by=self.user)
+        token = self.sign_internal_jwt(
+            project_uuid=str(project.project_uuid),
+            can_communicate_internally=False,
+        )
+        response = self.client.post(
+            "/api/v2/internals/contacts",
+            data={"contacts": []},
+            content_type="application/json",
+            HTTP_X_WENI_AUTH=token,
+        )
 
         self.assertEqual(response.status_code, 403)
 
-    def test_request_without_body(self):
-        with override_settings(BILLING_FIXED_ACCESS_TOKEN="12345"):
-            url = "/api/v2/internals/contacts?token=12345"
-            response = self.client.post(url)
+    def test_jwt_without_tenant_claim_is_unauthorized(self):
+        token = self.sign_internal_jwt(can_communicate_internally=True)
+        response = self.client.post(
+            "/api/v2/internals/contacts",
+            data={"contacts": []},
+            content_type="application/json",
+            HTTP_X_WENI_AUTH=token,
+        )
 
-            self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 401)
+
+    def test_request_without_body(self):
+        project = Project.objects.create(name="Test project", created_by=self.user, modified_by=self.user)
+        response = self.client.post(
+            "/api/v2/internals/contacts",
+            **self.jwt_headers(project_uuid=str(project.project_uuid)),
+        )
+
+        self.assertEqual(response.status_code, 400)
 
     def test_get_contacts(self):
-        with override_settings(BILLING_FIXED_ACCESS_TOKEN="12345"):
-            contact1 = self.create_contact("Magnus", urns=["twitterid:123456"])
-            contact2 = self.create_contact("Nakamura", urns=["whatsapp:5561123456789"])
+        project = Project.objects.create(name="Test project", created_by=self.user, modified_by=self.user)
+        contact1 = self.create_contact("Magnus", urns=["twitterid:123456"], org=project.org)
+        contact2 = self.create_contact("Nakamura", urns=["whatsapp:5561123456789"], org=project.org)
 
-            url = "/api/v2/internals/contacts?token=12345"
-            response = self.client.post(
-                url,
-                data={"contacts": [str(contact1.uuid), str(contact2.uuid)]},
-                content_type="application/json",
-            )
-            data = response.json()
+        response = self.client.post(
+            "/api/v2/internals/contacts",
+            data={"contacts": [str(contact1.uuid), str(contact2.uuid)]},
+            content_type="application/json",
+            **self.jwt_headers(project_uuid=str(project.project_uuid)),
+        )
+        data = response.json()
 
-            self.assertEqual(response.status_code, 200)
-            self.assertTrue("results" in data)
-            self.assertEqual(len(data.get("results")), 2)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue("results" in data)
+        self.assertEqual(len(data.get("results")), 2)
+        self.assertContains(response, str(contact1.uuid))
 
-            self.assertContains(response, str(contact1.uuid))
+    def test_rejects_contact_from_other_project(self):
+        project = Project.objects.create(name="Test project", created_by=self.user, modified_by=self.user)
+        other_project = Project.objects.create(name="Other project", created_by=self.user, modified_by=self.user)
+        contact = self.create_contact("Magnus", urns=["twitterid:123456"], org=project.org)
+
+        response = self.client.post(
+            "/api/v2/internals/contacts",
+            data={"contacts": [str(contact.uuid)]},
+            content_type="application/json",
+            **self.jwt_headers(project_uuid=str(other_project.project_uuid)),
+        )
+
+        self.assertEqual(response.status_code, 404)
 
 
 class ContactsExportByStatusViewTest(TembaTest):

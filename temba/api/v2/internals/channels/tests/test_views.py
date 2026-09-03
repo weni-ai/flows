@@ -5,8 +5,8 @@ from weni.internal.models import Project
 
 from django.test import override_settings
 
-from temba.api.auth.billing import BillingFixedAccessTokenAuthentication, HasBillingFixedAccessToken
 from temba.api.v2.internals.views import JWTAuthMockMixin
+from temba.api.weni_jwt_test_utils import WeniJWTTestMixin
 from temba.tests import TembaTest
 
 
@@ -316,74 +316,75 @@ class InternalChannelViewTest(TembaTest):
         self.assertFalse(wac["config"]["is_demo"])
 
 
-class InternalChannelViewBillingTokenTest(TembaTest):
-    """Exercises the billing-token auth path on InternalChannelView.
-
-    OIDC is stripped from authentication_classes because CI has no OIDC settings
-    and instantiating InternalOIDCAuthentication raises ImproperlyConfigured.
-    """
-
+class InternalChannelViewJWTTest(WeniJWTTestMixin, TembaTest):
     def setUp(self):
         super().setUp()
         self.url = "/api/v2/internals/channels-by-project"
-        auth_patch = patch(
-            "temba.api.v2.internals.channels.views.InternalChannelView.authentication_classes",
-            [BillingFixedAccessTokenAuthentication],
-        )
-        perm_patch = patch(
-            "temba.api.v2.internals.channels.views.InternalChannelView.permission_classes",
-            [HasBillingFixedAccessToken],
-        )
-        auth_patch.start()
-        perm_patch.start()
-        self.addCleanup(auth_patch.stop)
-        self.addCleanup(perm_patch.stop)
 
     def test_request_without_token(self):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 403)
 
     def test_request_with_invalid_token(self):
-        response = self.client.get(f"{self.url}?token=invalidtoken")
+        response = self.client.get(self.url, HTTP_X_WENI_AUTH="invalidtoken")
+        self.assertEqual(response.status_code, 401)
+
+    def test_request_without_internal_claim(self):
+        project = Project.objects.create(name="Test project", created_by=self.user, modified_by=self.user)
+        token = self.sign_internal_jwt(
+            project_uuid=str(project.project_uuid),
+            can_communicate_internally=False,
+        )
+        response = self.client.get(
+            f"{self.url}?project_uuid={project.project_uuid}",
+            HTTP_X_WENI_AUTH=token,
+        )
         self.assertEqual(response.status_code, 403)
 
-    def test_request_without_project_uuid(self):
-        with override_settings(BILLING_FIXED_ACCESS_TOKEN="12345"):
-            response = self.client.get(f"{self.url}?token=12345")
-            self.assertEqual(response.status_code, 400)
-            self.assertEqual(response.json(), {"error": "project_uuid is required"})
+    def test_jwt_ignores_query_project_uuid(self):
+        project = Project.objects.create(name="Test project", created_by=self.user, modified_by=self.user)
+        other_project = Project.objects.create(name="Other project", created_by=self.user, modified_by=self.user)
+        active = self.create_channel("TG", "Active Channel", "active", org=project.org)
+
+        response = self.client.get(
+            f"{self.url}?project_uuid={other_project.project_uuid}",
+            **self.jwt_headers(project_uuid=str(project.project_uuid)),
+        )
+        data = response.json()
+
+        self.assertEqual(response.status_code, 200)
+        uuids = {entry["uuid"] for entry in data["results"]}
+        self.assertIn(str(active.uuid), uuids)
 
     def test_returns_active_channels_for_project(self):
-        with override_settings(BILLING_FIXED_ACCESS_TOKEN="12345"):
-            project = Project.objects.create(name="Test project", created_by=self.user, modified_by=self.user)
-            active = self.create_channel("TG", "Active Channel", "active", org=project.org)
-            wac = self.create_channel("WAC", "WAC Channel", "74123456789", org=project.org)
-            wac.config = {
-                "wa_waba_id": "waba-1",
-                "wa_number": "+5500900001234",
-                "is_demo": True,
-            }
-            wac.save()
-            inactive = self.create_channel("TG", "Inactive Channel", "inactive", org=project.org)
-            inactive.is_active = False
-            inactive.save()
+        project = Project.objects.create(name="Test project", created_by=self.user, modified_by=self.user)
+        active = self.create_channel("TG", "Active Channel", "active", org=project.org)
+        wac = self.create_channel("WAC", "WAC Channel", "74123456789", org=project.org)
+        wac.config = {
+            "wa_waba_id": "waba-1",
+            "wa_number": "+5500900001234",
+            "is_demo": True,
+        }
+        wac.save()
+        inactive = self.create_channel("TG", "Inactive Channel", "inactive", org=project.org)
+        inactive.is_active = False
+        inactive.save()
 
-            url = f"{self.url}?token=12345&project_uuid={project.project_uuid}"
-            response = self.client.get(url)
-            data = response.json()
+        response = self.client.get(self.url, **self.jwt_headers(project_uuid=str(project.project_uuid)))
+        data = response.json()
 
-            self.assertEqual(response.status_code, 200)
-            self.assertIn("results", data)
-            uuids = {entry["uuid"] for entry in data["results"]}
-            self.assertIn(str(active.uuid), uuids)
-            self.assertIn(str(wac.uuid), uuids)
-            self.assertNotIn(str(inactive.uuid), uuids)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("results", data)
+        uuids = {entry["uuid"] for entry in data["results"]}
+        self.assertIn(str(active.uuid), uuids)
+        self.assertIn(str(wac.uuid), uuids)
+        self.assertNotIn(str(inactive.uuid), uuids)
 
-            wac_entry = next(entry for entry in data["results"] if entry["uuid"] == str(wac.uuid))
-            self.assertEqual(wac_entry["channel_type"], "WAC")
-            self.assertEqual(wac_entry["waba"], "waba-1")
-            self.assertEqual(wac_entry["phone_number"], "+5500900001234")
-            self.assertTrue(wac_entry["config"]["is_demo"])
+        wac_entry = next(entry for entry in data["results"] if entry["uuid"] == str(wac.uuid))
+        self.assertEqual(wac_entry["channel_type"], "WAC")
+        self.assertEqual(wac_entry["waba"], "waba-1")
+        self.assertEqual(wac_entry["phone_number"], "+5500900001234")
+        self.assertTrue(wac_entry["config"]["is_demo"])
 
 
 class ChannelWabaMigrationViewTest(TembaTest):
