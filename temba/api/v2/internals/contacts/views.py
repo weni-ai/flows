@@ -14,8 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
 from weni.internal.permissions import CanCommunicateInternally
-from weni_commons.auth import CanCommunicateInternally as WeniCanCommunicateInternally
-from weni_commons.auth import WeniAuthentication
+from weni_commons.auth import CanCommunicateInternally as WeniCanCommunicateInternally, WeniAuthentication
 from weni_commons.auth.helpers import get_auth_context
 
 from django.conf import settings

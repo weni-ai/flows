@@ -10,7 +10,6 @@ from weni_commons.auth.helpers import get_auth_context
 from django.core import exceptions as django_exceptions
 
 from temba.api.auth.billing import BillingFixedAccessTokenViewMixin
-from temba.orgs.models import Org
 from temba.api.auth.jwt import RequiredJWTAuthentication
 from temba.api.v2.internals.channels.serializers import (
     ChannelElevenLabsApiKeySerializer,
@@ -23,6 +22,7 @@ from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel
 from temba.channels.types.whatsapp_cloud.usecases import UpdateWhatsAppCloudWabaUseCase, WabaChannelNotFound
+from temba.orgs.models import Org
 
 
 class ChannelProjectView(BillingFixedAccessTokenViewMixin, APIViewMixin, APIView):

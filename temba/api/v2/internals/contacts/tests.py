@@ -9,6 +9,7 @@ from openpyxl import load_workbook
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APIClient
+from weni.internal.models import Project
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
