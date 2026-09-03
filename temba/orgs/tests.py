@@ -2528,6 +2528,23 @@ class OrgTest(TembaTest):
         self.assertContains(response, self.channel.name)
         self.assertNotContains(response, preview_channel.name)
 
+    def test_home_hides_copilot_channels(self):
+        self.login(self.admin)
+
+        copilot_channel = self.create_channel(
+            "WWC",
+            "Weni Web Chat - Copilot",
+            "copilot-channel",
+            org=self.org,
+            config={"is_live_desk_copilot": True},
+        )
+
+        response = self.client.get(reverse("orgs.org_home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.channel.name)
+        self.assertNotContains(response, copilot_channel.name)
+
     @patch("temba.channels.types.vonage.client.VonageClient.check_credentials")
     def test_connect_vonage(self, mock_check_credentials):
         self.login(self.admin)
