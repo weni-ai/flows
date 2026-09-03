@@ -1,3 +1,7 @@
+3.94.2
+----------
+* fix: normalizing whatsapp urn on create
+
 3.94.1
 ----------
 * feat: increase flow start params string limit from 640 to 4096

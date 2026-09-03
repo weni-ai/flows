@@ -14,6 +14,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
 from weni.internal.permissions import CanCommunicateInternally
+from weni_commons.auth import CanCommunicateInternally as WeniCanCommunicateInternally
+from weni_commons.auth import WeniAuthentication
+from weni_commons.auth.helpers import get_auth_context
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -28,7 +31,6 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.decorators import method_decorator
 
-from temba.api.auth.billing import BillingFixedAccessTokenViewMixin
 from temba.api.auth.jwt import BaseJWTAuthentication, OptionalJWTAuthentication, RequiredJWTAuthentication
 from temba.api.v2.internals.contacts.serializers import (
     CleanContactFieldsSerializer,
@@ -67,14 +69,23 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-class InternalContactView(BillingFixedAccessTokenViewMixin, APIViewMixin, APIView):
+class InternalContactView(APIViewMixin, APIView):
+    authentication_classes = [WeniAuthentication]
+    permission_classes = [WeniCanCommunicateInternally]
+
     def post(self, request: Request):
+        auth = get_auth_context(request)
+        project_uuid = auth.project_uuid
+
         serializer = InternalContactSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         contacts_uuids = serializer.validated_data.get("contacts")
 
+        if Contact.objects.filter(uuid__in=contacts_uuids).exclude(org__proj_uuid=project_uuid).exists():
+            return Response({"error": "Contact not found"}, status=status.HTTP_404_NOT_FOUND)
+
         contacts = (
-            Contact.objects.filter(uuid__in=contacts_uuids)
+            Contact.objects.filter(uuid__in=contacts_uuids, org__proj_uuid=project_uuid)
             .select_related("org")
             .only("uuid", "org__proj_uuid", "name")
         )

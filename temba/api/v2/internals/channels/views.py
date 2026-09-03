@@ -3,13 +3,14 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
-from weni.internal.permissions import CanCommunicateInternally
+from weni.internal.permissions import CanCommunicateInternally as OIDCCanCommunicateInternally
+from weni_commons.auth import CanCommunicateInternally, WeniAuthentication
+from weni_commons.auth.helpers import get_auth_context
 
-from temba.api.auth.billing import (
-    BillingFixedAccessTokenAuthentication,
-    BillingFixedAccessTokenViewMixin,
-    HasBillingFixedAccessToken,
-)
+from django.core import exceptions as django_exceptions
+
+from temba.api.auth.billing import BillingFixedAccessTokenViewMixin
+from temba.orgs.models import Org
 from temba.api.auth.jwt import RequiredJWTAuthentication
 from temba.api.v2.internals.channels.serializers import (
     ChannelElevenLabsApiKeySerializer,
@@ -54,22 +55,33 @@ class ChannelProjectView(BillingFixedAccessTokenViewMixin, APIViewMixin, APIView
 
 
 class InternalChannelView(APIViewMixin, APIView):
-    authentication_classes = [BillingFixedAccessTokenAuthentication, InternalOIDCAuthentication]
-    permission_classes = [(IsAuthenticated & IsUserInOrg) | HasBillingFixedAccessToken]
+    authentication_classes = [WeniAuthentication, InternalOIDCAuthentication]
+    permission_classes = [CanCommunicateInternally | (IsAuthenticated & IsUserInOrg)]
 
     def get(self, request: Request):
-        org = self.get_org_from_request(
-            request,
-            missing_status=400,
-            missing_error="project_uuid is required",
-            not_found_error="Project not found",
-        )
+        auth = get_auth_context(request)
+        if auth is not None and auth.is_jwt:
+            org = self._get_org_for_project_uuid(auth.project_uuid)
+        else:
+            org = self.get_org_from_request(
+                request,
+                missing_status=400,
+                missing_error="project_uuid is required",
+                not_found_error="Project not found",
+            )
         if isinstance(org, Response):
             return org
 
         channels = Channel.objects.filter(org=org, is_active=True)
         results = [self._serialize_channel(channel) for channel in channels]
         return Response({"results": results})
+
+    @staticmethod
+    def _get_org_for_project_uuid(project_uuid):
+        try:
+            return Org.objects.get(proj_uuid=project_uuid)
+        except (Org.DoesNotExist, django_exceptions.ValidationError, ValueError):
+            return Response({"error": "Project not found"}, status=404)
 
     @staticmethod
     def _serialize_channel(channel):
@@ -146,7 +158,7 @@ class ChannelMarketingTagsView(APIViewMixin, APIView):
 
 class ChannelWabaMigrationView(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, CanCommunicateInternally]
+    permission_classes = [IsAuthenticated, OIDCCanCommunicateInternally]
 
     def post(self, request: Request):
         serializer = ChannelWabaMigrationSerializer(data=request.data)

@@ -1607,6 +1607,22 @@ class ContactTest(TembaTest):
         )
         self.assertFormError(response, "form", "name", "This field is required.")
 
+        # strip leading + from WhatsApp and pair a tel URN (Mailroom rejects whatsapp:+...)
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            {"name": "Fernando Luiz", "urn__whatsapp__0": "+5545991163316"},
+        )
+        self.assertNoFormErrors(response)
+        fernando = Contact.objects.get(name="Fernando Luiz")
+        self.assertEqual(
+            set(fernando.urns.values_list("identity", flat=True)),
+            {"whatsapp:5545991163316", "tel:+5545991163316"},
+        )
+        self.assertEqual(
+            mr_mocks.calls["contact_create"][-1].args[2].urns,
+            ["whatsapp:5545991163316", "tel:+5545991163316"],
+        )
+
         # non-phone whatsapp URNs use the single-URN save path
         response = self.client.post(
             reverse("contacts.contact_create"),
@@ -1625,6 +1641,21 @@ class ContactTest(TembaTest):
             {"name": "No Phone", "urn__whatsapp__0": ""},
         )
         self.assertFormError(response, "form", None, "At least one WhatsApp number or connection is required.")
+
+    @mock_mailroom
+    def test_create_with_mailroom_error(self, mr_mocks):
+        mr_mocks.error("Error creating contact")
+
+        self.login(self.admin)
+
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            {"name": "Fernando Luiz", "urn__whatsapp__0": "+5545991163316"},
+        )
+
+        self.assertFormError(
+            response, "form", None, "An error occurred creating your contact. Please try again later."
+        )
 
     @mock_mailroom
     def test_contact_update_name_validation(self, mr_mocks):
@@ -3506,7 +3537,7 @@ class ContactTest(TembaTest):
 
         response = self.client.post(
             reverse("contacts.contact_update", args=[self.joe.id]),
-            dict(name="Joey", new_scheme="whatsapp", new_path="5582988990000"),
+            dict(name="Joey", new_scheme="whatsapp", new_path="+5582988990000"),
         )
 
         self.assertEqual(response.status_code, 200)
@@ -5259,10 +5290,10 @@ class URNTest(TembaTest):
         self.assertFalse(URN.validate("whatsapp:BR."))
         self.assertFalse(URN.validate("whatsapp:US.ENT."))
 
-        # normalize preserves both formats
+        # normalize preserves BSUID and strips + from WhatsApp phone paths
         self.assertEqual(URN.normalize("whatsapp:BR.35029025746744354"), "whatsapp:BR.35029025746744354")
         self.assertEqual(URN.normalize("whatsapp:12065551212"), "whatsapp:12065551212")
-        self.assertEqual(URN.normalize("whatsapp:+12065551212", "US"), "whatsapp:+12065551212")
+        self.assertEqual(URN.normalize("whatsapp:+12065551212", "US"), "whatsapp:12065551212")
         self.assertEqual(URN.normalize("whatsapp:86982810225", "BR"), "whatsapp:86982810225")
         self.assertEqual(URN.normalize("tel:86982810225", "BR"), "tel:+86982810225")
 
@@ -5282,6 +5313,10 @@ class URNTest(TembaTest):
         self.assertEqual(
             URN.paired_phone_urns("86982810225", "BR"),
             ["whatsapp:86982810225", "tel:+86982810225"],
+        )
+        self.assertEqual(
+            URN.paired_phone_urns("+5545991163316", "BR"),
+            ["whatsapp:5545991163316", "tel:+5545991163316"],
         )
         self.assertTrue(URN.looks_like_phone("+12065551212", "US"))
         self.assertTrue(URN.looks_like_phone("0788 123 123", "RW"))
@@ -5849,7 +5884,7 @@ class ContactImportTest(TembaTest):
 
         spec = imp._row_to_spec(["0788 111 111", "Jean"])
 
-        self.assertEqual(["whatsapp:0788 111 111"], spec["urns"])
+        self.assertEqual(["whatsapp:250788111111"], spec["urns"])
         self.assertEqual("Jean", spec["name"])
 
     def test_row_to_spec_preserves_explicit_tel_mapping(self):
