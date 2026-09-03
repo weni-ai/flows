@@ -329,7 +329,7 @@ class InternalChannelViewJWTTest(WeniJWTTestMixin, TembaTest):
 
     def test_request_without_token(self):
         response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
 
     def test_request_with_invalid_token(self):
         response = self.client.get(self.url, HTTP_X_WENI_AUTH="invalidtoken")
