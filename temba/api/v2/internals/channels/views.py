@@ -1,3 +1,4 @@
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -81,7 +82,7 @@ class InternalChannelView(APIViewMixin, APIView):
         try:
             return Org.objects.get(proj_uuid=project_uuid)
         except (Org.DoesNotExist, django_exceptions.ValidationError, ValueError):
-            return Response({"error": "Project not found"}, status=404)
+            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
     @staticmethod
     def _serialize_channel(channel):

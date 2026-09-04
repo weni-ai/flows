@@ -5,8 +5,8 @@ from weni.internal.models import Project
 
 from django.test import override_settings
 
-from temba.api.tests.weni_jwt_test_utils import WeniJWTTestMixin
 from temba.api.v2.internals.views import JWTAuthMockMixin
+from temba.api.weni_jwt_test_utils import WeniJWTTestMixin
 from temba.tests import TembaTest
 
 
@@ -319,6 +319,12 @@ class InternalChannelViewTest(TembaTest):
         self.assertFalse(wac["config"]["is_demo"])
 
 
+@override_settings(
+    OIDC_OP_TOKEN_ENDPOINT="https://example.com/token",
+    OIDC_OP_USER_ENDPOINT="https://example.com/user",
+    OIDC_RP_CLIENT_ID="test-client-id",
+    OIDC_RP_CLIENT_SECRET="test-client-secret",
+)
 class InternalChannelViewJWTTest(WeniJWTTestMixin, TembaTest):
     def setUp(self):
         super().setUp()
@@ -326,7 +332,7 @@ class InternalChannelViewJWTTest(WeniJWTTestMixin, TembaTest):
 
     def test_request_without_token(self):
         response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
 
     def test_request_with_invalid_token(self):
         response = self.client.get(self.url, HTTP_X_WENI_AUTH="invalidtoken")
