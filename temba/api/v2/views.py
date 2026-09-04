@@ -739,10 +739,10 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "groups": [],
                     "created_on": "2013-03-02T17:28:12.123456Z".
                     "metadata": {
-                        "text": "Essa é uma mensagem de teste para @contact.name",
+                        "text": "This is a test message for @contact.name",
                         "header": {
                             "type": "text",
-                            "text": "Oi @contact.name"
+                            "text": "Hello @contact.name"
                         }
                     },
                 },

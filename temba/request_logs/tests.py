@@ -300,7 +300,7 @@ class ExportTest(TembaTest):
 
         mock_process_queryset_results.assert_called_once()
         mock_export_data_to_xls.assert_called_once_with(mock_http_log)
-        mock_send_file.assert_called_once_with("xls_content", "Chamadas Webhook.xlsx", "test2@example.com", "Temba")
+        mock_send_file.assert_called_once_with("xls_content", "Webhook Calls.xlsx", "test2@example.com", "Temba")
         self.assertIsInstance(response, HttpResponse)
         self.assertEqual(response.status_code, 200)
 
