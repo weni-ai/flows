@@ -1,3 +1,8 @@
+3.95.0
+----------
+* feat: add speckit
+* feat: add broadcast flows trigger group
+
 3.94.1
 ----------
 * feat: increase flow start params string limit from 640 to 4096
