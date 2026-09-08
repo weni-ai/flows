@@ -114,6 +114,7 @@ LANGUAGES = (
     ("fr", _("French")),
     ("mn", _("Mongolian")),
     ("pt-br", _("Portuguese")),
+    ("ro", _("Romanian")),
     ("ru", _("Russian")),
 )
 DEFAULT_LANGUAGE = "en-us"

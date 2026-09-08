@@ -179,7 +179,7 @@ class HTTPLogCRUDL(SmartCRUDL):
             org = self.request.org
             user = self.request.user
 
-            filename = "Chamadas Webhook.xlsx"
+            filename = f"{_('Webhook Calls')}.xlsx"
 
             queryset = HTTPLog.objects.filter(org=org, flow__isnull=False)
 
@@ -261,7 +261,7 @@ class HTTPLogCRUDL(SmartCRUDL):
 
         # Exist a code in rp-apps that do almost the same thig. Refact to use the same code in future
         def send_file(self, file_stream, file_name, user_email, project_name):
-            email_subject = "Exportação de dados de Webhooks"
+            email_subject = _("Webhook data export")
 
             email_host = settings.EMAIL_HOST
             email_port = settings.EMAIL_PORT
