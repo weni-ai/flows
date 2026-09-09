@@ -264,6 +264,24 @@ class ManagedTriggerGroupUseCaseTest(TembaTest):
 
     @mock_mailroom
     @override_settings(WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY=2)
+    def test_create_contacts_concurrent_path_logs_and_wraps_unexpected_errors(self, mocks):
+        with patch("temba.msgs.usecases.managed_trigger_group.connection") as mock_conn:
+            mock_conn.in_atomic_block = False
+            with patch("temba.msgs.usecases.managed_trigger_group.ThreadPoolExecutor", ImmediateExecutor):
+                with patch(
+                    "temba.msgs.usecases.managed_trigger_group._create_contact_in_thread",
+                    side_effect=RuntimeError("boom"),
+                ):
+                    with self.assertRaises(ContactResolutionError) as ctx:
+                        with self.assertLogs("temba.msgs.usecases.managed_trigger_group", level="ERROR") as logs:
+                            resolve_contacts_for_urns(
+                                self.org, self.admin, ["whatsapp:5511111111111", "whatsapp:5511222222222"]
+                            )
+        self.assertEqual(ctx.exception.urn, "whatsapp:5511111111111")
+        self.assertTrue(any("contact create failed" in entry for entry in logs.output))
+
+    @mock_mailroom
+    @override_settings(WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY=2)
     def test_create_contacts_concurrent_path_reraises_resolution_error(self, mocks):
         with patch("temba.msgs.usecases.managed_trigger_group.connection") as mock_conn:
             mock_conn.in_atomic_block = False
