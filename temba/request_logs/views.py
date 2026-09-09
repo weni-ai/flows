@@ -261,7 +261,7 @@ class HTTPLogCRUDL(SmartCRUDL):
 
         # Exist a code in rp-apps that do almost the same thig. Refact to use the same code in future
         def send_file(self, file_stream, file_name, user_email, project_name):
-            email_subject = _("Webhook data export")
+            email_subject = str(_("Webhook data export"))
 
             email_host = settings.EMAIL_HOST
             email_port = settings.EMAIL_PORT

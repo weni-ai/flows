@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from email import message_from_string
 from io import BytesIO
 from unittest.mock import MagicMock, Mock, patch
 
@@ -390,9 +391,22 @@ class ExportTest(TembaTest):
         mock_sendmail = MagicMock()
         mock_smtp.return_value.sendmail = mock_sendmail
 
-        view.send_file(file_stream, file_name, [user_email], project_name)
+        view.send_file(file_stream, file_name, user_email, project_name)
 
         mock_connection = mock_smtp.return_value
         mock_connection.ehlo.assert_called_once()
         mock_connection.starttls.assert_called_once_with()
         mock_connection.login.assert_called_once_with("your_email_username", "your_email_password")
+
+        mock_sendmail.assert_called_once()
+        from_email, to_email, raw_message = mock_sendmail.call_args[0]
+        self.assertEqual(from_email, "your_from_email")
+        self.assertEqual(to_email, user_email)
+
+        message = message_from_string(raw_message)
+        self.assertEqual(message["Subject"], "Webhook data export")
+        self.assertEqual(message["To"], user_email)
+
+        attachment = list(message.walk())[-1]
+        self.assertEqual(attachment["Content-Disposition"], f"attachment; filename={file_name}")
+        self.assertEqual(attachment.get_payload(decode=True), b"Test file content")
