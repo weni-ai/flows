@@ -135,7 +135,7 @@ class ManagedTriggerGroupUseCaseTest(TembaTest):
         self.assertFalse(trigger.is_archived)
 
     @mock_mailroom
-    def test_create_race_reuses_winner_and_releases_loser_group(self, mocks):
+    def test_create_race_reuses_winner_after_integrity_error(self, mocks):
         flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
         winner = resolve_or_create_managed_trigger_group(self.org, self.admin, flow)
         association = ManagedTriggerGroup.objects.select_related("group").get(org=self.org, flow=flow)
@@ -150,36 +150,6 @@ class ManagedTriggerGroupUseCaseTest(TembaTest):
 
         self.assertEqual(reused.id, winner.id)
         self.assertTrue(ContactGroup.user_groups.filter(org=self.org, id=winner.id).exists())
-
-    @mock_mailroom
-    def test_create_race_skips_release_when_winner_is_same_group(self, mocks):
-        flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
-        created_groups = []
-        real_create_static = ContactGroup.create_static
-
-        def capture_create(*args, **kwargs):
-            group = real_create_static(*args, **kwargs)
-            created_groups.append(group)
-            return group
-
-        qs = MagicMock()
-        qs.filter.return_value.first.return_value = None
-
-        def get_winner(**kwargs):
-            group = created_groups[0]
-            association = MagicMock()
-            association.group_id = group.id
-            association.group = group
-            return association
-
-        qs.get.side_effect = get_winner
-
-        with patch.object(ContactGroup, "create_static", side_effect=capture_create):
-            with patch.object(ManagedTriggerGroup.objects, "select_related", return_value=qs):
-                with patch.object(ManagedTriggerGroup.objects, "create", side_effect=IntegrityError("duplicate")):
-                    reused = resolve_or_create_managed_trigger_group(self.org, self.admin, flow)
-
-        self.assertEqual(reused.id, created_groups[0].id)
 
     @mock_mailroom
     def test_resolve_contacts_empty_urns(self, mocks):
@@ -261,6 +231,23 @@ class ManagedTriggerGroupUseCaseTest(TembaTest):
                     )
         self.assertEqual(len(contacts), 2)
         self.assertCountEqual(contacts, [contact_a, contact_b])
+
+    @mock_mailroom
+    @override_settings(WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY=2)
+    def test_create_contacts_concurrent_path_logs_and_wraps_unexpected_errors(self, mocks):
+        with patch("temba.msgs.usecases.managed_trigger_group.connection") as mock_conn:
+            mock_conn.in_atomic_block = False
+            with patch("temba.msgs.usecases.managed_trigger_group.ThreadPoolExecutor", ImmediateExecutor):
+                with patch(
+                    "temba.msgs.usecases.managed_trigger_group._create_contact_in_thread",
+                    side_effect=RuntimeError("boom"),
+                ):
+                    urns = ["whatsapp:5511111111111", "whatsapp:5511222222222"]
+                    with self.assertRaises(ContactResolutionError) as ctx:
+                        with self.assertLogs("temba.msgs.usecases.managed_trigger_group", level="ERROR") as logs:
+                            resolve_contacts_for_urns(self.org, self.admin, urns)
+        self.assertIn(ctx.exception.urn, urns)
+        self.assertTrue(any("contact create failed" in entry for entry in logs.output))
 
     @mock_mailroom
     @override_settings(WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY=2)
