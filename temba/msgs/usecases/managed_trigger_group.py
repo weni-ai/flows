@@ -141,9 +141,7 @@ def _create_contacts(org, user, urns: list) -> list:
     if not urns:
         return []
 
-    concurrency = int(
-        getattr(settings, "WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY", DEFAULT_URN_RESOLVE_CONCURRENCY)
-    )
+    concurrency = int(getattr(settings, "WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY", DEFAULT_URN_RESOLVE_CONCURRENCY))
     use_threads = len(urns) > 1 and concurrency > 1 and not connection.in_atomic_block
 
     if not use_threads:
@@ -185,7 +183,7 @@ def assign_exclusive_membership(org, user, contacts, target_group: ContactGroup)
 
     unique = list({c.id: c for c in contacts}.values())
     other_groups = list(
-        ContactGroup.objects.filter(
+        ContactGroup.user_groups.filter(
             managed_trigger_group_link__org=org,
             is_active=True,
         ).exclude(id=target_group.id)
