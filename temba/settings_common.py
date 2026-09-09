@@ -1456,6 +1456,12 @@ RETENTION_PERIODS = {
 MAILROOM_URL = None
 MAILROOM_AUTH_TOKEN = None
 
+# Concurrent mailroom contact creates when arming trigger_flow_uuid on a WhatsApp broadcast.
+# Sequential fallback is used inside atomic blocks (Django TestCase) so tests share the transaction.
+WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY = int(
+    os.environ.get("WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY", default=20)
+)
+
 # To allow manage fields to support up to 1000 fields
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 4000
 

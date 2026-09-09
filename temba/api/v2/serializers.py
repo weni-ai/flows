@@ -28,6 +28,11 @@ from temba.locations.models import AdminBoundary
 from temba.mailroom import modifiers
 from temba.mailroom.client import MailroomException
 from temba.msgs.models import Broadcast, Label, Msg
+from temba.msgs.usecases.managed_trigger_group import (
+    ContactResolutionError,
+    GroupQuotaExceeded,
+    prepare_trigger_group_for_broadcast,
+)
 from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tickets.models import Ticket, Ticketer, Topic
@@ -359,12 +364,8 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 if data.get("contacts"):
                     raise serializers.ValidationError("Contacts are not allowed for template_batch queue")
 
-        # If a flow UUID is provided it is only valid for template_batch queue
+        # Resolve and validate trigger flow if provided. trigger_flow_uuid is independent of queue.
         trigger_flow_uuid = data.get("trigger_flow_uuid")
-        if trigger_flow_uuid and data.get("queue") != "template_batch":
-            raise serializers.ValidationError("trigger_flow_uuid is only allowed when queue is template_batch")
-
-        # Resolve and validate trigger flow if provided
         if trigger_flow_uuid:
             org = self.context.get("org")
             try:
@@ -422,16 +423,37 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         """
         Create a new whatsapp broadcast to send out
         """
+        org = self.context["org"]
+        user = self.context["user"]
+        trigger_flow = self.validated_data.get("trigger_flow")
+        urns = self.validated_data.get("urns") or []
+        contacts = self.validated_data.get("contacts") or []
+        groups = self.validated_data.get("groups") or []
+        msg = dict(self.validated_data.get("msg") or {})
+
+        # Ad-hoc recipients (urns/contacts) are covered by a platform-managed group + Catch All.
+        if trigger_flow and (urns or contacts):
+            try:
+                managed_group = prepare_trigger_group_for_broadcast(org, user, trigger_flow, urns, contacts)
+            except GroupQuotaExceeded as e:
+                raise serializers.ValidationError(str(e))
+            except ContactResolutionError as e:
+                raise serializers.ValidationError(str(e))
+            except MailroomException:
+                raise serializers.ValidationError(
+                    "Contact group membership couldn't be updated due to a technical issue"
+                )
+            msg["trigger_group"] = {"uuid": str(managed_group.uuid), "name": managed_group.name}
 
         # create the broadcast
         broadcast = Broadcast.create(
-            self.context["org"],
-            self.context["user"],
-            groups=self.validated_data.get("groups", []),
-            contacts=self.validated_data.get("contacts", []),
-            urns=self.validated_data.get("urns", []),
+            org,
+            user,
+            groups=groups,
+            contacts=contacts,
+            urns=urns,
             template_state=Broadcast.TEMPLATE_STATE_UNEVALUATED,
-            msg=self.validated_data.get("msg", {}),
+            msg=msg,
             channel=self.validated_data.get("channel", None),
             broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
             queue=self.validated_data.get("queue", None),
@@ -439,14 +461,9 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             template_id=self.validated_data.get("template_id", None),
             is_bulk_send=True if self.validated_data.get("queue") == "template_batch" else False,
         )
-        # create optional catch-all trigger (uncaught message) for provided flow and groups
-        trigger_flow = self.validated_data.get("trigger_flow")
-        if trigger_flow and self.validated_data.get("queue") == "template_batch":
-            groups = self.validated_data.get("groups", [])
-            if groups:
-                create_catchall_trigger(
-                    org=self.context["org"], user=self.context["user"], flow=trigger_flow, groups=groups
-                )
+        # Caller-supplied groups keep today's Catch All behavior, independent of the managed group.
+        if trigger_flow and groups:
+            create_catchall_trigger(org=org, user=user, flow=trigger_flow, groups=groups)
 
         # send it
         on_transaction_commit(lambda: broadcast.send_async())
