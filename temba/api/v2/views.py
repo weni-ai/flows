@@ -757,6 +757,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
       * **urns** - the URNs of contacts to send to (array of up to 1000 strings, optional)
       * **contacts** - the UUIDs of contacts to send to (array of up to 1000 strings, optional)
       * **groups** - the UUIDs of contact groups to send to (array of up to 100 strings, optional)
+      * **trigger_flow_uuid** - the UUID of the messaging or voice flow to start when a recipient replies (string, optional)
       * **msg** - the template, text and attachments that will be send to contacts
 
 
@@ -768,6 +769,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
         {
             "urns": ["tel:+250788123123", "tel:+250788123124"],
             "contacts": ["09d23a05-47fe-11e4-bfe9-b8f6b119e9ab"],
+            "trigger_flow_uuid": "f14e4ff0-724d-43fe-a953-1d16aefd1c00",
             "msg": {
                 "text": "This is a test message for @contact.name",
                 "template":{
@@ -1151,6 +1153,11 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                 {"name": "urns", "required": False, "help": "The URNs of contacts you want to send to"},
                 {"name": "contacts", "required": False, "help": "The UUIDs of contacts you want to send to"},
                 {"name": "groups", "required": False, "help": "The UUIDs of contact groups you want to send to"},
+                {
+                    "name": "trigger_flow_uuid",
+                    "required": False,
+                    "help": "The UUID of the messaging or voice flow to start when a recipient replies",
+                },
                 {
                     "name": "msg",
                     "required": True,
