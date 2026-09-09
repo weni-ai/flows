@@ -282,6 +282,9 @@ class URN:
     def _normalize_path_for_scheme(cls, scheme, norm_path, display, country_code):
         if scheme == cls.TEL_SCHEME:
             return cls.normalize_number(norm_path, country_code), display
+        if scheme == cls.WHATSAPP_SCHEME and cls.is_phone_based_path(norm_path):
+            # WhatsApp phone ids are E.164 without a leading +
+            return cls.normalize_number(norm_path, country_code).lstrip("+"), display
         if scheme == cls.TWITTER_SCHEME:
             return cls._normalize_twitter_path(norm_path), display
         if scheme == cls.TWITTERID_SCHEME:
