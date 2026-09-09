@@ -912,7 +912,7 @@ class MiddlewareTest(TembaTest):
 
         # can be overridden in Django settings
         with override_settings(DEFAULT_LANGUAGE="es"):
-            assert_text("Cree visualmente aplicaciones móviles")
+            assert_text("Crea visualmente aplicaciones móviles")
 
         # if we have an authenticated user, their setting takes priority
         self.login(self.admin)

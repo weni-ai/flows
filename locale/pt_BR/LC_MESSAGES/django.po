@@ -4554,11 +4554,11 @@ msgid ""
 "Hi %(org_name)s,\n"
 "\n"
 "We've noticed that the Android phone for %(org_name)s has been connected back to internet and has been able to sync with the %(brand)s servers recently at\n"
-msgstr "
-Olá %(org_name)s,
-
-Observamos que o celular Android de %(org_name)s se reconectou à internet e conseguiu sincronizar recentemente com os servidores do %(brand)s em
-"
+msgstr ""
+"\n"
+"Olá %(org_name)s,\n"
+"\n"
+"Observamos que o celular Android de %(org_name)s se reconectou à internet e conseguiu sincronizar recentemente com os servidores do %(brand)s em\n"
 
 #, python-format
 msgid ""
@@ -4596,11 +4596,11 @@ msgid ""
 "This is usually an indication that your phone has lost its connection to the internet.\n"
 "\n"
 "Please check on your phone to make sure it is connected to WiFi or a cellular data network.  If problems persist you may want to try turning the phone off then back on.\n"
-msgstr "
-Isso geralmente indica que seu celular perdeu a conexão com a internet.
-
-Verifique seu celular para garantir que ele está conectado ao Wi-Fi ou a uma rede de dados móveis. Se os problemas persistirem, tente desligar e ligar o celular novamente.
-"
+msgstr ""
+"\n"
+"Isso geralmente indica que seu celular perdeu a conexão com a internet.\n"
+"\n"
+"Verifique seu celular para garantir que ele está conectado ao Wi-Fi ou a uma rede de dados móveis. Se os problemas persistirem, tente desligar e ligar o celular novamente.\n"
 
 #, python-format
 msgid ""
@@ -4631,17 +4631,17 @@ msgstr "\n"
 msgid ""
 "\n"
 "We've noticed that your Android phone, %(channel_name)s, is getting low on power and isn't plugged in.  If it runs out of power then you will stop receiving messages for %(brand)s.\n"
-msgstr "
-Observamos que o seu celular Android, %(channel_name)s, está com bateria fraca e não está carregando. Se a bateria acabar, você deixará de receber mensagens para o %(brand)s.
-"
+msgstr ""
+"\n"
+"Observamos que o seu celular Android, %(channel_name)s, está com bateria fraca e não está carregando. Se a bateria acabar, você deixará de receber mensagens para o %(brand)s.\n"
 
 #, python-format
 msgid ""
 "\n"
 "Please check on your phone to make sure it is plugged into a reliable power source.  You will only receive this notification when the power drops below 25%%.  The current power level is %(power_level)s%%.\n"
-msgstr "
-Verifique seu celular para garantir que ele está conectado a uma fonte de energia confiável. Você só receberá esta notificação quando o nível de bateria cair abaixo de 25%%. O nível atual de bateria é %(power_level)s%%.
-"
+msgstr ""
+"\n"
+"Verifique seu celular para garantir que ele está conectado a uma fonte de energia confiável. Você só receberá esta notificação quando o nível de bateria cair abaixo de 25%%. O nível atual de bateria é %(power_level)s%%.\n"
 
 #, python-format
 msgid "We've noticed that the Android phone for %(org_name)s is now charging the battery."
@@ -4657,12 +4657,12 @@ msgid ""
 "\n"
 "We've noticed that the Android phone for %(org_name)s is now charging the battery.\n"
 "This email is to announce that your android phone battery low reported last time was resolved. Now the battery is charging.\n"
-msgstr "
-Olá %(org_name)s,
-
-Observamos que o celular Android de %(org_name)s está carregando agora.
-Este e-mail é para informar que o problema de bateria fraca relatado anteriormente foi resolvido. A bateria está carregando agora.
-"
+msgstr ""
+"\n"
+"Olá %(org_name)s,\n"
+"\n"
+"Observamos que o celular Android de %(org_name)s está carregando agora.\n"
+"Este e-mail é para informar que o problema de bateria fraca relatado anteriormente foi resolvido. A bateria está carregando agora.\n"
 
 #, python-format
 msgid ""
@@ -4701,19 +4701,19 @@ msgid ""
 "Hi %(org_name)s,\n"
 "\n"
 "We've noticed that the Android phone for %(org_name)s is having trouble sending text messages.  This might be a temporary problem due to your cellular network, or could be an indication that your phone is out of credit.\n"
-msgstr "
-Olá %(org_name)s,
-
-Observamos que o celular Android de %(org_name)s está tendo problemas para enviar mensagens de texto. Isso pode ser um problema temporário da rede móvel ou pode indicar que o celular ficou sem crédito.
-"
+msgstr ""
+"\n"
+"Olá %(org_name)s,\n"
+"\n"
+"Observamos que o celular Android de %(org_name)s está tendo problemas para enviar mensagens de texto. Isso pode ser um problema temporário da rede móvel ou pode indicar que o celular ficou sem crédito.\n"
 
 #, python-format
 msgid ""
 "\n"
 "Please check on your phone to make sure it has sufficient credit and can send text messages.  If problems persist you may want to try turning the phone off then back on.  Currently your Android phone has %(unsent_count)s messages which haven't sent in over an hour.\n"
-msgstr "
-Verifique seu celular para garantir que ele tem crédito suficiente e pode enviar mensagens de texto. Se os problemas persistirem, tente desligar e ligar o celular novamente. Atualmente, seu celular Android tem <strong>%(unsent_count)s</strong> mensagens que não foram enviadas há mais de uma hora.
-"
+msgstr ""
+"\n"
+"Verifique seu celular para garantir que ele tem crédito suficiente e pode enviar mensagens de texto. Se os problemas persistirem, tente desligar e ligar o celular novamente. Atualmente, seu celular Android tem <strong>%(unsent_count)s</strong> mensagens que não foram enviadas há mais de uma hora.\n"
 
 #, python-format
 msgid ""
@@ -4721,19 +4721,19 @@ msgid ""
 "Hi %(org_name)s,\n"
 "\n"
 "We've noticed that the %(channel_type)s for %(org_name)s is having trouble sending text messages.  This might be a temporary problem due to network communication to %(channel_type)s or may indicate a change in configuration which required your action.\n"
-msgstr "
-Olá %(org_name)s,
-
-Observamos que o %(channel_type)s de %(org_name)s está tendo problemas para enviar mensagens de texto. Isso pode ser um problema temporário de comunicação com o %(channel_type)s ou pode indicar uma alteração de configuração que requer atenção.
-"
+msgstr ""
+"\n"
+"Olá %(org_name)s,\n"
+"\n"
+"Observamos que o %(channel_type)s de %(org_name)s está tendo problemas para enviar mensagens de texto. Isso pode ser um problema temporário de comunicação com o %(channel_type)s ou pode indicar uma alteração de configuração que requer atenção.\n"
 
 #, python-format
 msgid ""
 "\n"
 "Please check on your %(channel_type)s to make sure it can send text messages. Currently your %(channel_type)s has %(unsent_count)s messages which haven't sent in over an hour.\n"
-msgstr "
-Verifique seu %(channel_type)s para garantir que ele pode enviar mensagens de texto. Atualmente, seu %(channel_type)s tem <strong>%(unsent_count)s</strong> mensagens que não foram enviadas há mais de uma hora.
-"
+msgstr ""
+"\n"
+"Verifique seu %(channel_type)s para garantir que ele pode enviar mensagens de texto. Atualmente, seu %(channel_type)s tem <strong>%(unsent_count)s</strong> mensagens que não foram enviadas há mais de uma hora.\n"
 
 #, python-format
 msgid ""
@@ -4741,19 +4741,19 @@ msgid ""
 "Hi %(org_name)s,\n"
 "\n"
 "We've noticed that the %(channel_type)s for %(org_name)s is having trouble sending text messages.  This might be a temporary problem due to network communication to %(channel_type)s, or could be an indication that your %(channel_type)s is out of credit.\n"
-msgstr "
-Olá %(org_name)s,
-
-Observamos que o %(channel_type)s de %(org_name)s está tendo problemas para enviar mensagens de texto. Isso pode ser um problema temporário de comunicação com o %(channel_type)s ou pode indicar que o %(channel_type)s ficou sem crédito.
-"
+msgstr ""
+"\n"
+"Olá %(org_name)s,\n"
+"\n"
+"Observamos que o %(channel_type)s de %(org_name)s está tendo problemas para enviar mensagens de texto. Isso pode ser um problema temporário de comunicação com o %(channel_type)s ou pode indicar que o %(channel_type)s ficou sem crédito.\n"
 
 #, python-format
 msgid ""
 "\n"
 "Please check on your %(channel_type)s to make sure it has sufficient credit and can send text messages. Currently your %(channel_type)s has %(unsent_count)s messages which haven't sent in over an hour.\n"
-msgstr "
-Verifique seu %(channel_type)s para garantir que ele tem crédito suficiente e pode enviar mensagens de texto. Atualmente, seu %(channel_type)s tem <strong>%(unsent_count)s</strong> mensagens que não foram enviadas há mais de uma hora.
-"
+msgstr ""
+"\n"
+"Verifique seu %(channel_type)s para garantir que ele tem crédito suficiente e pode enviar mensagens de texto. Atualmente, seu %(channel_type)s tem <strong>%(unsent_count)s</strong> mensagens que não foram enviadas há mais de uma hora.\n"
 
 msgid "Connect your Android phone"
 msgstr "Conecte seu telefone Android"
@@ -5729,14 +5729,15 @@ msgid ""
 "        There is no way to undo this. Are you sure?\n"
 "\n"
 "      "
-msgstr "
-        Você está prestes a excluir
-        <span class='font-normal'>
-          %(object)s.
-        </span>
-        Não é possível desfazer esta ação. Tem certeza?
-
-      "
+msgstr ""
+"\n"
+"        Você está prestes a excluir\n"
+"        <span class='font-normal'>\n"
+"          %(object)s.\n"
+"        </span>\n"
+"        Não é possível desfazer esta ação. Tem certeza?\n"
+"\n"
+"      "
 
 msgid "This flow is in the process of being sent, this message will disappear once all contacts have been added to the flow."
 msgstr "Este fluxo está no processo de ser enviado, essa mensagem irá desaparecer assim que todos os contatos forem adicionados ao fluxo."
@@ -6199,77 +6200,83 @@ msgid ""
 "\n"
 "Your %(brand)s workspace for %(org)s is out of credit. You will no longer be able to send messages and users will no longer be able to interact in flows.\n"
 "\n"
-msgstr "
-
-Seu workspace %(brand)s para %(org)s ficou sem crédito. Você não conseguirá mais enviar mensagens até recarregar seu saldo.
-"
+msgstr ""
+"\n"
+"\n"
+"Seu workspace %(brand)s para %(org)s ficou sem crédito. Você não conseguirá mais enviar mensagens até recarregar seu saldo.\n"
 
 msgid ""
 "\n"
 "    To resume your service please visit your workspace page to purchase a top up.\n"
 "    "
-msgstr "
-    Para retomar o serviço, acesse a página do seu workspace para comprar uma recarga.
-    "
+msgstr ""
+"\n"
+"    Para retomar o serviço, acesse a página do seu workspace para comprar uma recarga.\n"
+"    "
 
 msgid ""
 "\n"
 "    To resume your service, please contact your account manager.\n"
 "    "
-msgstr "
-    Para retomar o serviço, entre em contato com seu gerente de conta.
-    "
+msgstr ""
+"\n"
+"    Para retomar o serviço, entre em contato com seu gerente de conta.\n"
+"    "
 
 #, python-format
 msgid ""
 "\n"
 "\n"
 "Your %(brand)s workspace for %(org)s has expiring credits in less than one month.\n"
-msgstr "
-
-Seu workspace %(brand)s para %(org)s tem créditos que expirarão em menos de um mês.
-"
+msgstr ""
+"\n"
+"\n"
+"Seu workspace %(brand)s para %(org)s tem créditos que expirarão em menos de um mês.\n"
 
 msgid ""
 "\n"
 "      Messages will no longer be sent when your credits expire, to prevent an interruption in your service visit your workspace page to purchase a top up.\n"
 "    "
-msgstr "
-      As mensagens deixarão de ser enviadas quando seus créditos expirarem. Para evitar uma interrupção no serviço, acesse a página do seu workspace para comprar uma recarga.
-      "
+msgstr ""
+"\n"
+"      As mensagens deixarão de ser enviadas quando seus créditos expirarem. Para evitar uma interrupção no serviço, acesse a página do seu workspace para comprar uma recarga.\n"
+"      "
 
 msgid ""
 "\n"
 "      Messages will no longer be sent when your credits expire, to prevent an interruption in your service, please contact your account manager.\n"
 "    "
-msgstr "
-      As mensagens deixarão de ser enviadas quando seus créditos expirarem. Para evitar uma interrupção no serviço, entre em contato com seu gerente de conta.
-      "
+msgstr ""
+"\n"
+"      As mensagens deixarão de ser enviadas quando seus créditos expirarem. Para evitar uma interrupção no serviço, entre em contato com seu gerente de conta.\n"
+"      "
 
 #, python-format
 msgid ""
 "\n"
 "Your %(brand)s workspace for %(org)s is running low on credits, you currently only have %(remaining)s credits remaining.\n"
-msgstr "
-Seu workspace %(brand)s para %(org)s está com poucos créditos, atualmente você tem apenas %(remaining_credits)s créditos. As mensagens deixarão de ser enviadas quando seus créditos chegarem a zero.
-"
+msgstr ""
+"\n"
+"Seu workspace %(brand)s para %(org)s está com poucos créditos, atualmente você tem apenas %(remaining)s créditos. As mensagens deixarão de ser enviadas quando seus créditos chegarem a zero.\n"
 
 msgid ""
 "\n"
 "      Messages will no longer be sent when your credits reach zero, to prevent an interruption in your service visit your workspace page to purchase a top up.\n"
 "    "
-msgstr "
-      As mensagens deixarão de ser enviadas quando seus créditos chegarem a zero. Para evitar uma interrupção no serviço, acesse a página do seu workspace para comprar uma recarga.
-      "
+msgstr ""
+"\n"
+"      As mensagens deixarão de ser enviadas quando seus créditos chegarem a zero. Para evitar uma interrupção no serviço, acesse a página do seu workspace para comprar uma recarga.\n"
+"      "
 
 msgid ""
 "\n"
 "      Messages will no longer be sent when your credits reach zero, to prevent an interruption in your service, please contact your account manager.\n"
 "\n"
 "    "
-msgstr "
-      As mensagens deixarão de ser enviadas quando seus créditos chegarem a zero. Para evitar uma interrupção no serviço, entre em contato com seu gerente de conta.
-      "
+msgstr ""
+"\n"
+"      As mensagens deixarão de ser enviadas quando seus créditos chegarem a zero. Para evitar uma interrupção no serviço, entre em contato com seu gerente de conta.\n"
+"      "
 
 #, python-format
 msgid ""
@@ -6299,16 +6306,16 @@ msgstr "\n\n"
 msgid ""
 "\n"
 "To resume your service please visit your workspace page to purchase a top up.\n"
-msgstr "
-Para retomar o serviço, acesse a página do seu workspace para comprar uma recarga.
-"
+msgstr ""
+"\n"
+"Para retomar o serviço, acesse a página do seu workspace para comprar uma recarga.\n"
 
 msgid ""
 "\n"
 "To resume your service, please contact your account manager.\n"
-msgstr "
-Para retomar o serviço, entre em contato com seu gerente de conta.
-"
+msgstr ""
+"\n"
+"Para retomar o serviço, entre em contato com seu gerente de conta.\n"
 
 #, python-format
 msgid ""
@@ -6316,25 +6323,25 @@ msgid ""
 "\n"
 "Your %(brand)s workspace for %(org)s has expiring credits in less than one month.\n"
 "\n"
-msgstr "
-
-Seu workspace %(brand)s para %(org)s tem créditos que expirarão em menos de um mês.
-
-"
+msgstr ""
+"\n"
+"\n"
+"Seu workspace %(brand)s para %(org)s tem créditos que expirarão em menos de um mês.\n"
+"\n"
 
 msgid ""
 "\n"
 "Messages will no longer be sent when your credits expire, to prevent an interruption in your service visit your workspace page to purchase a top up.\n"
-msgstr "
-As mensagens deixarão de ser enviadas quando seus créditos expirarem. Para evitar uma interrupção no serviço, acesse a página do seu workspace para comprar uma recarga.
-"
+msgstr ""
+"\n"
+"As mensagens deixarão de ser enviadas quando seus créditos expirarem. Para evitar uma interrupção no serviço, acesse a página do seu workspace para comprar uma recarga.\n"
 
 msgid ""
 "\n"
 "Messages will no longer be sent when your credits expire, to prevent an interruption in your service, please contact your account manager.\n"
-msgstr "
-As mensagens deixarão de ser enviadas quando seus créditos expirarem. Para evitar uma interrupção no serviço, entre em contato com seu gerente de conta.
-"
+msgstr ""
+"\n"
+"As mensagens deixarão de ser enviadas quando seus créditos expirarem. Para evitar uma interrupção no serviço, entre em contato com seu gerente de conta.\n"
 
 #, python-format
 msgid ""
@@ -6342,24 +6349,24 @@ msgid ""
 "\n"
 "Your %(brand)s workspace for %(org)s is running low on credits, you currently only have %(remaining)s credits remaining.\n"
 "\n"
-msgstr "
-
-Seu workspace %(brand)s para %(org)s está com poucos créditos, atualmente você tem apenas %(remaining_credits)s créditos. As mensagens deixarão de ser enviadas quando seus créditos chegarem a zero.
-"
+msgstr ""
+"\n"
+"\n"
+"Seu workspace %(brand)s para %(org)s está com poucos créditos, atualmente você tem apenas %(remaining)s créditos. As mensagens deixarão de ser enviadas quando seus créditos chegarem a zero.\n"
 
 msgid ""
 "\n"
 "Messages will no longer be sent when your credits reach zero, to prevent an interruption in your service visit your workspace page to purchase a top up.\n"
-msgstr "
-As mensagens deixarão de ser enviadas quando seus créditos chegarem a zero. Para evitar uma interrupção no serviço, acesse a página do seu workspace para comprar uma recarga.
-"
+msgstr ""
+"\n"
+"As mensagens deixarão de ser enviadas quando seus créditos chegarem a zero. Para evitar uma interrupção no serviço, acesse a página do seu workspace para comprar uma recarga.\n"
 
 msgid ""
 "\n"
 "Messages will no longer be sent when your credits reach zero, to prevent an interruption in your service, please contact your account manager.\n"
-msgstr "
-As mensagens deixarão de ser enviadas quando seus créditos chegarem a zero. Para evitar uma interrupção no serviço, entre em contato com seu gerente de conta.
-"
+msgstr ""
+"\n"
+"As mensagens deixarão de ser enviadas quando seus créditos chegarem a zero. Para evitar uma interrupção no serviço, entre em contato com seu gerente de conta.\n"
 
 #, python-format
 msgid ""
@@ -6434,13 +6441,44 @@ msgid ""
 "Credit Card: %(cc_type)s X%(cc_last4)s\n"
 "<br/>\n"
 "<br/>\n"
-msgstr "
-
-<br/>
-Olá %(customer)s,
-<br/>
-<br/>
-Este é um recibo de sua compra no %(brand_name)s por %(credits)s créditos. "
+msgstr ""
+"\n"
+"\n"
+"<br/>\n"
+"Olá %(customer)s,\n"
+"<br/>\n"
+"<br/>\n"
+"Este é um recibo para a sua compra no %(brand_name)s de %(credits)s créditos.   Este é apenas um recibo, nenhum pagamento é devido. Se você tiver alguma dúvida, entre em contato conosco a qualquer momento em %(brand_support)s.  Você pode visualizar seu saldo a qualquer momento visitando sua página de preenchimento.\n"
+"<br/>\n"
+"Obrigado novamente pelo seu apoio!!\n"
+"<br/>\n"
+"<br/>\n"
+"-----------------------------------------------------------------------------------------------\n"
+"%(brand_name)s Receipt\n"
+"-----------------------------------------------------------------------------------------------\n"
+"<br/>\n"
+"Detalhes da fatura\n"
+"<br/>\n"
+"Id: %(charge_id)s\n"
+"<br/>\n"
+"Data: %(charge_date)s\n"
+"<br/>\n"
+"Área de trabalho: %(org)s\n"
+"<br/>\n"
+"Descrição: %(description)s\n"
+"<br/>\n"
+"Créditos: %(credits)s\n"
+"<br/>\n"
+"Valor: USD $%(amount)s\n"
+"<br/>\n"
+"<br/>\n"
+"Detalhes da cobrança\n"
+"<br/>\n"
+"Nome: %(cc_name)s\n"
+"<br/>\n"
+"Cartão de Crédito: %(cc_type)s X%(cc_last4)s\n"
+"<br/>\n"
+"<br/>\n"
 
 #, python-format
 msgid ""
@@ -6468,11 +6506,31 @@ msgid ""
 "Name: %(cc_name)s\n"
 "Credit Card: %(cc_type)s X%(cc_last4)s\n"
 "\n"
-msgstr "
-
-Olá %(customer)s,
-
-Este é um recibo de sua compra no %(brand_name)s por %(credits)s créditos. "
+msgstr ""
+"\n"
+"\n"
+"Oi %(customer)s,\n"
+"\n"
+"Este é um recibo da sua compra%(brand_name)s  de %(credits)s créditos.  Isto é apenas um recibo, nenhum pagamento é devido. Se você tiver qualquer dúvida, por favor entre em contato conosco a qualquer momento atravé do %(brand_support)s.  Você pode visualizar suas recargas a qualquer momento visitando sua página de recarga.\n"
+"\n"
+"Obrigada pelo suporte!\n"
+"\n"
+"-----------------------------------------------------------------------------------------------\n"
+"%(brand_name)s Recibo\n"
+"-----------------------------------------------------------------------------------------------\n"
+"\n"
+"Detalhes da fatura\n"
+"Id: %(charge_id)s\n"
+"Data: %(charge_date)s\n"
+"Área de trabalho: %(org)s\n"
+"Descrição: %(description)s\n"
+"Créditos %(credits)s\n"
+"Quantidade: USD $%(amount)s\n"
+"\n"
+"Detalhes da cobrança\n"
+"Nome: %(cc_name)s\n"
+"Cartão de crédito: %(cc_type)s X%(cc_last4)s\n"
+"\n"
 
 #, python-format
 msgid ""
@@ -6498,13 +6556,29 @@ msgid ""
 "Please do not reply to this email.\n"
 "<br/>\n"
 "<br/>\n"
-msgstr "
-
-<br/>
-Olá de %(hostname)s,
-<br/>
-<br/>
-Alguém solicitou a redefinição de senha para este endereço de e-mail. Se não foi você, pode ignorar esta mensagem. O link expirará em 24 horas."
+msgstr ""
+"\n"
+"\n"
+"<br/>\n"
+"Olá de %(hostname)s,\n"
+"<br/>\n"
+"<br/>\n"
+"Alguém solicitou a redefinição da senha para este endereço de e-mail.\n"
+"<br/>\n"
+"<br/>\n"
+"Clicar no seguinte link permitirá redefinir a senha da conta %(account_name)s:\n"
+"<br/>\n"
+"<a href='%(brand_link)s%(path)s'>Redefinir senha</a>.\n"
+"<br/>\n"
+"<br/>\n"
+"Se você não fez essa solicitação, não se preocupe, este e-mail foi enviado apenas para você e sua conta permanece segura.\n"
+"<br/>\n"
+"Obrigado.\n"
+"<br/>\n"
+"<br/>\n"
+"Por favor, não responda a este e-mail.\n"
+"<br/>\n"
+"<br/>\n"
 
 #, python-format
 msgid ""
@@ -6524,11 +6598,23 @@ msgid ""
 "\n"
 "Please do not reply to this email.\n"
 "\n"
-msgstr "
-
-Olá de %(hostname)s,
-
-Alguém solicitou a redefinição de senha para este endereço de e-mail. Se não foi você, pode ignorar esta mensagem. O link expirará em 24 horas."
+msgstr ""
+"\n"
+"\n"
+"Olá de %(hostname)s,\n"
+"\n"
+"Alguém solicitou a redefinição da senha para este endereço de e-mail.\n"
+"\n"
+"Clicar no seguinte link permitirá redefinir a senha da conta %(account_name)s:\n"
+"\n"
+"%(brand_link)s%(path)s\n"
+"\n"
+"Se você não fez essa solicitação, não se preocupe, este e-mail foi enviado apenas para você e sua conta permanece segura.\n"
+"\n"
+"Obrigado.\n"
+"\n"
+"Por favor, não responda a este e-mail.\n"
+"\n"
 
 #, python-format
 msgid "Connected to your Chatbase account as agent <b>%(agent)s</b>."
@@ -6977,10 +7063,11 @@ msgid ""
 "    send you an email with details on how to reset your password.\n"
 "\n"
 "  "
-msgstr "
-    Digite o endereço de e-mail que você usou para se cadastrar. Enviaremos
-    um e-mail com as instruções para redefinir sua senha.
-    "
+msgstr ""
+"\n"
+"    Digite o endereço de e-mail que você usou para se cadastrar. Enviaremos\n"
+"    um e-mail com as instruções para redefinir sua senha.\n"
+"    "
 
 msgid "To disable two-factor authentication for your login, enter your current password."
 msgstr "Para desabilitar a autenticação de 2-fatores para o seu login, entre a senha atual."
@@ -7013,9 +7100,10 @@ msgid ""
 "      introducing a new policy which will archive the current policy for posterity and replace it.\n"
 "\n"
 "    "
-msgstr "
-      Estas são as políticas atualmente em vigor. Em geral, não devem ser modificadas, a menos que seja absolutamente necessário, pois as alterações exigirão que todos os usuários as aceitem novamente.
-      "
+msgstr ""
+"\n"
+"      Estas são as políticas atualmente em vigor. Em geral, não devem ser modificadas, a menos que seja absolutamente necessário, pois as alterações exigirão que todos os usuários as aceitem novamente.\n"
+"      "
 
 msgid "Created"
 msgstr "Criado"
@@ -7031,9 +7119,10 @@ msgid ""
 "    as your consent is required to continue to use %(name)s.\n"
 "\n"
 "  "
-msgstr "
-    A %(name)s se preocupa profundamente com sua privacidade. Criamos esta página de privacidade para ajudá-lo(a) a entender quais informações coletamos, por que as coletamos e como as utilizamos.
-    "
+msgstr ""
+"\n"
+"    A %(name)s se preocupa profundamente com sua privacidade. Criamos esta página de privacidade para ajudá-lo(a) a entender quais informações coletamos, por que as coletamos e como as utilizamos.\n"
+"    "
 
 #, python-format
 msgid ""
@@ -7042,9 +7131,10 @@ msgid ""
 "            the updated policies below. Don't worry, you can revoke your consent at any time.\n"
 "\n"
 "          "
-msgstr "
-            Aviso! Atualizamos nossas políticas. Antes de continuar usando %(name)s, você precisará revisar e aceitar nossas novas políticas.
-            "
+msgstr ""
+"\n"
+"            Aviso! Atualizamos nossas políticas. Antes de continuar usando %(name)s, você precisará revisar e aceitar nossas novas políticas.\n"
+"            "
 
 msgid "Revoke"
 msgstr "Revogar"
@@ -7055,10 +7145,11 @@ msgid ""
 "            You agreed to the these policies on %(day)s\n"
 "\n"
 "          "
-msgstr "
-            Você concordou com estas políticas em %(day)s
-
-          "
+msgstr ""
+"\n"
+"            Você concordou com estas políticas em %(day)s\n"
+"\n"
+"          "
 
 msgid "I agree to the above policies"
 msgstr "Concordo com as políticas acima"
@@ -7078,9 +7169,10 @@ msgid ""
 "        To use an Android phone with your %(brand)s workspace to send messages you need to download the %(brand)s relayer app\n"
 "\n"
 "      "
-msgstr "
-        Para usar um celular Android com seu workspace do %(brand)s e enviar mensagens, você precisará baixar o aplicativo %(brand)s e instalá-lo no celular.
-        "
+msgstr ""
+"\n"
+"        Para usar um celular Android com seu workspace do %(brand)s e enviar mensagens, você precisará baixar o aplicativo %(brand)s e instalá-lo no celular.\n"
+"        "
 
 msgid "Latest released on"
 msgstr "Último lançamento em"
@@ -7094,10 +7186,11 @@ msgid ""
 "      No Android app available yet. Please contact %(email)s and report that.\n"
 "\n"
 "    "
-msgstr "
-      Ainda não há aplicativo Android disponível. Entre em contato com %(email)s e reporte isso.
-
-    "
+msgstr ""
+"\n"
+"      Ainda não há aplicativo Android disponível. Entre em contato com %(email)s e reporte isso.\n"
+"\n"
+"    "
 
 #, python-format
 msgid ""
@@ -7105,9 +7198,10 @@ msgid ""
 "        To increase the capacity of messages your phone can send in an hour we recommend you install each of the following %(brand)s message packs as well.\n"
 "\n"
 "      "
-msgstr "
-        Para aumentar a capacidade de mensagens que seu celular pode enviar por hora, recomendamos instalar o aplicativo %(brand)s em um celular Android de médio a alto desempenho.
-        "
+msgstr ""
+"\n"
+"        Para aumentar a capacidade de mensagens que seu celular pode enviar por hora, recomendamos instalar o aplicativo %(brand)s em um celular Android de médio a alto desempenho.\n"
+"        "
 
 #, python-format
 msgid ""
@@ -7163,10 +7257,11 @@ msgid ""
 "            see how things are going.\n"
 "\n"
 "          "
-msgstr "
-            Com uma interface simples de arrastar e soltar, qualquer pessoa pode criar um aplicativo de SMS personalizado
-            sem precisar de conhecimentos de programação. Os fluxos permitem criar pesquisas, cadastros e muito mais.
-            "
+msgstr ""
+"\n"
+"            Com uma interface simples de arrastar e soltar, qualquer pessoa pode criar um aplicativo de SMS personalizado\n"
+"            sem precisar de conhecimentos de programação. Os fluxos permitem criar pesquisas, cadastros e muito mais.\n"
+"            "
 
 msgid "To learn more about flows, visit the"
 msgstr "Para saber mais sobre fluxos, visite o"
@@ -7202,9 +7297,10 @@ msgid ""
 "              You can also use our flow simulator if you don't want to setup a number right away.\n"
 "\n"
 "            "
-msgstr "
-              Você também pode usar nosso simulador de fluxo se não quiser configurar um número agora.
-              "
+msgstr ""
+"\n"
+"              Você também pode usar nosso simulador de fluxo se não quiser configurar um número agora.\n"
+"              "
 
 msgid "Add Number"
 msgstr "Adicionar número"
@@ -7225,9 +7321,21 @@ msgid ""
 "          remove people from groups later if you need to tweak things.\n"
 "\n"
 "        "
-msgstr "
-          Antes de fazer qualquer outra coisa no %(name)s, é útil ter uma lista de contatos. Você pode importar contatos de uma planilha do Excel ou de um arquivo CSV.
-          "
+msgstr ""
+"\n"
+"          Antes de fazer qualquer outra coisa no %(name)s, é útil ter uma lista de contatos. Isso facilita o envio de uma mensagem ou pesquisa\n"
+"          para uma ampla lista de distribuição.\n"
+"\n"
+"          Por exemplo, você pode ter grupos\n"
+"          chamados <i>Equipe de Campo</i>, <i>Gerentes</i> ou <i>Trainees</i>. Você pode importar esses grupos para o\n"
+"          %(name)s enviando um arquivo do Excel usando o nosso\n"
+"          <a href='%(STATIC_URL)s/examples/contacts.xls'>\n"
+"            modelo\n"
+"          </a>\n"
+"          como guia. Criaremos um grupo automaticamente para cada arquivo que você enviar. Não se preocupe, é fácil adicionar ou\n"
+"          remover pessoas dos grupos depois, se precisar ajustar algo.\n"
+"\n"
+"        "
 
 msgid ""
 "\n"
@@ -7235,9 +7343,10 @@ msgid ""
 "            texts with that keyword will automatically be registered into the group.\n"
 "\n"
 "          "
-msgstr "
-            Se você quiser que qualquer pessoa possa entrar em um grupo via SMS, pode configurar uma <i>palavra-chave de entrada</i> para esse grupo. Quando alguém enviar essa palavra-chave, entrará automaticamente no grupo.
-            "
+msgstr ""
+"\n"
+"            Se você quiser que qualquer pessoa possa entrar em um grupo via SMS, pode configurar uma <i>palavra-chave de entrada</i> para esse grupo. Quando alguém enviar essa palavra-chave, entrará automaticamente no grupo.\n"
+"            "
 
 #, python-format
 msgid ""
@@ -7247,9 +7356,10 @@ msgid ""
 "          on a regular schedule.\n"
 "\n"
 "        "
-msgstr "
-          Se você usa e-mail, ler e escrever mensagens no %(name)s já será familiar para você. Cada contato tem sua própria caixa de entrada onde você pode ver o histórico completo da conversa.
-          "
+msgstr ""
+"\n"
+"          Se você usa e-mail, ler e escrever mensagens no %(name)s já será familiar para você. Cada contato tem sua própria caixa de entrada onde você pode ver o histórico completo da conversa.\n"
+"          "
 
 #, python-format
 msgid ""
@@ -7258,9 +7368,10 @@ msgid ""
 "            If anybody joins the <i>Field Staff</i> group later, they will automatically start receiving the weekly reminder.\n"
 "\n"
 "          "
-msgstr "
-            Por exemplo, você pode configurar o %(name)s para enviar uma mensagem toda sexta-feira lembrando as pessoas do grupo sobre as reuniões agendadas.
-            "
+msgstr ""
+"\n"
+"            Por exemplo, você pode configurar o %(name)s para enviar uma mensagem toda sexta-feira lembrando as pessoas do grupo sobre as reuniões agendadas.\n"
+"            "
 
 #, python-format
 msgid ""
@@ -7272,9 +7383,15 @@ msgid ""
 "            to learn more.\n"
 "\n"
 "          "
-msgstr "
-            O %(name)s também oferece uma API REST robusta para adicionar recursos de SMS ao seu próprio site. Alguma dúvida? Consulte a documentação da API.
-            "
+msgstr ""
+"\n"
+"            O %(name)s também oferece uma API REST robusta para adicionar recursos de SMS ao seu próprio site. Consulte a\n"
+"            <a href='%(api_url)s'>\n"
+"              documentação da API\n"
+"            </a>\n"
+"            para saber mais.\n"
+"\n"
+"          "
 
 msgid "API Documentation"
 msgstr "Documentação da API"
@@ -7295,9 +7412,10 @@ msgid ""
 "    Start building SMS applications by watching these short two minutes videos on various %(brand)s features.\n"
 "\n"
 "  "
-msgstr "
-    Comece a criar aplicativos de SMS assistindo a estes vídeos curtos de dois minutos sobre os vários recursos do %(brand)s.
-    "
+msgstr ""
+"\n"
+"    Comece a criar aplicativos de SMS assistindo a estes vídeos curtos de dois minutos sobre os vários recursos do %(brand)s.\n"
+"    "
 
 msgid "Mastering Flows"
 msgstr "Gerenciar fluxos"
@@ -7313,18 +7431,20 @@ msgid ""
 "    build complex flows without a lot of effort.\n"
 "\n"
 "  "
-msgstr "
-    Para aproveitar ao máximo o %(brand)s, preparamos uma série de vídeos curtos para ajudá-lo(a) a se familiarizar com a plataforma.
-    "
+msgstr ""
+"\n"
+"    Para aproveitar ao máximo o %(brand)s, preparamos uma série de vídeos curtos para ajudá-lo(a) a se familiarizar com a plataforma.\n"
+"    "
 
 msgid ""
 "\n"
 "      You don't have to, but it's best if these are watched in order since they build on each other as you go.\n"
 "\n"
 "    "
-msgstr "
-      Não é obrigatório, mas é melhor assisti-los em ordem, pois cada um se baseia no anterior.
-      "
+msgstr ""
+"\n"
+"      Não é obrigatório, mas é melhor assisti-los em ordem, pois cada um se baseia no anterior.\n"
+"      "
 
 msgid "More"
 msgstr "Mais"
@@ -7389,9 +7509,10 @@ msgid ""
 "    Sorry, you cannot log in at this time because we received %(failed_login_limit)s incorrect login attempts.\n"
 "\n"
 "  "
-msgstr "
-    Desculpe, não é possível fazer login no momento porque recebemos %(failed_login_limit)s tentativas de login incorretas nos últimos %(lockout_period)s minutos.
-    "
+msgstr ""
+"\n"
+"    Desculpe, não é possível fazer login no momento porque recebemos %(failed_login_limit)s tentativas de login incorretas.\n"
+"    "
 
 #, python-format
 msgid ""
@@ -7399,10 +7520,11 @@ msgid ""
 "      Please wait %(lockout_timeout)s minutes before to try log in again.\n"
 "\n"
 "    "
-msgstr "
-      Aguarde %(lockout_timeout)s minutos antes de tentar fazer login novamente.
-
-    "
+msgstr ""
+"\n"
+"      Aguarde %(lockout_timeout)s minutos antes de tentar fazer login novamente.\n"
+"\n"
+"    "
 
 msgid "Alternatively, you can fill out the form below to have your password reset via e-mail."
 msgstr "Alternativamente, você pode completar o formulário abaixo para ter a sua senha reconfigurada via email."
@@ -7439,10 +7561,11 @@ msgid ""
 "                  will also be deleted. All workspace data will be deleted and there is no\n"
 "                  going back. This includes all flows, contacts, messages, etc.\n"
 "                "
-msgstr "
-                  também serão excluídos. Todos os dados do workspace serão excluídos e não há
-                  forma de desfazer essa ação.
-                  "
+msgstr ""
+"\n"
+"                  também serão excluídos. Todos os dados do workspace serão excluídos e não há\n"
+"                  forma de desfazer essa ação.\n"
+"                  "
 
 #, python-format
 msgid ""
