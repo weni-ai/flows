@@ -1578,7 +1578,7 @@ class ContactTest(TembaTest):
             reverse("contacts.contact_create"),
             {"name": "Niue Phone", "urn__whatsapp__0": "+6831234"},
         )
-        self.assertFormError(response, "form", "urn__whatsapp__0", "Phone number must have at least 8 digits.")
+        self.assertFormError(response, "form", "urn__whatsapp__0", "Phone number must have at least 8 digits")
 
         # reject creation with no name at all (empty input)
         response = self.client.post(
@@ -5777,14 +5777,14 @@ class ContactImportTest(TembaTest):
         bad_files = [
             ("empty.csv", "Import file doesn't contain any records"),
             ("empty_header.xls", "Import file contains an empty header"),
-            ("duplicate_urn.xlsx", "Import file contains duplicated contact URN 'tel:+250788382382'."),
+            ("duplicate_urn.xlsx", "Import file contains duplicated contact URN 'tel:+250788382382'"),
             (
                 "duplicate_uuid.xlsx",
-                "Import file contains duplicated contact UUID 'f519ca1f-8513-49ba-8896-22bf0420dec7'.",
+                "Import file contains duplicated contact UUID 'f519ca1f-8513-49ba-8896-22bf0420dec7'",
             ),
-            ("invalid_scheme.xlsx", "Header 'URN:XXX' is not a valid URN type."),
-            ("invalid_field_key.xlsx", "Header 'Field: #$^%' is not a valid field name."),
-            ("reserved_field_key.xlsx", "Header 'Field:id' is not a valid field name."),
+            ("invalid_scheme.xlsx", "Header 'URN:XXX' isn't a valid URN type"),
+            ("invalid_field_key.xlsx", "Header 'Field: #$^%' isn't a valid field name"),
+            ("reserved_field_key.xlsx", "Header 'Field:id' isn't a valid field name"),
             ("no_urn_or_uuid.xlsx", "Import files must contain either UUID or a URN header"),
             ("uuid_only.csv", "Import files must contain columns besides UUID"),
         ]
@@ -6499,7 +6499,7 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
             },
         )
         self.assertEqual(1, len(response.context["form"].errors))
-        self.assertFormError(response, "form", "__all__", "Field name 'goats' is repeated.")
+        self.assertFormError(response, "form", "__all__", "Field name 'goats' is repeated")
 
         # if including a new field, name can't be invalid
         response = self.client.post(
@@ -6515,9 +6515,7 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
             },
         )
         self.assertEqual(1, len(response.context["form"].errors))
-        self.assertFormError(
-            response, "form", "__all__", "Field name for 'Field:Sheep' is invalid or a reserved word."
-        )
+        self.assertFormError(response, "form", "__all__", "Field name for 'Field:Sheep' is invalid or a reserved word")
 
         # or empty
         response = self.client.post(
@@ -6533,7 +6531,7 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
             },
         )
         self.assertEqual(1, len(response.context["form"].errors))
-        self.assertFormError(response, "form", "__all__", "Field name for 'Field:Sheep' can't be empty.")
+        self.assertFormError(response, "form", "__all__", "Field name for 'Field:Sheep' can't be empty")
 
         # unless you're ignoring it
         response = self.client.post(

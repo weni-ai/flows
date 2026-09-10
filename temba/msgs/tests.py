@@ -2056,7 +2056,7 @@ class BroadcastCRUDLTest(TembaTest, CRUDLTestMixin):
 
         response = self.requestView(send_url, self.admin)
         self.assertContains(
-            response, 'To get started you need to <a href="/channels/channel/claim/">add a channel</a>'
+            response, 'To get started, <a href="/channels/channel/claim/">add a channel</a> to your workspace'
         )
         self.assertNotContains(response, "Send")
 

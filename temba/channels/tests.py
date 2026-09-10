@@ -218,7 +218,7 @@ class ChannelTest(TembaTest):
     def test_get_channel_type_name(self):
         self.assertEqual(self.tel_channel.get_channel_type_name(), "Android phone")
         self.assertEqual(self.twitter_channel.get_channel_type_name(), "Twitter channel")
-        self.assertEqual(self.unclaimed_channel.get_channel_type_name(), "Vonage Channel")
+        self.assertEqual(self.unclaimed_channel.get_channel_type_name(), "Vonage channel")
 
     def test_get_address_display(self):
         self.assertEqual("+250 785 551 212", self.tel_channel.get_address_display())

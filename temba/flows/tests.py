@@ -2796,7 +2796,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         # shouldn't be able to since we don't have a call channel
         response = self.requestView(ivr_bcast_url, self.admin)
         self.assertContains(
-            response, 'To get started you need to <a href="/channels/channel/claim/">add a voice channel</a>'
+            response, 'To get started, <a href="/channels/channel/claim/">add a voice channel</a> to your workspace'
         )
         self.assertNotContains(response, "Start Flow")
 
@@ -2805,7 +2805,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
 
         response = self.requestView(broadcast_url, self.admin)
         self.assertContains(
-            response, 'To get started you need to <a href="/channels/channel/claim/">add a channel</a>'
+            response, 'To get started, <a href="/channels/channel/claim/">add a channel</a> to your workspace'
         )
         self.assertNotContains(response, "Start Flow")
 
@@ -3466,7 +3466,7 @@ msgstr "Bleu"
             response,
             "form",
             "po_file",
-            "Contains translations in French which is not a supported translation language.",
+            "Contains translations in French, which isn't a supported translation language",
         )
 
         # submit with something that doesn't have an explicit language

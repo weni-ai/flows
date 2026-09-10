@@ -549,7 +549,7 @@ class CampaignTest(TembaTest):
         post_data = dict(action="archive", objects=[self.reminder_flow.pk, self.reminder2_flow.pk])
         response = self.client.post(reverse("flows.flow_list"), post_data)
         self.assertEqual(
-            "The following flows are still used by campaigns so could not be archived: Planting Reminder, Reminder Flow",
+            "The following flows are still used by campaigns and couldn't be archived: Planting Reminder, Reminder Flow",
             response.get("Temba-Toast"),
         )
 
