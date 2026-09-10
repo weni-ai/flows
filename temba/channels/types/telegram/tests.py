@@ -40,7 +40,7 @@ class TelegramTypeTest(TembaTest):
         response = self.client.post(url, {"auth_token": "invalid"})
         self.assertEqual(200, response.status_code)
         self.assertEqual(
-            "Your authentication token is invalid, please check and try again",
+            "Your authentication token is invalid. Check and try again.",
             response.context["form"].errors["auth_token"][0],
         )
 
@@ -68,7 +68,7 @@ class TelegramTypeTest(TembaTest):
 
         response = self.client.post(url, {"auth_token": "184875172:BAEKbsOKAL23CXufXG4ksNV7Dq7e_1qi3j8"})
         self.assertEqual(
-            "A telegram channel for this bot already exists on your account.",
+            "A Telegram channel for this bot already exists on your account.",
             response.context["form"].errors["auth_token"][0],
         )
 

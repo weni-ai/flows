@@ -8,7 +8,7 @@
     {{user_org.name|capfirst}}
 
 -block subtitle
-  -trans "Manage Logins"
+  -trans "Manage logins"
 
 -block extra-style
   {{block.super}}
@@ -49,7 +49,7 @@
       -if has_invites
         %tr.invites-title
           %th(colspan=3)
-            -trans "Pending Invitations"
+            -trans "Pending invitations"
 
       -for row in form.invite_rows
         %tr
@@ -63,7 +63,7 @@
 
   .card
     .title.mb-0.pb-0
-      -trans "Invite New Users"
+      -trans "Invite new users"
 
     .flex.w-full.items-end
       .pr-4.flex-grow

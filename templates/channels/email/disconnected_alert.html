@@ -6,7 +6,7 @@
 {% block body %}
     <p>
       {% blocktrans trimmed with org_name=org.name brand=branding.name %}
-        We've noticed that the Android phone for {{ org_name }} hasn't contacted the {{ brand }} servers since
+        It looks like the Android phone for {{ org_name }} hasn't contacted the {{ brand }} servers since
       {% endblocktrans %}
 
       <strong>{% timezone org.timezone %}{{ last_seen|date:"g:i A" }}{% endtimezone %}</strong>.
@@ -15,8 +15,8 @@
 
     <p>
       {% blocktrans trimmed %}
-        Please check on your phone to make sure it is connected to a WiFi network or cellular data.
-        If problems persist you may want to try turning the phone off then back on.
+        Check your phone to make sure it's connected to a WiFi network or phone data. If problems persist, try turning
+        the phone off and back on.
       {% endblocktrans %}
     </p>
 
@@ -31,5 +31,5 @@
 
     <p>{% trans "Thanks!" %}</p>
 
-    <p>{% blocktrans with brand=branding.name %}The {{ brand }} Team{% endblocktrans %}</p>
+    <p>{% blocktrans with brand=branding.name %}The {{ brand }} team{% endblocktrans %}</p>
 {% endblock %}

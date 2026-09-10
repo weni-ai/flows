@@ -62,10 +62,10 @@ class ClickSendType(ChannelType):
 
     claim_view = AuthenticatedExternalClaimView
     claim_view_kwargs = {
-        "username_label": _("API Username"),
-        "username_help": _("Your API Username"),
-        "password_label": _("API Password"),
-        "password_help": _("Your API Password"),
+        "username_label": _("API username"),
+        "username_help": _("Your API username"),
+        "password_label": _("API password"),
+        "password_help": _("Your API password"),
         "form_blurb": _("You can connect your ClickSend number by entering the settings below."),
     }
 
@@ -74,7 +74,7 @@ class ClickSendType(ChannelType):
     }
 
     configuration_blurb = _(
-        "To finish connecting your channel, you need to set your inbound SMS URL below for your number."
+        "To finish connecting your channel, you'll need to set your inbound SMS URL below for your number."
     )
 
     configuration_urls = (
@@ -82,10 +82,7 @@ class ClickSendType(ChannelType):
             label=_("Receive URL"),
             url="https://{{channel.callback_domain}}/c/cs/{{channel.uuid}}/receive",
             description=_(
-                "This URL should be called by ClickSend when new messages are received. "
-                "On your ClickSend dashboard, you can set this URL by going to SMS, then Settings, "
-                "then the Inbound SMS Settings menu. "
-                "Add a new rule, select action URL, and use the URL above, then click save."
+                "This URL should be called by ClickSend when new messages are received. On your ClickSend dashboard, you can set this URL by going to SMS, then Settings, then the Inbound SMS Settings menu. Add a new rule, select action URL, use the URL above, and click Save."
             ),
         ),
     )

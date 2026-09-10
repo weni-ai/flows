@@ -2,10 +2,10 @@
 -load i18n
 
 -block title
-  -trans "Reset Password"
+  -trans "Reset password"
 -block fields
 
-  -trans "Pick a new password and enter it below. A good password will be at least eight characters long and have a mixture of upper and lower case letters."
+  -trans "Choose a new password and enter it below. A strong password is at least eight characters long and contains a mix of uppercase and lowercase letters."
   
   -for field, errors in form.errors.items
     -if field == '__all__'

@@ -20,8 +20,7 @@ class DMarkType(ChannelType):
     courier_url = r"^dk/(?P<uuid>[a-z0-9\-]+)/(?P<action>receive|status)$"
 
     claim_blurb = _(
-        "If you are based in Uganda or DRC you can purchase a short code from %(link)s and connect it in a few simple "
-        "steps."
+        "If you're based in Uganda or DRC, you can purchase a short code from %(link)s and connect it in a few steps."
     ) % {"link": '<a href="http://dmarkmobile.com/">DMark Mobile</a>'}
     claim_view = ClaimView
 
@@ -30,7 +29,7 @@ class DMarkType(ChannelType):
     attachment_support = False
 
     configuration_blurb = _(
-        "To finish configuring your DMark channel you need to set DMark to send MO messages to the URL below."
+        "To finish configuring your DMark channel, you'll need to set DMark to send MO messages to the URL below."
     )
 
     configuration_urls = (

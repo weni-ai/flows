@@ -2237,7 +2237,7 @@ class APITest(APIJSONMixin, TembaTest):
                 {
                     "uuid": event3.uuid,
                     "campaign": {"uuid": campaign3.uuid, "name": "Alerts"},
-                    "relative_to": {"key": "created_on", "label": "Created On"},
+                    "relative_to": {"key": "created_on", "label": "Created on"},
                     "offset": 6,
                     "unit": "hours",
                     "delivery_hour": 12,
@@ -4086,7 +4086,7 @@ class APITest(APIJSONMixin, TembaTest):
 
         # create some globals
         global1 = Global.get_or_create(self.org, self.admin, "org_name", "Org Name", "Acme Ltd")
-        global2 = Global.get_or_create(self.org, self.admin, "access_token", "Access Token", "23464373")
+        global2 = Global.get_or_create(self.org, self.admin, "access_token", "Access token", "23464373")
 
         # on another org
         Global.get_or_create(self.org2, self.admin, "thingy", "Thingy", "xyz")
@@ -4103,7 +4103,7 @@ class APITest(APIJSONMixin, TembaTest):
             [
                 {
                     "key": "access_token",
-                    "name": "Access Token",
+                    "name": "Access token",
                     "value": "23464373",
                     "modified_on": format_datetime(global2.modified_on),
                 },
@@ -4143,7 +4143,7 @@ class APITest(APIJSONMixin, TembaTest):
             [
                 {
                     "key": "access_token",
-                    "name": "Access Token",
+                    "name": "Access token",
                     "value": "23464373",
                     "modified_on": format_datetime(global2.modified_on),
                 },

@@ -18,7 +18,7 @@ class StartType(ChannelType):
 
     name = "Start Mobile"
 
-    claim_blurb = _("Easily add a two way number you have configured with %(link)s using their APIs.") % {
+    claim_blurb = _("Easily add a two-way number you have configured with %(link)s using their APIs.") % {
         "link": '<a href="https://bulk.startmobile.ua/">Start Mobile</a>'
     }
     claim_view = AuthenticatedExternalClaimView
@@ -29,14 +29,14 @@ class StartType(ChannelType):
     attachment_support = False
 
     configuration_blurb = _(
-        "To finish configuring your Start connection you'll need to notify Start of the following receiving URL."
+        "To finish configuring your Start connection, you'll need to notify Start of the following receiving URL."
     )
 
     configuration_urls = (
         dict(
             label=_("Inbound URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.st' channel.uuid 'receive' %}",
-            description=_("This endpoint should be called by Start when new messages are received to your number."),
+            description=_("This endpoint should be called by Start when new messages are received at your number."),
         ),
     )
 

@@ -25,20 +25,22 @@ class SignalWireClaimView(ClaimViewMixin, SmartFormView):
             max_length=14,
             min_length=1,
             label=_("Number"),
-            help_text=_("The phone number or short code you are connecting."),
+            help_text=_("The phone number or short code you're connecting"),
         )
         domain = forms.CharField(
-            max_length=1024, label=_("Domain"), help_text=_("The domain for your account ex: rapid.signalwire.com")
+            max_length=1024,
+            label=_("Domain"),
+            help_text=_("The domain for your account. Example: rapid.signalwire.com"),
         )
         project_key = forms.CharField(
             max_length=64,
-            label=_("Project Key"),
-            help_text=_("The key for your project ex: 990c5c10-bf8f-4156-b014-44282e60b3a1"),
+            label=_("Project key"),
+            help_text=_("The key for your project. Example: 990c5c10-bf8f-4156-b014-44282e60b3a1"),
         )
         api_token = forms.CharField(
             max_length=64,
             required=False,
-            help_text=_("The API token to use to authenticate ex: FPd199eb93e878f8a3tw9ttna313914tnauwy"),
+            help_text=_("The API token to use to authenticate. Example: FPd199eb93e878f8a3tw9ttna313914tnauwy"),
         )
 
         def clean(self):

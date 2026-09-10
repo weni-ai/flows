@@ -1130,7 +1130,7 @@ class EventTest(TembaTest):
             {
                 "type": "call_started",
                 "status": "I",
-                "status_display": "In Progress",
+                "status_display": "In progress",
                 "created_on": matchers.ISODate(),
                 "logs_url": None,
             },

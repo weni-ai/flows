@@ -3,29 +3,29 @@
 
 -block pre-form
     -blocktrans with name=brand.name trimmed
-      To connect your VK community to RapidPro, you will need to
-      create a community token with messaging permissions.
+      To connect your VK community to RapidPro, you'll need to create a community token with messaging permissions.
 
   .mt-2
     -blocktrans trimmed
-      To obtain the name of your community, access it and enter the exact name below.
+      To get your community name, go to your community page and enter the exact name below.
   .mt-2
 
     -blocktrans trimmed
-      To get your community id, go to Manage > API Usage > Callback API > Server Settings.
-      Copy the whole number you have right after the group_id present in the example json
-      present in the part regarding the verification of the request.
+      To get your community ID, go to Manage > API Usage > Callback API > Server Settings. Copy the number that
+      appears right after group_id in the example JSON in the request verification section.
   .mt-2
 
     -blocktrans trimmed
-      To obtain the verification string, go to the Manage > API Usage > Callback API > Server Settings section.
-      You will find the verification string in an excerpt similar to: String to be returned: <code>4412dd18</code>, copy the string and inform below.
+      To get the verification string, go to Manage > API Usage > Callback API > Server Settings. You'll find the
+      verification string in a section similar to: String to be returned: <code>4412dd18</code>. Copy the string and
+      enter it below.
 
   .mt-2
 
     .alert-warning
       -blocktrans trimmed
-        The API Version of the configured server must be <code>5.103</code>. To configure this, go to Manage > API Usage > Callback API > Server Settings.
+        The API version of the configured server must be <code>5.103</code>. To configure this, go to Manage > API
+        Usage > Callback API > Server Settings.
 
 
 -block extra-style

@@ -25,7 +25,7 @@ class CreateGlobalForm(forms.ModelForm):
         org_active_globals_limit = self.org.get_limit(Org.LIMIT_GLOBALS)
         if self.org.globals.filter(is_active=True).count() >= org_active_globals_limit:
             raise forms.ValidationError(
-                _("Cannot create a new global as limit is %(limit)s."), params={"limit": org_active_globals_limit}
+                _("Can't create a new global as the limit is %(limit)s"), params={"limit": org_active_globals_limit}
             )
 
         return cleaned_data
@@ -34,12 +34,12 @@ class CreateGlobalForm(forms.ModelForm):
         name = self.cleaned_data["name"]
 
         if not Global.is_valid_name(name):
-            raise forms.ValidationError(_("Can only contain letters, numbers and hypens."))
+            raise forms.ValidationError(_("Can only contain letters, numbers and hyphens"))
 
         exists = self.org.globals.filter(is_active=True, name__iexact=name.lower()).exists()
 
         if self.instance.name != name and exists:
-            raise forms.ValidationError(_("Must be unique."))
+            raise forms.ValidationError(_("Must be unique"))
 
         if not Global.is_valid_key(Global.make_key(name)):
             raise forms.ValidationError(_("Isn't a valid name"))
@@ -111,7 +111,7 @@ class GlobalCRUDL(SmartCRUDL):
         success_message = ""
 
     class List(OrgPermsMixin, SmartListView):
-        title = _("Manage Globals")
+        title = _("Manage globals")
         fields = ("name", "key", "value")
         search_fields = ("name__icontains", "key__icontains")
         default_order = ("key",)

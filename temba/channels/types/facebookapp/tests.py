@@ -112,7 +112,7 @@ class FacebookTypeTest(TembaTest):
         response = self.client.post(url, post_data, follow=True)
         self.assertEqual(
             response.context["form"].errors["__all__"][0],
-            "Sorry your Facebook channel could not be connected. Please try again",
+            "Your Facebook channel couldn't be connected. Try again.",
         )
 
     @patch("requests.delete")
@@ -141,14 +141,14 @@ class FacebookTypeTest(TembaTest):
         ]
 
         response = self.client.get(url)
-        self.assertContains(response, "Reconnect Facebook Page")
+        self.assertContains(response, "Reconnect Facebook page")
         self.assertEqual(response.context["facebook_app_id"], "FB_APP_ID")
         self.assertEqual(response.context["refresh_url"], url)
         self.assertTrue(response.context["error_connect"])
 
         mock_get.side_effect = [MockResponse(200, json.dumps({"data": {"is_valid": False}}))]
         response = self.client.get(url)
-        self.assertContains(response, "Reconnect Facebook Page")
+        self.assertContains(response, "Reconnect Facebook page")
         self.assertEqual(response.context["facebook_app_id"], "FB_APP_ID")
         self.assertEqual(response.context["refresh_url"], url)
         self.assertTrue(response.context["error_connect"])
@@ -163,7 +163,7 @@ class FacebookTypeTest(TembaTest):
         ]
 
         response = self.client.get(url)
-        self.assertContains(response, "Reconnect Facebook Page")
+        self.assertContains(response, "Reconnect Facebook page")
         self.assertEqual(response.context["facebook_app_id"], "FB_APP_ID")
         self.assertEqual(response.context["refresh_url"], url)
         self.assertFalse(response.context["error_connect"])

@@ -23,7 +23,7 @@ class PlivoType(ChannelType):
     name = "Plivo"
     icon = "icon-channel-plivo"
 
-    claim_blurb = _("Easily add a two way number you have configured with %(link)s using their APIs.") % {
+    claim_blurb = _("Easily add a two-way number you have configured with %(link)s using their APIs.") % {
         "link": '<a href="https://www.plivo.com/">Plivo</a>'
     }
     claim_view = ClaimView

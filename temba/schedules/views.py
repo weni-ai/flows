@@ -13,13 +13,13 @@ from .models import Schedule
 
 class ScheduleFormMixin(forms.Form):
     start_datetime = forms.DateTimeField(
-        label=_("Start Time"),
+        label=_("Start time"),
         widget=InputWidget(attrs={"datetimepicker": True, "placeholder": _("Select a date and time")}),
     )
     repeat_period = forms.ChoiceField(choices=Schedule.REPEAT_CHOICES, label=_("Repeat"), widget=SelectWidget())
     repeat_days_of_week = forms.MultipleChoiceField(
         choices=Schedule.REPEAT_DAYS_CHOICES,
-        label=_("Repeat On Days"),
+        label=_("Repeat on days"),
         help_text=_("The days of the week to repeat on for weekly schedules"),
         required=False,
         widget=SelectMultipleWidget(attrs=({"placeholder": _("Select days")})),
@@ -31,7 +31,7 @@ class ScheduleFormMixin(forms.Form):
         forms args and kwargs, so we have to customize based on user after the form has been created.
         """
         tz = user.get_org().timezone
-        self.fields["start_datetime"].help_text = _("First time this should happen in the %s timezone.") % tz
+        self.fields["start_datetime"].help_text = _("First time this should happen in the %s timezone") % tz
 
     def clean_repeat_days_of_week(self):
         value = self.cleaned_data["repeat_days_of_week"]
@@ -46,7 +46,7 @@ class ScheduleFormMixin(forms.Form):
 
         if self.is_valid():
             if cleaned_data["repeat_period"] == Schedule.REPEAT_WEEKLY and not cleaned_data.get("repeat_days_of_week"):
-                self.add_error("repeat_days_of_week", _("Must specify at least one day of the week."))
+                self.add_error("repeat_days_of_week", _("Must specify at least one day of the week"))
 
         return cleaned_data
 

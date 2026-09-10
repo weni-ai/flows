@@ -82,8 +82,8 @@ class URN:
         (TEL_SCHEME, _("Phone number")),
         (FACEBOOK_SCHEME, _("Facebook identifier")),
         (INSTAGRAM_SCHEME, _("Instagram identifier")),
-        (TWITTER_SCHEME, _("Twitter handle")),
-        (TWITTERID_SCHEME, _("Twitter ID")),
+        (TWITTER_SCHEME, _("X handle")),
+        (TWITTERID_SCHEME, _("X ID")),
         (VIBER_SCHEME, _("Viber identifier")),
         (LINE_SCHEME, _("LINE identifier")),
         (TELEGRAM_SCHEME, _("Telegram identifier")),
@@ -96,7 +96,7 @@ class URN:
         (FRESHCHAT_SCHEME, _("Freshchat identifier")),
         (VK_SCHEME, _("VK identifier")),
         (ROCKETCHAT_SCHEME, _("RocketChat identifier")),
-        (DISCORD_SCHEME, _("Discord Identifier")),
+        (DISCORD_SCHEME, _("Discord identifier")),
         (WENIWEBCHAT_SCHEME, _("WeniWebChat Identifier")),
         (SLACK_SCHEME, _("Slack Identifier")),
         (TEAMS_SCHEME, _("Teams Identifier")),
@@ -521,7 +521,7 @@ class ContactField(SmartModel, DependencyMixin):
     TYPE_CHOICES = (
         (TYPE_TEXT, _("Text")),
         (TYPE_NUMBER, _("Number")),
-        (TYPE_DATETIME, _("Date & Time")),
+        (TYPE_DATETIME, _("Date and time")),
         (TYPE_STATE, _("State")),
         (TYPE_DISTRICT, _("District")),
         (TYPE_WARD, _("Ward")),
@@ -549,9 +549,9 @@ class ContactField(SmartModel, DependencyMixin):
     SYSTEM_FIELDS = {
         KEY_ID: dict(label="ID", value_type=TYPE_NUMBER),
         KEY_NAME: dict(label="Name", value_type=TYPE_TEXT),
-        KEY_CREATED_ON: dict(label=_("Created On"), value_type=TYPE_DATETIME),
+        KEY_CREATED_ON: dict(label=_("Created on"), value_type=TYPE_DATETIME),
         KEY_LANGUAGE: dict(label="Language", value_type=TYPE_TEXT),
-        KEY_LAST_SEEN_ON: dict(label=_("Last Seen On"), value_type=TYPE_DATETIME),
+        KEY_LAST_SEEN_ON: dict(label=_("Last seen on"), value_type=TYPE_DATETIME),
     }
 
     EXPORT_KEY = "key"
@@ -2342,10 +2342,10 @@ class ContactImport(SmartModel):
         try:
             headers = [str(h).strip() for h in next(data)]
         except StopIteration:
-            raise ValidationError(_("Import file appears to be empty."))
+            raise ValidationError(_("Import file appears to be empty"))
 
         if any([h == "" for h in headers]):
-            raise ValidationError(_("Import file contains an empty header."))
+            raise ValidationError(_("Import file contains an empty header"))
 
         mappings = cls._auto_mappings(org, headers)
 
@@ -2369,13 +2369,13 @@ class ContactImport(SmartModel):
             if uuid:
                 if uuid in seen_uuids:
                     raise ValidationError(
-                        _("Import file contains duplicated contact UUID '%(uuid)s'."), params={"uuid": uuid}
+                        _("Import file contains duplicated contact UUID '%(uuid)s'"), params={"uuid": uuid}
                     )
                 seen_uuids.add(uuid)
             for urn in urns:
                 if urn in seen_urns:
                     raise ValidationError(
-                        _("Import file contains duplicated contact URN '%(urn)s'."), params={"urn": urn}
+                        _("Import file contains duplicated contact URN '%(urn)s'"), params={"urn": urn}
                     )
                 seen_urns.add(urn)
 
@@ -2396,12 +2396,12 @@ class ContactImport(SmartModel):
             num_records += 1
             if num_records > ContactImport.MAX_RECORDS:
                 raise ValidationError(
-                    _("Import files can contain a maximum of %(max)d records."),
+                    _("Import files can contain a maximum of %(max)d records"),
                     params={"max": ContactImport.MAX_RECORDS},
                 )
 
         if num_records == 0:
-            raise ValidationError(_("Import file doesn't contain any records."))
+            raise ValidationError(_("Import file doesn't contain any records"))
 
         file.seek(0)  # seek back to beginning so subsequent reads work
 
@@ -2487,21 +2487,19 @@ class ContactImport(SmartModel):
             elif mapping["type"] == "scheme":
                 has_urn = True
                 if mapping["scheme"] not in URN.VALID_SCHEMES:
-                    raise ValidationError(_("Header '%(header)s' is not a valid URN type."), params={"header": header})
+                    raise ValidationError(_("Header '%(header)s' isn't a valid URN type"), params={"header": header})
             elif mapping["type"] == "new_field":
                 if not ContactField.is_valid_key(mapping["key"]):
-                    raise ValidationError(
-                        _("Header '%(header)s' is not a valid field name."), params={"header": header}
-                    )
+                    raise ValidationError(_("Header '%(header)s' isn't a valid field name"), params={"header": header})
 
             if mapping != ContactImport.MAPPING_IGNORE:
                 non_ignored_mappings.append(mapping)
 
         if not (has_uuid or has_urn):
-            raise ValidationError(_("Import files must contain either UUID or a URN header."))
+            raise ValidationError(_("Import files must contain either UUID or a URN header"))
 
         if has_uuid and len(non_ignored_mappings) == 1:
-            raise ValidationError(_("Import files must contain columns besides UUID."))
+            raise ValidationError(_("Import files must contain columns besides UUID"))
 
     def start_async(self):
         from .tasks import import_contacts_task

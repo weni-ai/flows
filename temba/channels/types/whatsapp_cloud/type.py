@@ -19,7 +19,7 @@ class WhatsAppCloudType(ChannelType):
     A WhatsApp Cloud Channel Type
     """
 
-    extra_links = [dict(name=_("Message Templates"), link="channels.types.whatsapp_cloud.templates")]
+    extra_links = [dict(name=_("Message templates"), link="channels.types.whatsapp_cloud.templates")]
 
     code = "WAC"
     category = ChannelType.Category.SOCIAL_MEDIA

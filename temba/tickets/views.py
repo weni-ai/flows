@@ -390,4 +390,4 @@ class TicketerCRUDL(SmartCRUDL):
     class Delete(DependencyDeleteModal):
         cancel_url = "@orgs.org_home"
         success_url = "@orgs.org_home"
-        success_message = _("Your ticketing service has been deleted.")
+        success_message = _("Your ticketing service has been deleted")

@@ -413,7 +413,7 @@ class CampaignTest(TembaTest):
             reverse("campaigns.campaignevent_create") + "?campaign=%d" % campaign.pk, post_data
         )
 
-        self.assertFormError(response, "form", "flow_to_start", "This field is required.")
+        self.assertFormError(response, "form", "flow_to_start", "Required field")
 
         post_data = dict(
             relative_to=self.planting_date.pk,
@@ -669,7 +669,7 @@ class CampaignTest(TembaTest):
         self.assertContains(response, "Archived", count=0)
 
         gear_links = response.context["view"].get_gear_links()
-        self.assertListEqual([gl["title"] for gl in gear_links], ["Add Event", "Export", "Edit", "Archive"])
+        self.assertListEqual([gl["title"] for gl in gear_links], ["Add event", "Export", "Edit", "Archive"])
 
         # archive the campaign
         campaign.is_archived = True
@@ -1040,7 +1040,7 @@ class CampaignTest(TembaTest):
                         "start_mode": "I",
                         "delivery_hour": -1,
                         "message": None,
-                        "relative_to": {"key": "created_on", "label": "Created On"},
+                        "relative_to": {"key": "created_on", "label": "Created on"},
                         "flow": {"uuid": self.reminder_flow.uuid, "name": "Reminder Flow"},
                     }
                 ],
@@ -1067,7 +1067,7 @@ class CampaignTest(TembaTest):
                         "start_mode": "I",
                         "delivery_hour": -1,
                         "message": {"base": "o' a framer?"},
-                        "relative_to": {"key": "created_on", "label": "Created On"},
+                        "relative_to": {"key": "created_on", "label": "Created on"},
                         "base_language": "base",
                     }
                 ],
@@ -1431,7 +1431,7 @@ class CampaignEventCRUDLTest(TembaTest, CRUDLTestMixin):
                 "unit": "W",
                 "delivery_hour": 13,
             },
-            form_errors={"message_start_mode": "This field is required."},
+            form_errors={"message_start_mode": "Required field"},
         )
         self.assertCreateSubmit(
             create_url,
@@ -1442,7 +1442,7 @@ class CampaignEventCRUDLTest(TembaTest, CRUDLTestMixin):
                 "unit": "W",
                 "delivery_hour": 13,
             },
-            form_errors={"flow_start_mode": "This field is required.", "flow_to_start": "This field is required."},
+            form_errors={"flow_start_mode": "Required field", "flow_to_start": "Required field"},
         )
 
         # can create an event with just a base translation

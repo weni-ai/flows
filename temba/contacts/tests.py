@@ -1043,7 +1043,7 @@ class ContactGroupTest(TembaTest):
         a_campaign = Campaign.objects.first()
 
         response = self.client.get(delete_url, dict(), HTTP_X_PJAX=True)
-        self.assertContains(response, "There is an active campaign using this group.")
+        self.assertContains(response, "an active campaign using this group.")
 
         # archive the campaign
         self.client.post(reverse("campaigns.campaign_archive", args=(a_campaign.pk,)))
@@ -1101,7 +1101,7 @@ class ContactGroupTest(TembaTest):
 
         # users are notified that a group cannot be deleted
         response = self.client.get(delete_url, dict(), HTTP_X_PJAX=True)
-        self.assertContains(response, "There is an active campaign using this group")
+        self.assertContains(response, "an active campaign using this group")
 
         # can't delete if it is a dependency
         response = self.client.post(delete_url, dict())
@@ -1388,7 +1388,7 @@ class ContactGroupCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # dependent on id
         response = self.client.post(url, dict(name="Frank", query="id = 123"))
-        self.assertFormError(response, "form", "query", 'You cannot create a smart group based on "id" or "group".')
+        self.assertFormError(response, "form", "query", 'You can\'t create a smart group based on "id" or "group"')
 
         response = self.client.post(url, dict(name="Frank", query='twitter = "hola"'))
 
@@ -1403,7 +1403,7 @@ class ContactGroupCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # and check we can't change the query while that is the case
         response = self.client.post(url, dict(name="Frank", query='twitter = "hello"'))
-        self.assertFormError(response, "form", "query", "You cannot update the query of a group that is evaluating.")
+        self.assertFormError(response, "form", "query", "You can't update the query of a group that is evaluating")
 
         # but can change the name
         response = self.client.post(url, dict(name="Frank2", query='twitter = "hola"'))
@@ -2780,13 +2780,13 @@ class ContactTest(TembaTest):
         # we have a field to add new urns
         response = self.fetch_protected(update_url, self.admin)
         self.assertEqual(self.joe, response.context["object"])
-        self.assertContains(response, "Add Connection")
+        self.assertContains(response, "Add connection")
 
         # no field to add new urns for anon org
         with AnonymousOrg(self.org):
             response = self.fetch_protected(update_url, self.admin)
             self.assertEqual(self.joe, response.context["object"])
-            self.assertNotContains(response, "Add Connection")
+            self.assertNotContains(response, "Add connection")
 
     @mock_mailroom
     def test_read(self, mr_mocks):
@@ -3541,9 +3541,7 @@ class ContactTest(TembaTest):
             dict(language="fra", name="Muller Awesome", urn__tel__0="+250781111111", urn__twitter__1="blow80"),
         )
 
-        self.assertFormError(
-            response, "form", None, "An error occurred updating your contact. Please try again later."
-        )
+        self.assertFormError(response, "form", None, "An error occurred updating your contact. Try again later.")
 
     def test_contact_read_with_contactfields(self):
         self.login(self.admin)
@@ -4089,7 +4087,7 @@ class ContactFieldTest(TembaTest):
         self.assertEqual(contact_field(self.joe, "Not there"), "--")
 
     def test_make_key(self):
-        self.assertEqual("first_name", ContactField.make_key("First Name"))
+        self.assertEqual("first_name", ContactField.make_key("First name"))
         self.assertEqual("second_name", ContactField.make_key("Second   Name  "))
         self.assertEqual("caf", ContactField.make_key("café"))
         self.assertEqual("first_name", ContactField.make_key("First_Name"))
@@ -4177,7 +4175,7 @@ class ContactFieldTest(TembaTest):
         blocking_export = ExportContactsTask.create(self.org, self.admin)
 
         response = self.client.post(export_url, {}, follow=True)
-        self.assertContains(response, "already an export in progress")
+        self.assertContains(response, "An export is already in progress")
 
         # ok, mark that one as finished and try again
         blocking_export.update_status(ExportContactsTask.STATUS_COMPLETE)
@@ -4972,14 +4970,14 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"label": "UUID", "value_type": "T", "show_in_table": True},
-            form_errors={"label": "Can't be a reserved word."},
+            form_errors={"label": "Can't be a reserved word"},
         )
 
         # try to submit with name of existing field
         self.assertCreateSubmit(
             create_url,
             {"label": "AGE", "value_type": "N", "show_in_table": True},
-            form_errors={"label": "Must be unique."},
+            form_errors={"label": "Must be unique"},
         )
 
         # try to submit with underscore label that conflicts with existing key
@@ -5064,7 +5062,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertUpdateSubmit(
             update_url,
             {"label": "GENDER", "value_type": "N", "show_in_table": True},
-            form_errors={"label": "Must be unique."},
+            form_errors={"label": "Must be unique"},
             object_unchanged=self.age,
         )
 
@@ -5114,18 +5112,18 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         )
         self.assertEqual(4, response.context["total_count"])
         self.assertEqual(250, response.context["total_limit"])
-        self.assertNotContains(response, "You have reached the limit")
-        self.assertNotContains(response, "You are approaching the limit")
+        self.assertNotContains(response, "reached the limit")
+        self.assertNotContains(response, "approaching the limit")
 
         with override_settings(ORG_LIMIT_DEFAULTS={"fields": 10}):
             response = self.requestView(list_url, self.admin)
 
-            self.assertContains(response, "You are approaching the limit")
+            self.assertContains(response, "approaching the limit")
 
         with override_settings(ORG_LIMIT_DEFAULTS={"fields": 3}):
             response = self.requestView(list_url, self.admin)
 
-            self.assertContains(response, "You have reached the limit")
+            self.assertContains(response, "reached the limit")
 
     @mock_mailroom
     def test_usages(self, mr_mocks):
@@ -5195,8 +5193,8 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.assertDeleteFetch(delete_gender_url, allow_editors=True)
         self.assertEqual({}, response.context["soft_dependents"])
         self.assertEqual({}, response.context["hard_dependents"])
-        self.assertContains(response, "You are about to delete")
-        self.assertContains(response, "There is no way to undo this. Are you sure?")
+        self.assertContains(response, "You're about to delete")
+        self.assertContains(response, "This action can't be undone. Are you sure you want to continue?")
 
         self.assertDeleteSubmit(delete_gender_url, object_deactivated=self.gender, success_status=200)
 
@@ -5206,7 +5204,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertEqual({}, response.context["hard_dependents"])
         self.assertContains(response, "is used by the following items but can still be deleted:")
         self.assertContains(response, "Amazing Flow")
-        self.assertContains(response, "There is no way to undo this. Are you sure?")
+        self.assertContains(response, "This action can't be undone. Are you sure you want to continue?")
 
         self.assertDeleteSubmit(delete_joined_url, object_deactivated=joined_on, success_status=200)
 
@@ -5222,7 +5220,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.assertDeleteFetch(delete_age_url, allow_editors=True)
         self.assertEqual({"flow"}, set(response.context["soft_dependents"].keys()))
         self.assertEqual({"group"}, set(response.context["hard_dependents"].keys()))
-        self.assertContains(response, "can't be deleted as it is still used by the following items:")
+        self.assertContains(response, "can't be deleted as it's still used by the following items:")
         self.assertContains(response, "Amazing Group")
         self.assertNotContains(response, "Delete")
 
@@ -5766,7 +5764,7 @@ class ESIntegrationTest(TembaNonAtomicTest):
 class ContactImportTest(TembaTest):
     def test_parse_errors(self):
         # try to open an import that is completely empty
-        with self.assertRaisesRegexp(ValidationError, "Import file appears to be empty."):
+        with self.assertRaisesRegexp(ValidationError, "Import file appears to be empty"):
             ContactImport.try_to_parse(self.org, io.BytesIO(b""), "foo.csv")
 
         def try_to_parse(name):
@@ -5780,8 +5778,8 @@ class ContactImportTest(TembaTest):
                 try_to_parse("simple.xlsx")
 
         bad_files = [
-            ("empty.csv", "Import file doesn't contain any records."),
-            ("empty_header.xls", "Import file contains an empty header."),
+            ("empty.csv", "Import file doesn't contain any records"),
+            ("empty_header.xls", "Import file contains an empty header"),
             ("duplicate_urn.xlsx", "Import file contains duplicated contact URN 'tel:+250788382382'."),
             (
                 "duplicate_uuid.xlsx",
@@ -5790,8 +5788,8 @@ class ContactImportTest(TembaTest):
             ("invalid_scheme.xlsx", "Header 'URN:XXX' is not a valid URN type."),
             ("invalid_field_key.xlsx", "Header 'Field: #$^%' is not a valid field name."),
             ("reserved_field_key.xlsx", "Header 'Field:id' is not a valid field name."),
-            ("no_urn_or_uuid.xlsx", "Import files must contain either UUID or a URN header."),
-            ("uuid_only.csv", "Import files must contain columns besides UUID."),
+            ("no_urn_or_uuid.xlsx", "Import files must contain either UUID or a URN header"),
+            ("uuid_only.csv", "Import files must contain columns besides UUID"),
         ]
 
         for imp_file, imp_error in bad_files:
@@ -6343,7 +6341,7 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # try uploading an empty CSV file
         response = self.client.post(create_url, {"file": upload("media/test_imports/empty.csv")})
-        self.assertFormError(response, "form", "file", "Import file doesn't contain any records.")
+        self.assertFormError(response, "form", "file", "Import file doesn't contain any records")
 
         # try uploading a valid XLSX file
         response = self.client.post(create_url, {"file": upload("media/test_imports/simple.xlsx")})
@@ -6392,17 +6390,17 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # try creating new group but not providing a name
         response = self.client.post(preview_url, {"add_to_group": True, "group_mode": "N", "new_group_name": "  "})
-        self.assertFormError(response, "form", "new_group_name", "Required.")
+        self.assertFormError(response, "form", "new_group_name", "Required")
 
         # try creating new group but providing an invalid name
         response = self.client.post(preview_url, {"add_to_group": True, "group_mode": "N", "new_group_name": "????"})
-        self.assertFormError(response, "form", "new_group_name", "Invalid group name.")
+        self.assertFormError(response, "form", "new_group_name", "Invalid group name")
 
         # try creating new group but providing a name of an existing group
         response = self.client.post(
             preview_url, {"add_to_group": True, "group_mode": "N", "new_group_name": "testERs"}
         )
-        self.assertFormError(response, "form", "new_group_name", "Already exists.")
+        self.assertFormError(response, "form", "new_group_name", "Already exists")
 
         # try creating new group when we've already reached our group limit
         with override_settings(ORG_LIMIT_DEFAULTS={"groups": 2}):
@@ -6438,7 +6436,7 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # try submitting without group
         response = self.client.post(preview_url, {"add_to_group": True, "group_mode": "E", "existing_group": ""})
-        self.assertFormError(response, "form", "existing_group", "Required.")
+        self.assertFormError(response, "form", "existing_group", "Required")
 
         # finally try with actual group...
         response = self.client.post(

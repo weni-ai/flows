@@ -91,7 +91,7 @@
     <div class="control-group {% if form.errors.new_path %}error{%endif%}">
       .controls
         .flex
-          %temba-select#id-urn-scheme.w-96{name:'new_scheme', float:'left', label:'{{_("Add Connection")|escapejs}}', help_text:'{{_("Add a new way connect with this contact")|escapejs}}'}
+          %temba-select#id-urn-scheme.w-96{name:'new_scheme', float:'left', label:'{{_("Add connection")|escapejs}}', help_text:'{{_("Add a new way to connect with this contact")|escapejs}}'}
             -for key, value in schemes
               <temba-option name='{{value}}' value='{{key}}' {% if form.data.new_scheme == key %}selected{%endif%}></temba-option>
           %temba-textinput.flex-grow{name:'new_path', type:'text', value:'{{form.data.new_path}}'}

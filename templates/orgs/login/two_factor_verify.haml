@@ -2,13 +2,13 @@
 -load smartmin i18n
 
 -block login-title
-  -trans "Two-factor Authentication"
+  -trans "Two-factor authentication"
 
 -block login-content
   .mt-4
     -blocktrans trimmed
-      Open the one-time password application with which you setup two-factor authentication on your account
-      and enter the code below to verify your identity.
+      Open the one-time password app you used to set up two-factor authentication on your account and enter the code
+      below to verify your identity.
 
   %form(method="POST")
     -csrf_token
@@ -22,7 +22,7 @@
 
     .mt-2.text-right
       %a(href="{% url 'users.two_factor_backup' %}")
-        -trans "Use Backup Token"
+        -trans "Use backup token"
 
     .mt-6
       %input.button-primary(type="submit" value='{{_("Verify")|escape}}')

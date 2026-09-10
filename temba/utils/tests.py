@@ -1774,14 +1774,14 @@ class RedactTest(TestCase):
 class TestValidators(TestCase):
     def test_validate_external_url(self):
         cases = (
-            dict(url="ftp://google.com", error="Must use HTTP or HTTPS."),
-            dict(url="http://localhost/foo", error="Cannot be a local or private host."),
-            dict(url="http://localhost:80/foo", error="Cannot be a local or private host."),
-            dict(url="http://127.0.00.1/foo", error="Cannot be a local or private host."),  # loop back
-            dict(url="http://192.168.0.0/foo", error="Cannot be a local or private host."),  # private
-            dict(url="http://255.255.255.255", error="Cannot be a local or private host."),  # multicast
-            dict(url="http://169.254.169.254/latest", error="Cannot be a local or private host."),  # link local
-            dict(url="http://::1:80/foo", error="Unable to resolve host."),  # no ipv6 addresses for now
+            dict(url="ftp://google.com", error="Must use HTTP or HTTPS"),
+            dict(url="http://localhost/foo", error="Can't be a local or private host"),
+            dict(url="http://localhost:80/foo", error="Can't be a local or private host"),
+            dict(url="http://127.0.00.1/foo", error="Can't be a local or private host"),  # loop back
+            dict(url="http://192.168.0.0/foo", error="Can't be a local or private host"),  # private
+            dict(url="http://255.255.255.255", error="Can't be a local or private host"),  # multicast
+            dict(url="http://169.254.169.254/latest", error="Can't be a local or private host"),  # link local
+            dict(url="http://::1:80/foo", error="Couldn't resolve host"),  # no ipv6 addresses for now
             dict(url="http://google.com/foo", error=None),
             dict(url="http://google.com:8000/foo", error=None),
             dict(url="HTTP://google.com:8000/foo", error=None),

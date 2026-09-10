@@ -27,7 +27,7 @@ class PolicyCRUDL(SmartCRUDL):
         paginate_by = 500
 
         def get_gear_links(self):
-            links = [dict(title=_("New Policy"), href=reverse("policies.policy_create"))]
+            links = [dict(title=_("New policy"), href=reverse("policies.policy_create"))]
             return links
 
         def get_queryset(self, **kwargs):
@@ -71,7 +71,7 @@ class PolicyCRUDL(SmartCRUDL):
             return Policy.objects.filter(policy_type=policy_type, is_active=True).order_by("-created_on").first()
 
     class List(SmartListView):
-        title = _("Your Privacy")
+        title = _("Your privacy")
         permission = None
         link_fields = ()
 

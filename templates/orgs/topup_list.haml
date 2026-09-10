@@ -7,7 +7,7 @@
 -block table-buttons
 
 -block title
-  -trans "Top Ups"
+  -trans "Top-ups"
 
 -block content
   -with user_org.get_credits_remaining as credits
@@ -22,18 +22,18 @@
         .alert-warning
           -trans "You have"
           {{ credits|intcomma }}
-          -trans "credits remaining. Your service will be suspended when they are all used."
+          -trans "credits remaining. Your service will stop when they're all used."
       -else
         .alert-warning
           -trans "You have"
           {{ credits|intcomma }}
-          -trans "credits remaining. Your service will be suspended when they are all used."
+          -trans "credits remaining. Your service will stop when they're all used."
 
   -for topup in object_list
     .mt-4.border.rounded.p-4
       .flex.font-normal.mb-4.text-xl
         .flex-1
-          {{ topup.get_used|intcomma }} {% trans "of" %} {{ topup.credits|intcomma }} {% trans "Credits Used" %}
+          {{ topup.get_used|intcomma }} {% trans "of" %} {{ topup.credits|intcomma }} {% trans "Credits used" %}
 
 
         .flex-1.text-right
@@ -62,8 +62,8 @@
         -else
           -if topup.price|default_if_none:-1 == -1
             -blocktrans trimmed with brand.name as brand
-              Thank you for supporting {{ brand }}.
+              Thank you for supporting {{ brand }}
 
           -elif topup.price == 0
             -blocktrans trimmed with brand.name as brand
-              Complementary credits, thanks for trying {{ brand }}.
+              Complimentary credits, thanks for trying {{ brand }}

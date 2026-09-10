@@ -173,9 +173,8 @@ class ContactGroupForm(forms.ModelForm):
         if groups_count >= org_active_group_limit:
             raise forms.ValidationError(
                 _(
-                    "This org has %(count)d groups and the limit is %(limit)d. "
-                    "You must delete existing ones before you can "
-                    "create new ones." % dict(count=groups_count, limit=org_active_group_limit)
+                    "This org has %(count)d groups and the limit is %(limit)d. Delete existing ones before creating new ones."
+                    % dict(count=groups_count, limit=org_active_group_limit)
                 )
             )
 
@@ -185,14 +184,14 @@ class ContactGroupForm(forms.ModelForm):
         try:
             parsed = parse_query(self.org, self.cleaned_data["query"])
             if not parsed.metadata.allow_as_group:
-                raise forms.ValidationError(_('You cannot create a smart group based on "id" or "group".'))
+                raise forms.ValidationError(_('You can\'t create a smart group based on "id" or "group"'))
 
             if (
                 self.instance
                 and self.instance.status != ContactGroup.STATUS_READY
                 and parsed.query != self.instance.query
             ):
-                raise forms.ValidationError(_("You cannot update the query of a group that is evaluating."))
+                raise forms.ValidationError(_("You can't update the query of a group that is evaluating"))
 
             return parsed.query
 
@@ -203,7 +202,7 @@ class ContactGroupForm(forms.ModelForm):
         model = ContactGroup
         fields = ("name", "query")
         labels = {"name": _("Name"), "query": _("Query")}
-        help_texts = {"query": _("Only contacts matching this query will belong to this group.")}
+        help_texts = {"query": _("Only contacts matching this query will belong to this group")}
 
 
 class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
@@ -616,7 +615,7 @@ class UpdateContactForm(ContactForm):
 
         self.fields["groups"].initial = self.instance.user_groups.all()
         self.fields["groups"].queryset = ContactGroup.get_user_groups(self.user.get_org(), dynamic=False)
-        self.fields["groups"].help_text = _("The groups which this contact belongs to")
+        self.fields["groups"].help_text = _("The groups this contact belongs to")
 
     class Meta:
         model = Contact
@@ -630,9 +629,9 @@ class ExportForm(Form):
     group_memberships = forms.ModelMultipleChoiceField(
         queryset=ContactGroup.user_groups.none(),
         required=False,
-        label=_("Group Memberships for"),
+        label=_("Group memberships for"),
         widget=SelectMultipleWidget(
-            attrs={"widget_only": True, "placeholder": _("Optional: Choose groups to show in your export")}
+            attrs={"widget_only": True, "placeholder": _("Optional: choose groups to show in your export")}
         ),
     )
 
@@ -645,7 +644,7 @@ class ExportForm(Form):
         ).order_by(Lower("name"))
 
         self.fields["group_memberships"].help_text = _(
-            "Include group membership only for these groups. " "(Leave blank to ignore group memberships)."
+            "Include group membership only for these groups. Leave blank to ignore group memberships."
         )
 
 
@@ -781,8 +780,8 @@ class ContactCRUDL(SmartCRUDL):
                 messages.info(
                     self.request,
                     _(
-                        "There is already an export in progress, started by %s. You must wait "
-                        "for that export to complete before starting another." % existing.created_by.username
+                        "An export is already in progress, started by %s. Wait for it to complete before starting another."
+                        % existing.created_by.username
                     ),
                 )
             else:
@@ -806,7 +805,7 @@ class ContactCRUDL(SmartCRUDL):
                 if not getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):  # pragma: no cover
                     messages.info(
                         self.request,
-                        _("We are preparing your export. We will e-mail you at %s when it is ready.")
+                        _("Your export is in progress. We'll email you at %s when it's ready.")
                         % self.request.user.username,
                     )
 
@@ -814,7 +813,7 @@ class ContactCRUDL(SmartCRUDL):
                     dl_url = reverse("assets.download", kwargs=dict(type="contact_export", pk=export.pk))
                     messages.info(
                         self.request,
-                        _("Export complete, you can find it here: %s (production users will get an email)") % dl_url,
+                        _("Export complete. You can find it here: %s (production users will get an email)") % dl_url,
                     )
             if "HTTP_X_PJAX" not in self.request.META:
                 return HttpResponseRedirect(redirect or reverse("contacts.contact_list"))
@@ -983,10 +982,10 @@ class ContactCRUDL(SmartCRUDL):
                     links.append(
                         dict(
                             id="send-message",
-                            title=_("Send Message"),
+                            title=_("Send message"),
                             style="button-primary",
                             href=f"{reverse('msgs.broadcast_send')}?c={self.object.uuid}",
-                            modax=_("Send Message"),
+                            modax=_("Send message"),
                         )
                     )
 
@@ -994,9 +993,9 @@ class ContactCRUDL(SmartCRUDL):
                     links.append(
                         dict(
                             id="start-flow",
-                            title=_("Start In Flow"),
+                            title=_("Start in Flows"),
                             href=f"{reverse('contacts.contact_start', args=[self.object.id])}",
-                            modax=_("Start In Flow"),
+                            modax=_("Start in Flows"),
                         )
                     )
 
@@ -1005,7 +1004,7 @@ class ContactCRUDL(SmartCRUDL):
                     dict(
                         id="edit-contact",
                         title=_("Edit"),
-                        modax=_("Edit Contact"),
+                        modax=_("Edit contact"),
                         href=f"{reverse('contacts.contact_update', args=[self.object.pk])}",
                     )
                 )
@@ -1013,8 +1012,8 @@ class ContactCRUDL(SmartCRUDL):
                 links.append(
                     dict(
                         id="update-custom-fields",
-                        title=_("Custom Fields"),
-                        modax=_("Custom Fields"),
+                        title=_("Custom fields"),
+                        modax=_("Custom fields"),
                         href=f"{reverse('contacts.contact_update_fields', args=[self.object.pk])}",
                     )
                 )
@@ -1209,8 +1208,8 @@ class ContactCRUDL(SmartCRUDL):
                         links.append(
                             dict(
                                 id="create-smartgroup",
-                                title=_("Create Smart Group"),
-                                modax=_("Create Smart Group"),
+                                title=_("Create smart group"),
+                                modax=_("Create smart group"),
                                 href=f"{reverse('contacts.contactgroup_create')}?search={urlquote_plus(search)}",
                             )
                         )
@@ -1218,14 +1217,14 @@ class ContactCRUDL(SmartCRUDL):
                     pass
 
             if self.has_org_perm("contacts.contactfield_list") and not is_spa:
-                links.append(dict(title=_("Manage Fields"), href=reverse("contacts.contactfield_list")))
+                links.append(dict(title=_("Manage fields"), href=reverse("contacts.contactfield_list")))
 
             if self.has_org_perm("contacts.contact_export"):
                 links.append(
                     dict(
                         id="export-contacts",
                         title=_("Export"),
-                        modax=_("Export Contacts"),
+                        modax=_("Export contacts"),
                         href=self.derive_export_url(),
                     )
                 )
@@ -1234,8 +1233,8 @@ class ContactCRUDL(SmartCRUDL):
                 links.append(
                     dict(
                         id="create-contact",
-                        title=_("New Contact"),
-                        modax=_("New Contact"),
+                        title=_("New contact"),
+                        modax=_("New contact"),
                         href=reverse("contacts.contact_create"),
                     )
                 )
@@ -1243,8 +1242,8 @@ class ContactCRUDL(SmartCRUDL):
                 links.append(
                     dict(
                         id="create-group",
-                        title=_("New Group"),
-                        modax=_("New Group"),
+                        title=_("New group"),
+                        modax=_("New group"),
                         href=reverse("contacts.contactgroup_create"),
                     )
                 )
@@ -1261,7 +1260,7 @@ class ContactCRUDL(SmartCRUDL):
             return context
 
     class Blocked(ContactListView):
-        title = _("Blocked Contacts")
+        title = _("Blocked contacts")
         system_group = ContactGroup.TYPE_BLOCKED
 
         def get_bulk_actions(self):
@@ -1273,7 +1272,7 @@ class ContactCRUDL(SmartCRUDL):
             return context
 
     class Stopped(ContactListView):
-        title = _("Stopped Contacts")
+        title = _("Stopped contacts")
         template_name = "contacts/contact_stopped.haml"
         system_group = ContactGroup.TYPE_STOPPED
 
@@ -1286,7 +1285,7 @@ class ContactCRUDL(SmartCRUDL):
             return context
 
     class Archived(ContactListView):
-        title = _("Archived Contacts")
+        title = _("Archived contacts")
         template_name = "contacts/contact_archived.haml"
         system_group = ContactGroup.TYPE_ARCHIVED
         bulk_action_permissions = {"delete": "contacts.contact_delete"}
@@ -1309,7 +1308,7 @@ class ContactCRUDL(SmartCRUDL):
             if self.has_org_perm("contacts.contact_delete"):
                 links.append(
                     dict(
-                        title=_("Delete All"),
+                        title=_("Delete all"),
                         style="btn-default",
                         on_click="handleDeleteAllContacts(event)",
                         js_class="contacts-btn-delete-all",
@@ -1327,14 +1326,14 @@ class ContactCRUDL(SmartCRUDL):
             is_spa = "HTTP_TEMBA_SPA" in self.request.META
 
             if self.has_org_perm("contacts.contactfield_list") and not is_spa:
-                links.append(dict(title=_("Manage Fields"), href=reverse("contacts.contactfield_list")))
+                links.append(dict(title=_("Manage fields"), href=reverse("contacts.contactfield_list")))
 
             if self.has_org_perm("contacts.contactgroup_update"):
                 links.append(
                     dict(
                         id="edit-group",
-                        title=_("Edit Group"),
-                        modax=_("Edit Group"),
+                        title=_("Edit group"),
+                        modax=_("Edit group"),
                         href=reverse("contacts.contactgroup_update", args=[self.group.id]),
                     )
                 )
@@ -1344,7 +1343,7 @@ class ContactCRUDL(SmartCRUDL):
                     dict(
                         id="export-contacts",
                         title=_("Export"),
-                        modax=_("Export Contacts"),
+                        modax=_("Export contacts"),
                         href=self.derive_export_url(),
                     )
                 )
@@ -1362,8 +1361,8 @@ class ContactCRUDL(SmartCRUDL):
                 links.append(
                     dict(
                         id="delete-group",
-                        title=_("Delete Group"),
-                        modax=_("Delete Group"),
+                        title=_("Delete group"),
+                        modax=_("Delete group"),
                         href=reverse("contacts.contactgroup_delete", args=[self.group.id]),
                     )
                 )
@@ -1429,7 +1428,7 @@ class ContactCRUDL(SmartCRUDL):
         form_class = UpdateContactForm
         success_url = "uuid@contacts.contact_read"
         success_message = ""
-        submit_button_name = _("Save Changes")
+        submit_button_name = _("Save changes")
 
         def derive_exclude(self):
             obj = self.get_object()
@@ -1490,7 +1489,7 @@ class ContactCRUDL(SmartCRUDL):
                 obj.modify(self.request.user, mods)
             except Exception:
                 errors = form._errors.setdefault(forms.forms.NON_FIELD_ERRORS, forms.utils.ErrorList())
-                errors.append(_("An error occurred updating your contact. Please try again later."))
+                errors.append(_("An error occurred updating your contact. Try again later."))
                 return self.render_to_response(self.get_context_data(form=form))
 
             messages.success(self.request, self.derive_success_message())
@@ -1519,7 +1518,7 @@ class ContactCRUDL(SmartCRUDL):
         form_class = Form
         success_url = "uuid@contacts.contact_read"
         success_message = ""
-        submit_button_name = _("Save Changes")
+        submit_button_name = _("Save changes")
 
         def get_form_kwargs(self):
             kwargs = super().get_form_kwargs()
@@ -1699,10 +1698,10 @@ class ContactGroupCRUDL(SmartCRUDL):
                 links.append(
                     {
                         "id": "new-group",
-                        "title": _("New Group"),
+                        "title": _("New group"),
                         "style": "button-primary",
                         "href": f"{reverse('contacts.contactgroup_create')}",
-                        "modax": _("New Group"),
+                        "modax": _("New group"),
                     }
                 )
 
@@ -1871,14 +1870,14 @@ class ContactFieldForm(forms.ModelForm):
         key = ContactField.make_key(label)
 
         if not ContactField.is_valid_key(key):
-            raise forms.ValidationError(_("Can't be a reserved word."))
+            raise forms.ValidationError(_("Can't be a reserved word"))
 
         conflict = ContactField.user_fields.active_for_org(org=self.org).filter(label__iexact=label.lower())
         if self.instance:
             conflict = conflict.exclude(id=self.instance.id)
 
         if conflict.exists():
-            raise forms.ValidationError(_("Must be unique."))
+            raise forms.ValidationError(_("Must be unique"))
 
         conflict_key = ContactField.user_fields.active_for_org(org=self.org).filter(key=key)
         if self.instance:
@@ -1893,7 +1892,7 @@ class ContactFieldForm(forms.ModelForm):
         model = ContactField
         fields = ("label", "value_type", "show_in_table")
         labels = {"label": _("Name"), "value_type": _("Data Type"), "show_in_table": _("Featured")}
-        help_texts = {"value_type": _("The type of the values that will be stored in this field.")}
+        help_texts = {"value_type": _("The type of the values that will be stored in this field")}
         widgets = {
             "label": InputWidget(attrs={"widget_only": False}),
             "value_type": SelectWidget(attrs={"widget_only": False}),
@@ -1903,7 +1902,7 @@ class ContactFieldForm(forms.ModelForm):
 
 class ContactFieldListView(SpaMixin, OrgPermsMixin, SmartListView):
     queryset = ContactField.user_fields
-    title = _("Manage Contact Fields")
+    title = _("Manage contact fields")
     fields = ("label", "show_in_table", "key", "value_type")
     search_fields = ("label__icontains", "key__icontains")
     default_order = ("label",)
@@ -2001,7 +2000,7 @@ class ContactFieldCRUDL(SmartCRUDL):
                 field_count = ContactField.user_fields.count_active_for_org(org=self.org)
                 if field_count >= org_active_fields_limit:
                     raise forms.ValidationError(
-                        _(f"Cannot create a new field as limit is %(limit)s."),
+                        _(f"Can't create a new field as the limit is %(limit)s"),
                         params={"limit": org_active_fields_limit},
                     )
 
@@ -2270,26 +2269,24 @@ class ContactImportCRUDL(SmartCRUDL):
                     if mapping["type"] == "new_field" and data["include"]:
                         field_name = data["name"]
                         if not field_name:
-                            raise ValidationError(
-                                _("Field name for '%(header)s' can't be empty.") % {"header": header}
-                            )
+                            raise ValidationError(_("Field name for '%(header)s' can't be empty") % {"header": header})
                         else:
                             field_key = ContactField.make_key(field_name)
                             if field_key in existing_field_keys:
                                 raise forms.ValidationError(
-                                    _("Field name for '%(header)s' matches an existing field."),
+                                    _("Field name for '%(header)s' matches an existing field"),
                                     params={"header": header},
                                 )
 
                             if not ContactField.is_valid_label(field_name) or not ContactField.is_valid_key(field_key):
                                 raise forms.ValidationError(
-                                    _("Field name for '%(header)s' is invalid or a reserved word."),
+                                    _("Field name for '%(header)s' is invalid or a reserved word"),
                                     params={"header": header},
                                 )
 
                             if field_key in used_field_keys:
                                 raise forms.ValidationError(
-                                    _("Field name '%(name)s' is repeated.") % {"name": field_name}
+                                    _("Field name '%(name)s' is repeated") % {"name": field_name}
                                 )
 
                             used_field_keys.add(field_key)
@@ -2300,21 +2297,21 @@ class ContactImportCRUDL(SmartCRUDL):
                     if group_mode == self.GROUP_MODE_NEW:
                         new_group_name = self.cleaned_data.get("new_group_name")
                         if not new_group_name:
-                            self.add_error("new_group_name", _("Required."))
+                            self.add_error("new_group_name", _("Required"))
                         elif not ContactGroup.is_valid_name(new_group_name):
-                            self.add_error("new_group_name", _("Invalid group name."))
+                            self.add_error("new_group_name", _("Invalid group name"))
                         elif ContactGroup.get_user_group_by_name(self.org, new_group_name):
-                            self.add_error("new_group_name", _("Already exists."))
+                            self.add_error("new_group_name", _("Already exists"))
                     else:
                         existing_group = self.cleaned_data.get("existing_group")
                         if not existing_group:
-                            self.add_error("existing_group", _("Required."))
+                            self.add_error("existing_group", _("Required"))
 
                     groups_count = ContactGroup.get_user_groups(self.org, ready_only=False).count()
                     groups_limit = self.org.get_limit(Org.LIMIT_GROUPS)
                     if groups_count >= groups_limit:
                         raise forms.ValidationError(
-                            _("This workspace has reached the limit of %(count)d groups."),
+                            _("This workspace has reached the limit of %(count)d groups"),
                             params={"count": groups_limit},
                         )
 

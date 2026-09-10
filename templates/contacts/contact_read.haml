@@ -79,7 +79,7 @@
         %td
           .whitespace-nowrap.pr-24.contact-field
             .contact-field-value.uppercase.tracking-wider.font-normal.text-xs
-              -trans "Created On"
+              -trans "Created on"
         %td.w-full
           .contact-field-value
             {% format_datetime contact.created_on %}
@@ -87,7 +87,7 @@
         %td
           .whitespace-nowrap.pr-24.contact-field
             .contact-field-value.uppercase.tracking-wider.font-normal.text-xs
-              -trans "Last Seen On"
+              -trans "Last seen on"
         %td.w-full
           .contact-field-value
             -if contact.last_seen_on
@@ -103,7 +103,7 @@
                 -trans "Language"
           %td.w-full
             .contact-field-value.hover-linked
-              -trans 'Edit Contact' as title
+              -trans 'Edit contact' as title
               %temba-modax(header="{{title|escapejs}}" endpoint="{% url 'contacts.contact_update' contact.pk %}")
                 {{contact_language}}
 
@@ -112,7 +112,7 @@
           %td
             .whitespace-nowrap.pr-12.contact-field
               .contact-field-value.uppercase.tracking-wider.font-normal.text-xs
-                -trans "Contact Id"
+                -trans "Contact ID"
           %td.w-full
             .contact-field
               .contact-field-value
@@ -207,7 +207,7 @@
     %table.list.tickets.mt-6
       %thead
         %th(colspan="5")
-          -trans "Open Tickets"
+          -trans "Open tickets"
 
       -for ticket in open_tickets
         %tr.item

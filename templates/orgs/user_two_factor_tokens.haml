@@ -39,13 +39,13 @@
   .my-3
 
     -blocktrans trimmed
-      You can generate new backup tokens but remember that the current tokens will be no longer be usable if you do this.
+      You can generate new backup tokens, but the current tokens will no longer be usable if you do.
 
     .mt-3
       %form(action="{% url 'orgs.user_two_factor_tokens'%}" method="POST")
         {% csrf_token %}
-        %input.button-primary(type="submit" value='{{_("Regenerate Tokens")|escapejs }}')
+        %input.button-primary(type="submit" value='{{_("Regenerate tokens")|escapejs }}')
 
 -block summary
   -blocktrans trimmed
-    Two-factor authentication is <b>enabled</b>.
+    Two-factor authentication is <b>enabled</b>

@@ -110,7 +110,7 @@ class FlowTest(TembaTest):
 
     @patch("temba.mailroom.queue_interrupt")
     def test_release(self, mock_queue_interrupt):
-        global1 = Global.get_or_create(self.org, self.admin, "api_key", "API Key", "234325")
+        global1 = Global.get_or_create(self.org, self.admin, "api_key", "API key", "234325")
         flow = self.get_flow("color")
         flow.global_dependencies.add(global1)
 
@@ -216,7 +216,7 @@ class FlowTest(TembaTest):
         response = self.client.get(reverse("flows.flow_broadcast", args=[no_topic.id]))
 
         # no warning, we don't have a facebook channel
-        self.assertNotContains(response, "does not specify a Facebook topic")
+        self.assertNotContains(response, "specify a Facebook topic")
 
         # change our channel to use a facebook scheme
         self.channel.schemes = [URN.FACEBOOK_SCHEME]
@@ -224,11 +224,11 @@ class FlowTest(TembaTest):
 
         # should see a warning for no topic now
         response = self.client.get(reverse("flows.flow_broadcast", args=[no_topic.id]))
-        self.assertContains(response, "does not specify a Facebook topic")
+        self.assertContains(response, "specify a Facebook topic")
 
         # warning shouldn't be present for flow with a topic
         response = self.client.get(reverse("flows.flow_broadcast", args=[with_topic.id]))
-        self.assertNotContains(response, "does not specify a Facebook topic")
+        self.assertNotContains(response, "specify a Facebook topic")
 
     def test_template_warnings(self):
         self.login(self.admin)
@@ -251,7 +251,7 @@ class FlowTest(TembaTest):
         flow.save(update_fields=["metadata"])
 
         response = self.client.get(reverse("flows.flow_broadcast", args=[flow.id]))
-        self.assertContains(response, "does not use message")
+        self.assertContains(response, "use message templates")
 
         # restore our dependency
         flow.metadata = metadata
@@ -1975,7 +1975,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertEqual(
             [
                 (Flow.TYPE_MESSAGE, "Messaging"),
-                (Flow.TYPE_VOICE, "Phone Call"),
+                (Flow.TYPE_VOICE, "Phone call"),
                 (Flow.TYPE_BACKGROUND, "Background"),
                 (Flow.TYPE_SURVEY, "Surveyor"),
             ],
@@ -2644,17 +2644,13 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.client.post(
             reverse("flows.flow_revisions", args=[flow.uuid]), definition, content_type="application/json"
         )
-        self.assertResponseError(
-            response, "description", "Your changes will not be saved until you refresh your browser"
-        )
+        self.assertResponseError(response, "description", "Your changes won't be saved until you refresh your browser")
 
         # but we can't save our old revision
         response = self.client.post(
             reverse("flows.flow_revisions", args=[flow.uuid]), definition, content_type="application/json"
         )
-        self.assertResponseError(
-            response, "description", "Your changes will not be saved until you refresh your browser"
-        )
+        self.assertResponseError(response, "description", "Your changes won't be saved until you refresh your browser")
 
         # or save an old version
         definition = flow.revisions.all().first().definition
@@ -2728,7 +2724,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertUpdateSubmit(
             broadcast_url,
             {"mode": "query", "query": "", "exclude_in_other": False, "exclude_reruns": False},
-            form_errors={"query": "This field is required."},
+            form_errors={"query": "Required field"},
             object_unchanged=flow,
         )
 
@@ -2736,7 +2732,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertUpdateSubmit(
             broadcast_url,
             {"mode": "select", "omnibox": [], "exclude_in_other": False, "exclude_reruns": False},
-            form_errors={"omnibox": "This field is required."},
+            form_errors={"omnibox": "Required field"},
             object_unchanged=flow,
         )
 
@@ -2790,7 +2786,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # trying to start again should fail because there is already a pending start for this flow
         response = self.requestView(broadcast_url, self.admin)
-        self.assertContains(response, "This flow is already being started - please wait")
+        self.assertContains(response, "This flow is already being started. Wait until")
         self.assertNotContains(response, "Start Flow")
 
         # clear that start and try to start the IVR flow
@@ -3340,7 +3336,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertEqual(
             {
                 "status": "failure",
-                "description": "Your flow failed validation. Please refresh your browser.",
+                "description": "Your flow failed validation. Refresh your browser.",
                 "detail": f"unable to read flow: node UUID {mode0_uuid} isn't unique",
             },
             response.json(),
@@ -3358,7 +3354,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         )
 
         self.assertUpdateSubmit(
-            change_url, {"language": "fra"}, form_errors={"language": "Not a valid language."}, object_unchanged=flow
+            change_url, {"language": "fra"}, form_errors={"language": "Not a valid language"}, object_unchanged=flow
         )
 
         self.assertUpdateSubmit(change_url, {"language": "spa"}, success_status=302)
@@ -3430,7 +3426,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # submit with something that's not a valid PO file
         response = self.requestView(step1_url, self.admin, post_data={"po_file": io.BytesIO(b"msgid")})
-        self.assertFormError(response, "form", "po_file", "File doesn't appear to be a valid PO file.")
+        self.assertFormError(response, "form", "po_file", "File doesn't appear to be a valid PO file")
 
         # submit with something that's in the base language of the flow
         po_file = io.BytesIO(
@@ -4192,7 +4188,7 @@ class ExportFlowResultsTest(TembaTest):
         response = self.client.post(
             reverse("flows.flow_export_results"), {"flows": [flow.id], "group_memberships": [devs.id]}, follow=True
         )
-        self.assertContains(response, "already an export in progress")
+        self.assertContains(response, "An export is already in progress")
 
         # ok, mark that one as finished and try again
         blocking_export.update_status(ExportFlowResultsTask.STATUS_COMPLETE)

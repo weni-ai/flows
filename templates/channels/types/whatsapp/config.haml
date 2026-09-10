@@ -1,11 +1,11 @@
 -load i18n
 
 -blocktrans trimmed
-  Your WhatsApp channel is now connected, you should be able to send and receive messages as normal.
+  Your WhatsApp channel is now connected. You should be able to send and receive messages as usual.
 
 -blocktrans trimmed
-  In the case of a new WhatsApp install or replacement of an existing WhatsApp channel you may need to refresh
-  the contacts on the WhatsApp application. This may take a few minutes.
+  If you've installed WhatsApp for the first time or replaced an existing WhatsApp channel, you may need to refresh
+  the contacts on the WhatsApp app. This may take a few minutes.
 
 .mt-4
   %a.button-primary.inline-block.mt-2.posterize(href="{% url 'channels.types.whatsapp.refresh' channel.uuid %}") Refresh Contacts

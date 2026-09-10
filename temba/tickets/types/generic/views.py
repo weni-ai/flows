@@ -9,7 +9,7 @@ from temba.utils.uuid import uuid4
 class ConnectView(BaseConnectView):
     class Form(BaseConnectView.Form):
         base_url = forms.URLField(label=_("Base URL"), help_text=_("The base URL of the generic ticketer"))
-        api_token = forms.CharField(label=_("API Token"), help_text=_("The API token of the generic ticketer"))
+        api_token = forms.CharField(label=_("API token"), help_text=_("The API token of the generic ticketer"))
         webhook_secret = forms.CharField(
             label=_("Webhook Secret"), help_text=_("The webhook secret of the generic ticketer")
         )

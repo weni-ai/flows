@@ -2,7 +2,7 @@
 -load smartmin temba i18n humanize
 
 -block page-title
-  -trans "Manage Globals"
+  -trans "Manage globals"
 
 -block title-icon
   .title-icon
@@ -18,7 +18,7 @@
     You have <b>{{ counter }} globals</b> configured
     {% endblocktrans %}
   -else
-    -trans "You do not have any globals configured."
+    -trans "You don't have any globals configured"
 
 -block top-form
   -if view.search_fields
@@ -32,9 +32,9 @@
       .lp-frame
         .left
           - if view.add_button and org_perms.globals.global_create
-            %temba-modax#create-global-modal{ header:'{% trans "Create Global" %}', endpoint:"{% url 'globals.global_create' %}"}
+            %temba-modax#create-global-modal{ header:'{% trans "Create global" %}', endpoint:"{% url 'globals.global_create' %}"}
               .button-primary.mb-3.block
-                -trans "Create Global"
+                -trans "Create global"
 
           .lp-nav.upper
             .font-normal.uppercase.text-xs.pb-1.text-gray-500
@@ -66,13 +66,13 @@
           -elif search
             .mb-4.ml-1.text-base.leading-relaxed
               -blocktrans trimmed with results_count=paginator.count|intcomma count cc=paginator.count
-                Found {{ results_count }} global matching <i>{{search}}</i>.
+                Found {{ results_count }} global matching <i>{{search}}</i>
               -plural
-                Found {{ results_count }} globals matching <i>{{search}}</i>.
+                Found {{ results_count }} globals matching <i>{{search}}</i>
 
           -block pre-table
-            %temba-modax(id='update-global' header='{{_("Update Global")|escapejs}}')
-            %temba-modax(id='delete-global' header='{{_("Delete Global")|escapejs}}')
+            %temba-modax(id='update-global' header='{{_("Update global")|escapejs}}')
+            %temba-modax(id='delete-global' header='{{_("Delete global")|escapejs}}')
             %temba-modax(id='usages-global' header='{{_("Usages")|escapejs}}')
 
           %table.list.object-list.lined{class:"{% if org_perms.contacts.contact_update %}selectable{%endif%}"}
@@ -92,9 +92,9 @@
                           .uses(onclick='event.stopPropagation(); showGlobalUsagesModal("{{ obj.uuid }}");')
                             .lbl.linked
                               {% blocktrans trimmed count counter=usage_count %}
-                                {{counter}} Use
+                                {{counter}} use
                               {% plural %}
-                                {{counter}} Uses
+                                {{counter}} uses
                               {% endblocktrans %}
 
                   %td.w-10

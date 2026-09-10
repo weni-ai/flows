@@ -28,7 +28,7 @@ class BongoLiveType(ChannelType):
     }
 
     configuration_blurb = _(
-        "To finish connecting your channel, you need to have Bongo Live configure the URLs below for your short code."
+        "To finish connecting your channel, Bongo Live must configure the URLs below for your short code."
     )
 
     configuration_urls = (

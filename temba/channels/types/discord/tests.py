@@ -52,7 +52,7 @@ class DiscordTypeTest(TembaTest):
         response = self.client.post(url, {"auth_token": "invalid", "proxy_url": "http://foo.bar"})
         self.assertEqual(200, response.status_code)
         self.assertEqual(
-            "Couldn't log in using that bot token. Please check and try again",
+            "Couldn't log in using that bot token. Check and try again.",
             response.context["form"].errors["auth_token"][0],
         )
 
@@ -60,7 +60,7 @@ class DiscordTypeTest(TembaTest):
         response = self.client.post(url, {"auth_token": "fake-network-error", "proxy_url": "http://foo.bar"})
         self.assertEqual(200, response.status_code)
         self.assertEqual(
-            "An error occurred accessing the Discord API. Please try again",
+            "An error occurred accessing the Discord API. Try again.",
             response.context["form"].errors["auth_token"][0],
         )
 

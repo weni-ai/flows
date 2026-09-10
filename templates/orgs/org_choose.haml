@@ -3,12 +3,12 @@
 
 -block title
   .page-title
-    -trans "Choose Workspace"
+    -trans "Choose workspace"
 
 -block content
   -if not orgs
     .my-6
-      -trans "Your login is not associated with any workspace. Please contact your administrator to receive an invitation to a workspace."
+      -trans "Your login isn't associated with any workspace. Contact your administrator to receive an invitation."
 
   -for org in orgs
     %a.button-light.mr-3.inline-block.posterize(href="?organization={{ org.id }}")

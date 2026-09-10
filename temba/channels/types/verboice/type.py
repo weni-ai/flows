@@ -24,13 +24,12 @@ class VerboiceType(ChannelType):
     ivr_protocol = ChannelType.IVRProtocol.IVR_PROTOCOL_TWIML
 
     configuration_blurb = _(
-        "To finish configuring your connection you'll need to set the following status callback URL for your Verboice "
-        "project"
+        "To finish configuring your connection, set the following status callback URL for your Verboice project."
     )
 
     configuration_urls = (
         dict(
-            label=_("Status Callback URL"),
+            label=_("Status callback URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.vb' channel.uuid 'status' %}",
         ),
     )

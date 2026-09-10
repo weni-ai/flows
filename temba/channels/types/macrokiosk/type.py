@@ -18,7 +18,7 @@ class MacrokioskType(ChannelType):
 
     name = "Macrokiosk"
 
-    claim_blurb = _("Easily add a two way number you have configured with %(link)s using their APIs.") % {
+    claim_blurb = _("Easily add a two-way number you have configured with %(link)s using their APIs.") % {
         "link": '<a href="http://macrokiosk.com/">Macrokiosk</a>'
     }
     claim_view = ClaimView
@@ -29,7 +29,7 @@ class MacrokioskType(ChannelType):
     attachment_support = False
 
     configuration_blurb = _(
-        "To finish configuring your MACROKIOSK connection you'll need to notify MACROKIOSK of the following URLs."
+        "To finish configuring your MACROKIOSK connection, you'll need to notify MACROKIOSK of the following URLs."
     )
 
     configuration_urls = (
@@ -37,14 +37,14 @@ class MacrokioskType(ChannelType):
             label=_("Inbound URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.mk' channel.uuid 'receive' %}",
             description=_(
-                "This endpoint should be called by MACROKIOSK when new messages are received to your number."
+                "This endpoint should be called by MACROKIOSK when new messages are received at your number."
             ),
         ),
         dict(
             label=_("DLR URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.mk' channel.uuid 'status' %}",
             description=_(
-                "This endpoint should be called by MACROKIOSK when the message status changes. (delivery reports)"
+                "This endpoint should be called by MACROKIOSK when the message status changes (delivery reports)."
             ),
         ),
     )
