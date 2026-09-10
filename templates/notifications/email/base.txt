@@ -4,7 +4,7 @@
 
 {% block notification-body %}{% endblock notification-body %}
 
-{% trans "If you have any questions we are always here to help." %}
+{% trans "If you have any questions, we're always here to help." %}
 
 {% trans "Thanks" %}
 {% blocktrans with brand=branding.name %}The {{ brand }} team{% endblocktrans %}

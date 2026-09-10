@@ -410,7 +410,7 @@ class FlowCRUDL(SmartCRUDL):
             )
 
             flow_type = forms.ChoiceField(
-                label=_("Flow Type"),
+                label=_("Flow type"),
                 help_text=_("Choose the method for your flow"),
                 choices=Flow.TYPE_CHOICES,
                 widget=SelectWidget(attrs={"widget_only": False}),

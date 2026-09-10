@@ -12,21 +12,21 @@ from ...views import ClaimViewMixin
 class ClaimView(ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
         user_token = forms.CharField(
-            label=_("User OAuth Token"),
+            label=_("User OAuth token"),
             help_text=_(
-                "In https://api.slack.com/apps select your bot app and go to Features / OAuth & Permissions to see this information."
+                "In https://api.slack.com/apps, select your bot app and go to Features > OAuth & Permissions to see this information."
             ),
         )
         bot_token = forms.CharField(
-            label=_("Bot User OAuth Token"),
+            label=_("Bot user OAuth token"),
             help_text=_(
-                "In https://api.slack.com/apps select your bot app and go to Features / OAuth & Permissions to see this information."
+                "In https://api.slack.com/apps, select your bot app and go to Features > OAuth & Permissions to see this information."
             ),
         )
         verification_token = forms.CharField(
-            label=_("Verification Token"),
+            label=_("Verification token"),
             help_text=_(
-                "In https://api.slack.com/apps go to Settings / Basic information, find in App Credentials and paste here."
+                "In https://api.slack.com/apps, go to Settings > Basic Information, find it under App Credentials and paste it here."
             ),
         )
 
@@ -36,13 +36,13 @@ class ClaimView(ClaimViewMixin, SmartFormView):
 
             for channel in Channel.objects.filter(org=org, is_active=True, channel_type=self.channel_type.code):
                 if channel.config["user_token"] == value:
-                    raise ValidationError(_("A slack channel for this bot already exists on your account."))
+                    raise ValidationError(_("A Slack channel for this bot already exists on your account."))
 
             try:
                 client = slack_sdk.WebClient(token=value)
                 client.api_call(api_method="auth.test")
             except slack_sdk.errors.SlackApiError:
-                raise ValidationError(_("Your user token is invalid, please check and try again"))
+                raise ValidationError(_("Your user token is invalid. Check and try again."))
 
             return value
 
@@ -52,13 +52,13 @@ class ClaimView(ClaimViewMixin, SmartFormView):
 
             for channel in Channel.objects.filter(org=org, is_active=True, channel_type=self.channel_type.code):
                 if channel.config["bot_token"] == value:
-                    raise ValidationError(_("A slack channel for this bot already exists on your account."))
+                    raise ValidationError(_("A Slack channel for this bot already exists on your account."))
 
             try:
                 client = slack_sdk.WebClient(token=value)
                 client.api_call(api_method="auth.test")
             except slack_sdk.errors.SlackApiError:
-                raise ValidationError(_("Your bot user token is invalid, please check and try again"))
+                raise ValidationError(_("Your bot user token is invalid. Check and try again."))
 
             return value
 

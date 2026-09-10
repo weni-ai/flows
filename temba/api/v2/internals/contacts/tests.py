@@ -827,7 +827,7 @@ class UpdateContactFieldsViewTest(TembaTest):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
             response.json(),
-            {"contact_fields": {"name": ["Contact name cannot be empty."]}},
+            {"contact_fields": {"name": ["Contact name can't be empty"]}},
         )
 
     @mock_mailroom

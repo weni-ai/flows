@@ -3,14 +3,14 @@
 
 -block pre-form
   -blocktrans trimmed with name=brand.name
-    You can connect your Instagram business account to {{name}} in just a few simple steps.
+    You can connect your Instagram business account to {{name}} in a few steps.
 
 -block form
   .mt-4.card
     #fb-guide
       %ol.steps
         %li
-          -trans "The page must be linked to your instagram business account, so check how to link"
+          -trans "The page must be linked to your Instagram business account, so check how to link it"
           %a(href="https://help.instagram.com/399237934150902") here
           first.
 
@@ -31,7 +31,7 @@
 
     #fb-app-connect.flex.mt-4
       .button-primary.connect-facebook
-        -trans "Add Instagram Business Account"
+        -trans "Add Instagram business account"
 
     #throbber(style="display:none;")
       %temba-loading
@@ -46,7 +46,7 @@
   .mt-4.card#fb-channel-options(style="display:none;")
     #fb-channel-no-pages.mb-4(style="display:none;")
       %p
-        -trans "No Facebook pages with permission were found for this account. Check that you are still an admin on the page linked to your Instagram business account and try again."
+        -trans "No Facebook pages with permission were found for this account. Check that you're still an admin on the page linked to your Instagram business account and try again."
     %p#fb-channel-select(style="font-size:1rem;")
       -trans "Select the page you want to add as a channel:"
 

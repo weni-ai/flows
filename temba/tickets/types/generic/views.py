@@ -8,27 +8,33 @@ from temba.utils.uuid import uuid4
 
 class ConnectView(BaseConnectView):
     class Form(BaseConnectView.Form):
-        base_url = forms.URLField(label=_("Base URL"), help_text=_("The base URL of the generic ticketer"))
-        api_token = forms.CharField(label=_("API token"), help_text=_("The API token of the generic ticketer"))
+        base_url = forms.URLField(label=_("Base URL"), help_text=_("The base URL of the generic ticketing service"))
+        api_token = forms.CharField(
+            label=_("API token"), help_text=_("The API token of the generic ticketing service")
+        )
         webhook_secret = forms.CharField(
-            label=_("Webhook Secret"), help_text=_("The webhook secret of the generic ticketer")
+            label=_("Webhook secret"), help_text=_("The webhook secret of the generic ticketing service")
         )
         project_uuid = forms.UUIDField(
-            label=_("Project UUID"), help_text=_("The project UUID of the generic ticketer")
+            label=_("Project UUID"), help_text=_("The project UUID of the generic ticketing service")
         )
         project_name = forms.CharField(
-            label=_("Project Name"), help_text=_("The project name of the generic ticketer")
+            label=_("Project name"), help_text=_("The project name of the generic ticketing service")
         )
-        route_open = forms.CharField(label=_("Route Open"), help_text=_("The route open of the generic ticketer"))
+        route_open = forms.CharField(
+            label=_("Open route"), help_text=_("The open route of the generic ticketing service")
+        )
         route_forward = forms.CharField(
-            label=_("Route Forward"), help_text=_("The route forward of the generic ticketer")
+            label=_("Forward route"), help_text=_("The forward route of the generic ticketing service")
         )
-        route_close = forms.CharField(label=_("Route Close"), help_text=_("The route close of the generic ticketer"))
+        route_close = forms.CharField(
+            label=_("Close route"), help_text=_("The close route of the generic ticketing service")
+        )
         route_reopen = forms.CharField(
-            label=_("Route Reopen"), help_text=_("The route reopen of the generic ticketer")
+            label=_("Reopen route"), help_text=_("The reopen route of the generic ticketing service")
         )
         route_history = forms.CharField(
-            label=_("Route History"), help_text=_("The route history of the generic ticketer")
+            label=_("History route"), help_text=_("The history route of the generic ticketing service")
         )
 
         def clean(self):

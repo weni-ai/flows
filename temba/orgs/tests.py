@@ -2824,7 +2824,7 @@ class OrgTest(TembaTest):
 
         headers = {"HTTP_TEMBA_SPA": 1}
         response = self.client.get("%s?org=%d" % (reverse("orgs.org_manage_accounts_sub_org"), sub_org.id), **headers)
-        self.assertContains(response, "Edit Workspace")
+        self.assertContains(response, "Edit workspace")
 
         # edit our sub org's details
         response = self.client.post(
@@ -5196,7 +5196,9 @@ class UserCRUDLTestCase(TestCase):
 
         self.assertFalse(form.is_valid())
         self.assertIn("email", form.errors)
-        expected_error = "You have exceeded the maximum number of attempts, please try again in {settings.USER_RECOVER_TIME_INTERVAL} hours!"
+        expected_error = (
+            "You've exceeded the maximum number of attempts. Try again in {settings.USER_RECOVER_TIME_INTERVAL} hours."
+        )
         self.assertEqual(form.errors["email"][0], expected_error)
 
     @patch("django.core.cache.cache.get_or_set")

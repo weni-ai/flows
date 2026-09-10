@@ -100,7 +100,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
                 self.cleaned_data["ig_user_id"] = response_json.get("instagram_business_account").get("id")
 
             except Exception:
-                raise forms.ValidationError(_("Sorry your Instagram channel could not be connected. Please try again"))
+                raise forms.ValidationError(_("Your Instagram channel couldn't be connected. Try again."))
 
             return self.cleaned_data
 
@@ -152,7 +152,7 @@ class RefreshToken(ModalMixin, OrgObjPermsMixin, SmartModelActionView):
     permission = "channels.channel_claim"
     fields = ()
     template_name = "channels/types/instagram/refresh_token.html"
-    title = _("Reconnect Instagram Business Account")
+    title = _("Reconnect Instagram business account")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -225,8 +225,7 @@ class RefreshToken(ModalMixin, OrgObjPermsMixin, SmartModelActionView):
         except Exception:
             raise ValidationError(
                 _(
-                    "Unable to refresh the token because this Facebook user doesn't have permission "
-                    "on the linked page. Check that you are still an admin on that page and try again."
+                    "Couldn't refresh the token because this Facebook user doesn't have permission on the linked page. Check that you're still an admin on that page and try again."
                 )
             )
 

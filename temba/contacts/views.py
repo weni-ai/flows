@@ -523,7 +523,7 @@ class ContactForm(forms.ModelForm):
                 if not URN.validate(normalized):
                     if scheme in (URN.TEL_SCHEME, URN.WHATSAPP_SCHEME) and URN.is_phone_based_path(path):
                         self._errors[key] = self.error_class(
-                            [_("Invalid number. Ensure number includes country code, e.g. +55-11-98765-4321")]
+                            [_("Invalid number. Include the country code. Example: +55-11-98765-4321")]
                         )
                     else:
                         self._errors[key] = self.error_class([_("Invalid format")])
@@ -574,7 +574,7 @@ class ContactForm(forms.ModelForm):
             has_existing_urn = any(value for field_key, value in self.data.items() if field_key.startswith("urn__"))
             has_new_urn = bool(self.data.get("new_path"))
             if not has_existing_urn and not has_new_urn:
-                raise forms.ValidationError(_("At least one WhatsApp number or connection is required."))
+                raise forms.ValidationError(_("At least one WhatsApp number or connection is required"))
 
         return self.cleaned_data
 
@@ -1422,7 +1422,7 @@ class ContactCRUDL(SmartCRUDL):
             try:
                 Contact.create(obj.org, self.request.user, obj.name, language="", urns=urns, fields={}, groups=[])
             except mailroom.MailroomException:
-                raise ValidationError(_("An error occurred creating your contact. Please try again later."))
+                raise ValidationError(_("An error occurred creating your contact. Try again later."))
 
     class Update(NonAtomicMixin, ModalMixin, OrgObjPermsMixin, SmartUpdateView):
         form_class = UpdateContactForm
@@ -1865,7 +1865,7 @@ class ContactFieldForm(forms.ModelForm):
         label = self.cleaned_data["label"]
 
         if not ContactField.is_valid_label(label):
-            raise forms.ValidationError(_("Can only contain letters, numbers, hyphens and underscores."))
+            raise forms.ValidationError(_("Can only contain letters, numbers, hyphens and underscores"))
 
         key = ContactField.make_key(label)
 
@@ -1884,7 +1884,7 @@ class ContactFieldForm(forms.ModelForm):
             conflict_key = conflict_key.exclude(id=self.instance.id)
 
         if conflict_key.exists():
-            raise forms.ValidationError(_("A field with the same generated key already exists."))
+            raise forms.ValidationError(_("A field with the same generated key already exists"))
 
         return label
 

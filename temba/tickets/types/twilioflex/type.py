@@ -21,8 +21,7 @@ class TwilioFlexType(TicketerType):
 
     connect_view = ConnectView
     connect_blurb = _(
-        "%(link)s  is a solution for cloud communication which can be connected as ticket service "
-        "through its twilio flex feature."
+        "%(link)s is a solution for cloud communication that can be connected as a ticket service through its Twilio Flex feature."
     ) % {"link": '<a href="https://twilio.chat/">Twilio Flex</a>'}
 
     def is_available_to(self, user):

@@ -1564,7 +1564,7 @@ class ContactTest(TembaTest):
             reverse("contacts.contact_create"),
             {"name": "   ", "urn__whatsapp__0": "+250788777777"},
         )
-        self.assertFormError(response, "form", "name", "Contact name cannot be empty.")
+        self.assertFormError(response, "form", "name", "Contact name can't be empty")
 
         # reject creation with a name longer than the configured maximum
         response = self.client.post(
@@ -1621,7 +1621,7 @@ class ContactTest(TembaTest):
             reverse("contacts.contact_create"),
             {"name": "No Phone", "urn__whatsapp__0": ""},
         )
-        self.assertFormError(response, "form", None, "At least one WhatsApp number or connection is required.")
+        self.assertFormError(response, "form", None, "At least one WhatsApp number or connection is required")
 
     @mock_mailroom
     def test_create_with_mailroom_error(self, mr_mocks):
@@ -1634,9 +1634,7 @@ class ContactTest(TembaTest):
             {"name": "Fernando Luiz", "urn__whatsapp__0": "+5545991163316"},
         )
 
-        self.assertFormError(
-            response, "form", None, "An error occurred creating your contact. Please try again later."
-        )
+        self.assertFormError(response, "form", None, "An error occurred creating your contact. Try again later.")
 
     @mock_mailroom
     def test_contact_update_name_validation(self, mr_mocks):
@@ -1649,7 +1647,7 @@ class ContactTest(TembaTest):
             update_url,
             data=dict(name="   ", urn__tel__0="+250781111111", groups=[]),
         )
-        self.assertFormError(response, "form", "name", "Contact name cannot be empty.")
+        self.assertFormError(response, "form", "name", "Contact name can't be empty")
 
         # reject update with name longer than max length
         response = self.client.post(
@@ -4963,7 +4961,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"label": "???", "value_type": "T", "show_in_table": True},
-            form_errors={"label": "Can only contain letters, numbers, hyphens and underscores."},
+            form_errors={"label": "Can only contain letters, numbers, hyphens and underscores"},
         )
 
         # try to submit with something that would be an invalid key
@@ -4994,7 +4992,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"label": "age-in-years", "value_type": "N", "show_in_table": True},
-            form_errors={"label": "A field with the same generated key already exists."},
+            form_errors={"label": "A field with the same generated key already exists"},
         )
 
         # submit with valid data
@@ -5054,7 +5052,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertUpdateSubmit(
             update_url,
             {"label": "???", "value_type": "N", "show_in_table": True},
-            form_errors={"label": "Can only contain letters, numbers, hyphens and underscores."},
+            form_errors={"label": "Can only contain letters, numbers, hyphens and underscores"},
             object_unchanged=self.age,
         )
 
@@ -5070,7 +5068,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertUpdateSubmit(
             update_url,
             {"label": "nick_name", "value_type": "N", "show_in_table": True},
-            form_errors={"label": "A field with the same generated key already exists."},
+            form_errors={"label": "A field with the same generated key already exists"},
             object_unchanged=self.age,
         )
 
@@ -6703,14 +6701,14 @@ class ContactNameValidatorTest(TembaTest):
 
         with self.assertRaises(ValidationError) as cm:
             clean_contact_name("")
-        self.assertIn("Contact name cannot be empty.", cm.exception.messages)
+        self.assertIn("Contact name can't be empty", cm.exception.messages)
 
     def test_clean_contact_name_rejects_whitespace_only(self):
         from temba.contacts.validators import clean_contact_name
 
         with self.assertRaises(ValidationError) as cm:
             clean_contact_name("   ")
-        self.assertIn("Contact name cannot be empty.", cm.exception.messages)
+        self.assertIn("Contact name can't be empty", cm.exception.messages)
 
     def test_clean_contact_name_accepts_max_length(self):
         from temba.contacts.validators import CONTACT_NAME_MAX_LEN, clean_contact_name

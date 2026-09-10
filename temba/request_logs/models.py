@@ -58,9 +58,9 @@ class HTTPLog(models.Model):
         (WHATSAPP_TOKENS_SYNCED, _("WhatsApp tokens synced")),
         (WHATSAPP_CONTACTS_REFRESHED, _("WhatsApp contacts refreshed")),
         (WHATSAPP_CHECK_HEALTH, _("WhatsApp health check")),
-        (WHATSAPP_CATALOGS_SYNCED, _("WhatsApp Catalogs Synced")),
-        (WHATSAPP_PRODUCTS_SYNCED, _("WhatsApp Products Synced")),
-        (TEAMS_TOKENS_SYNCED, _("Teams Tokens Synced")),
+        (WHATSAPP_CATALOGS_SYNCED, _("WhatsApp catalogs synced")),
+        (WHATSAPP_PRODUCTS_SYNCED, _("WhatsApp products synced")),
+        (TEAMS_TOKENS_SYNCED, _("Teams tokens synced")),
     )
 
     org = models.ForeignKey(Org, related_name="http_logs", on_delete=models.PROTECT)

@@ -1144,7 +1144,7 @@ class OrgCRUDL(SmartCRUDL):
                     menu.append(
                         self.create_menu_item(
                             menu_id="authentication",
-                            name=_("Enable 2FA"),
+                            name=_("Enable two-factor authentication"),
                             icon="shield",
                             href=reverse("orgs.user_two_factor_enable"),
                         )
@@ -1212,7 +1212,7 @@ class OrgCRUDL(SmartCRUDL):
                     )
                     menu.append(
                         self.create_menu_item(
-                            name=_("Flow Runs"),
+                            name=_("Flow runs"),
                             icon="flow",
                             href=reverse("archives.archive_run"),
                         )
@@ -1221,7 +1221,7 @@ class OrgCRUDL(SmartCRUDL):
                 child_orgs = Org.objects.filter(parent=org, is_active=True).order_by("name")
 
                 if child_orgs:
-                    menu.append(self.create_section(_("Child Workspaces")))
+                    menu.append(self.create_section(_("Child workspaces")))
 
                 for child in child_orgs:
                     menu.append(
@@ -1592,9 +1592,7 @@ class OrgCRUDL(SmartCRUDL):
                                 'Missing permission, we need all the following permissions "business_management", "whatsapp_business_management", "whatsapp_business_messaging"'
                             )
                 except Exception:
-                    raise forms.ValidationError(
-                        _("Sorry account could not be connected. Please try again"), code="invalid"
-                    )
+                    raise forms.ValidationError(_("Your account couldn't be connected. Try again."), code="invalid")
 
                 return self.cleaned_data
 
@@ -2273,7 +2271,7 @@ class OrgCRUDL(SmartCRUDL):
                     links.append(
                         dict(
                             title=_("Edit"),
-                            modax=_("Edit Workspace"),
+                            modax=_("Edit workspace"),
                             href=f"{reverse('orgs.org_edit_sub_org')}?org={self.object.pk}",
                         )
                     )

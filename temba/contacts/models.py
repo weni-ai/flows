@@ -97,9 +97,9 @@ class URN:
         (VK_SCHEME, _("VK identifier")),
         (ROCKETCHAT_SCHEME, _("RocketChat identifier")),
         (DISCORD_SCHEME, _("Discord identifier")),
-        (WENIWEBCHAT_SCHEME, _("WeniWebChat Identifier")),
-        (SLACK_SCHEME, _("Slack Identifier")),
-        (TEAMS_SCHEME, _("Teams Identifier")),
+        (WENIWEBCHAT_SCHEME, _("Weni Web Chat identifier")),
+        (SLACK_SCHEME, _("Slack identifier")),
+        (TEAMS_SCHEME, _("Teams identifier")),
     )
 
     VALID_SCHEMES = {s[0] for s in SCHEME_CHOICES}
@@ -2388,7 +2388,7 @@ class ContactImport(SmartModel):
                     and len(str(raw_name).strip()) > CONTACT_NAME_MAX_LEN
                 ):
                     raise ValidationError(
-                        _("Import file contains a contact name longer than %(max)d characters at row %(row)d."),
+                        _("Import file contains a contact name longer than %(max)d characters at row %(row)d"),
                         params={"max": CONTACT_NAME_MAX_LEN, "row": num_records + 2},
                     )
 

@@ -387,7 +387,7 @@ class Org(SmartModel):
         help_text=_("The parent org that manages this org"),
     )
 
-    brain_on = models.BooleanField(default=False, help_text=_("Whether this organization use router"))
+    brain_on = models.BooleanField(default=False, help_text=_("Whether this organization uses the router"))
 
     proj_uuid = models.UUIDField(null=True, blank=True)
 
