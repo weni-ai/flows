@@ -212,9 +212,7 @@ def update_local_templates(channel, templates_data, unique=False):
         content = "\n\n".join(content_parts)
         parameter_format = normalize_parameter_format(template.get("parameter_format"))
         parameter_names = (
-            extract_parameter_names_from_components(template.get("components"))
-            if parameter_format == "named"
-            else []
+            extract_parameter_names_from_components(template.get("components")) if parameter_format == "named" else []
         )
         variable_count = len(parameter_names) if parameter_format == "named" else _calculate_variable_count(content)
 
