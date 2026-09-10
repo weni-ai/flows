@@ -17,6 +17,7 @@ from temba.triggers.usecases import create_catchall_trigger
 logger = logging.getLogger(__name__)
 
 GROUP_NAME_PREFIX = "Trigger · "
+DEFAULT_URN_RESOLVE_CONCURRENCY = 20
 
 
 class GroupQuotaExceeded(Exception):
@@ -61,23 +62,21 @@ def resolve_or_create_managed_trigger_group(org, user, flow) -> ContactGroup:
         if count >= limit:
             raise GroupQuotaExceeded(count, limit)
 
-        group = ContactGroup.create_static(org, user, managed_trigger_group_display_name(flow))
-        created_group = True
+        try:
+            with transaction.atomic():
+                group = ContactGroup.create_static(org, user, managed_trigger_group_display_name(flow))
+                created_group = True
 
-        if association:
-            association.group = group
-            association.modified_on = timezone.now()
-            association.save(update_fields=("group", "modified_on"))
-        else:
-            try:
-                with transaction.atomic():
-                    association = ManagedTriggerGroup.objects.create(org=org, flow=flow, group=group)
-            except IntegrityError:
-                association = ManagedTriggerGroup.objects.select_related("group").get(org=org, flow=flow)
-                if association.group_id != group.id:
-                    group.release(user)
-                    group = association.group
-                    created_group = False
+                if association:
+                    association.group = group
+                    association.modified_on = timezone.now()
+                    association.save(update_fields=("group", "modified_on"))
+                else:
+                    ManagedTriggerGroup.objects.create(org=org, flow=flow, group=group)
+        except IntegrityError:
+            association = ManagedTriggerGroup.objects.select_related("group").get(org=org, flow=flow)
+            group = association.group
+            created_group = False
 
     _ensure_catchall(org, user, flow, group)
     logger.info(
@@ -142,7 +141,7 @@ def _create_contacts(org, user, urns: list) -> list:
     if not urns:
         return []
 
-    concurrency = int(getattr(settings, "WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY", 20))
+    concurrency = int(getattr(settings, "WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY", DEFAULT_URN_RESOLVE_CONCURRENCY))
     use_threads = len(urns) > 1 and concurrency > 1 and not connection.in_atomic_block
 
     if not use_threads:
@@ -157,7 +156,8 @@ def _create_contacts(org, user, urns: list) -> list:
                 results.append(future.result())
             except ContactResolutionError:
                 raise
-            except Exception as e:  # pragma: no cover
+            except Exception as e:
+                logger.exception("managed_trigger_group contact create failed urn=%s", urn)
                 raise ContactResolutionError(urn) from e
     return results
 
@@ -182,11 +182,12 @@ def assign_exclusive_membership(org, user, contacts, target_group: ContactGroup)
         return
 
     unique = list({c.id: c for c in contacts}.values())
-    other_groups = [
-        assoc.group
-        for assoc in ManagedTriggerGroup.objects.filter(org=org).exclude(group=target_group).select_related("group")
-        if assoc.group.is_active
-    ]
+    other_groups = list(
+        ContactGroup.user_groups.filter(
+            managed_trigger_group_link__org=org,
+            is_active=True,
+        ).exclude(id=target_group.id)
+    )
 
     mods = [
         modifiers.Groups(

@@ -1,5 +1,7 @@
-3.94.2
+3.95.0
 ----------
+* feat: add speckit
+* feat: add broadcast flows trigger group
 * fix: normalizing whatsapp urn on create
 
 3.94.1

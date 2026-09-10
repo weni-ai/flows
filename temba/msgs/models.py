@@ -1584,7 +1584,7 @@ class ManagedTriggerGroup(models.Model):
     modified_on = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        indexes = [models.Index(fields=["org"])]
+        indexes = [models.Index(fields=["org"], name="msgs_mtg_org_idx")]
 
     def __str__(self):  # pragma: no cover
         return f"ManagedTriggerGroup[flow={self.flow_id} group={self.group_id}]"
