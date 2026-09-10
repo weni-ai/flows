@@ -7,7 +7,7 @@ from weni.internal.models import Project
 from django.contrib.auth import get_user_model
 
 from temba.projects.usecases.authorizations_creation import create_authorizations
-from temba.projects.usecases.channel_creation import create_default_wwc_channel
+from temba.projects.usecases.channel_creation import create_default_wwc_channel, create_live_desk_copilot_channel
 from temba.projects.usecases.globals_creation import create_globals
 
 from .interfaces import TemplateTypeIntegrationInterface
@@ -27,6 +27,7 @@ class ProjectCreationDTO:
     brain_on: bool
     language: Optional[str] = None
     inline_agent_switch: bool = False
+    is_live_desk_copilot: bool = False
 
 
 class ProjectCreationUseCase:
@@ -62,7 +63,11 @@ class ProjectCreationUseCase:
         )
 
     def create_project(
-        self, project_dto: ProjectCreationDTO, user_email: str, extra_fields: dict, authorizations: list
+        self,
+        project_dto: ProjectCreationDTO,
+        user_email: str,
+        extra_fields: dict,
+        authorizations: list,
     ) -> None:
         user, _ = self.get_or_create_user_by_email(user_email)  # pragma: no cover
         project, _ = self.get_or_create_project(project_dto, user)
@@ -71,6 +76,9 @@ class ProjectCreationUseCase:
         project.initialize(sample_flows=False)
         project.save()
         create_default_wwc_channel(project, user)
+
+        if project_dto.is_live_desk_copilot:
+            create_live_desk_copilot_channel(project, user)
 
         if extra_fields:
             create_globals(extra_fields, project, user)

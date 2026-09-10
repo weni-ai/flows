@@ -63,6 +63,7 @@ from temba.classifiers.models import Classifier
 from temba.contacts.models import ContactGroupCount
 from temba.flows.models import Flow
 from temba.formax import FormaxMixin
+from temba.projects.usecases.channel_creation import is_hidden_from_ui
 from temba.utils import analytics, get_anonymous_user, json, languages, str_to_bool
 from temba.utils.email import is_valid_address, send_template_email
 from temba.utils.fields import (
@@ -3253,7 +3254,7 @@ class OrgCRUDL(SmartCRUDL):
                 # get any channel thats not a delegate
                 channels = Channel.objects.filter(org=org, is_active=True, parent=None).order_by("-role")
                 for channel in channels:
-                    if channel.config.get("preview") is True:
+                    if is_hidden_from_ui(channel):
                         continue
                     self.add_channel_section(formax, channel)
 

@@ -41,6 +41,7 @@ from temba.msgs.models import Msg, SystemLabel
 from temba.msgs.views import InboxView
 from temba.orgs.models import Org
 from temba.orgs.views import AnonMixin, DependencyDeleteModal, MenuMixin, ModalMixin, OrgObjPermsMixin, OrgPermsMixin
+from temba.projects.usecases.channel_creation import is_hidden_from_ui
 from temba.utils import analytics, countries, json
 from temba.utils.fields import SelectWidget
 from temba.utils.models import patch_queryset_count
@@ -747,6 +748,8 @@ class ChannelCRUDL(SmartCRUDL):
 
                 channels = Channel.objects.filter(org=org, is_active=True, parent=None).order_by("-role")
                 for channel in channels:
+                    if is_hidden_from_ui(channel):
+                        continue
                     icon = channel.get_type().icon.replace("icon-", "")
                     icon = icon.replace("power-cord", "box")
 
@@ -813,7 +816,9 @@ class ChannelCRUDL(SmartCRUDL):
                         )
                     )
 
-            if self.has_org_perm("channels.channel_update"):
+            channel_is_hidden = is_hidden_from_ui(self.object)
+
+            if self.has_org_perm("channels.channel_update") and not channel_is_hidden:
                 links.append(
                     dict(
                         id="update-channel",
@@ -863,7 +868,7 @@ class ChannelCRUDL(SmartCRUDL):
                             )
                         )
 
-            if self.has_org_perm("channels.channel_delete"):
+            if self.has_org_perm("channels.channel_delete") and not channel_is_hidden:
                 links.append(
                     dict(
                         id="delete-channel",
@@ -1131,6 +1136,12 @@ class ChannelCRUDL(SmartCRUDL):
             "If you do not need this number you can delete it from the Twilio website."
         )
 
+        def get_object(self, queryset=None):
+            channel = super().get_object(queryset)
+            if is_hidden_from_ui(channel):
+                raise Http404()
+            return channel
+
         def get_success_url(self):
             # if we're deleting a child channel, redirect to parent afterwards
             channel = self.get_object()
@@ -1179,6 +1190,12 @@ class ChannelCRUDL(SmartCRUDL):
     class Update(OrgObjPermsMixin, ComponentFormMixin, ModalMixin, SmartUpdateView):
         success_message = ""
         submit_button_name = _("Save Changes")
+
+        def get_object(self, queryset=None):
+            channel = super().get_object(queryset)
+            if is_hidden_from_ui(channel):
+                raise Http404()
+            return channel
 
         def derive_title(self):
             return _("%s Channel") % self.object.get_channel_type_display()
@@ -1411,7 +1428,9 @@ class ChannelCRUDL(SmartCRUDL):
                 org = self.request.user.get_org()
                 queryset = queryset.filter(org=org)
 
-            return queryset.filter(is_active=True)
+            queryset = queryset.filter(is_active=True)
+            hidden_ids = [channel.pk for channel in queryset if is_hidden_from_ui(channel)]
+            return queryset.exclude(pk__in=hidden_ids)
 
         def pre_process(self, *args, **kwargs):
             # superuser sees things as they are
@@ -1420,7 +1439,11 @@ class ChannelCRUDL(SmartCRUDL):
 
             # everybody else goes to a different page depending how many channels there are
             org = self.request.user.get_org()
-            channels = list(Channel.objects.filter(org=org, is_active=True))
+            channels = [
+                channel
+                for channel in Channel.objects.filter(org=org, is_active=True)
+                if not is_hidden_from_ui(channel)
+            ]
 
             if len(channels) == 0:
                 return HttpResponseRedirect(reverse("channels.channel_claim"))
