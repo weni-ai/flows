@@ -1,15 +1,8 @@
 from django.test import TestCase
 
-from temba.msgs.usecases.named_template_broadcast import (
-    NamedTemplateBroadcastError,
-    resolve_named_recipients,
-)
+from temba.msgs.usecases.named_template_broadcast import NamedTemplateBroadcastError, resolve_named_recipients
 from temba.templates.models import Template, TemplateTranslation
-from temba.templates.parameter_format import (
-    extract_parameter_names,
-    has_placeholders,
-    normalize_parameter_format,
-)
+from temba.templates.parameter_format import extract_parameter_names, has_placeholders, normalize_parameter_format
 from temba.tests import TembaTest
 
 
