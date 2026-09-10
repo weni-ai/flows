@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('policies', '0006_squashed'),
+        ("policies", "0006_squashed"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='policy',
-            name='requires_consent',
-            field=models.BooleanField(default=True, help_text='Is consent required?'),
+            model_name="policy",
+            name="requires_consent",
+            field=models.BooleanField(default=True, help_text="Is consent required?"),
         ),
     ]

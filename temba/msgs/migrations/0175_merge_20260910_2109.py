@@ -6,9 +6,8 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('msgs', '0174_auto_20260910_2044'),
-        ('msgs', '0174_managedtriggergroup'),
+        ("msgs", "0174_auto_20260910_2044"),
+        ("msgs", "0174_managedtriggergroup"),
     ]
 
-    operations = [
-    ]
+    operations = []

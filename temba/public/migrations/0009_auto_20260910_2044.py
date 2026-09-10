@@ -6,18 +6,20 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('public', '0008_squashed'),
+        ("public", "0008_squashed"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='video',
-            name='summary',
-            field=models.TextField(help_text='A short description of the video', verbose_name='Summary'),
+            model_name="video",
+            name="summary",
+            field=models.TextField(help_text="A short description of the video", verbose_name="Summary"),
         ),
         migrations.AlterField(
-            model_name='video',
-            name='vimeo_id',
-            field=models.CharField(help_text='The ID that Vimeo uses for this video', max_length=255, verbose_name='Vimeo ID'),
+            model_name="video",
+            name="vimeo_id",
+            field=models.CharField(
+                help_text="The ID that Vimeo uses for this video", max_length=255, verbose_name="Vimeo ID"
+            ),
         ),
     ]
