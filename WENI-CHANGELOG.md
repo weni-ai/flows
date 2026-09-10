@@ -1,3 +1,7 @@
+3.97.0
+----------
+* feat: named WhatsApp template parameters — record parameter format/names, accept named broadcast values, resolve per recipient
+
 3.96.0
 ----------
 * feat: Full localization review of the project for the officially supported languages: EN (source), ES, PT and RO.

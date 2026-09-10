@@ -301,13 +301,34 @@ class WhatsAppUtilsTest(TembaTest):
                 "category": "ISSUE_RESOLUTION",
                 "id": "9018",
             },
+            {
+                "name": "cobranca_bf4",
+                "parameter_format": "NAMED",
+                "components": [
+                    {
+                        "type": "BODY",
+                        "text": "Olá {{nome}}, sua cota {{cota}} vence em {{data}}.",
+                        "example": {
+                            "body_text_named_params": [
+                                {"param_name": "nome", "example": "João"},
+                                {"param_name": "cota", "example": "045"},
+                                {"param_name": "data", "example": "10/09/2026"},
+                            ]
+                        },
+                    }
+                ],
+                "language": "pt_BR",
+                "status": "APPROVED",
+                "category": "UTILITY",
+                "id": "9020",
+            },
         ]
 
         update_local_templates(channel, WA_templates_data)
 
-        self.assertEqual(6, Template.objects.filter(org=self.org).count())
-        self.assertEqual(8, TemplateTranslation.objects.filter(channel=channel).count())
-        self.assertEqual(8, TemplateTranslation.objects.filter(channel=channel, namespace="foo_namespace").count())
+        self.assertEqual(7, Template.objects.filter(org=self.org).count())
+        self.assertEqual(9, TemplateTranslation.objects.filter(channel=channel).count())
+        self.assertEqual(9, TemplateTranslation.objects.filter(channel=channel, namespace="foo_namespace").count())
 
         ct = TemplateTranslation.objects.get(template__name="goodbye", is_active=True)
         self.assertEqual(2, ct.variable_count)
@@ -326,6 +347,12 @@ class WhatsAppUtilsTest(TembaTest):
         self.assertEqual("eng", ct.language)
         self.assertEqual(TemplateTranslation.STATUS_PENDING, ct.status)
         self.assertEqual("foo_namespace", ct.namespace)
+
+        named = Template.objects.get(name="cobranca_bf4")
+        self.assertEqual("named", named.parameter_format)
+        named_tr = named.translations.get()
+        self.assertEqual(["nome", "cota", "data"], named_tr.parameter_names)
+        self.assertEqual(3, named_tr.variable_count)
 
         # assert that a template translation was created despite it being in an unknown language
         ct = TemplateTranslation.objects.get(template__name="invalid_language", is_active=True)
