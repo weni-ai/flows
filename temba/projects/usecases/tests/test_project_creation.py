@@ -6,7 +6,9 @@ import pytz
 from django.conf import settings
 
 from temba.channels.models import Channel
+from temba.contacts.models import ContactField
 from temba.projects.usecases.channel_creation import COPILOT_WWC_CHANNEL_NAME, DEFAULT_WWC_CHANNEL_NAME
+from temba.projects.usecases.contact_field_creation import ORIGINAL_CONTACT_URN_KEY, SELLER_EMAIL_KEY
 from temba.projects.usecases.project_creation import ProjectCreationDTO, ProjectCreationUseCase
 from temba.tests.base import TembaTest
 
@@ -206,6 +208,43 @@ class ProjectCreationUseCaseTest(TembaTest):
         self.assertEqual(mock_publish_channel_event.call_count, 2)
         mock_publish_channel_event.assert_any_call(preview_channel, action="create")
         mock_publish_channel_event.assert_any_call(copilot_channel, action="create")
+
+        original_contact_urn = ContactField.user_fields.active_for_org(org=project.org).get(
+            key=ORIGINAL_CONTACT_URN_KEY
+        )
+        seller_email = ContactField.user_fields.active_for_org(org=project.org).get(key=SELLER_EMAIL_KEY)
+
+        self.assertEqual(original_contact_urn.value_type, ContactField.TYPE_TEXT)
+        self.assertEqual(seller_email.value_type, ContactField.TYPE_TEXT)
+
+    @patch("temba.projects.usecases.project_creation.ConnectInternalClient")
+    @patch("temba.projects.usecases.channel_creation.publish_channel_event")
+    def test_create_project_does_not_create_copilot_contact_fields_without_flag(
+        self, mock_publish_channel_event, mock_connect_client
+    ):
+        user_email = "regular-admin@example.com"
+        project_uuid = uuid.uuid4()
+        project_dto = ProjectCreationDTO(
+            uuid=str(project_uuid),
+            name="Projeto regular",
+            is_template=False,
+            date_format="D",
+            timezone=pytz.timezone("Africa/Kigali"),
+            template_type_uuid="",
+            description="Projeto regular",
+            brain_on=False,
+        )
+
+        use_case = ProjectCreationUseCase(template_type_integration=Mock())
+
+        use_case.create_project(project_dto, user_email, extra_fields={}, authorizations=[])
+
+        project = self.project.__class__.objects.get(project_uuid=project_uuid)
+        copilot_fields = ContactField.user_fields.active_for_org(org=project.org).filter(
+            key__in=[ORIGINAL_CONTACT_URN_KEY, SELLER_EMAIL_KEY]
+        )
+
+        self.assertFalse(copilot_fields.exists())
 
     @patch("temba.projects.usecases.project_creation.ConnectInternalClient")
     @patch("temba.projects.usecases.channel_creation.publish_channel_event")
