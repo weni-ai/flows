@@ -58,7 +58,7 @@ from temba.externals.models import ExternalService
 from temba.flows.models import Flow, FlowLabel, FlowRun, FlowStart
 from temba.globals.models import Global
 from temba.locations.models import AdminBoundary, BoundaryAlias
-from temba.msgs.models import Broadcast, Label, Msg
+from temba.msgs.models import Broadcast, Label, ManagedTriggerGroup, Msg
 from temba.orgs.models import Org
 from temba.templates.models import Template, TemplateTranslation
 from temba.tests import AnonymousOrg, TembaTest, matchers, mock_mailroom
@@ -1940,6 +1940,30 @@ class APITest(APIJSONMixin, TembaTest):
             url, None, {"groups": [str(uuid.uuid4()) for _ in range(101)], "msg": {"text": "Bulk"}}
         )
         self.assertResponseError(response, "groups", "This field can only contain up to 100 items.")
+
+    @patch("temba.mailroom.queue_broadcast")
+    @mock_mailroom
+    def test_whatsapp_broadcasts_trigger_flow_with_urns(self, mocks, mock_queue_broadcast):
+        url = reverse("api.v2.whatsapp_broadcasts")
+        self.assertEndpointAccess(url)
+
+        flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5511999999999"],
+                "trigger_flow_uuid": str(flow.uuid),
+                "msg": {"text": "Hello"},
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        self.assertEqual(data["groups"], [])
+        self.assertIn("trigger_group", data["metadata"])
+        association = ManagedTriggerGroup.objects.get(org=self.org, flow=flow)
+        self.assertEqual(str(association.group.uuid), data["metadata"]["trigger_group"]["uuid"])
+        self.assertEqual(association.group.contacts.count(), 1)
 
     def test_archives(self):
         url = reverse("api.v2.archives")

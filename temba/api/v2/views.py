@@ -17,11 +17,12 @@ from weni_datalake_sdk.clients.redshift.events import get_events as dl_get_event
 from django import forms
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 
@@ -706,6 +707,7 @@ class BroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
         }
 
 
+@method_decorator(transaction.non_atomic_requests, name="dispatch")
 class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     """
     This endpoint allows you to send new whatsapp message broadcasts and list existing broadcasts in your account.
@@ -755,6 +757,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
       * **urns** - the URNs of contacts to send to (array of up to 1000 strings, optional)
       * **contacts** - the UUIDs of contacts to send to (array of up to 1000 strings, optional)
       * **groups** - the UUIDs of contact groups to send to (array of up to 100 strings, optional)
+      * **trigger_flow_uuid** - the UUID of the messaging or voice flow to start when a recipient replies (string, optional)
       * **msg** - the template, text and attachments that will be send to contacts
 
 
@@ -766,6 +769,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
         {
             "urns": ["tel:+250788123123", "tel:+250788123124"],
             "contacts": ["09d23a05-47fe-11e4-bfe9-b8f6b119e9ab"],
+            "trigger_flow_uuid": "f14e4ff0-724d-43fe-a953-1d16aefd1c00",
             "msg": {
                 "text": "This is a test message for @contact.name",
                 "template":{
@@ -1085,6 +1089,8 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     model = Broadcast
     serializer_class = WhatsappBroadcastReadSerializer
     write_serializer_class = WhatsappBroadcastWriteSerializer
+    # Mailroom must see the managed group committed before contact_modify (ATOMIC_REQUESTS would hide it).
+    write_with_transaction = False
     pagination_class = CreatedOnCursorPagination
     throttle_scope = "v2.broadcasts"
 
@@ -1147,6 +1153,11 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                 {"name": "urns", "required": False, "help": "The URNs of contacts you want to send to"},
                 {"name": "contacts", "required": False, "help": "The UUIDs of contacts you want to send to"},
                 {"name": "groups", "required": False, "help": "The UUIDs of contact groups you want to send to"},
+                {
+                    "name": "trigger_flow_uuid",
+                    "required": False,
+                    "help": "The UUID of the messaging or voice flow to start when a recipient replies",
+                },
                 {
                     "name": "msg",
                     "required": True,
