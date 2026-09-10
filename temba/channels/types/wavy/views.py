@@ -19,11 +19,11 @@ class ClaimView(ClaimViewMixin, SmartFormView):
         )
 
         number = forms.CharField(
-            max_length=14, min_length=4, label=_("Number"), help_text=_("The number you are connecting.")
+            max_length=14, min_length=4, label=_("Number"), help_text=_("The number you're connecting")
         )
         username = forms.CharField(label=_("Username"), help_text=_("The username for your Movile/Wavy account"))
         token = forms.CharField(
-            label=_("Authentication Token"), help_text=_("The Authentication Token for your Movile/Wavy account")
+            label=_("Authentication token"), help_text=_("The authentication token for your Movile/Wavy account")
         )
 
     form_class = Form

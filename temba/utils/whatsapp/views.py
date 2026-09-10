@@ -19,7 +19,7 @@ class RefreshView(PostOnlyMixin, OrgPermsMixin, SmartUpdateView):
 
     model = Channel
     fields = ()
-    success_message = _("Contacts refresh begun, it may take a few minutes to complete.")
+    success_message = _("Contacts refresh began. It may take a few minutes to complete.")
     success_url = "uuid@channels.channel_configuration"
     permission = "channels.channel_claim"
     slug_url_kwarg = "uuid"
@@ -47,7 +47,7 @@ class TemplatesView(OrgPermsMixin, SmartReadView):
     def get_gear_links(self):
         return [
             dict(
-                title=_("Sync Logs"),
+                title=_("Sync logs"),
                 href=reverse(f"channels.types.{self.object.get_type().slug}.sync_logs", args=[self.object.uuid]),
             )
         ]
@@ -78,7 +78,7 @@ class SyncLogsView(OrgPermsMixin, SmartReadView):
     def get_gear_links(self):
         return [
             dict(
-                title=_("Message Templates"),
+                title=_("Message templates"),
                 href=reverse(f"channels.types.{self.object.get_type().slug}.templates", args=[self.object.uuid]),
             )
         ]

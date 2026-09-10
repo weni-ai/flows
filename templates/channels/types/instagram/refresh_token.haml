@@ -4,9 +4,9 @@
 -block pre-form
   %p#fb-status
     -if error_connect
-      -trans "Error with token, you need to reconnect the Instagram Business Account by clicking the button below"
+      -trans "Token error. Reconnect the Instagram business account by clicking the button below."
     -else
-      -trans "Everything looks good. No need to reconnect"
+      -trans "Everything looks good. No need to reconnect."
 
 -block form
   .mt-4.card
@@ -16,11 +16,11 @@
 
     #fb-channel-error.mb-4(style="display:none;")
       %p
-        -trans "Error reconnecting Instagram Business Account. Please retry"
+        -trans "Error reconnecting Instagram business account. Try again."
 
     #fb-app-connect.flex
       .button-primary.connect-facebook
-        -trans "Reconnect Instagram Business Account"
+        -trans "Reconnect Instagram business account"
 
     #throbber(style="display:none;")
       %img(src="{{ STATIC_URL }}/images/loader-circles.gif")

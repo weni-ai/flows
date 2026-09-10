@@ -103,7 +103,7 @@ class WitTypeTest(TembaTest):
 
             self.assertEqual(200, response.status_code)
             self.assertFalse(Classifier.objects.all())
-            self.assertContains(response, "Unable to access wit.ai with credentials")
+            self.assertContains(response, "access wit.ai with credentials. Check and try again.")
 
         # all good
         with patch("requests.get") as mock_get:

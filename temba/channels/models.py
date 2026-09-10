@@ -295,9 +295,9 @@ class Channel(TembaModel, DependencyMixin):
     ENCODING_UNICODE = "U"  # we send everything as unicode
 
     ENCODING_CHOICES = (
-        (ENCODING_DEFAULT, _("Default Encoding")),
-        (ENCODING_SMART, _("Smart Encoding")),
-        (ENCODING_UNICODE, _("Unicode Encoding")),
+        (ENCODING_DEFAULT, _("Default encoding")),
+        (ENCODING_SMART, _("Smart encoding")),
+        (ENCODING_UNICODE, _("Unicode encoding")),
     )
 
     # the role types for our channels
@@ -328,7 +328,7 @@ class Channel(TembaModel, DependencyMixin):
     }
 
     CONTENT_TYPE_CHOICES = (
-        (CONTENT_TYPE_URLENCODED, _("URL Encoded - application/x-www-form-urlencoded")),
+        (CONTENT_TYPE_URLENCODED, _("URL encoded - application/x-www-form-urlencoded")),
         (CONTENT_TYPE_JSON, _("JSON - application/json")),
         (CONTENT_TYPE_XML, _("XML - text/xml; charset=utf-8")),
     )
@@ -354,16 +354,16 @@ class Channel(TembaModel, DependencyMixin):
     )
 
     country = CountryField(
-        verbose_name=_("Country"), null=True, blank=True, help_text=_("Country which this channel is for")
+        verbose_name=_("Country"), null=True, blank=True, help_text=_("Country this channel is for")
     )
 
     claim_code = models.CharField(
-        verbose_name=_("Claim Code"),
+        verbose_name=_("Claim code"),
         max_length=16,
         blank=True,
         null=True,
         unique=True,
-        help_text=_("The token the user will us to claim this channel"),
+        help_text=_("The token the user will use to claim this channel"),
     )
 
     secret = models.CharField(
@@ -376,7 +376,7 @@ class Channel(TembaModel, DependencyMixin):
     )
 
     last_seen = models.DateTimeField(
-        verbose_name=_("Last Seen"), auto_now_add=True, help_text=_("The last time this channel contacted the server")
+        verbose_name=_("Last seen"), auto_now_add=True, help_text=_("The last time this channel contacted the server")
     )
 
     device = models.CharField(
@@ -392,14 +392,14 @@ class Channel(TembaModel, DependencyMixin):
         max_length=255,
         null=True,
         blank=True,
-        help_text=_("What Android OS version this channel is running on"),
+        help_text=_("The Android OS version this channel is running on"),
     )
 
     alert_email = models.EmailField(
-        verbose_name=_("Alert Email"),
+        verbose_name=_("Alert email"),
         null=True,
         blank=True,
-        help_text=_("We will send email alerts to this address if experiencing issues sending"),
+        help_text=_("Email alerts will be sent to this address if there are issues sending"),
     )
 
     config = JSONAsTextField(null=True, default=dict)
@@ -413,9 +413,9 @@ class Channel(TembaModel, DependencyMixin):
     bod = models.TextField(null=True)
 
     tps = models.IntegerField(
-        verbose_name=_("Maximum Transactions per Second"),
+        verbose_name=_("Maximum transactions per second"),
         null=True,
-        help_text=_("The max number of messages that will be sent per second"),
+        help_text=_("The maximum number of messages sent per second"),
     )
 
     @classmethod
@@ -751,16 +751,16 @@ class Channel(TembaModel, DependencyMixin):
         elif self.device:
             return self.device
         else:
-            return _("Android Phone")
+            return _("Android phone")
 
     def get_channel_type_display(self):
         return self.get_type().name
 
     def get_channel_type_name(self):
         if self.is_android():
-            return _("Android Phone")
+            return _("Android phone")
         else:
-            return _("%s Channel" % self.get_channel_type_display())
+            return _("%s channel" % self.get_channel_type_display())
 
     def get_address_display(self, e164=False):
         from temba.contacts.models import URN
@@ -1068,12 +1068,12 @@ class ChannelCount(SquashableModel):
     ERROR_LOG_TYPE = "LE"  # ChannelLog record that is an error
 
     COUNT_TYPE_CHOICES = (
-        (INCOMING_MSG_TYPE, _("Incoming Message")),
-        (OUTGOING_MSG_TYPE, _("Outgoing Message")),
-        (INCOMING_IVR_TYPE, _("Incoming Voice")),
-        (OUTGOING_IVR_TYPE, _("Outgoing Voice")),
-        (SUCCESS_LOG_TYPE, _("Success Log Record")),
-        (ERROR_LOG_TYPE, _("Error Log Record")),
+        (INCOMING_MSG_TYPE, _("Incoming message")),
+        (OUTGOING_MSG_TYPE, _("Outgoing message")),
+        (INCOMING_IVR_TYPE, _("Incoming voice")),
+        (OUTGOING_IVR_TYPE, _("Outgoing voice")),
+        (SUCCESS_LOG_TYPE, _("Success log record")),
+        (ERROR_LOG_TYPE, _("Error log record")),
     )
 
     channel = models.ForeignKey(Channel, on_delete=models.PROTECT, related_name="counts")
@@ -1139,15 +1139,15 @@ class ChannelEvent(models.Model):
 
     # single char flag, human readable name, API readable name
     TYPE_CONFIG = (
-        (TYPE_UNKNOWN, _("Unknown Call Type"), "unknown"),
-        (TYPE_CALL_OUT, _("Outgoing Call"), "call-out"),
-        (TYPE_CALL_OUT_MISSED, _("Missed Outgoing Call"), "call-out-missed"),
-        (TYPE_CALL_IN, _("Incoming Call"), "call-in"),
-        (TYPE_CALL_IN_MISSED, _("Missed Incoming Call"), "call-in-missed"),
-        (TYPE_STOP_CONTACT, _("Stop Contact"), "stop-contact"),
-        (TYPE_NEW_CONVERSATION, _("New Conversation"), "new-conversation"),
+        (TYPE_UNKNOWN, _("Unknown call type"), "unknown"),
+        (TYPE_CALL_OUT, _("Outgoing call"), "call-out"),
+        (TYPE_CALL_OUT_MISSED, _("Missed outgoing call"), "call-out-missed"),
+        (TYPE_CALL_IN, _("Incoming call"), "call-in"),
+        (TYPE_CALL_IN_MISSED, _("Missed incoming call"), "call-in-missed"),
+        (TYPE_STOP_CONTACT, _("Stop contact"), "stop-contact"),
+        (TYPE_NEW_CONVERSATION, _("New conversation"), "new-conversation"),
         (TYPE_REFERRAL, _("Referral"), "referral"),
-        (TYPE_WELCOME_MESSAGE, _("Welcome Message"), "welcome-message"),
+        (TYPE_WELCOME_MESSAGE, _("Welcome message"), "welcome-message"),
     )
 
     TYPE_CHOICES = [(t[0], t[1]) for t in TYPE_CONFIG]
@@ -1425,17 +1425,17 @@ class Alert(SmartModel):
         SyncEvent,
         related_name="alerts",
         on_delete=models.PROTECT,
-        verbose_name=_("Sync Event"),
+        verbose_name=_("Sync event"),
         null=True,
         help_text=_("The sync event that caused this alert to be sent (if any)"),
     )
     alert_type = models.CharField(
-        verbose_name=_("Alert Type"),
+        verbose_name=_("Alert type"),
         max_length=1,
         choices=TYPE_CHOICES,
         help_text=_("The type of alert the channel is sending"),
     )
-    ended_on = models.DateTimeField(verbose_name=_("Ended On"), blank=True, null=True)
+    ended_on = models.DateTimeField(verbose_name=_("Ended on"), blank=True, null=True)
 
     @classmethod
     def create_and_send(cls, channel, alert_type: str, *, sync_event=None):
@@ -1646,9 +1646,9 @@ class ChannelConnection(models.Model):
         (STATUS_PENDING, _("Pending")),
         (STATUS_QUEUED, _("Queued")),
         (STATUS_WIRED, _("Wired")),
-        (STATUS_IN_PROGRESS, _("In Progress")),
+        (STATUS_IN_PROGRESS, _("In progress")),
         (STATUS_COMPLETED, _("Complete")),
-        (STATUS_ERRORED, _("Errored")),
+        (STATUS_ERRORED, _("Error")),
         (STATUS_FAILED, _("Failed")),
     )
 
@@ -1659,8 +1659,8 @@ class ChannelConnection(models.Model):
     ERROR_CHOICES = (
         (ERROR_PROVIDER, _("Provider")),  # an API call to the IVR provider returned an error
         (ERROR_BUSY, _("Busy")),  # the contact couldn't be called because they're busy
-        (ERROR_NOANSWER, _("No Answer")),  # the contact didn't answer the call
-        (ERROR_MACHINE, _("Answering Machine")),  # the call went to an answering machine
+        (ERROR_NOANSWER, _("No answer")),  # the contact didn't answer the call
+        (ERROR_MACHINE, _("Answering machine")),  # the call went to an answering machine
     )
 
     org = models.ForeignKey(Org, on_delete=models.PROTECT)

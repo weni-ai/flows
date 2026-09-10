@@ -50,12 +50,11 @@ class UpdateForm(UpdateChannelForm):
             CONFIG_WELCOME_MESSAGE,
             forms.CharField(
                 max_length=640,
-                label=_("Welcome Message"),
+                label=_("Welcome message"),
                 required=False,
                 widget=forms.Textarea,
                 help_text=_(
-                    "The message send to user who have not yet subscribed to the channel, changes may take up to 30 "
-                    "seconds to take effect"
+                    "The message sent to users who haven't yet subscribed to the channel. Changes may take up to 30 seconds to take effect."
                 ),
             ),
             default="",

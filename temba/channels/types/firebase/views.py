@@ -9,14 +9,14 @@ from ...views import ClaimViewMixin
 
 class ClaimView(ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
-        title = forms.CharField(label=_("Notification Title"))
+        title = forms.CharField(label=_("Notification title"))
         key = forms.CharField(
-            label=_("FCM Key"), help_text=_("The key provided on the the Firebase Console when you created your app.")
+            label=_("FCM key"), help_text=_("The key provided on the Firebase Console when you created your app")
         )
         send_notification = forms.CharField(
             label=_("Send notification"),
             required=False,
-            help_text=_("Check if you want this channel to send notifications " "to contacts."),
+            help_text=_("Check if you want this channel to send notifications to contacts"),
             widget=forms.CheckboxInput(),
         )
 

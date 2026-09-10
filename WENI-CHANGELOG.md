@@ -1,3 +1,7 @@
+3.96.0
+----------
+* feat: Full localization review of the project for the officially supported languages: EN (source), ES, PT and RO.
+
 3.95.0
 ----------
 * feat: add speckit

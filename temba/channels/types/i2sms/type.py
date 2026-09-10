@@ -19,9 +19,9 @@ class I2SMSType(ChannelType):
     name = "I2SMS"
     icon = "icon-channel-external"
 
-    claim_blurb = _(
-        "If you have a long number or short code with %(link)s you can connect it in a few easy steps."
-    ) % {"link": '<a href="https://www.i2sms.com/">I2SMS</a>'}
+    claim_blurb = _("If you have a long number or short code with %(link)s, you can connect it in a few steps.") % {
+        "link": '<a href="https://www.i2sms.com/">I2SMS</a>'
+    }
     claim_view = ClaimView
 
     schemes = [URN.TEL_SCHEME]
@@ -29,8 +29,7 @@ class I2SMSType(ChannelType):
     attachment_support = False
 
     configuration_blurb = _(
-        "To finish configuring your I2SMS channel you'll need to set the message URL for the `DEFAULT` keyword as "
-        "below."
+        "To finish configuring your I2SMS channel, you'll need to set the message URL for the `DEFAULT` keyword as below."
     )
 
     configuration_urls = (

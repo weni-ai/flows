@@ -551,8 +551,8 @@ class CampaignEvent(TembaModel):
         return f'Event[relative_to={self.relative_to.key}, offset={self.offset}, flow="{self.flow.name}"]'
 
     class Meta:
-        verbose_name = _("Campaign Event")
-        verbose_name_plural = _("Campaign Events")
+        verbose_name = _("Campaign event")
+        verbose_name_plural = _("Campaign events")
 
 
 class EventFire(Model):

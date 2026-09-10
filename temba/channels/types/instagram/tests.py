@@ -54,14 +54,14 @@ class InstagramTypeTest(TembaTest):
         ]
 
         response = self.client.get(url)
-        self.assertContains(response, "Reconnect Instagram Business Account")
+        self.assertContains(response, "Reconnect Instagram business account")
         self.assertEqual(response.context["facebook_app_id"], "FB_APP_ID")
         self.assertEqual(response.context["refresh_url"], url)
         self.assertTrue(response.context["error_connect"])
 
         mock_get.side_effect = [MockResponse(200, json.dumps({"data": {"is_valid": False}}))]
         response = self.client.get(url)
-        self.assertContains(response, "Reconnect Instagram Business Account")
+        self.assertContains(response, "Reconnect Instagram business account")
         self.assertEqual(response.context["facebook_app_id"], "FB_APP_ID")
         self.assertEqual(response.context["refresh_url"], url)
         self.assertTrue(response.context["error_connect"])
@@ -86,7 +86,7 @@ class InstagramTypeTest(TembaTest):
         ]
 
         response = self.client.get(url)
-        self.assertContains(response, "Reconnect Instagram Business Account")
+        self.assertContains(response, "Reconnect Instagram business account")
         self.assertEqual(response.context["facebook_app_id"], "FB_APP_ID")
         self.assertEqual(response.context["refresh_url"], url)
         self.assertFalse(response.context["error_connect"])
@@ -159,19 +159,19 @@ class InstagramTypeTest(TembaTest):
         ]
 
         response = self.client.get(url)
-        self.assertContains(response, "Reconnect Instagram Business Account")
+        self.assertContains(response, "Reconnect Instagram business account")
         self.assertEqual(response.context["facebook_app_id"], "FB_APP_ID")
         self.assertEqual(response.context["refresh_url"], url)
         self.assertTrue(response.context["error_connect"])
 
         response = self.client.get(url)
-        self.assertContains(response, "Reconnect Instagram Business Account")
+        self.assertContains(response, "Reconnect Instagram business account")
         self.assertEqual(response.context["facebook_app_id"], "FB_APP_ID")
         self.assertEqual(response.context["refresh_url"], url)
         self.assertTrue(response.context["error_connect"])
 
         response = self.client.get(url)
-        self.assertContains(response, "Reconnect Instagram Business Account")
+        self.assertContains(response, "Reconnect Instagram business account")
         self.assertEqual(response.context["facebook_app_id"], "FB_APP_ID")
         self.assertEqual(response.context["refresh_url"], url)
         self.assertFalse(response.context["error_connect"])
@@ -184,8 +184,8 @@ class InstagramTypeTest(TembaTest):
 
         self.assertEqual(
             response.context["form"].errors["__all__"][0],
-            "Unable to refresh the token because this Facebook user doesn't have permission "
-            "on the linked page. Check that you are still an admin on that page and try again.",
+            "Couldn't refresh the token because this Facebook user doesn't have permission "
+            "on the linked page. Check that you're still an admin on that page and try again.",
         )
 
     @override_settings(FACEBOOK_APPLICATION_ID="FB_APP_ID", FACEBOOK_APPLICATION_SECRET="FB_APP_SECRET")
@@ -310,7 +310,7 @@ class InstagramTypeTest(TembaTest):
         response = self.client.post(url, post_data, follow=True)
         self.assertEqual(
             response.context["form"].errors["__all__"][0],
-            "Sorry your Instagram channel could not be connected. Please try again",
+            "Your Instagram channel couldn't be connected. Try again.",
         )
 
     @override_settings(FACEBOOK_APPLICATION_ID="FB_APP_ID", FACEBOOK_APPLICATION_SECRET="FB_APP_SECRET")
@@ -330,14 +330,14 @@ class InstagramTypeTest(TembaTest):
         ]
 
         response = self.client.get(url)
-        self.assertContains(response, "Reconnect Instagram Business Account")
+        self.assertContains(response, "Reconnect Instagram business account")
         self.assertEqual(response.context["facebook_app_id"], "FB_APP_ID")
         self.assertEqual(response.context["refresh_url"], url)
         self.assertTrue(response.context["error_connect"])
 
         mock_get.side_effect = [MockResponse(200, json.dumps({"data": {"is_valid": False}}))]
         response = self.client.get(url)
-        self.assertContains(response, "Reconnect Instagram Business Account")
+        self.assertContains(response, "Reconnect Instagram business account")
         self.assertEqual(response.context["facebook_app_id"], "FB_APP_ID")
         self.assertEqual(response.context["refresh_url"], url)
         self.assertTrue(response.context["error_connect"])
@@ -362,7 +362,7 @@ class InstagramTypeTest(TembaTest):
         ]
 
         response = self.client.get(url)
-        self.assertContains(response, "Reconnect Instagram Business Account")
+        self.assertContains(response, "Reconnect Instagram business account")
         self.assertEqual(response.context["facebook_app_id"], "FB_APP_ID")
         self.assertEqual(response.context["refresh_url"], url)
         self.assertFalse(response.context["error_connect"])
@@ -404,8 +404,8 @@ class InstagramTypeTest(TembaTest):
 
         self.assertEqual(
             response.context["form"].errors["__all__"][0],
-            "Unable to refresh the token because this Facebook user doesn't have permission "
-            "on the linked page. Check that you are still an admin on that page and try again.",
+            "Couldn't refresh the token because this Facebook user doesn't have permission "
+            "on the linked page. Check that you're still an admin on that page and try again.",
         )
 
     @override_settings(FACEBOOK_APPLICATION_ID="FB_APP_ID", FACEBOOK_APPLICATION_SECRET="FB_APP_SECRET")
@@ -430,5 +430,5 @@ class InstagramTypeTest(TembaTest):
         response = self.client.post(url, post_data, follow=True)
         self.assertEqual(
             response.context["form"].errors["__all__"][0],
-            "Sorry your Instagram channel could not be connected. Please try again",
+            "Your Instagram channel couldn't be connected. Try again.",
         )

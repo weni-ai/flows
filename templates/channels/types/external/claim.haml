@@ -6,19 +6,19 @@
 
 -block pre-form
   -blocktrans trimmed with brand.name as brand
-    You can connect an external aggregator or messaging service to {{ brand }} using our external API. You can
-    specify parameters to substitute in the URL or body by using these variables:
+    You can connect an external aggregator or messaging service to {{ brand }} using our external API. You can specify
+    parameters to substitute in the URL or body using these variables:
 
   %ul.my-4
     %li
       .code text
-      -trans "the message of the text being sent"
+      -trans "the text message being sent"
     %li
       .code from
-      -trans "the phone number or address you have configured for this service"
+      -trans "the phone number or address you've configured for this service"
     %li 
       .code from_no_plus
-      -trans "the phone number or address you have configured for this service, with leading +'s removed"
+      -trans "the phone number or address you've configured for this service, with leading +'s removed"
     %li
       .code to
       -trans "the phone number or URN this message is addressed to"
@@ -30,7 +30,7 @@
       -trans "the unique ID of this message"
     %li
       .code quick_replies
-      -trans "the quick replies for this message, formatted according to send method and content type"
+      -trans "the quick replies for this message, formatted according to the send method and content type"
 
   .mb-2
     -blocktrans trimmed
@@ -41,7 +41,7 @@
 
   .mt-6
     -blocktrans trimmed
-      If using POST or PUT, you can specify the body of the request using the same variables.
+      If using POST or PUT, you can specify the request body using the same variables.
 
   .mt-4.leading-loose
     -blocktrans trimmed with "<div class='code'>quick_replies</div>" as quick_replies_var and "<div class='code'>&quick_reply=(reply)</div>" as quick_replies_output
@@ -50,7 +50,7 @@
 
   .mt-4
     -blocktrans trimmed with brand.name as brand
-      After connecting your service we will provide URLs for the endpoints to call when you want to push a message to
+      After connecting your service, we'll provide URLs for the endpoints to call when you want to push a message to
       {{ brand }} or notify {{ brand }} of the delivery status of a message.
 
 -block extra-script

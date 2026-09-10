@@ -6,12 +6,12 @@
 -block title-icon
 
 -block title
-  -trans "Connect a Phone Number"
+  -trans "Connect a phone number"
 
 -block content
   - block claim-numbers-description
     -blocktrans trimmed
-      Once you connect a number you will immediately be able to send and receive messages. Contacts who send messages
+      Once you connect a number, you'll immediately be able to send and receive messages. Contacts who send messages
       to your number will be charged according to their plan.
 
   - block account-trial-warning
@@ -55,9 +55,9 @@
   -if account_numbers
     #account-numbers.card.mt-3.mb-3
       .title
-        -trans "Existing Numbers"
+        -trans "Existing numbers"
       .mb-3
-        -trans "Select a number you already own to connect it to your account."
+        -trans "Select a number you already own to connect it to your account"
       -for number in account_numbers
         - if number.country in supported_country_iso_codes or number.number|length <= 6
           .lbl.mt-3.mr-2.linked{class:"phone-number", data-number:"{{ number.number}}", data-country:"{{ number.country}}" }
@@ -116,7 +116,7 @@
             $("#claim-message").text(data['error']);
             $("#claim-message").show();
           } else {
-            $("#claim-message").text("{% trans 'Sorry, no numbers found, please enter another pattern and try again.' %}");
+            $("#claim-message").text("{% trans 'No numbers found. Enter another pattern and try again.' %}");
             $("#claim-message").show();
           }
         },

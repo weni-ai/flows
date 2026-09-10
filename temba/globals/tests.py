@@ -9,7 +9,7 @@ from .models import Global
 class GlobalTest(TembaTest):
     def test_model(self):
         global1 = Global.get_or_create(self.org, self.admin, "org_name", "Org Name", "Acme Ltd")
-        global2 = Global.get_or_create(self.org, self.admin, "access_token", "Access Token", "23464373")
+        global2 = Global.get_or_create(self.org, self.admin, "access_token", "Access token", "23464373")
 
         self.assertEqual("org_name", global1.key)
         self.assertEqual("Org Name", global1.name)
@@ -79,8 +79,8 @@ class GlobalCRUDLTest(TembaTest, CRUDLTestMixin):
         super().setUp()
 
         self.global1 = Global.get_or_create(self.org, self.admin, "org_name", "Org Name", "Acme Ltd")
-        self.global2 = Global.get_or_create(self.org, self.admin, "access_token", "Access Token", "23464373")
-        self.other_org_global = Global.get_or_create(self.org2, self.admin, "access_token", "Access Token", "653732")
+        self.global2 = Global.get_or_create(self.org, self.admin, "access_token", "Access token", "23464373")
+        self.other_org_global = Global.get_or_create(self.org2, self.admin, "access_token", "Access token", "653732")
 
         self.flow = self.create_flow("Color Flow")
         self.flow.global_dependencies.add(self.global1)
@@ -93,7 +93,7 @@ class GlobalCRUDLTest(TembaTest, CRUDLTestMixin):
         )
         self.assertContains(response, "Acme Ltd")
         self.assertContains(response, "23464373")
-        self.assertContains(response, "1 Use")
+        self.assertContains(response, "1 use")
 
         response = self.client.get(list_url + "?search=access")
         self.assertEqual(list(response.context["object_list"]), [self.global2])
@@ -112,7 +112,7 @@ class GlobalCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"name": "/?:"},
-            form_errors={"name": "Can only contain letters, numbers and hypens.", "value": "This field is required."},
+            form_errors={"name": "Can only contain letters, numbers and hyphens", "value": "This field is required."},
         )
 
         # try to submit with name that would become invalid key
@@ -128,7 +128,7 @@ class GlobalCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # try to submit with same name
         self.assertCreateSubmit(
-            create_url, {"name": "Secret", "value": "[abc]"}, form_errors={"name": "Must be unique."}
+            create_url, {"name": "Secret", "value": "[abc]"}, form_errors={"name": "Must be unique"}
         )
 
         # works if name is unique
@@ -143,7 +143,7 @@ class GlobalCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"name": "Secret3", "value": "[abc]"},
-            form_errors={"__all__": "Cannot create a new global as limit is 4."},
+            form_errors={"__all__": "Can't create a new global as the limit is 4"},
         )
 
     def test_update(self):
@@ -189,7 +189,7 @@ class GlobalCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # fetch delete modal
         response = self.assertDeleteFetch(delete_url)
-        self.assertContains(response, "You are about to delete")
+        self.assertContains(response, "You're about to delete")
 
         response = self.assertDeleteSubmit(delete_url, object_deleted=self.global2, success_status=200)
         self.assertEqual("/global/", response["Temba-Success"])

@@ -2261,7 +2261,7 @@ class APITest(APIJSONMixin, TembaTest):
                 {
                     "uuid": event3.uuid,
                     "campaign": {"uuid": campaign3.uuid, "name": "Alerts"},
-                    "relative_to": {"key": "created_on", "label": "Created On"},
+                    "relative_to": {"key": "created_on", "label": "Created on"},
                     "offset": 6,
                     "unit": "hours",
                     "delivery_hour": 12,
@@ -3336,17 +3336,17 @@ class APITest(APIJSONMixin, TembaTest):
 
         # reject names that exceed the configured maximum length
         response = self.postJSON(url, None, {"name": "x" * 101, "urns": ["tel:+250787000111"]})
-        self.assertResponseError(response, "name", "Contact name cannot exceed 100 characters.")
+        self.assertResponseError(response, "name", "Contact name can't exceed 100 characters")
 
         # reject empty/whitespace-only names when explicitly provided
         response = self.postJSON(url, None, {"name": "   ", "urns": ["tel:+250787000222"]})
-        self.assertResponseError(response, "name", "Contact name cannot be empty.")
+        self.assertResponseError(response, "name", "Contact name can't be empty")
 
         # reject tel: URN that passes phonenumbers (4-digit Niue national + 3-digit country code)
         # but has fewer than 8 digits, exercising validate_contact_phone in the URN field
         response = self.postJSON(url, None, {"name": "Niue Phone", "urns": ["tel:+6831234"]})
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Phone number must have at least 8 digits.", response.json()["urns"]["0"])
+        self.assertIn("Phone number must have at least 8 digits", response.json()["urns"]["0"])
 
     @mock_mailroom
     def test_contacts_lean(self, mr_mocks):
@@ -4110,7 +4110,7 @@ class APITest(APIJSONMixin, TembaTest):
 
         # create some globals
         global1 = Global.get_or_create(self.org, self.admin, "org_name", "Org Name", "Acme Ltd")
-        global2 = Global.get_or_create(self.org, self.admin, "access_token", "Access Token", "23464373")
+        global2 = Global.get_or_create(self.org, self.admin, "access_token", "Access token", "23464373")
 
         # on another org
         Global.get_or_create(self.org2, self.admin, "thingy", "Thingy", "xyz")
@@ -4127,7 +4127,7 @@ class APITest(APIJSONMixin, TembaTest):
             [
                 {
                     "key": "access_token",
-                    "name": "Access Token",
+                    "name": "Access token",
                     "value": "23464373",
                     "modified_on": format_datetime(global2.modified_on),
                 },
@@ -4167,7 +4167,7 @@ class APITest(APIJSONMixin, TembaTest):
             [
                 {
                     "key": "access_token",
-                    "name": "Access Token",
+                    "name": "Access token",
                     "value": "23464373",
                     "modified_on": format_datetime(global2.modified_on),
                 },

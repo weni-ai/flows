@@ -19,7 +19,7 @@ class WhatsAppCloudType(ChannelType):
     A WhatsApp Cloud Channel Type
     """
 
-    extra_links = [dict(name=_("Message Templates"), link="channels.types.whatsapp_cloud.templates")]
+    extra_links = [dict(name=_("Message templates"), link="channels.types.whatsapp_cloud.templates")]
 
     code = "WAC"
     category = ChannelType.Category.SOCIAL_MEDIA
@@ -64,7 +64,7 @@ class WhatsAppCloudType(ChannelType):
         resp = requests.post(url, params=params, headers=headers)
 
         if resp.status_code != 200:  # pragma: no cover
-            raise ValidationError(_("Unable to add system user to %s" % waba_id))
+            raise ValidationError(_("Couldn't add system user to %s" % waba_id))
 
         if waba_business_id != settings.WHATSAPP_FACEBOOK_BUSINESS_ID:
             # Get credit line ID
@@ -73,7 +73,7 @@ class WhatsAppCloudType(ChannelType):
             resp = requests.get(url, params=params, headers=headers)
 
             if resp.status_code != 200:  # pragma: no cover
-                raise ValidationError(_("Unable to fetch credit line ID"))
+                raise ValidationError(_("Couldn't fetch credit line ID"))
 
             data = resp.json().get("data", [])
             if data:
@@ -84,14 +84,14 @@ class WhatsAppCloudType(ChannelType):
             resp = requests.post(url, params=params, headers=headers)
 
             if resp.status_code != 200:  # pragma: no cover
-                raise ValidationError(_("Unable to assign credit line ID"))
+                raise ValidationError(_("Couldn't assign credit line ID"))
 
         # Subscribe to events
         url = f"{settings.WHATSAPP_API_URL}/{waba_id}/subscribed_apps"
         resp = requests.post(url, headers=headers)
 
         if resp.status_code != 200:  # pragma: no cover
-            raise ValidationError(_("Unable to subscribe to app to WABA with ID %s" % waba_id))
+            raise ValidationError(_("Couldn't subscribe the app to the WABA with ID %s" % waba_id))
 
     def get_api_templates(self, channel):
         if not settings.WHATSAPP_ADMIN_SYSTEM_USER_TOKEN:  # pragma: no cover

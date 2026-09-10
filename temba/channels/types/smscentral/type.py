@@ -19,7 +19,7 @@ class SMSCentralType(ChannelType):
     name = "SMSCentral"
     icon = "icon-channel-external"
 
-    claim_blurb = _("Easily add a two way number you have configured with %(link)s using their APIs.") % {
+    claim_blurb = _("Easily add a two-way number you have configured with %(link)s using their APIs.") % {
         "link": '<a href="http://smscentral.com.np/">SMSCentral</a>'
     }
     claim_view = AuthenticatedExternalClaimView
@@ -31,7 +31,7 @@ class SMSCentralType(ChannelType):
     attachment_support = False
 
     configuration_blurb = _(
-        "To finish configuring your SMSCentral connection you'll need to notify SMSCentral of the following URL."
+        "To finish configuring your SMSCentral connection, you'll need to notify SMSCentral of the following URL."
     )
 
     configuration_urls = (
@@ -39,7 +39,7 @@ class SMSCentralType(ChannelType):
             label=_("Inbound URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.sc' channel.uuid 'receive' %}",
             description=_(
-                "This endpoint should be called by SMSCentral when new messages are received to your number."
+                "This endpoint should be called by SMSCentral when new messages are received at your number."
             ),
         ),
     )

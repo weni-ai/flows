@@ -391,7 +391,7 @@ class OrgSignupForm(forms.ModelForm):
     password = forms.CharField(
         widget=InputWidget(attrs={"hide_label": True, "password": True, "placeholder": _("Password")}),
         validators=[validate_password],
-        help_text=_("At least eight characters or more"),
+        help_text=_("Must contain at least eight characters"),
     )
 
     name = forms.CharField(
@@ -425,7 +425,7 @@ class OrgGrantForm(forms.ModelForm):
         max_length=User._meta.get_field("first_name").max_length,
     )
     last_name = forms.CharField(
-        help_text=_("Your last name of the workspace administrator"),
+        help_text=_("The last name of the workspace administrator"),
         max_length=User._meta.get_field("last_name").max_length,
     )
     email = forms.EmailField(
@@ -435,7 +435,7 @@ class OrgGrantForm(forms.ModelForm):
     password = forms.CharField(
         widget=forms.PasswordInput,
         required=False,
-        help_text=_("Their password, at least eight letters please. (leave blank for existing login)"),
+        help_text=_("Their password (should be at least eight characters). Leave blank for existing login."),
     )
     name = forms.CharField(label=_("Workspace"), help_text=_("The name of the new workspace"))
     credits = forms.ChoiceField(choices=(), help_text=_("The initial number of credits granted to this workspace"))
@@ -466,10 +466,10 @@ class OrgGrantForm(forms.ModelForm):
             user = User.objects.filter(username__iexact=email).first()
             if user:
                 if password:
-                    raise ValidationError(_("Login already exists, please do not include password."))
+                    raise ValidationError(_("Login already exists. Don't include a password."))
             else:
                 if not password:
-                    raise ValidationError(_("Password required for new login."))
+                    raise ValidationError(_("Password required for new login"))
 
                 validate_password(password)
 
@@ -588,7 +588,7 @@ class TwoFactorVerifyView(BaseTwoFactorView):
         def clean_otp(self):
             data = self.cleaned_data["otp"]
             if not self.user.verify_2fa(otp=data):
-                raise ValidationError(_("Incorrect OTP. Please try again."))
+                raise ValidationError(_("Incorrect OTP. Try again."))
             return data
 
     form_class = Form
@@ -610,7 +610,7 @@ class TwoFactorBackupView(BaseTwoFactorView):
         def clean_token(self):
             data = self.cleaned_data["token"]
             if not self.user.verify_2fa(backup_token=data):
-                raise ValidationError(_("Invalid backup token. Please try again."))
+                raise ValidationError(_("Invalid backup token. Try again."))
             return data
 
     form_class = Form
@@ -635,7 +635,7 @@ class ConfirmAccessView(SpaMixin, Login):
         def clean_password(self):
             data = self.cleaned_data["password"]
             if not self.user.check_password(data):
-                raise forms.ValidationError(_("Password incorrect."))
+                raise forms.ValidationError(_("Password incorrect"))
             return data
 
         def get_user(self):
@@ -728,16 +728,16 @@ class UserCRUDL(SmartCRUDL):
 
     class Forget(SmartFormView):
         class ForgetForm(forms.Form):
-            email = forms.EmailField(required=True, label=_("Your Email"), widget=InputWidget())
+            email = forms.EmailField(required=True, label=_("Your email"), widget=InputWidget())
 
             def clean_email(self):
                 email = self.cleaned_data["email"].lower().strip()
                 return email
 
-        title = _("Password Recovery")
+        title = _("Password recovery")
         form_class = ForgetForm
         permission = None
-        success_message = _("An Email has been sent to your account with further instructions.")
+        success_message = _("An email has been sent to your account with further instructions")
         success_url = "@users.user_login"
         fields = ("email",)
 
@@ -746,7 +746,7 @@ class UserCRUDL(SmartCRUDL):
             user = User.objects.filter(email__iexact=email).first()
 
             if user:
-                subject = _("Password Recovery Request")
+                subject = _("Password recovery request")
                 template = "orgs/email/user_forget"
 
                 token = "".join(random.choice(string.ascii_uppercase + string.digits) for x in range(32))
@@ -767,28 +767,28 @@ class UserCRUDL(SmartCRUDL):
     class Edit(SmartUpdateView):
         class EditForm(forms.ModelForm):
             first_name = forms.CharField(
-                label=_("First Name"), widget=InputWidget(attrs={"placeholder": _("Required")})
+                label=_("First name"), widget=InputWidget(attrs={"placeholder": _("Required")})
             )
-            last_name = forms.CharField(label=_("Last Name"), widget=InputWidget(attrs={"placeholder": _("Required")}))
+            last_name = forms.CharField(label=_("Last name"), widget=InputWidget(attrs={"placeholder": _("Required")}))
             email = forms.EmailField(required=True, label=_("Email"), widget=InputWidget())
             current_password = forms.CharField(
                 required=False,
-                label=_("Current Password"),
-                widget=InputWidget({"widget_only": True, "placeholder": _("Password Required"), "password": True}),
+                label=_("Current password"),
+                widget=InputWidget({"widget_only": True, "placeholder": _("Password required"), "password": True}),
             )
             new_password = forms.CharField(
                 required=False,
-                label=_("New Password"),
+                label=_("New password"),
                 widget=InputWidget(attrs={"placeholder": _("Optional"), "password": True}),
             )
             language = forms.ChoiceField(
-                choices=settings.LANGUAGES, required=True, label=_("Website Language"), widget=SelectWidget()
+                choices=settings.LANGUAGES, required=True, label=_("Website language"), widget=SelectWidget()
             )
 
             def clean_new_password(self):
                 password = self.cleaned_data["new_password"]
                 if password and not len(password) >= 8:
-                    raise forms.ValidationError(_("Passwords must have at least 8 letters."))
+                    raise forms.ValidationError(_("Passwords must have at least 8 characters"))
                 return password
 
             def clean_current_password(self):
@@ -798,7 +798,7 @@ class UserCRUDL(SmartCRUDL):
                 # password is required to change your email address or set a new password
                 if self.data.get("new_password", None) or self.data.get("email", None) != user.email:
                     if not user.check_password(password):
-                        raise forms.ValidationError(_("Please enter your password to save changes."))
+                        raise forms.ValidationError(_("Enter your password to save changes"))
 
                 return password
 
@@ -807,7 +807,7 @@ class UserCRUDL(SmartCRUDL):
                 email = self.cleaned_data["email"].lower()
 
                 if User.objects.filter(username=email).exclude(pk=user.pk):
-                    raise forms.ValidationError(_("Sorry, that email address is already taken."))
+                    raise forms.ValidationError(_("That email address is already being used"))
 
                 return email
 
@@ -890,13 +890,13 @@ class UserCRUDL(SmartCRUDL):
             def clean_otp(self):
                 data = self.cleaned_data["otp"]
                 if not self.user.verify_2fa(otp=data):
-                    raise forms.ValidationError(_("OTP incorrect. Please try again."))
+                    raise forms.ValidationError(_("OTP incorrect. Try again."))
                 return data
 
             def clean_password(self):
                 data = self.cleaned_data["password"]
                 if not self.user.check_password(data):
-                    raise forms.ValidationError(_("Password incorrect."))
+                    raise forms.ValidationError(_("Password incorrect"))
                 return data
 
         form_class = Form
@@ -904,7 +904,7 @@ class UserCRUDL(SmartCRUDL):
         success_message = _("Two-factor authentication enabled")
         submit_button_name = _("Enable")
         permission = "orgs.org_two_factor"
-        title = _("Enable Two-factor Authentication")
+        title = _("Enable two-factor authentication")
 
         def get_form_kwargs(self):
             kwargs = super().get_form_kwargs()
@@ -943,7 +943,7 @@ class UserCRUDL(SmartCRUDL):
             def clean_password(self):
                 data = self.cleaned_data["password"]
                 if not self.user.check_password(data):
-                    raise forms.ValidationError(_("Password incorrect."))
+                    raise forms.ValidationError(_("Password incorrect"))
                 return data
 
         form_class = Form
@@ -951,7 +951,7 @@ class UserCRUDL(SmartCRUDL):
         success_message = _("Two-factor authentication disabled")
         submit_button_name = _("Disable")
         permission = "orgs.org_two_factor"
-        title = _("Disable Two-factor Authentication")
+        title = _("Disable two-factor authentication")
 
         def get_form_kwargs(self):
             kwargs = super().get_form_kwargs()
@@ -966,7 +966,7 @@ class UserCRUDL(SmartCRUDL):
 
     class TwoFactorTokens(SpaMixin, RequireRecentAuthMixin, InferOrgMixin, OrgPermsMixin, SmartTemplateView):
         permission = "orgs.org_two_factor"
-        title = _("Two-factor Authentication")
+        title = _("Two-factor authentication")
 
         def pre_process(self, request, *args, **kwargs):
             # if 2FA isn't enabled for this user, take them to the enable view instead
@@ -977,7 +977,7 @@ class UserCRUDL(SmartCRUDL):
 
         def post(self, request, *args, **kwargs):
             BackupToken.generate_for_user(self.request.user)
-            messages.info(request, _("Two-factor authentication backup tokens changed."))
+            messages.info(request, _("Two-factor authentication backup tokens changed"))
 
             return super().get(request, *args, **kwargs)
 
@@ -1144,7 +1144,7 @@ class OrgCRUDL(SmartCRUDL):
                     menu.append(
                         self.create_menu_item(
                             menu_id="authentication",
-                            name=_("Enable 2FA"),
+                            name=_("Enable two-factor authentication"),
                             icon="shield",
                             href=reverse("orgs.user_two_factor_enable"),
                         )
@@ -1197,7 +1197,7 @@ class OrgCRUDL(SmartCRUDL):
 
                     menu.append(
                         self.create_menu_item(
-                            menu_id="channel", name=_("Add Channel"), icon="channel", href="channels.channel_claim"
+                            menu_id="channel", name=_("Add channel"), icon="channel", href="channels.channel_claim"
                         )
                     )
 
@@ -1212,7 +1212,7 @@ class OrgCRUDL(SmartCRUDL):
                     )
                     menu.append(
                         self.create_menu_item(
-                            name=_("Flow Runs"),
+                            name=_("Flow runs"),
                             icon="flow",
                             href=reverse("archives.archive_run"),
                         )
@@ -1221,7 +1221,7 @@ class OrgCRUDL(SmartCRUDL):
                 child_orgs = Org.objects.filter(parent=org, is_active=True).order_by("name")
 
                 if child_orgs:
-                    menu.append(self.create_section(_("Child Workspaces")))
+                    menu.append(self.create_section(_("Child workspaces")))
 
                 for child in child_orgs:
                     menu.append(
@@ -1280,16 +1280,14 @@ class OrgCRUDL(SmartCRUDL):
                 try:
                     json_data = json.loads(force_text(data))
                 except (DjangoUnicodeDecodeError, ValueError):
-                    raise ValidationError(_("This file is not a valid flow definition file."))
+                    raise ValidationError(_("This file isn't a valid flow definition file"))
 
                 if Version(str(json_data.get("version", 0))) < Version(Org.EARLIEST_IMPORT_VERSION):
-                    raise ValidationError(
-                        _("This file is no longer valid. Please export a new version and try again.")
-                    )
+                    raise ValidationError(_("This file is no longer valid. Export a new version and try again."))
 
                 return data
 
-        success_message = _("Import successful")
+        success_message = _("Imported successfully")
         form_class = FlowImportForm
 
         def get_success_url(self):  # pragma: needs cover
@@ -1309,7 +1307,7 @@ class OrgCRUDL(SmartCRUDL):
                 # this is an unexpected error, report it to sentry
                 logger = logging.getLogger(__name__)
                 logger.error("Exception on app import: %s" % str(e), exc_info=True)
-                form._errors["import_file"] = form.error_class([_("Sorry, your import file is invalid.")])
+                form._errors["import_file"] = form.error_class([_("Your import file is invalid")])
                 return self.form_invalid(form)
 
             return super().form_valid(form)  # pragma: needs cover
@@ -1408,18 +1406,18 @@ class OrgCRUDL(SmartCRUDL):
 
     class TwilioConnect(ComponentFormMixin, ModalMixin, InferOrgMixin, OrgPermsMixin, SmartFormView):
         class TwilioConnectForm(forms.Form):
-            account_sid = forms.CharField(help_text=_("Your Twilio Account SID"), widget=InputWidget())
-            account_token = forms.CharField(help_text=_("Your Twilio Account Token"), widget=InputWidget())
+            account_sid = forms.CharField(help_text=_("Your Twilio account SID"), widget=InputWidget())
+            account_token = forms.CharField(help_text=_("Your Twilio account token"), widget=InputWidget())
 
             def clean(self):
                 account_sid = self.cleaned_data.get("account_sid", None)
                 account_token = self.cleaned_data.get("account_token", None)
 
                 if not account_sid:  # pragma: needs cover
-                    raise ValidationError(_("You must enter your Twilio Account SID"))
+                    raise ValidationError(_("Enter your Twilio account SID"))
 
                 if not account_token:
-                    raise ValidationError(_("You must enter your Twilio Account Token"))
+                    raise ValidationError(_("Enter your Twilio account token"))
 
                 try:
                     client = Client(account_sid, account_token)
@@ -1430,7 +1428,7 @@ class OrgCRUDL(SmartCRUDL):
                     self.cleaned_data["account_token"] = account.auth_token
                 except Exception:
                     raise ValidationError(
-                        _("The Twilio account SID and Token seem invalid. Please check them again and retry.")
+                        _("The Twilio account SID and token seem invalid. Check them and try again.")
                     )
 
                 return self.cleaned_data
@@ -1466,8 +1464,8 @@ class OrgCRUDL(SmartCRUDL):
 
     class VonageAccount(InferOrgMixin, ComponentFormMixin, OrgPermsMixin, SmartUpdateView):
         class Form(forms.ModelForm):
-            api_key = forms.CharField(max_length=128, label=_("API Key"), required=False)
-            api_secret = forms.CharField(max_length=128, label=_("API Secret"), required=False)
+            api_key = forms.CharField(max_length=128, label=_("API key"), required=False)
+            api_secret = forms.CharField(max_length=128, label=_("API secret"), required=False)
             disconnect = forms.CharField(widget=forms.HiddenInput, max_length=6, required=True)
 
             def clean(self):
@@ -1477,17 +1475,15 @@ class OrgCRUDL(SmartCRUDL):
                     api_secret = self.cleaned_data.get("api_secret", None)
 
                     if not api_key:
-                        raise ValidationError(_("You must enter your account API Key"))
+                        raise ValidationError(_("Enter your account API key"))
 
                     if not api_secret:  # pragma: needs cover
-                        raise ValidationError(_("You must enter your account API Secret"))
+                        raise ValidationError(_("Enter your account API secret"))
 
                     from temba.channels.types.vonage.client import VonageClient
 
                     if not VonageClient(api_key, api_secret).check_credentials():
-                        raise ValidationError(
-                            _("Your API key and secret seem invalid. Please check them again and retry.")
-                        )
+                        raise ValidationError(_("Your API key and secret seem invalid. Check them and try again."))
 
                 return self.cleaned_data
 
@@ -1547,9 +1543,7 @@ class OrgCRUDL(SmartCRUDL):
                 from temba.channels.types.vonage.client import VonageClient
 
                 if not VonageClient(api_key, api_secret).check_credentials():
-                    raise ValidationError(
-                        _("Your API key and secret seem invalid. Please check them again and retry.")
-                    )
+                    raise ValidationError(_("Your API key and secret seem invalid. Check them and try again."))
 
                 return self.cleaned_data
 
@@ -1598,9 +1592,7 @@ class OrgCRUDL(SmartCRUDL):
                                 'Missing permission, we need all the following permissions "business_management", "whatsapp_business_management", "whatsapp_business_messaging"'
                             )
                 except Exception:
-                    raise forms.ValidationError(
-                        _("Sorry account could not be connected. Please try again"), code="invalid"
-                    )
+                    raise forms.ValidationError(_("Your account couldn't be connected. Try again."), code="invalid")
 
                 return self.cleaned_data
 
@@ -1653,7 +1645,7 @@ class OrgCRUDL(SmartCRUDL):
 
                 if response.status_code != 200:
                     raise ValidationError(
-                        _("Your Plivo auth ID and auth token seem invalid. Please check them again and retry.")
+                        _("Your Plivo auth ID and auth token seem invalid. Check them and try again.")
                     )
 
                 return self.cleaned_data
@@ -1678,22 +1670,22 @@ class OrgCRUDL(SmartCRUDL):
         class Form(forms.ModelForm):
             from_email = forms.CharField(
                 max_length=128,
-                label=_("Email Address"),
+                label=_("Email address"),
                 required=False,
-                help_text=_("The from email address, can contain a name: ex: Jane Doe <jane@example.org>"),
+                help_text=_("The from email address can contain a name. Example: Jane Doe <jane@example.org>"),
                 widget=InputWidget(),
             )
             smtp_host = forms.CharField(
                 max_length=128,
                 required=False,
-                widget=InputWidget(attrs={"widget_only": True, "placeholder": _("SMTP Host")}),
+                widget=InputWidget(attrs={"widget_only": True, "placeholder": _("SMTP host")}),
             )
             smtp_username = forms.CharField(max_length=128, label=_("Username"), required=False, widget=InputWidget())
             smtp_password = forms.CharField(
                 max_length=128,
                 label=_("Password"),
                 required=False,
-                help_text=_("Leave blank to keep the existing set password if one exists"),
+                help_text=_("Leave blank to keep the existing password"),
                 widget=InputWidget(attrs={"password": True}),
             )
             smtp_port = forms.CharField(
@@ -1721,23 +1713,23 @@ class OrgCRUDL(SmartCRUDL):
                         smtp_password = unquote(existing_smtp_server.password)
 
                     if not from_email:
-                        raise ValidationError(_("You must enter a from email"))
+                        raise ValidationError(_("Enter a from email"))
 
                     parsed = parseaddr(from_email)
                     if not is_valid_address(parsed[1]):
-                        raise ValidationError(_("Please enter a valid email address"))
+                        raise ValidationError(_("Enter a valid email address"))
 
                     if not smtp_host:
-                        raise ValidationError(_("You must enter the SMTP host"))
+                        raise ValidationError(_("Enter the SMTP host"))
 
                     if not smtp_username:
-                        raise ValidationError(_("You must enter the SMTP username"))
+                        raise ValidationError(_("Enter the SMTP username"))
 
                     if not smtp_password:
-                        raise ValidationError(_("You must enter the SMTP password"))
+                        raise ValidationError(_("Enter the SMTP password"))
 
                     if not smtp_port:
-                        raise ValidationError(_("You must enter the SMTP port"))
+                        raise ValidationError(_("Enter the SMTP port"))
 
                     self.cleaned_data["smtp_password"] = smtp_password
 
@@ -1750,7 +1742,7 @@ class OrgCRUDL(SmartCRUDL):
                         subject = _("%(name)s SMTP configuration test") % branding
                         body = (
                             _(
-                                "This email is a test to confirm the custom SMTP server configuration added to your %(name)s account."
+                                "This email is a test to confirm the custom SMTP server configuration added to your %(name)s account"
                             )
                             % branding
                         )
@@ -1769,10 +1761,10 @@ class OrgCRUDL(SmartCRUDL):
 
                     except smtplib.SMTPException as e:
                         raise ValidationError(
-                            _("Failed to send email with STMP server configuration with error '%s'") % str(e)
+                            _("Couldn't send email with SMTP server configuration. Error: '%s'") % str(e)
                         )
                     except Exception:
-                        raise ValidationError(_("Failed to send email with STMP server configuration"))
+                        raise ValidationError(_("Couldn't send email with SMTP server configuration"))
 
                 return self.cleaned_data
 
@@ -2009,7 +2001,7 @@ class OrgCRUDL(SmartCRUDL):
             if org.is_active:
                 links.append(
                     dict(
-                        title=_("Topups"),
+                        title=_("Top-ups"),
                         style="button-primary",
                         href="%s?org=%d" % (reverse("orgs.topup_manage"), org.pk),
                     )
@@ -2050,7 +2042,7 @@ class OrgCRUDL(SmartCRUDL):
                             id="delete-org",
                             title=_("Delete"),
                             href=reverse("orgs.org_delete", args=[org.id]),
-                            modax=_("Delete Workspace"),
+                            modax=_("Delete workspace"),
                         )
                     )
             return links
@@ -2101,7 +2093,7 @@ class OrgCRUDL(SmartCRUDL):
                 password = self.cleaned_data.get("surveyor_password", "")
                 existing = Org.objects.filter(surveyor_password=password).exclude(pk=self.instance.pk).first()
                 if existing:
-                    raise forms.ValidationError(_("This password is not valid. Choose a new password and try again."))
+                    raise forms.ValidationError(_("This password isn't valid. Choose a new password and try again."))
                 return password
 
             class Meta:
@@ -2111,7 +2103,7 @@ class OrgCRUDL(SmartCRUDL):
         form_class = PasswordForm
         success_url = "@orgs.org_home"
         success_message = ""
-        submit_button_name = _("Save Changes")
+        submit_button_name = _("Save changes")
         title = "Logins"
         fields = ("surveyor_password",)
 
@@ -2133,7 +2125,7 @@ class OrgCRUDL(SmartCRUDL):
     class ManageAccounts(SpaMixin, InferOrgMixin, OrgPermsMixin, SmartUpdateView):
         class AccountsForm(forms.ModelForm):
             invite_emails = forms.CharField(
-                required=False, widget=InputWidget(attrs={"widget_only": True, "placeholder": _("Email Address")})
+                required=False, widget=InputWidget(attrs={"widget_only": True, "placeholder": _("Email address")})
             )
             invite_role = forms.ChoiceField(
                 choices=[], required=True, initial="V", label=_("Role"), widget=SelectWidget()
@@ -2213,15 +2205,15 @@ class OrgCRUDL(SmartCRUDL):
                         try:
                             validate_email(email)
                         except ValidationError:
-                            raise forms.ValidationError(_("One of the emails you entered is invalid."))
+                            raise forms.ValidationError(_("One of the emails you entered is invalid"))
 
                         if email in existing_users_emails:
                             raise forms.ValidationError(
-                                _("One of the emails you entered has an existing user on the workspace.")
+                                _("One of the emails you entered belongs to an existing user on the workspace")
                             )
 
                         if email in cleaned_emails:
-                            raise forms.ValidationError(_("One of the emails you entered is duplicated."))
+                            raise forms.ValidationError(_("One of the emails you entered is duplicated"))
 
                         cleaned_emails.append(email)
 
@@ -2260,7 +2252,7 @@ class OrgCRUDL(SmartCRUDL):
                         break
 
                 if not has_admin:
-                    raise forms.ValidationError(_("A workspace must have at least one administrator."))
+                    raise forms.ValidationError(_("A workspace must have at least one administrator"))
 
             class Meta:
                 model = Invitation
@@ -2269,8 +2261,8 @@ class OrgCRUDL(SmartCRUDL):
         form_class = AccountsForm
         success_url = "@orgs.org_manage_accounts"
         success_message = ""
-        submit_button_name = _("Save Changes")
-        title = _("Manage Logins")
+        submit_button_name = _("Save changes")
+        title = _("Manage logins")
 
         def get_gear_links(self):
             links = []
@@ -2279,7 +2271,7 @@ class OrgCRUDL(SmartCRUDL):
                     links.append(
                         dict(
                             title=_("Edit"),
-                            modax=_("Edit Workspace"),
+                            modax=_("Edit workspace"),
                             href=f"{reverse('orgs.org_edit_sub_org')}?org={self.object.pk}",
                         )
                     )
@@ -2400,9 +2392,9 @@ class OrgCRUDL(SmartCRUDL):
             if self.has_org_perm("orgs.org_create_sub_org"):
                 links.append(
                     dict(
-                        title=_("New Workspace"),
+                        title=_("New workspace"),
                         href=reverse("orgs.org_create_sub_org"),
-                        modax=_("New Workspace"),
+                        modax=_("New workspace"),
                         id="new-workspace",
                     )
                 )
@@ -2410,9 +2402,9 @@ class OrgCRUDL(SmartCRUDL):
             if self.has_org_perm("orgs.org_transfer_credits") and self.get_object().uses_topups:
                 links.append(
                     dict(
-                        title=_("Transfer Credits"),
+                        title=_("Transfer credits"),
                         href=reverse("orgs.org_transfer_credits"),
-                        modax=_("Transfer Credits"),
+                        modax=_("Transfer credits"),
                         id="transfer-credits",
                     )
                 )
@@ -2422,12 +2414,12 @@ class OrgCRUDL(SmartCRUDL):
         def get_manage(self, obj):  # pragma: needs cover
             if obj == self.get_object():
                 return mark_safe(
-                    f'<a href="{reverse("orgs.org_manage_accounts")}" class="float-right pr-4"><div class="button-light inline-block ">{_("Manage Logins")}</div></a>'
+                    f'<a href="{reverse("orgs.org_manage_accounts")}" class="float-right pr-4"><div class="button-light inline-block ">{_("Manage logins")}</div></a>'
                 )
 
             if obj.parent:
                 return mark_safe(
-                    f'<a href="{reverse("orgs.org_manage_accounts_sub_org")}?org={obj.id}" class="float-right pr-4"><div class="button-light inline-block">{_("Manage Logins")}</div></a>'
+                    f'<a href="{reverse("orgs.org_manage_accounts_sub_org")}?org={obj.id}" class="float-right pr-4"><div class="button-light inline-block">{_("Manage logins")}</div></a>'
                 )
             return ""
 
@@ -2519,7 +2511,7 @@ class OrgCRUDL(SmartCRUDL):
 
         form_class = Form
         fields = ("organization",)
-        title = _("Select your Workspace")
+        title = _("Select your workspace")
         success_urls = {
             OrgRole.ADMINISTRATOR: "msgs.msg_inbox",
             OrgRole.EDITOR: "msgs.msg_inbox",
@@ -2557,7 +2549,7 @@ class OrgCRUDL(SmartCRUDL):
                         return HttpResponseRedirect(reverse("orgs.org_manage"))
 
                     # for regular users, if there's no orgs, log them out with a message
-                    messages.info(request, _("No organizations for this account, please contact your administrator."))
+                    messages.info(request, _("No organizations found for this account. Contact your administrator."))
                     logout(request)
                     return HttpResponseRedirect(reverse("users.user_login"))
             return None
@@ -2595,9 +2587,7 @@ class OrgCRUDL(SmartCRUDL):
         def pre_process(self, request, *args, **kwargs):
             org = self.get_object()
             if not org:
-                messages.info(
-                    request, _("Your invitation link is invalid. Please contact your workspace administrator.")
-                )
+                messages.info(request, _("Your invitation link is invalid. Contact your workspace administrator."))
                 return HttpResponseRedirect(reverse("public.public_index"))
 
             invite = self.get_invitation()
@@ -2683,9 +2673,7 @@ class OrgCRUDL(SmartCRUDL):
                     return HttpResponseRedirect(reverse("orgs.org_create_login", args=[secret]))
 
             else:
-                messages.info(
-                    request, _("Your invitation link has expired. Please contact your workspace administrator.")
-                )
+                messages.info(request, _("Your invitation link has expired. Contact your workspace administrator."))
                 return HttpResponseRedirect(reverse("users.user_login"))
 
         def get_context_data(self, **kwargs):
@@ -2724,9 +2712,7 @@ class OrgCRUDL(SmartCRUDL):
             org = self.get_object()
             invitation = self.get_invitation()
             if not (invitation and org):
-                messages.info(
-                    request, _("Your invitation link has expired. Please contact your workspace administrator.")
-                )
+                messages.info(request, _("Your invitation link has expired. Contact your workspace administrator."))
                 return HttpResponseRedirect(reverse("public.public_index"))
 
             secret = self.kwargs.get("secret")
@@ -2792,7 +2778,7 @@ class OrgCRUDL(SmartCRUDL):
                 org = Org.objects.filter(surveyor_password=password).first()
                 if not org:
                     raise forms.ValidationError(
-                        _("Invalid surveyor password, please check with your project leader and try again.")
+                        _("Invalid surveyor password. Check with your project leader and try again.")
                     )
                 self.cleaned_data["org"] = org
                 return password
@@ -2812,7 +2798,7 @@ class OrgCRUDL(SmartCRUDL):
                 widget=forms.PasswordInput(attrs={"placeholder": "Password"}),
                 required=True,
                 validators=[validate_password],
-                help_text=_("Your password, at least eight letters please"),
+                help_text=_("Your password (should be at least eight characters)"),
             )
 
             def __init__(self, *args, **kwargs):
@@ -2911,7 +2897,7 @@ class OrgCRUDL(SmartCRUDL):
                 return super().get_template_names()
 
     class Grant(NonAtomicMixin, SmartCreateView):
-        title = _("Create Workspace Account")
+        title = _("Create workspace account")
         form_class = OrgGrantForm
         fields = ("first_name", "last_name", "email", "password", "name", "timezone", "credits")
         success_message = "Workspace successfully created."
@@ -2971,7 +2957,7 @@ class OrgCRUDL(SmartCRUDL):
             return obj
 
     class Signup(ComponentFormMixin, Grant):
-        title = _("Sign Up")
+        title = _("Sign up")
         form_class = OrgSignupForm
         permission = None
         success_message = ""
@@ -3016,8 +3002,8 @@ class OrgCRUDL(SmartCRUDL):
         class ResthookForm(forms.ModelForm):
             new_slug = forms.SlugField(
                 required=False,
-                label=_("New Event"),
-                help_text=_("Enter a name for your event. ex: new-registration"),
+                label=_("New event"),
+                help_text=_("Enter a name for your event. Example: new-registration"),
                 widget=InputWidget(),
                 max_length=Resthook._meta.get_field("slug").max_length,
             )
@@ -3136,9 +3122,9 @@ class OrgCRUDL(SmartCRUDL):
             ):
                 links.append(
                     dict(
-                        title=_("Transfer Credits"),
+                        title=_("Transfer credits"),
                         href=reverse("orgs.org_transfer_credits"),
-                        modax=_("Transfer Credits"),
+                        modax=_("Transfer credits"),
                         id="transfer-credits",
                     )
                 )
@@ -3178,19 +3164,19 @@ class OrgCRUDL(SmartCRUDL):
                     formax.add_section("plan", reverse("orgs.org_plan"), icon="icon-credit", action="summary")
 
     class Home(SpaMixin, FormaxMixin, InferOrgMixin, OrgPermsMixin, SmartReadView):
-        title = _("Your Account")
+        title = _("Your account")
 
         def get_gear_links(self):
             links = []
 
             if self.has_org_perm("channels.channel_claim"):
-                links.append(dict(title=_("Add Channel"), href=reverse("channels.channel_claim")))
+                links.append(dict(title=_("Add channel"), href=reverse("channels.channel_claim")))
 
             if self.has_org_perm("classifiers.classifier_connect"):
-                links.append(dict(title=_("Add Classifier"), href=reverse("classifiers.classifier_connect")))
+                links.append(dict(title=_("Add classifier"), href=reverse("classifiers.classifier_connect")))
 
             if self.has_org_perm("tickets.ticketer_connect"):
-                links.append(dict(title=_("Add Ticketing Service"), href=reverse("tickets.ticketer_connect")))
+                links.append(dict(title=_("Add ticketing service"), href=reverse("tickets.ticketer_connect")))
 
             if len(links) > 0:
                 links.append(dict(divider=True))
@@ -3326,7 +3312,7 @@ class OrgCRUDL(SmartCRUDL):
 
         class TwilioKeys(forms.ModelForm):
             account_sid = forms.CharField(max_length=128, label=_("Account SID"), required=False)
-            account_token = forms.CharField(max_length=128, label=_("Account Token"), required=False)
+            account_token = forms.CharField(max_length=128, label=_("Account token"), required=False)
             disconnect = forms.CharField(widget=forms.HiddenInput, max_length=6, required=True)
 
             def clean(self):
@@ -3336,10 +3322,10 @@ class OrgCRUDL(SmartCRUDL):
                     account_token = self.cleaned_data.get("account_token", None)
 
                     if not account_sid:
-                        raise ValidationError(_("You must enter your Twilio Account SID"))
+                        raise ValidationError(_("Enter your Twilio account SID"))
 
                     if not account_token:  # pragma: needs cover
-                        raise ValidationError(_("You must enter your Twilio Account Token"))
+                        raise ValidationError(_("Enter your Twilio account token"))
 
                     try:
                         client = Client(account_sid, account_token)
@@ -3350,7 +3336,7 @@ class OrgCRUDL(SmartCRUDL):
                         self.cleaned_data["account_token"] = account.auth_token
                     except Exception:  # pragma: needs cover
                         raise ValidationError(
-                            _("The Twilio account SID and Token seem invalid. Please check them again and retry.")
+                            _("The Twilio account SID and token seem invalid. Check them and try again.")
                         )
 
                 return self.cleaned_data
@@ -3441,21 +3427,24 @@ class OrgCRUDL(SmartCRUDL):
             from_org = OrgChoiceField(
                 None,
                 required=True,
-                label=_("From Workspace"),
-                help_text=_("Select which workspace to take credits from"),
+                label=_("From workspace"),
+                help_text=_("Select the workspace to transfer credits from"),
                 widget=SelectWidget(attrs={"searchable": True}),
             )
 
             to_org = OrgChoiceField(
                 None,
                 required=True,
-                label=_("To Workspace"),
-                help_text=_("Select which workspace to receive the credits"),
+                label=_("To workspace"),
+                help_text=_("Select the workspace to receive the credits"),
                 widget=SelectWidget(attrs={"searchable": True}),
             )
 
             amount = forms.IntegerField(
-                required=True, label=_("Credits"), help_text=_("How many credits to transfer"), widget=InputWidget()
+                required=True,
+                label=_("Credits"),
+                help_text=_("The number of credits to transfer"),
+                widget=InputWidget(),
             )
 
             def __init__(self, *args, **kwargs):
@@ -3480,7 +3469,7 @@ class OrgCRUDL(SmartCRUDL):
                     if cleaned_data["amount"] > from_org.get_credits_remaining():
                         raise ValidationError(
                             _(
-                                "Sorry, %(org_name)s doesn't have enough credits for this transfer. Pick a different workspace to transfer from or reduce the transfer amount."
+                                "%(org_name)s doesn't have enough credits for this transfer. Select a different workspace to transfer from or reduce the transfer amount."
                             )
                             % dict(org_name=from_org.name)
                         )
@@ -3512,8 +3501,8 @@ class OrgCRUDL(SmartCRUDL):
             country = forms.ModelChoiceField(
                 Org.get_possible_countries(),
                 required=False,
-                label=_("The country used for location values. (optional)"),
-                help_text=_("State and district names will be searched against this country."),
+                label=_("The country used for location values (optional)"),
+                help_text=_("State and district names will be searched based on the selected country"),
                 widget=SelectWidget(),
             )
 
@@ -3532,8 +3521,8 @@ class OrgCRUDL(SmartCRUDL):
         class Form(forms.ModelForm):
             primary_lang = ArbitraryJsonChoiceField(
                 required=True,
-                label=_("Default Flow Language"),
-                help_text=_("Used for contacts with no language preference."),
+                label=_("Default flow language"),
+                help_text=_("Used for contacts with no language preference"),
                 widget=SelectWidget(
                     attrs={
                         "placeholder": _("Select a language"),
@@ -3545,8 +3534,8 @@ class OrgCRUDL(SmartCRUDL):
             )
             other_langs = ArbitraryJsonChoiceField(
                 required=False,
-                label=_("Additional Languages"),
-                help_text=_("The languages that your flows can be translated into."),
+                label=_("Additional languages"),
+                help_text=_("The languages that your flows can be translated into"),
                 widget=SelectMultipleWidget(
                     attrs={
                         "placeholder": _("Select languages"),

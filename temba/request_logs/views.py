@@ -74,7 +74,7 @@ class HTTPLogCRUDL(SmartCRUDL):
     actions = ("webhooks", "classifier", "ticketer", "read", "export")
 
     class Webhooks(OrgPermsMixin, SmartListView):
-        title = _("Webhook Calls")
+        title = _("Webhook calls")
         default_order = ("-created_on",)
         select_related = ("flow",)
 
@@ -129,7 +129,7 @@ class HTTPLogCRUDL(SmartCRUDL):
     class Classifier(BaseObjLogsView):
         source_field = "classifier"
         source_url = "uuid@classifiers.classifier_read"
-        title = _("Recent Classifier Events")
+        title = _("Recent classifier events")
 
         def get_source(self, uuid):
             return Classifier.objects.filter(uuid=uuid, is_active=True)
@@ -137,7 +137,7 @@ class HTTPLogCRUDL(SmartCRUDL):
     class Ticketer(BaseObjLogsView):
         source_field = "ticketer"
         source_url = "@tickets.ticket_list"
-        title = _("Recent Ticketing Service Events")
+        title = _("Recent ticketing service events")
 
         def get_source(self, uuid):
             return Ticketer.objects.filter(uuid=uuid, is_active=True)
@@ -160,7 +160,7 @@ class HTTPLogCRUDL(SmartCRUDL):
             if self.object.classifier:
                 links.append(
                     dict(
-                        title=_("Classifier Log"),
+                        title=_("Classifier log"),
                         style="button-light",
                         href=reverse("request_logs.httplog_classifier", args=[self.object.classifier.uuid]),
                     )
@@ -179,7 +179,7 @@ class HTTPLogCRUDL(SmartCRUDL):
             org = self.request.org
             user = self.request.user
 
-            filename = "Chamadas Webhook.xlsx"
+            filename = f"{_('Webhook calls')}.xlsx"
 
             queryset = HTTPLog.objects.filter(org=org, flow__isnull=False)
 
@@ -261,7 +261,7 @@ class HTTPLogCRUDL(SmartCRUDL):
 
         # Exist a code in rp-apps that do almost the same thig. Refact to use the same code in future
         def send_file(self, file_stream, file_name, user_email, project_name):
-            email_subject = "Exportação de dados de Webhooks"
+            email_subject = str(_("Webhook data export"))
 
             email_host = settings.EMAIL_HOST
             email_port = settings.EMAIL_PORT

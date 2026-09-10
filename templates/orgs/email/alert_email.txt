@@ -9,17 +9,17 @@ Hi {{ customer }},
 {% if alert.alert_type == 'O' %}
 {% blocktrans with org=alert.org.name brand=branding.name %}
 
-Your {{ brand }} workspace for {{ org }} is out of credit. You will no longer be able to send messages and users will no longer be able to interact in flows.
+Your {{ brand }} workspace for {{ org }} has no credits left. You'll no longer be able to send messages and users won't be able to interact in flows.
 
 {% endblocktrans %}
 
 {% if branding.allow_signups %}
 {% blocktrans %}
-To resume your service please visit your workspace page to purchase a top up.
+To keep your service running, visit your workspace page to purchase a top-up.
 {% endblocktrans %}
 {% else %}
 {% blocktrans %}
-To resume your service, please contact your account manager.
+To keep your service running, contact your account manager.
 {% endblocktrans %}
 {% endif %}
 
@@ -27,33 +27,33 @@ To resume your service, please contact your account manager.
 
 {% blocktrans with org=alert.org.name brand=branding.name%}
 
-Your {{ brand }} workspace for {{ org }} has expiring credits in less than one month.
+Your {{ brand }} workspace for {{ org }} has credits expiring in less than one month.
 
 {% endblocktrans %}
 
 {% if branding.allow_signups %}
 {% blocktrans %}
-Messages will no longer be sent when your credits expire, to prevent an interruption in your service visit your workspace page to purchase a top up.
+Once your credits run out, messages will stop being sent. To keep your service running, visit your workspace page to purchase a top-up.
 {% endblocktrans %}
 {% else %}
 {% blocktrans %}
-Messages will no longer be sent when your credits expire, to prevent an interruption in your service, please contact your account manager.
+Once your credits run out, messages will stop being sent. To keep your service running, contact your account manager.
 {% endblocktrans %}
 {% endif %}
 
 {% else %}
 {% blocktrans with org=alert.org.name brand=branding.name remaining=org.get_credits_remaining %}
 
-Your {{ brand }} workspace for {{ org }} is running low on credits, you currently only have {{ remaining }} credits remaining.
+Your {{ brand }} workspace for {{ org }} is running low on credits. You currently have {{ remaining }} credits left.
 
 {% endblocktrans %}
 {% if branding.allow_signups %}
 {% blocktrans %}
-Messages will no longer be sent when your credits reach zero, to prevent an interruption in your service visit your workspace page to purchase a top up.
+Once your credits run out, messages will stop being sent. To keep your service running, visit your workspace page to purchase a top-up.
 {% endblocktrans %}
 {% else %}
 {% blocktrans %}
-Messages will no longer be sent when your credits reach zero, to prevent an interruption in your service, please contact your account manager.
+Once your credits run out, messages will stop being sent. To keep your service running, contact your account manager.
 {% endblocktrans %}
 {% endif %}
 
@@ -62,6 +62,6 @@ Messages will no longer be sent when your credits reach zero, to prevent an inte
 {% blocktrans with brand=branding.name %}
 Thanks!
 
-The {{ brand }} Team
+The {{ brand }} team
 
 {% endblocktrans %}

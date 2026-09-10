@@ -26,7 +26,7 @@
   .event-details.p-4.bg-gray-100.rounded-lg.mb-6
     -if object.event_type == 'M'
       .cap-label
-        -trans "Send Message"
+        -trans "Send message"
       .text-gray-600
         {{object.get_message}}
     -else
@@ -41,7 +41,7 @@
       %thead
         %tr
           %th{colspan:"99"}
-            -trans "Upcoming Events"
+            -trans "Upcoming events"
 
       %body
         %tr.empty_list
@@ -85,7 +85,7 @@
       %thead
         %tr
           %th{colspan:"99"}
-            -trans "Recent Events"
+            -trans "Recent events"
       %tbody
         %tr.empty_list
           %td

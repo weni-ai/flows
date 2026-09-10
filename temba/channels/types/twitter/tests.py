@@ -77,7 +77,7 @@ class TwitterTypeTest(TembaTest):
             url, {"api_key": "ak", "api_secret": "as", "access_token": "at", "access_token_secret": "ats"}
         )
         self.assertEqual(response.status_code, 200)
-        self.assertFormError(response, "form", None, "The provided Twitter credentials do not appear to be valid.")
+        self.assertFormError(response, "form", None, "The provided X credentials are invalid")
 
         # error registering webhook
         mock_verify_credentials.return_value = {"id": "87654", "screen_name": "jimmy"}

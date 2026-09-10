@@ -22,9 +22,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             max_length=14,
             min_length=1,
             label=_("Number"),
-            help_text=_(
-                "The phone number with country code or short code you are connecting. " "ex: +250788123124 or 15543"
-            ),
+            help_text=_("The phone number with the country code or short code. Example: +250788123124 or 15543"),
         )
         username = forms.CharField(
             label=_("Username"), help_text=_("The username provided by the provider to use their API")
@@ -33,7 +31,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             label=_("Password"), help_text=_("The password provided by the provider to use their API")
         )
         channel = forms.CharField(
-            label=_("Channel Name"), help_text=_("The Verboice channel that will be handling your calls")
+            label=_("Channel name"), help_text=_("The Verboice channel that will be handling your calls")
         )
 
         def clean_number(self):
@@ -52,7 +50,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
                 return phonenumbers.format_number(cleaned, phonenumbers.PhoneNumberFormat.E164)
             except Exception:  # pragma: needs cover
                 raise forms.ValidationError(
-                    _("Invalid phone number, please include the country code. ex: +250788123123")
+                    _("Invalid phone number. Include the country code. Example: +250788123123")
                 )
 
     form_class = VerboiceClaimForm

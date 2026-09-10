@@ -29,7 +29,9 @@ class GenericType(TicketerType):
     CONFIG_ROUTE_HISTORY = "route_history"
 
     connect_view = ConnectView
-    connect_blurb = _("%(link)s generic ticketer.") % {"link": '<a href="https://www.generic.com/">Generic</a>'}
+    connect_blurb = _("%(link)s generic ticketing service.") % {
+        "link": '<a href="https://www.generic.com/">Generic</a>'
+    }
 
     def is_available_to(self, user):
         return True

@@ -4,11 +4,11 @@
 -block page-top
 
 -block login-title
-  -trans "Create Account"
+  -trans "Create account"
 
 -block login-content
   -blocktrans trimmed with brand.name as brand
-    Creating a {{brand}} account is free and only takes a minute.
+    Creating a {{brand}} account is free and only takes a minute
 
   %form.my-6(method="post")
     -csrf_token
@@ -42,7 +42,7 @@
     .mt-6
       Already have an account?
       %a(href="/users/login/")<
-        -trans "Sign In"
+        -trans "Sign in"
 
 
 -block extra-script

@@ -33,15 +33,15 @@ class ConnectView(BaseConnectView):
             widget=forms.URLInput(
                 attrs={
                     "placeholder": _(
-                        "Ex.: https://my.rocket.chat/api/apps/public/51c5cebe-b8e4-48ae-89d3-2b7746019cc4"
+                        "Example: https://my.rocket.chat/api/apps/public/51c5cebe-b8e4-48ae-89d3-2b7746019cc4"
                     )
                 }
             ),
-            help_text=_("URL of the Rocket.Chat Tickets app"),
+            help_text=_("URL of the Rocket.Chat tickets app"),
         )
-        admin_user_id = forms.CharField(label=_("Admin User ID"), help_text=_("User ID of an administrator user"))
+        admin_user_id = forms.CharField(label=_("Admin user ID"), help_text=_("User ID of an administrator user"))
         admin_auth_token = forms.CharField(
-            label=_("Admin Auth Token"), help_text=_("Authentication token of an administrator user")
+            label=_("Admin auth token"), help_text=_("Authentication token of an administrator user")
         )
         secret = forms.CharField(
             label=_("Secret"), widget=forms.HiddenInput(), help_text=_("Secret to be passed to Rocket.Chat")
@@ -50,13 +50,13 @@ class ConnectView(BaseConnectView):
         def clean(self):
             secret = self.cleaned_data.get("secret")
             if not secret:
-                raise forms.ValidationError(_("Invalid secret code."))
+                raise forms.ValidationError(_("Invalid secret code"))
 
             initial = self.initial.get("secret")
             if secret != initial:
                 self.data = self.data.copy()
                 self.data["secret"] = initial
-                raise forms.ValidationError(_("Secret code change detected."))
+                raise forms.ValidationError(_("Secret code change detected"))
             return self.cleaned_data
 
         def clean_base_url(self):
@@ -75,7 +75,7 @@ class ConnectView(BaseConnectView):
                 **{f"config__{RocketChatType.CONFIG_BASE_URL}": base_url},
             ).exists()
             if base_url_exists:
-                raise forms.ValidationError(_("There is already a ticketing service configured for this URL."))
+                raise forms.ValidationError(_("A ticketing service configured for this URL already exists"))
 
             return base_url
 

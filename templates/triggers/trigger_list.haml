@@ -23,7 +23,7 @@
             -if org_perms.triggers.trigger_create
               .w-64.mr-5
                 .button-primary.block(onclick="goto(event)" href="{% url 'triggers.trigger_create' %}")
-                  -trans "Create Trigger"
+                  -trans "Create trigger"
 
           .lp-nav.upper
             -for folder in main_folders
@@ -96,7 +96,7 @@
                             %a{href:'{%url "channels.channel_read" obj.channel.uuid %}'}= obj.channel
 
                       -elif obj.trigger_type == 'R'
-                        -trans "The referrer id"
+                        -trans "The referrer ID"
                         %b
                           {{obj.referrer_id}}
                         -if obj.channel
@@ -118,7 +118,7 @@
                         -if obj.schedule.next_fire and not obj.is_archived
                           {{ obj.schedule.get_display }}
                         -else
-                          -trans "is not scheduled"
+                          -trans "isn't scheduled"
 
                     %td(onclick="handleRowSelection(this)" width="250px")
                       -include "includes/recipients.haml" with groups=obj.groups.all contacts=obj.contacts.all
@@ -126,7 +126,7 @@
                   -empty
                     %tr.empty_list
                       %td{colspan:3}
-                        -trans "No matching triggers."
+                        -trans "No matching triggers"
 
               -block extra-rows
 
@@ -143,7 +143,7 @@
       event.stopPropagation();
       var modal = document.querySelector("#update-trigger");
       modal.endpoint = '/trigger/update/' + id + '/';
-      modal.header = '{{ _("Update Trigger")|escapejs }}';
+      modal.header = '{{ _("Update trigger")|escapejs }}';
       modal.open = true;
     }
     

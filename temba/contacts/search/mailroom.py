@@ -13,12 +13,12 @@ class SearchException(Exception):
 
     messages = {
         "unexpected_token": _("Invalid query syntax at '%(token)s'"),
-        "invalid_number": _("Unable to convert '%(value)s' to a number"),
-        "invalid_date": _("Unable to convert '%(value)s' to a date"),
-        "invalid_language": _("'%(value)s' is not a valid language code"),
-        "invalid_group": _("'%(value)s' is not a valid group name"),
-        "invalid_partial_name": _("Using ~ with name requires token of at least %(min_token_length)s characters"),
-        "invalid_partial_urn": _("Using ~ with URN requires value of at least %(min_value_length)s characters"),
+        "invalid_number": _("Couldn't convert '%(value)s' to a number"),
+        "invalid_date": _("Couldn't convert '%(value)s' to a date"),
+        "invalid_language": _("'%(value)s' isn't a valid language code"),
+        "invalid_group": _("'%(value)s' isn't a valid group name"),
+        "invalid_partial_name": _("Using ~ with name requires a token of at least %(min_token_length)s characters"),
+        "invalid_partial_urn": _("Using ~ with URN requires a value of at least %(min_value_length)s characters"),
         "unsupported_contains": _("Can only use ~ with name or URN values"),
         "unsupported_comparison": _("Can only use %(operator)s with number or date values"),
         "unsupported_setcheck": _("Can't check whether '%(property)s' is set or not set"),

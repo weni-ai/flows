@@ -20,7 +20,7 @@ class FirebaseCloudMessagingType(ChannelType):
     icon = "icon-fcm"
 
     claim_blurb = _(
-        "Add a %(link)s channel to send and receive messages. Your users will need an App to send and receive messages."
+        "Add a %(link)s channel to send and receive messages. Your users will need an app to send and receive messages."
     ) % {"link": '<a href="https://firebase.google.com/docs/cloud-messaging/">Firebase Cloud Messaging</a>'}
     claim_view = ClaimView
 
@@ -31,13 +31,12 @@ class FirebaseCloudMessagingType(ChannelType):
     quick_reply_text_size = 36
 
     configuration_blurb = _(
-        "To use your Firebase Cloud Messaging channel you'll have to POST to the following URLs with the "
-        "parameters below."
+        "To use your Firebase Cloud Messaging channel, you'll have to POST to the following URLs with the parameters below."
     )
 
     configuration_urls = (
         dict(
-            label=_("Contact Register"),
+            label=_("Contact registration"),
             url="https://{{ channel.callback_domain }}{% url 'courier.fcm' channel.uuid 'register' %}",
             description=_(
                 "To register contacts, POST to the following URL with the parameters urn, "

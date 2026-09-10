@@ -29,7 +29,7 @@ class Client:
         try:
             return getattr(requests, method)(url, **kwargs)
         except Timeout as err:
-            raise ClientError(_("Connection to RocketChat is taking too long.")) from err
+            raise ClientError(_("Connection to Rocket.Chat is taking too long.")) from err
         except Exception as err:
             raise ClientError() from err
 

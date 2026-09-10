@@ -14,13 +14,13 @@ class ClaimView(AuthenticatedExternalClaimView):
             help_text=_("The country this phone number is used in"),
         )
         number = forms.CharField(
-            max_length=14, min_length=4, label=_("Number"), help_text=_("The short code you are connecting.")
+            max_length=14, min_length=4, label=_("Number"), help_text=_("The short code you're connecting")
         )
         username = forms.CharField(
-            label=_("Client Id"), help_text=_("The Client Id found on your Chikka API credentials page")
+            label=_("Client ID"), help_text=_("The client ID found on your Chikka API credentials page")
         )
         password = forms.CharField(
-            label=_("Secret Key"), help_text=_("The Secret Key found on your Chikka API credentials page")
+            label=_("Secret key"), help_text=_("The secret key found on your Chikka API credentials page")
         )
 
     form_class = ChikkaForm

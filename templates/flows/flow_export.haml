@@ -31,8 +31,8 @@
 
   %p
     -blocktrans trimmed
-      Sorry, this flow cannot be exported because it references another flow. To export it, please remove any
-      actions that reference other flows and try again.
+      This flow can't be exported because it references another flow. To export it, remove any actions that reference
+      other flows and try again.
 
   .referenced-flows
     -for name in other_flow_names
@@ -43,6 +43,6 @@
 
   %br
   %a.btn.btn-primary{href:"{% url 'flows.flow_editor' object.uuid %}"}
-    -trans "Back to Flow"
+    -trans "Back to flow"
 
 

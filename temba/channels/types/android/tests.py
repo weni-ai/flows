@@ -98,7 +98,7 @@ class AndroidTypeTest(TembaTest):
             reverse("channels.types.android.claim"), dict(claim_code=android1.claim_code, phone_number="078123")
         )
         self.assertEqual(response.status_code, 200)
-        self.assertFormError(response, "form", "phone_number", "Invalid phone number, try again.")
+        self.assertFormError(response, "form", "phone_number", "Invalid phone number. Try again.")
 
         # claim our channel
         response = self.client.post(
@@ -192,7 +192,7 @@ class AndroidTypeTest(TembaTest):
         # try to claim a bogus channel
         response = self.client.post(reverse("channels.types.android.claim"), dict(claim_code="Your Mom"))
         self.assertEqual(response.status_code, 200)
-        self.assertFormError(response, "form", "claim_code", "Invalid claim code, please check and try again.")
+        self.assertFormError(response, "form", "claim_code", "Invalid claim code. Check and try again.")
 
         # check our primary tel channel is the same as our outgoing
         default_sender = self.org.get_send_channel(URN.TEL_SCHEME)
@@ -238,7 +238,7 @@ class AndroidTypeTest(TembaTest):
         # reading our delegate channel should now offer a disconnect option
         vonage = self.org.channels.filter(channel_type="NX").first()
         response = self.client.get(reverse("channels.channel_read", args=[vonage.uuid]))
-        self.assertContains(response, "Disable Bulk Sending")
+        self.assertContains(response, "Disable bulk sending")
 
         # receiving still job of our Android device
         self.assertEqual(self.org.get_receive_channel(URN.TEL_SCHEME), android2)
@@ -317,7 +317,7 @@ class AndroidTypeTest(TembaTest):
             reverse("channels.types.android.claim"), dict(claim_code=claim_code, phone_number="+250788123124")
         )
         self.assertFormError(
-            response, "form", "phone_number", "Another channel has this number. Please remove that channel first."
+            response, "form", "phone_number", "Another channel has this number. Remove that channel first."
         )
 
         # create channel in another org
