@@ -2,17 +2,17 @@
 
 .card
   -blocktrans trimmed
-    To complete the configuration you will need to enter a few things on your VK account.
+    To complete the configuration, you'll need to enter some information on your VK account.
   -blocktrans trimmed with option='<div class="code inline-block py-1">Message received</div>'
 
     .code.mt-4
       Manage > API Usage > Callback API > Server Settings
 
     .mt-2  
-      Enter the Webhook URL below for the
+      Enter the webhook URL below for the
       .code.inline.py-1<
         URL
-      field and the Verify Token in the 
+      field and the verify token in the 
       .code.inline.py-1<
         Secret Key
       field.
@@ -31,7 +31,7 @@
     https://{{ channel.callback_domain }}{% url 'courier.vk' channel.uuid %}
 
   .subtitle.mt-4
-    -trans "Verify Token"
+    -trans "Verify token"
 
   .code
     {{ channel.config.secret }}

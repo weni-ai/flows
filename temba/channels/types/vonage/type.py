@@ -56,7 +56,7 @@ class VonageType(ChannelType):
     name = "Vonage"
     icon = "icon-vonage"
 
-    claim_blurb = _("Easily add a two way number you have configured with %(link)s using their APIs.") % {
+    claim_blurb = _("Easily add a two-way number you have configured with %(link)s using their APIs.") % {
         "link": '<a href="https://www.vonage.com/">Vonage</a>'
     }
     claim_view = ClaimView
@@ -69,27 +69,26 @@ class VonageType(ChannelType):
     ivr_protocol = ChannelType.IVRProtocol.IVR_PROTOCOL_NCCO
 
     configuration_blurb = _(
-        "Your Vonage configuration URLs are as follows. These should have been set up automatically when claiming your "
-        "number, but if not you can set them from your Vonage dashboard."
+        "Your Vonage configuration URLs are listed below. These should have been set up automatically when you claimed your number. If not, you can configure them from your Vonage dashboard."
     )
 
     configuration_urls = (
         dict(
-            label=_("Callback URL for Inbound Messages"),
+            label=_("Callback URL for inbound messages"),
             url="https://{{ channel.callback_domain }}{% url 'courier.nx' channel.uuid 'receive' %}",
-            description=_("The callback URL is called by Vonage when you receive new incoming messages."),
+            description=_("The callback URL is called by Vonage when you receive new incoming messages"),
         ),
         dict(
-            label=_("Callback URL for Delivery Receipt"),
+            label=_("Callback URL for delivery receipt"),
             url="https://{{ channel.callback_domain }}{% url 'courier.nx' channel.uuid 'status' %}",
             description=_(
-                "The delivery URL is called by Vonage when a message is successfully delivered to a recipient."
+                "The delivery URL is called by Vonage when a message is successfully delivered to a recipient"
             ),
         ),
         dict(
-            label=_("Callback URL for Incoming Call"),
+            label=_("Callback URL for incoming call"),
             url="https://{{ channel.callback_domain }}{% url 'mailroom.ivr_handler' channel.uuid 'incoming' %}",
-            description=_("The callback URL is called by Vonage when you receive an incoming call."),
+            description=_("The callback URL is called by Vonage when you receive an incoming call"),
         ),
     )
 

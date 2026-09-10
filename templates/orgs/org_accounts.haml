@@ -5,20 +5,20 @@
   -if not use_weni_layout
     .mb-2
       -blocktrans trimmed
-        Your workspace can have logins with various roles. You can use the Manage Logins page
-        to view all existing logins or to add new logins to your workspace.
+        Your workspace can have logins with various roles. You can use the Manage Logins page to view all existing
+        logins or add new ones.
     
     .inline-block
       .button-light(onclick="goto(event)" href="{%url 'orgs.org_manage_accounts'%}")
-        -trans "Manage Logins"
+        -trans "Manage logins"
 
     .mt-8
 
     .mb-3
       -blocktrans trimmed with brand=brand.name
-        If you use the {{ brand }} Surveyor application to run flows offline, we recommend enabling
-        users to create accounts from within the Android application. Setting a Surveyor password will
-        allow anybody with that password to join your workspace as a surveyor.
+        If you use the {{ brand }} Surveyor app to run flows offline, we recommend enabling users to create accounts
+        from the Android app. Setting a Surveyor password will allow anyone with that password to join your workspace
+        as a surveyor.
 
 -block summary
   -if not use_weni_layout

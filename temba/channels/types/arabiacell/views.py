@@ -17,7 +17,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             label=_("Country"),
             help_text=_("The country this channel will be used in"),
         )
-        shortcode = forms.CharField(label=_("Short Code"), help_text=_("The short code you are connecting"))
+        shortcode = forms.CharField(label=_("Short code"), help_text=_("The short code you're connecting"))
         service_id = forms.CharField(label=_("Service ID"), help_text=_("The service ID as provided by ArabiaCell"))
         charging_level = forms.ChoiceField(
             choices=(("0", _("Free")), ("1", _("Billed"))), help_text=_("The charging level for your account")

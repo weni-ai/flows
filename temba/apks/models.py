@@ -14,8 +14,8 @@ class Apk(models.Model):
     TYPE_MESSAGE_PACK = "M"
 
     TYPE_CHOICES = (
-        (TYPE_RELAYER, _("Relayer Application APK")),
-        (TYPE_MESSAGE_PACK, _("Message Pack Application APK")),
+        (TYPE_RELAYER, _("Relayer application APK")),
+        (TYPE_MESSAGE_PACK, _("Message Pack application APK")),
     )
 
     apk_type = models.CharField(choices=TYPE_CHOICES, max_length=1)

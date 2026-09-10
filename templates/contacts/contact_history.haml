@@ -16,7 +16,7 @@
 
       -elif event.type == 'call_started'
         -if event.status == 'D'
-          -trans "Call Started"
+          -trans "Call started"
         -else
           {{ event.status_display }}
 
@@ -38,9 +38,9 @@
         -elif event.channel_event_type == 'mo_miss'
           -trans "Missed incoming call"
         -elif event.channel_event_type == 'new_conversation'
-          -trans "Started Conversation"
+          -trans "Started conversation"
         -elif event.channel_event_type == 'welcome_message'
-          -trans "Welcome Message Sent"
+          -trans "Welcome message sent"
         -elif event.channel_event_type == 'referral'
           -trans "Referred"
         -elif event.channel_event_type == 'follow'
@@ -48,13 +48,13 @@
         -elif event.channel_event_type == 'stop_contact'
           -trans "Stopped"
         -elif event.channel_event_type == 'mt_call'
-          -trans "Outgoing Phone Call"
+          -trans "Outgoing phone call"
           ({{ event.duration|format_seconds }})
         -elif event.channel_event_type == 'mo_call'
-          -trans "Incoming Phone call"
+          -trans "Incoming phone call"
           ({{ event.duration|format_seconds }})
         -else
-          -trans "Unknown/Unsupported"
+          -trans "Unknown/unsupported"
 
       -elif event.type == 'contact_field_changed'
         -if event.value
@@ -124,7 +124,7 @@
               {{ event.flow.name }}
 
       -elif event.type == 'input_labels_added'
-        -trans "Message labelled as"
+        -trans "Message labeled as"
         -for label in event.labels
           <a href="{% url 'msgs.msg_filter' label.uuid %}">{{ label.name }}</a>{{ forloop|oxford }}
 
@@ -166,7 +166,7 @@
 
       -elif event.type == 'webhook_called'
         -if event.status == "success"
-          -trans "Successfully called"
+          -trans "Called successfully"
         -else
           -trans "Failed to call"
         {{ event.url|truncatechars:100 }}
@@ -197,5 +197,5 @@
           -blocktrans trimmed with start=start_date
             Any messages prior to {{ start }} can be found in your
         %a(href="{% url 'archives.archive_message'%}")><
-          -trans "archive"
+          -trans "archive."
         \.

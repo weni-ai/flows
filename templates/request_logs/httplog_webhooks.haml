@@ -11,25 +11,25 @@
 
   %temba-alert#sucess-alert.hidden.mb-6(level="info")
     -blocktrans trimmed
-      Webhook data will be sent to your Email address.
+      Webhook data will be sent to your email address
 
   %temba-alert#error-alert.hidden.mb-6(level="error")
     -blocktrans trimmed
-      Failed to send webhook data to your Email address. Please try again later.
+      Couldn't send webhook data to your email address. Try again later.
 
   %div.flex.gap-4.mb-6
     %temba-select#flows.flex-grow(name="flow" label='{{_("Flow")|escapejs}}' searchable="true" onchange="handleSelectChange(this, `flow`)" value="{{ request.GET.flow }}" style="flex-grow: 4;")
-      %temba-option(name='{{_("None Value")}}' value="")
+      %temba-option(name='{{_("No value")}}' value="")
       -for flow in flows
         %temba-option(name="{{flow.flow__name}}" value="{{flow.flow__uuid}}")
 
     %temba-select#status.flex-grow(name="status" label='{{_("Status")|escapejs}}' searchable="true" onchange="handleSelectChange(this, `status`)" value="{{ request.GET.status }}")
-      %temba-option(name='{{_("None Value")}}' value="")
+      %temba-option(name='{{_("No value")}}' value="")
       -for status in status_codes
         %temba-option(name="{{status}}" value="{{status}}")
 
     %temba-select#time.flex-grow(name="time" label='{{_("Time")|escapejs}}' searchable="true" onchange="handleSelectChange(this, `time`)" value="{{ request.GET.time }}")
-      %temba-option(name='{{_("None Value")}}' value="")
+      %temba-option(name='{{_("No value")}}' value="")
       %temba-option(name='{{_("Last minute")}}' value="1")
       %temba-option(name='2 {{_("minutes")}}' value="2")
       %temba-option(name='3 {{_("minutes")}}' value="3")

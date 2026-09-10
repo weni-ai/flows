@@ -6,7 +6,7 @@
     -trans "Schedule"
 
   .mb-3
-    -trans "Select when you would like the message to be sent"
+    -trans "Select when you'd like the message to be sent"
 
   -include 'includes/schedule_fields.haml' with form=form
 
@@ -16,19 +16,19 @@
       .schedule-summary
         -if object.get_broadcast
           -blocktrans trimmed with when=object.next_fire|naturaltime
-            The next message will be sent <b>{{ when }}</b>.
+            The next message will be sent <b>{{ when }}</b>
 
         -if object.repeat_period == 'M'
           -blocktrans trimmed with date=object.repeat_day_of_month|ordinal
-            It will repeat every <b>month</b> on the {{ date }}.
+            It will repeat every <b>month</b> on the {{ date }}
         -elif object.repeat_period == 'W'
-          -trans "It will repeat every"
+          -trans "It'll repeat every"
           {% for day in object.get_repeat_days_display %}<b>{{ day }}</b>{{ forloop|oxford }}{% endfor %}
-          -trans "at around the same time."
+          -trans "at around the same time"
         -elif object.repeat_period == 'D'
-          -trans "It will repeat <d>daily</b> at around the same time."
+          -trans "It will repeat <d>daily</b> at around the same time"
         -elif object.repeat_period == 'O'
-          -trans "It will <b>not repeat</b>."
+          -trans "It'll <b>not repeat</b>"
 
       .unschedule.ml-8
         .button-light(onclick="unschedule(event)" href="{% url 'schedules.schedule_update' object.id %}?start_datetime=&repeat_period=O")

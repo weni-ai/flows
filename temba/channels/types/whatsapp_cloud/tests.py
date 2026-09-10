@@ -104,13 +104,13 @@ class WhatsAppCloudTypeTest(TembaTest):
             # 400 status
             response = self.client.post(connect_whatsapp_cloud_url, dict(user_access_token="X" * 36), follow=True)
             self.assertEqual(
-                response.context["form"].errors["__all__"][0], "Sorry account could not be connected. Please try again"
+                response.context["form"].errors["__all__"][0], "Your account couldn't be connected. Try again."
             )
 
             # missing permissions
             response = self.client.post(connect_whatsapp_cloud_url, dict(user_access_token="X" * 36), follow=True)
             self.assertEqual(
-                response.context["form"].errors["__all__"][0], "Sorry account could not be connected. Please try again"
+                response.context["form"].errors["__all__"][0], "Your account couldn't be connected. Try again."
             )
 
             response = self.client.post(connect_whatsapp_cloud_url, dict(user_access_token="X" * 36))

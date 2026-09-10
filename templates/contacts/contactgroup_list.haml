@@ -33,9 +33,9 @@
 -block content
   -if org_perms.contacts.contactgroup_delete
     // this should be a modax that reports that some flows or campaigns will be affected appropriately
-    %temba-dialog#delete-confirmation.hide(header='{{ _("Delete Groups")|escapejs }}' primaryButtonName='{{ _("Delete")|escapejs }}' destructive='true')
+    %temba-dialog#delete-confirmation.hide(header='{{ _("Delete groups")|escapejs }}' primaryButtonName='{{ _("Delete")|escapejs }}' destructive='true')
       .p-6
-        -trans "Deleting groups will not delete the contacts inside the group. All contacts will remain in your account. Do you want to continue?"
+        -trans "Deleting groups won't delete the contacts inside them. All contacts will remain in your account. Do you want to continue?"
 
   .page-title
 

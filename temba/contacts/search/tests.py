@@ -94,11 +94,11 @@ class SearchExceptionTest(TembaTest):
             ),
             (
                 {"error": "can't convert 'XZ' to a number", "code": "invalid_number", "extra": {"value": "XZ"}},
-                "Unable to convert 'XZ' to a number",
+                "Couldn't convert 'XZ' to a number",
             ),
             (
                 {"error": "can't convert 'AB' to a date", "code": "invalid_date", "extra": {"value": "AB"}},
-                "Unable to convert 'AB' to a date",
+                "Couldn't convert 'AB' to a date",
             ),
             (
                 {
@@ -106,7 +106,7 @@ class SearchExceptionTest(TembaTest):
                     "code": "invalid_group",
                     "extra": {"value": "Cool Kids"},
                 },
-                "'Cool Kids' is not a valid group name",
+                "'Cool Kids' isn't a valid group name",
             ),
             (
                 {
@@ -114,7 +114,7 @@ class SearchExceptionTest(TembaTest):
                     "code": "invalid_language",
                     "extra": {"value": "zzzz"},
                 },
-                "'zzzz' is not a valid language code",
+                "'zzzz' isn't a valid language code",
             ),
             (
                 {
@@ -122,7 +122,7 @@ class SearchExceptionTest(TembaTest):
                     "code": "invalid_partial_name",
                     "extra": {"min_token_length": "2"},
                 },
-                "Using ~ with name requires token of at least 2 characters",
+                "Using ~ with name requires a token of at least 2 characters",
             ),
             (
                 {
@@ -130,7 +130,7 @@ class SearchExceptionTest(TembaTest):
                     "code": "invalid_partial_urn",
                     "extra": {"min_value_length": "3"},
                 },
-                "Using ~ with URN requires value of at least 3 characters",
+                "Using ~ with URN requires a value of at least 3 characters",
             ),
             (
                 {

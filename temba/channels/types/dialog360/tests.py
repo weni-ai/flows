@@ -39,7 +39,7 @@ class Dialog360TypeTest(TembaTest):
 
         # will fail with invalid phone number
         response = self.client.post(url, post_data)
-        self.assertFormError(response, "form", None, ["Please enter a valid phone number"])
+        self.assertFormError(response, "form", None, ["Enter a valid phone number"])
 
         # valid number
         post_data["number"] = "0788123123"
@@ -200,7 +200,7 @@ class Dialog360TypeTest(TembaTest):
         # Check if message templates link are in sync_logs view
         response = self.client.get(reverse("channels.types.dialog360.sync_logs", args=[channel.uuid]))
         gear_links = response.context["view"].get_gear_links()
-        self.assertEqual(gear_links[-1]["title"], "Message Templates")
+        self.assertEqual(gear_links[-1]["title"], "Message templates")
         self.assertEqual(gear_links[-1]["href"], reverse("channels.types.dialog360.templates", args=[channel.uuid]))
 
         # sync logs not accessible by user from other org

@@ -1,7 +1,7 @@
 -load i18n
 
 -blocktrans trimmed
-  To finish configuring your connection you'll need to set the following callback URLs on your service or aggregator.
+  To finish configuring your connection, you'll need to set the following callback URLs on your service or aggregator.
 
 .card.mt-6
   .title
@@ -12,7 +12,7 @@
 
   .my-4
     -blocktrans trimmed
-      When we need to send an outgoing message it will make a
+      When an outgoing message needs to be sent, it will make a
     {{ channel.config.method|default:"POST" }}
     -blocktrans trimmed
       to this URL with the parameters 'text', 'to', 'from', 'channel' and 'id'
@@ -41,7 +41,7 @@
       -blocktrans trimmed
         When a new message is received by your service, it should notify us with a POST to the following URL, passing
         the following parameters: 'from' and 'text'. Callers can optionally also send a 'date' parameter in ISO-8601
-        (ex: 2012-04-23T18:25:43.511Z) format to specify the time the message was received.
+        (example: 2012-04-23T18:25:43.511Z) format to specify the time the message was received.
 
     .bleed-x.bleed-b.text-white.bg-black.p-6
       .cap-label.mb-2.text-gray-600
@@ -62,7 +62,7 @@
     .my-4
       -blocktrans trimmed
         When your service successfully sends a message, it should notify us with a POST to the following URL, passing
-        the id of the message as the parameter 'id' (reporting sent messages is optional)
+        the ID of the message as the parameter 'id' (reporting sent messages is optional)
 
     .bleed-x.bleed-b.text-white.bg-black.p-6
       .cap-label.mb-2.text-gray-600
@@ -83,8 +83,8 @@
 
     .my-4
       -blocktrans trimmed
-        When your service successfully delivers a message, it should notify us with a POST to the following URL, passing
-        the id of the message as the parameter 'id' (reporting deliveries is optional)
+        When your service successfully delivers a message, it should notify us with a POST to the following URL,
+        passing the ID of the message as the parameter 'id' (reporting deliveries is optional)
 
     .bleed-x.bleed-b.text-white.bg-black.p-6
       .cap-label.mb-2.text-gray-600
@@ -104,8 +104,8 @@
 
     .my-4
       -blocktrans trimmed
-        If your service fails to send an outgoing message, it should notify us with a POST to the following URL, passing
-        the id of the message as the parameter 'id' (reporting failed sends is optional)
+        If your service fails to send an outgoing message, it should notify us with a POST to the following URL,
+        passing the ID of the message as the parameter 'id' (reporting failed sends is optional)
 
     .bleed-x.bleed-b.text-white.bg-black.p-6
       .cap-label.mb-2.text-gray-600
@@ -119,7 +119,7 @@
 
   .card.mt-6
     .title
-      -trans "Contact Opt out/Stopped URL"
+      -trans "Contact opt out/stopped URL"
   
     .code.inline-block.m-0
       https://{{ channel.callback_domain }}{% url 'courier.ex' channel.uuid 'stopped' %}

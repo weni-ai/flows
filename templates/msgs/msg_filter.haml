@@ -19,25 +19,25 @@
     .deletion.hide
       .title
         - if current_label.is_folder
-          - trans "Remove Folder"
+          - trans "Remove folder"
         - else
-          - trans "Remove Label"
+          - trans "Remove label"
 
       .body
         %p
           - if current_label.is_folder
-            - trans "Are you sure you want to remove this folder? This will also delete any labels contained in this folder."
+            - trans "Are you sure you want to remove this folder? This will also delete any labels in this folder."
           - else
             {% if current_label.dependent_flows.count == 0 %}
             - trans "Are you sure you want to remove this label?"
             {% else %}
-            - trans "This label cannot be removed because it in use."
+            - trans "This label can't be removed because it's in use."
             {% endif %}
         %p
           %b {{ current_label }}
           %p
             {% if current_label.dependent_flows.count == 0 %}
-              -trans "Once it is removed, it will be gone forever. There is no way to undo this operation."
+              -trans "Once removed, it will be permanently deleted. This action can't be undone."
             {% else %}
               {% blocktrans trimmed count num_flows=current_label.dependent_flows.count %}
               Used by {{num_flows}} flow:

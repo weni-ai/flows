@@ -68,7 +68,7 @@ class ArchiveCRUDL(SmartCRUDL):
             return r"^%s/%s/$" % (path, Archive.TYPE_FLOWRUN)
 
         def derive_title(self):
-            return _("Run Archives")
+            return _("Run archives")
 
         def get_archive_type(self):
             return Archive.TYPE_FLOWRUN
@@ -79,7 +79,7 @@ class ArchiveCRUDL(SmartCRUDL):
             return r"^%s/%s/$" % (path, Archive.TYPE_MSG)
 
         def derive_title(self):
-            return _("Message Archives")
+            return _("Message archives")
 
         def get_archive_type(self):
             return Archive.TYPE_MSG

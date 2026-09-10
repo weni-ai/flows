@@ -39,7 +39,7 @@ class MailgunTypeTest(TembaTest):
             response = self.client.post(connect_url, {"to_address": "bob@acme.com"})
 
             email_args = mock_send_email.call_args[0]
-            self.assertEqual(email_args[0], "Verify your email address for tickets")
+            self.assertEqual(email_args[0], "Check your email address for tickets")
 
             # extract code from email body
             code = re.search(r"code is (\w+)", email_args[1]).group(1)
@@ -60,7 +60,7 @@ class MailgunTypeTest(TembaTest):
 
         # submit with wrong code
         response = self.client.post(step2_url, {"verification_code": "XYZ"})
-        self.assertFormError(response, "form", "verification_code", ["Code does not match, please check your email."])
+        self.assertFormError(response, "form", "verification_code", ["Code doesn't match. Check your email."])
 
         # submit with correct code
         response = self.client.post(step2_url, {"verification_code": code})
@@ -81,4 +81,4 @@ class MailgunTypeTest(TembaTest):
 
         # submit again after code has been cleared
         response = self.client.post(step2_url, {"verification_code": "12341"})
-        self.assertFormError(response, "form", "verification_code", ["No verification code found, please start over."])
+        self.assertFormError(response, "form", "verification_code", ["No verification code found. Try again."])

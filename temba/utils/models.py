@@ -276,7 +276,7 @@ class TembaModel(SmartModel):
         unique=True,
         db_index=True,
         default=generate_uuid,
-        verbose_name=_("Unique Identifier"),
+        verbose_name=_("Unique identifier"),
         help_text=_("The unique identifier for this object"),
     )
 

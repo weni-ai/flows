@@ -57,19 +57,19 @@
       -if is_starting
         %temba-alert.mb-3
           -blocktrans trimmed
-            This flow is in the process of being sent, this message will disappear once all contacts have been added to the flow.
+            This flow is being sent. This message will disappear once all contacts have been added to the flow.
 
 -block page-container
 
   %temba-modax#send-message-modal{ header:"Send Message" }
 
-  %temba-dialog.hide#confirm-language(header='{{_("Change Language")|escapejs}}' primaryButtonName='{{_("Update")|escapejs}}')
+  %temba-dialog.hide#confirm-language(header='{{_("Change language")|escapejs}}' primaryButtonName='{{_("Update")|escapejs}}')
     .p-6.body
       -blocktrans trimmed with language="%LANG%"
-        This will change the default language of the flow to <b>{{ language }}</b>. This means that by default the
-        flow will be appear in that language and can be translated into other languages. Also if a contact is
-        in this flow and no translation exists for their language or the default language of the workspace,
-        communication with that contact will default to <b>{{ language }}</b>.
+        This will change the default language of the flow to <b>{{ language }}</b>. The flow will appear in that
+        language by default and can be translated into other languages. If a contact is in this flow and no
+        translation exists for their language or the workspace's default language, communication with that contact
+        will default to <b>{{ language }}</b>.
 
   #grid
     <temba-loading units="10" size="8"></temba-loading>

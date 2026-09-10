@@ -20,8 +20,7 @@ class RocketChatType(TicketerType):
 
     connect_view = ConnectView
     connect_blurb = _(
-        "%(link)s is a free open source solution for team communications which can be connected as a ticket service "
-        "through its omnichannel feature."
+        "%(link)s is a free, open-source solution for team communication that can be connected as a ticket service through its omnichannel feature."
     ) % {"link": '<a href="https://rocket.chat/">Rocket.Chat</a>'}
 
     def is_available_to(self, user):

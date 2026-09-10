@@ -5,7 +5,7 @@
   -if hard_dependents
     %span.font-normal
       {{ object.name }}
-    -trans "can't be deleted as it is still used by the following items:"
+    -trans "can't be deleted as it's still used by the following items:"
     .dependents.mt-4
       -for type_qs in hard_dependents.values
         -include "includes/dependents.haml" with dependents=type_qs
@@ -19,13 +19,13 @@
         -include "includes/dependents.haml" with dependents=type_qs warning=type_warnings|get:type_key
 
   -else
-    -trans "You are about to delete"
+    -trans "You're about to delete"
     %span.font-normal
       {{ object.name }}.
 
   -if not hard_dependents
     .mt-4
-      -trans "There is no way to undo this. Are you sure?"
+      -trans "This action can't be undone. Are you sure you want to continue?"
 
 -block form-buttons
   -if not hard_dependents

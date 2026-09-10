@@ -21,7 +21,7 @@ class Dialog360Type(ChannelType):
     A 360 Dialog Channel Type
     """
 
-    extra_links = [dict(name=_("Message Templates"), link="channels.types.dialog360.templates")]
+    extra_links = [dict(name=_("Message templates"), link="channels.types.dialog360.templates")]
 
     code = "D3"
     category = ChannelType.Category.SOCIAL_MEDIA
@@ -31,9 +31,9 @@ class Dialog360Type(ChannelType):
     name = "360Dialog WhatsApp"
     icon = "icon-whatsapp"
 
-    claim_blurb = _(
-        "Activate your own enterprise WhatsApp account in %(link)s to communicate with your contacts. "
-    ) % {"link": '<a href="https://www.360dialog.com/">360Dialog</a>'}
+    claim_blurb = _("Activate your own enterprise WhatsApp account in %(link)s to communicate with your contacts.") % {
+        "link": '<a href="https://www.360dialog.com/">360Dialog</a>'
+    }
     claim_view = ClaimView
 
     schemes = [URN.WHATSAPP_SCHEME]

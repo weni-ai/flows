@@ -6,13 +6,13 @@
 
   %h2.font_normalize.header-margin.title
     {{ ticketer.type.name }}
-    -trans "Ticketing Service"
+    -trans "Ticketing service"
     .ticketer-name
       {{ ticketer.name }}
 
 -block content
   -blocktrans trimmed
-    To complete connecting your account here to your Zendesk account you need to complete the following steps.
+    To finish connecting your account to Zendesk, complete the following steps.
 
   %ol.steps.card
     %li
@@ -20,10 +20,11 @@
         Install the {{ brand }} app into your Zendesk account from the <a href="{{ market_url }}">marketplace</a>.
     %li
       -blocktrans trimmed  with brand=brand.name
-        Go to <a href="{{ channels_url }}">channel integrations</a> where you will see a new {{ brand }} channel service.
+        Go to <a href="{{ channels_url }}">channel integrations</a> where you'll see a new {{ brand }} channel
+        service.
     %li
       -blocktrans trimmed with secret=object.config.secret
-        Add account for the channel and enter <code>{{ secret }}</code> as the secret.
+        Add an account for the channel and enter <code>{{ secret }}</code> as the secret.
 
 -block extra-style
   {{ block.super }}

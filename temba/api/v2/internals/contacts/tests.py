@@ -807,7 +807,7 @@ class UpdateContactFieldsViewTest(TembaTest):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
             response.json(),
-            {"contact_fields": {"name": ["Contact name cannot exceed 100 characters."]}},
+            {"contact_fields": {"name": ["Contact name can't exceed 100 characters"]}},
         )
 
     @mock_mailroom
@@ -830,7 +830,7 @@ class UpdateContactFieldsViewTest(TembaTest):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
             response.json(),
-            {"contact_fields": {"name": ["Contact name cannot be empty."]}},
+            {"contact_fields": {"name": ["Contact name can't be empty"]}},
         )
 
     @mock_mailroom

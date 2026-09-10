@@ -29,7 +29,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
         )
 
         facebook_template_list_domain = forms.CharField(
-            label=_("Templates Domain"),
+            label=_("Templates domain"),
             help_text=_("Which domain to retrieve the message templates from"),
             initial="graph.facebook.com",
         )
@@ -49,7 +49,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             country = self.cleaned_data["country"]
             normalized = URN.normalize_number(self.cleaned_data["number"], country)
             if not URN.validate(URN.from_parts(URN.TEL_SCHEME, normalized), country):
-                raise forms.ValidationError(_("Please enter a valid phone number"))
+                raise forms.ValidationError(_("Enter a valid phone number"))
             self.cleaned_data["number"] = normalized
 
             try:
@@ -65,7 +65,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
 
             except Exception:
                 raise forms.ValidationError(
-                    _("Unable to check WhatsApp enterprise account, please check username and password")
+                    _("Couldn't check the WhatsApp enterprise account. Check username and password.")
                 )
 
             # check we can access their facebook templates
@@ -81,8 +81,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
                 if response.status_code != 200:
                     raise forms.ValidationError(
                         _(
-                            "Unable to access Facebook templates, please check user id and access token and make sure "
-                            + "the whatsapp_business_management permission is enabled"
+                            "Couldn't access Facebook templates. Check the user ID and access token, and make sure the WhatsApp business management permission is enabled."
                         )
                     )
             return self.cleaned_data

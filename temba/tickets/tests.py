@@ -280,7 +280,7 @@ class TicketCRUDLTest(TembaTest, CRUDLTestMixin):
         menu = response.json()["results"]
         self.assertEqual(
             [
-                {"id": "mine", "name": "My Tickets", "icon": "coffee", "count": 2},
+                {"id": "mine", "name": "My tickets", "icon": "coffee", "count": 2},
                 {"id": "unassigned", "name": "Unassigned", "icon": "mail", "count": 1},
                 {"id": "all", "name": "All", "icon": "archive", "count": 3},
             ],
@@ -561,7 +561,7 @@ class TicketerCRUDLTest(TembaTest, CRUDLTestMixin):
 
         self.assertContains(response, "Email (bob@acme.com)")
         self.assertContains(response, "ticketer/delete/")
-        self.assertContains(response, "HTTP Log")
+        self.assertContains(response, "HTTP log")
         self.assertContains(response, reverse("request_logs.httplog_ticketer", args=[ticketer.uuid]))
 
     def test_connect(self):
@@ -594,7 +594,7 @@ class TicketerCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # fetch delete modal
         response = self.assertDeleteFetch(delete_url)
-        self.assertContains(response, "You are about to delete")
+        self.assertContains(response, "You're about to delete")
 
         # submit to delete it
         response = self.assertDeleteSubmit(delete_url, object_deactivated=ticketer, success_status=200)

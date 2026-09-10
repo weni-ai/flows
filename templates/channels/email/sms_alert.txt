@@ -5,33 +5,33 @@
 {% blocktrans with org_name=org.name %}
 Hi {{ org_name }},
 
-We've noticed that the Android phone for {{ org_name }} is having trouble sending text messages.  This might be a temporary problem due to your cellular network, or could be an indication that your phone is out of credit.
+It looks like the Android phone for {{ org_name }} is having trouble sending text messages. This might be a temporary network problem, or it could mean your phone is out of credit.
 {% endblocktrans %}
 
 {% blocktrans %}
-Please check on your phone to make sure it has sufficient credit and can send text messages.  If problems persist you may want to try turning the phone off then back on.  Currently your Android phone has {{ unsent_count }} messages which haven't sent in over an hour.
+Check your phone to make sure it has sufficient credit and can send text messages. If problems persist, try turning the phone off and back on. Your Android phone currently has {{ unsent_count }} messages that haven't been sent in over an hour.
 {% endblocktrans %}
 
 {% elif channel.get_type.free_sending %}
 {% blocktrans with org_name=org.name channel_type=channel.get_channel_type_name %}
 Hi {{ org_name }},
 
-We've noticed that the {{ channel_type }} for {{ org_name }} is having trouble sending text messages.  This might be a temporary problem due to network communication to {{ channel_type }} or may indicate a change in configuration which required your action.
+It looks like the {{ channel_type }} for {{ org_name }} is having trouble sending text messages. This might be a temporary problem due to network communication to {{ channel_type }}, or it may indicate a configuration change that requires your attention.
 {% endblocktrans %}
 
 {% blocktrans with channel_type=channel.get_channel_type_name %}
-Please check on your {{ channel_type }} to make sure it can send text messages. Currently your {{ channel_type }} has {{ unsent_count }} messages which haven't sent in over an hour.
+Check your {{ channel_type }} to make sure it can send text messages. Your {{ channel_type }} currently has {{ unsent_count }} messages that haven't been sent in over an hour.
 {% endblocktrans %}
 
 {% else %}
 {% blocktrans with org_name=org.name channel_type=channel.get_channel_type_name %}
 Hi {{ org_name }},
 
-We've noticed that the {{ channel_type }} for {{ org_name }} is having trouble sending text messages.  This might be a temporary problem due to network communication to {{ channel_type }}, or could be an indication that your {{ channel_type }} is out of credit.
+It looks like the {{ channel_type }} for {{ org_name }} is having trouble sending text messages. This might be a temporary problem due to network communication to {{ channel_type }}, or it could mean your {{ channel_type }} is out of credit.
 {% endblocktrans %}
 
 {% blocktrans with channel_type=channel.get_channel_type_name %}
-Please check on your {{ channel_type }} to make sure it has sufficient credit and can send text messages. Currently your {{ channel_type }} has {{ unsent_count }} messages which haven't sent in over an hour.
+Check your {{ channel_type }} to make sure it has sufficient credit and can send text messages. Your {{ channel_type }} currently has {{ unsent_count }} messages that haven't been sent in over an hour.
 {% endblocktrans %}
 {% endif %}
 
@@ -42,4 +42,4 @@ Please check on your {{ channel_type }} to make sure it has sufficient credit an
 
 {% trans "Thanks," %}
 
-{% blocktrans with brand=branding.name %}The {{ brand }} Team{% endblocktrans %}
+{% blocktrans with brand=branding.name %}The {{ brand }} team{% endblocktrans %}

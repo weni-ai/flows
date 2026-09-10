@@ -13,7 +13,7 @@
             -csrf_token
             -render_field 'claim_code'
             -render_field 'phone_number'
-            %input.mt-4.button-primary{type:"submit", value:"{% trans 'Add Android Channel' %}"}
+            %input.mt-4.button-primary{type:"submit", value:"{% trans 'Add Android channel' %}"}
             %errors
       .p-12
         -blocktrans trimmed with brand.name as brand
@@ -21,9 +21,9 @@
 
         .mt-4
           -blocktrans trimmed with brand.name as brand
-            Due to restrictions Android has on applications that send SMS messages, we cannot distribute
-            the {{ brand }} application through the Play Store. You will need to download the application manually
-            and install it using the steps below.
+            Due to restrictions Android has on applications that send SMS messages, we can't distribute the
+            {{ brand }} application through the Play Store. You'll need to download the application manually and
+            install it using the steps below.
 
     .mt-4.card 
         -if relayer_app
@@ -42,7 +42,7 @@
             %td
               .py-4.px-8
                 .subtitle
-                  -trans "Download App"
+                  -trans "Download app"
 
                 .mt-2
                   -blocktrans trimmed
@@ -61,7 +61,8 @@
                     Launch the {{ brand }} installer
                 .mt-2
                   -blocktrans trimmed
-                    Open the notifications shade by dragging from the top and select the downloaded file.
+                    Open the notifications shade by dragging from the top of your screen, then select the downloaded
+                    file.
 
           %tr
             %td
@@ -70,10 +71,10 @@
             %td
               .py-4.px-8
                 .subtitle
-                  -trans "Tap Settings"
+                  -trans "Click Settings"
                 .mt-2
                   -blocktrans trimmed
-                    You will be taken to a screen with "allow from this source" toggle
+                    You'll be redirected to a screen with an "Allow from this source" toggle
 
           %tr
             %td
@@ -82,10 +83,10 @@
             %td
               .py-4.px-8
                 .subtitle
-                  -trans "Toggle allow from this source"
+                  -trans "Enable allow from this source"
                 .mt-2
                   -blocktrans trimmed
-                    Make sure "allow from this source" toggle is in the On position.
+                    Make sure the "Allow from this source" toggle is activated.
 
           %tr
             %td
@@ -95,7 +96,7 @@
             %td
               .py-4.px-8
                 .subtitle
-                  -trans "Go Back"
+                  -trans "Back"
                 .mt-2
                   -trans "Click Install"
 
@@ -110,7 +111,8 @@
                     Open {{ brand }}
                 .mt-2
                   -blocktrans trimmed with brand.name as brand
-                    Once {{ brand }} has been installed, open the app drawer and tap on the {{ brand }} icon to start the app.
+                    Once {{ brand }} has been installed, open the app drawer and tap the {{ brand }} icon to start the
+                    app.
 
           %tr
             %td
@@ -119,12 +121,12 @@
             %td
               .py-4.px-8
                 .subtitle
-                  -trans "Enter Claim Code"
+                  -trans "Enter claim code"
                 .mt-2
                   -blocktrans trimmed with brand.name as brand
-                    When you first open {{ brand }}, the app will register your device with Google and our servers.  Once that is
-                    complete, it will display a claim code.  Enter that claim code in the form to the left and click
-                    "Add Phone" to connect your device.
+                    When you first open {{ brand }}, the app will register your device with Google and our servers.
+                    Once that's complete, it will display a claim code. Enter that claim code in the form to the left
+                    and click "Add Phone" to connect your device.
 
 -block extra-style
   {{ block.super }}

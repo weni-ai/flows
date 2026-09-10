@@ -113,7 +113,7 @@ class FlowTest(TembaTest):
 
     @patch("temba.mailroom.queue_interrupt")
     def test_release(self, mock_queue_interrupt):
-        global1 = Global.get_or_create(self.org, self.admin, "api_key", "API Key", "234325")
+        global1 = Global.get_or_create(self.org, self.admin, "api_key", "API key", "234325")
         flow = self.get_flow("color")
         flow.global_dependencies.add(global1)
 
@@ -219,7 +219,7 @@ class FlowTest(TembaTest):
         response = self.client.get(reverse("flows.flow_broadcast", args=[no_topic.id]))
 
         # no warning, we don't have a facebook channel
-        self.assertNotContains(response, "does not specify a Facebook topic")
+        self.assertNotContains(response, "specify a Facebook topic")
 
         # change our channel to use a facebook scheme
         self.channel.schemes = [URN.FACEBOOK_SCHEME]
@@ -227,11 +227,11 @@ class FlowTest(TembaTest):
 
         # should see a warning for no topic now
         response = self.client.get(reverse("flows.flow_broadcast", args=[no_topic.id]))
-        self.assertContains(response, "does not specify a Facebook topic")
+        self.assertContains(response, "specify a Facebook topic")
 
         # warning shouldn't be present for flow with a topic
         response = self.client.get(reverse("flows.flow_broadcast", args=[with_topic.id]))
-        self.assertNotContains(response, "does not specify a Facebook topic")
+        self.assertNotContains(response, "specify a Facebook topic")
 
     def test_template_warnings(self):
         self.login(self.admin)
@@ -254,7 +254,7 @@ class FlowTest(TembaTest):
         flow.save(update_fields=["metadata"])
 
         response = self.client.get(reverse("flows.flow_broadcast", args=[flow.id]))
-        self.assertContains(response, "does not use message")
+        self.assertContains(response, "use message templates")
 
         # restore our dependency
         flow.metadata = metadata
@@ -1946,20 +1946,130 @@ class FlowTest(TembaTest):
         # run expiration should be last arrived_on + 12 hours
         self.assertEqual(datetime.datetime(2019, 1, 1, 12, 0, 0, 0, pytz.UTC), run.expires_on)
 
-    def _assert_file_upload(self, url, file_name, file_content, content_type, expected_path=None, extra_params=None):
-        """
-        Helper method to test file uploads
-        """
-        # create the test file
-        if isinstance(file_content, str):
-            file_content = file_content.encode()
 
-        if os.path.exists(file_name):
-            with open(file_name, "rb") as f:
-                file_content = f.read()
-                test_file = SimpleUploadedFile(os.path.basename(file_name), file_content, content_type=content_type)
-        else:
-            test_file = SimpleUploadedFile(file_name, file_content, content_type=content_type)
+class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
+    def test_menu(self):
+        menu_url = reverse("flows.flow_menu")
+        FlowLabel.create(self.org, "Important")
+
+        response = self.assertListFetch(menu_url, allow_viewers=True, allow_editors=True, allow_agents=False)
+        menu = response.json()["results"]
+        self.assertEqual(3, len(menu))
+
+    def test_create(self):
+        create_url = reverse("flows.flow_create")
+
+        # don't show language if workspace doesn't have languages configured
+        self.assertCreateFetch(
+            create_url, allow_viewers=False, allow_editors=True, form_fields=["name", "keyword_triggers", "flow_type"]
+        )
+
+        self.org.set_flow_languages(self.admin, ["eng", "spa"])
+        self.org2.set_flow_languages(self.admin, ["eng"])
+
+        response = self.assertCreateFetch(
+            create_url,
+            allow_viewers=False,
+            allow_editors=True,
+            form_fields=["name", "keyword_triggers", "flow_type", "base_language"],
+        )
+
+        # check flow type options
+        self.assertEqual(
+            [
+                (Flow.TYPE_MESSAGE, "Messaging"),
+                (Flow.TYPE_VOICE, "Phone call"),
+                (Flow.TYPE_BACKGROUND, "Background"),
+                (Flow.TYPE_SURVEY, "Surveyor"),
+            ],
+            response.context["form"].fields["flow_type"].choices,
+        )
+
+        # try to submit without name or language
+        self.assertCreateSubmit(
+            create_url,
+            {"flow_type": "M"},
+            form_errors={"name": "This field is required.", "base_language": "This field is required."},
+        )
+
+        response = self.assertCreateSubmit(
+            create_url,
+            {"name": "Flow 1", "flow_type": "M", "base_language": "eng"},
+            new_obj_query=Flow.objects.filter(org=self.org, flow_type="M", name="Flow 1"),
+        )
+
+        flow1 = Flow.objects.get(name="Flow 1")
+        self.assertEqual(1, flow1.revisions.all().count())
+
+        self.assertRedirect(response, reverse("flows.flow_editor", args=[flow1.uuid]))
+
+    def test_create_with_keywords(self):
+        create_url = reverse("flows.flow_create")
+
+        # try creating a flow with invalid keywords
+        self.assertCreateSubmit(
+            create_url,
+            {
+                "name": "Flow #1",
+                "keyword_triggers": ["toooooooooooooolong", "test"],
+                "flow_type": Flow.TYPE_MESSAGE,
+            },
+            form_errors={
+                "keyword_triggers": '"toooooooooooooolong" must be a single word, less than 16 characters, containing only letters and numbers'
+            },
+        )
+
+        # submit with valid keywords
+        self.assertCreateSubmit(
+            create_url,
+            {
+                "name": "Flow 1",
+                "keyword_triggers": ["testing", "test"],
+                "flow_type": Flow.TYPE_MESSAGE,
+            },
+            new_obj_query=Flow.objects.filter(org=self.org, name="Flow 1", flow_type="M"),
+        )
+
+        # check the created keyword triggers
+        flow1 = Flow.objects.get(name="Flow 1")
+        self.assertEqual({"testing", "test"}, set(flow1.triggers.values_list("keyword", flat=True)))
+
+        # try to create another flow with one of the same keywords
+        self.assertCreateSubmit(
+            create_url,
+            {
+                "name": "Flow 2",
+                "keyword_triggers": ["test"],
+                "flow_type": Flow.TYPE_MESSAGE,
+            },
+            form_errors={"keyword_triggers": 'The keyword "test" is already used for another flow'},
+        )
+
+        # add a group to the existing trigger with that keyword
+        group = self.create_group("Testers", contacts=[])
+        flow1.triggers.get(keyword="test").groups.add(group)
+
+        # and now it's no longer a conflict
+        self.assertCreateSubmit(
+            create_url,
+            {
+                "name": "Flow 2",
+                "keyword_triggers": ["test"],
+                "flow_type": Flow.TYPE_MESSAGE,
+            },
+            new_obj_query=Flow.objects.filter(org=self.org, name="Flow 2", flow_type="M"),
+        )
+
+        # check the created keyword triggers
+        flow2 = Flow.objects.get(name="Flow 2")
+        self.assertEqual({"test"}, set(flow2.triggers.values_list("keyword", flat=True)))
+
+    def test_views(self):
+        contact = self.create_contact("Eric", phone="+250788382382")
+        flow = self.get_flow("color")
+
+        # create a flow for another org
+        other_flow = Flow.create(self.org2, self.admin2, "Flow2", base_language="base")
 
         # prepare post data
         post_data = {"file": test_file}
@@ -1993,6 +2103,170 @@ class FlowTest(TembaTest):
 
         # check that file exists in private storage
         self.assertTrue(private_file_storage.exists(path))
+        # make sure we don't get a start flow button for Android Surveys
+        response = self.client.get(reverse("flows.flow_editor", args=[flow2.uuid]))
+        self.assertNotContains(response, "broadcast-rulesflow btn-primary")
+
+        # create a new voice flow
+        response = self.client.post(
+            reverse("flows.flow_create"), dict(name="Voice Flow", flow_type=Flow.TYPE_VOICE), follow=True
+        )
+        voice_flow = Flow.objects.get(org=self.org, name="Voice Flow")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(voice_flow.flow_type, "V")
+
+        # default expiration for voice is shorter
+        self.assertEqual(voice_flow.expires_after_minutes, 5)
+
+        # test flows with triggers
+        # create a new flow with one unformatted keyword
+        post_data = {"name": "Flow With Unformated Keyword Triggers", "keyword_triggers": ["this is", "it"]}
+        response = self.client.post(reverse("flows.flow_create"), post_data)
+        self.assertFormError(
+            response,
+            "form",
+            "keyword_triggers",
+            '"this is" must be a single word, less than 16 characters, containing only letters and numbers',
+        )
+
+        # create a new flow with one existing keyword
+        post_data = {"name": "Flow With Existing Keyword Triggers", "keyword_triggers": ["this", "is", "unique"]}
+        response = self.client.post(reverse("flows.flow_create"), post_data)
+        self.assertFormError(
+            response, "form", "keyword_triggers", 'The keyword "unique" is already used for another flow'
+        )
+
+        # create another trigger so there are two in the way
+        trigger = Trigger.objects.create(
+            org=self.org, keyword="this", flow=flow1, created_by=self.admin, modified_by=self.admin
+        )
+
+        response = self.client.post(reverse("flows.flow_create"), post_data)
+        self.assertFormError(
+            response, "form", "keyword_triggers", 'The keywords "this, unique" are already used for another flow'
+        )
+        trigger.delete()
+
+        # create a new flow with keywords
+        post_data = {
+            "name": "Flow With Good Keyword Triggers",
+            "keyword_triggers": ["this", "is", "it"],
+            "flow_type": Flow.TYPE_MESSAGE,
+            "expires_after_minutes": 30,
+        }
+        response = self.client.post(reverse("flows.flow_create"), post_data, follow=True)
+        flow3 = Flow.objects.get(name=post_data["name"])
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(response.request["PATH_INFO"], reverse("flows.flow_editor", args=[flow3.uuid]))
+        self.assertEqual(response.context["object"].triggers.count(), 3)
+
+        # update flow triggers, and test if form has expected fields
+        post_data = dict()
+        response = self.client.post(reverse("flows.flow_update", args=[flow3.pk]), post_data, follow=True)
+
+        field_names = [field for field in response.context_data["form"].fields]
+        self.assertEqual(field_names, ["name", "keyword_triggers", "expires_after_minutes", "ignore_triggers", "loc"])
+
+        post_data = dict()
+        post_data["name"] = "Flow With Keyword Triggers"
+        post_data["keyword_triggers"] = ["it", "changes", "everything"]
+        post_data["expires_after_minutes"] = 60 * 12
+        response = self.client.post(reverse("flows.flow_update", args=[flow3.pk]), post_data, follow=True)
+
+        flow3 = Flow.objects.get(name=post_data["name"])
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(response.request["PATH_INFO"], reverse("flows.flow_editor", args=[flow3.uuid]))
+        self.assertEqual(flow3.triggers.count(), 5)
+        self.assertEqual(flow3.triggers.filter(is_archived=True).count(), 2)
+        self.assertEqual(flow3.triggers.filter(is_archived=False).count(), 3)
+        self.assertEqual(flow3.triggers.filter(is_archived=False).exclude(groups=None).count(), 0)
+
+        # update flow with unformatted keyword
+        post_data["keyword_triggers"] = "it,changes,every thing"
+        response = self.client.post(reverse("flows.flow_update", args=[flow3.pk]), post_data)
+        self.assertTrue(response.context["form"].errors)
+
+        # update flow with unformatted keyword
+        post_data["keyword_triggers"] = ["it", "changes", "everything", "unique"]
+        response = self.client.post(reverse("flows.flow_update", args=[flow3.pk]), post_data)
+        self.assertTrue(response.context["form"].errors)
+        response = self.client.get(reverse("flows.flow_update", args=[flow3.pk]))
+        self.assertEqual(response.context["form"].fields["keyword_triggers"].initial, ["it", "changes", "everything"])
+        self.assertEqual(flow3.triggers.filter(is_archived=False).count(), 3)
+        self.assertEqual(flow3.triggers.filter(is_archived=False).exclude(groups=None).count(), 0)
+        trigger = Trigger.objects.get(keyword="everything", flow=flow3)
+        group = self.create_group("first", [contact])
+        trigger.groups.add(group)
+        self.assertEqual(flow3.triggers.filter(is_archived=False).count(), 3)
+        self.assertEqual(flow3.triggers.filter(is_archived=False).exclude(groups=None).count(), 1)
+        self.assertEqual(flow3.triggers.filter(is_archived=False).exclude(groups=None)[0].keyword, "everything")
+        response = self.client.get(reverse("flows.flow_update", args=[flow3.pk]))
+        self.assertEqual(response.context["form"].fields["keyword_triggers"].initial, ["it", "changes"])
+        self.assertNotContains(response, "contact_creation")
+        self.assertEqual(flow3.triggers.filter(is_archived=False).count(), 3)
+        self.assertEqual(flow3.triggers.filter(is_archived=False).exclude(groups=None).count(), 1)
+        self.assertEqual(flow3.triggers.filter(is_archived=False).exclude(groups=None)[0].keyword, "everything")
+
+        # can see results for a flow
+        response = self.client.get(reverse("flows.flow_results", args=[flow.uuid]))
+        self.assertEqual(200, response.status_code)
+
+        # check flow listing
+        response = self.client.get(reverse("flows.flow_list"))
+        self.assertEqual(list(response.context["object_list"]), [flow3, voice_flow, flow2, flow1, flow])  # by saved_on
+
+        # test update view
+        response = self.client.post(reverse("flows.flow_update", args=[flow.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["form"].fields), 5)
+        self.assertIn("name", response.context["form"].fields)
+        self.assertIn("keyword_triggers", response.context["form"].fields)
+        self.assertIn("ignore_triggers", response.context["form"].fields)
+
+        # test ivr flow creation
+        self.channel.role = "SRCA"
+        self.channel.save()
+
+        post_data = dict(name="Message flow", expires_after_minutes=5, flow_type=Flow.TYPE_MESSAGE)
+        response = self.client.post(reverse("flows.flow_create"), post_data, follow=True)
+        msg_flow = Flow.objects.get(name=post_data["name"])
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(response.request["PATH_INFO"], reverse("flows.flow_editor", args=[msg_flow.uuid]))
+        self.assertEqual(msg_flow.flow_type, Flow.TYPE_MESSAGE)
+
+        post_data = dict(name="Call flow", expires_after_minutes=5, flow_type=Flow.TYPE_VOICE)
+        response = self.client.post(reverse("flows.flow_create"), post_data, follow=True)
+        call_flow = Flow.objects.get(name=post_data["name"])
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(response.request["PATH_INFO"], reverse("flows.flow_editor", args=[call_flow.uuid]))
+        self.assertEqual(call_flow.flow_type, Flow.TYPE_VOICE)
+
+        # test creating a flow with base language
+        self.org.set_flow_languages(self.admin, ["eng"])
+
+        response = self.client.post(
+            reverse("flows.flow_create"),
+            {
+                "name": "Language Flow",
+                "expires_after_minutes": 5,
+                "base_language": "eng",
+                "flow_type": Flow.TYPE_MESSAGE,
+            },
+            follow=True,
+        )
+
+        language_flow = Flow.objects.get(name="Language Flow")
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(response.request["PATH_INFO"], reverse("flows.flow_editor", args=[language_flow.uuid]))
+        self.assertEqual(language_flow.base_language, "eng")
+
+    def test_update_messaging_flow(self):
+        flow = self.get_flow("color_v13")
+        update_url = reverse("flows.flow_update", args=[flow.id])
 
         # check content
         with private_file_storage.open(path) as f:
@@ -2017,22 +2291,318 @@ class FlowTest(TembaTest):
         Test that recording uploads use private storage
         """
         self.login(self.admin)
-        flow = Flow.create(self.org, self.admin, "Test Flow", base_language="eng")
 
-        upload_url = reverse("flows.flow_upload_action_recording", args=[flow.uuid])
-        self._assert_file_upload(
-            upload_url,
-            "test.wav",
-            b"audio content",
-            "audio/wav",
-            expected_path="recordings/",
-            extra_params={
-                "actionset": "action-uuid",
-                "action": "action-uuid",
-            },
+        # we should have one revision for an imported flow
+        flow = self.get_flow("color_v11")
+        original_def = self.get_flow_json("color_v11")
+
+        # rewind definition to legacy spec
+        revision = flow.revisions.get()
+        revision.definition = original_def
+        revision.spec_version = "11.12"
+        revision.save(update_fields=("definition", "spec_version"))
+
+        # create a new migrated revision
+        flow_def = revision.get_migrated_definition()
+        flow.save_revision(self.admin, flow_def)
+
+        revisions = list(flow.revisions.all().order_by("-created_on"))
+
+        # now we should have two revisions
+        self.assertEqual(2, len(revisions))
+        self.assertEqual(2, revisions[0].revision)
+        self.assertEqual(Flow.CURRENT_SPEC_VERSION, revisions[0].spec_version)
+        self.assertEqual(1, revisions[1].revision)
+        self.assertEqual("11.12", revisions[1].spec_version)
+
+        response = self.client.get(reverse("flows.flow_revisions", args=[flow.uuid]))
+        self.assertEqual(
+            [
+                {
+                    "user": {"email": "Administrator@nyaruka.com", "name": ""},
+                    "created_on": matchers.ISODate(),
+                    "id": revisions[0].id,
+                    "version": "13.1.0",
+                    "revision": 2,
+                },
+                {
+                    "user": {"email": "Administrator@nyaruka.com", "name": ""},
+                    "created_on": matchers.ISODate(),
+                    "id": revisions[1].id,
+                    "version": "11.12",
+                    "revision": 1,
+                },
+            ],
+            response.json()["results"],
         )
 
+        # now make our legacy revision invalid
+        definition = original_def.copy()
+        del definition["base_language"]
+        revisions[1].definition = definition
+        revisions[1].save(update_fields=("definition",))
+
+        # should be back to one valid revision (the non-legacy one)
+        response = self.client.get(reverse("flows.flow_revisions", args=[flow.uuid]))
+        self.assertEqual(1, len(response.json()["results"]))
+
+        # fetch that revision
+        revision_id = response.json()["results"][0]["id"]
+        response = self.client.get(f"{reverse('flows.flow_revisions', args=[flow.uuid])}{revision_id}/")
+
+        # make sure we can read the definition
+        definition = response.json()["definition"]
+        self.assertEqual("base", definition["language"])
+
+        # really break the legacy revision
+        revisions[1].definition = {"foo": "bar"}
+        revisions[1].save(update_fields=("definition",))
+
+        # should still have only one valid revision
+        response = self.client.get(reverse("flows.flow_revisions", args=[flow.uuid]))
+        self.assertEqual(1, len(response.json()["results"]))
+
+        # fix the legacy revision
+        revisions[1].definition = original_def.copy()
+        revisions[1].save(update_fields=("definition",))
+
+        # fetch that revision
+        response = self.client.get(f"{reverse('flows.flow_revisions', args=[flow.uuid])}{revisions[1].id}/")
+
+        # should automatically migrate to latest spec
+        self.assertEqual(Flow.CURRENT_SPEC_VERSION, response.json()["definition"]["spec_version"])
+
+        # but we can also limit how far it is migrated
+        response = self.client.get(
+            f"{reverse('flows.flow_revisions', args=[flow.uuid])}{revisions[1].id}/?version=13.0.0"
+        )
+
+        # should only have been migrated to that version
+        self.assertEqual("13.0.0", response.json()["definition"]["spec_version"])
+
+    def test_save_revisions(self):
+        self.login(self.admin)
+        self.client.post(reverse("flows.flow_create"), data=dict(name="Go Flow", flow_type=Flow.TYPE_MESSAGE))
+        flow = Flow.objects.get(
+            org=self.org, name="Go Flow", flow_type=Flow.TYPE_MESSAGE, version_number=Flow.CURRENT_SPEC_VERSION
+        )
+        response = self.client.get(reverse("flows.flow_revisions", args=[flow.uuid]))
+        self.assertEqual(1, len(response.json()))
+
+        definition = flow.revisions.all().first().definition
+
+        # viewers can't save flows
+        self.login(self.user)
+        response = self.client.post(
+            reverse("flows.flow_revisions", args=[flow.uuid]), definition, content_type="application/json"
+        )
+        self.assertEqual(403, response.status_code)
+
+        # check that we can create a new revision
+        self.login(self.admin)
+        response = self.client.post(
+            reverse("flows.flow_revisions", args=[flow.uuid]), definition, content_type="application/json"
+        )
+        new_revision = response.json()
+        self.assertEqual(2, new_revision["revision"][Flow.DEFINITION_REVISION])
+
+        # but we can't save our old revision
+        response = self.client.post(
+            reverse("flows.flow_revisions", args=[flow.uuid]), definition, content_type="application/json"
+        )
+        self.assertResponseError(response, "description", "Your changes won't be saved until you refresh your browser")
+
+        # but we can't save our old revision
+        response = self.client.post(
+            reverse("flows.flow_revisions", args=[flow.uuid]), definition, content_type="application/json"
+        )
+        self.assertResponseError(response, "description", "Your changes won't be saved until you refresh your browser")
+
+        # or save an old version
+        definition = flow.revisions.all().first().definition
+        definition[Flow.DEFINITION_SPEC_VERSION] = "11.12"
+        response = self.client.post(
+            reverse("flows.flow_revisions", args=[flow.uuid]), definition, content_type="application/json"
+        )
+        self.assertResponseError(response, "description", "Your flow has been upgraded to the latest version")
+
+    def test_inactive_flow(self):
+        flow = self.get_flow("color_v13")
+        flow.release(self.admin)
+
+        self.login(self.admin)
+
+        response = self.client.get(reverse("flows.flow_revisions", args=[flow.uuid]))
+
+        self.assertEqual(404, response.status_code)
+
+        response = self.client.get(reverse("flows.flow_activity", args=[flow.uuid]))
+
+        self.assertEqual(404, response.status_code)
+
     @mock_mailroom
+    @override_settings(MANUAL_FLOW_BROADCAST_MAX_GROUP_SUM_SIZE=1)
+    def test_broadcast(self, mr_mocks):
+        contact = self.create_contact("Bob", phone="+593979099111")
+        flow = self.create_flow()
+        ivr_flow = self.create_flow(flow_type=Flow.TYPE_VOICE)
+
+        broadcast_url = reverse("flows.flow_broadcast", args=[flow.id])
+
+        self.assertUpdateFetch(
+            broadcast_url,
+            allow_viewers=False,
+            allow_editors=True,
+            form_fields=["mode", "omnibox", "query", "exclude_in_other", "exclude_reruns"],
+        )
+
+        # create flow start with a query
+        mr_mocks.parse_query("frank", cleaned='name ~ "frank"', fields=[])
+
+        self.assertUpdateSubmit(
+            broadcast_url,
+            {"mode": "query", "query": "frank", "exclude_in_other": False, "exclude_reruns": False},
+        )
+
+        start = FlowStart.objects.get()
+        self.assertEqual(flow, start.flow)
+        self.assertEqual(FlowStart.STATUS_PENDING, start.status)
+        self.assertTrue(start.restart_participants)
+        self.assertTrue(start.include_active)
+        self.assertEqual('name ~ "frank"', start.query)
+
+        self.assertEqual(1, len(mr_mocks.queued_batch_tasks))
+        self.assertEqual("start_flow", mr_mocks.queued_batch_tasks[0]["type"])
+
+        FlowStart.objects.all().delete()
+
+        # create flow start with a bogus query
+        mr_mocks.error("query contains an error")
+
+        self.assertUpdateSubmit(
+            broadcast_url,
+            {"mode": "query", "query": 'name = "frank', "exclude_in_other": False, "exclude_reruns": False},
+            form_errors={"query": "query contains an error"},
+            object_unchanged=flow,
+        )
+
+        # try to create a query based flow start with an empty query
+        self.assertUpdateSubmit(
+            broadcast_url,
+            {"mode": "query", "query": "", "exclude_in_other": False, "exclude_reruns": False},
+            form_errors={"query": "Required field"},
+            object_unchanged=flow,
+        )
+
+        # try to create selection based flow start with an empty selection
+        self.assertUpdateSubmit(
+            broadcast_url,
+            {"mode": "select", "omnibox": [], "exclude_in_other": False, "exclude_reruns": False},
+            form_errors={"omnibox": "Required field"},
+            object_unchanged=flow,
+        )
+
+        # try to create a selection based flow start with an exceeding group sum count
+        contact2 = self.create_contact("Alice", phone="+593979099112")
+        group = self.create_group("Group of Two", contacts=[contact, contact2])
+        selection = json.dumps({"id": group.uuid, "name": group.name, "type": "group"})
+        self.assertUpdateSubmit(
+            broadcast_url,
+            {"mode": "select", "omnibox": selection, "exclude_in_other": False, "exclude_reruns": False},
+            form_errors={
+                "omnibox": "The selected groups have 2 contacts in total, exceeding the maximum of 1. Select fewer or smaller groups and try again."
+            },
+            object_unchanged=flow,
+        )
+
+        # create selection based flow start with exclude_in_other and exclude_reruns both left unchecked
+        selection = json.dumps({"id": contact.uuid, "name": contact.name, "type": "contact"})
+
+        self.assertUpdateSubmit(
+            broadcast_url,
+            {"mode": "select", "omnibox": selection, "exclude_in_other": False, "exclude_reruns": False},
+        )
+
+        start = FlowStart.objects.get()
+        self.assertEqual({contact}, set(start.contacts.all()))
+        self.assertEqual(flow, start.flow)
+        self.assertEqual(FlowStart.TYPE_MANUAL, start.start_type)
+        self.assertEqual(FlowStart.STATUS_PENDING, start.status)
+        self.assertTrue(start.restart_participants)
+        self.assertTrue(start.include_active)
+
+        self.assertEqual(2, len(mr_mocks.queued_batch_tasks))
+        self.assertEqual("start_flow", mr_mocks.queued_batch_tasks[1]["type"])
+
+        FlowStart.objects.all().delete()
+
+        # create selection based flow start with exclude_in_other and exclude_reruns both checked
+        self.assertUpdateSubmit(
+            broadcast_url, {"mode": "select", "omnibox": selection, "exclude_in_other": True, "exclude_reruns": True}
+        )
+
+        start = FlowStart.objects.get()
+        self.assertEqual({contact}, set(start.contacts.all()))
+        self.assertEqual(flow, start.flow)
+        self.assertEqual(FlowStart.STATUS_PENDING, start.status)
+        self.assertFalse(start.restart_participants)
+        self.assertFalse(start.include_active)
+
+        self.assertEqual(3, len(mr_mocks.queued_batch_tasks))
+
+        # trying to start again should fail because there is already a pending start for this flow
+        response = self.requestView(broadcast_url, self.admin)
+        self.assertContains(response, "This flow is already being started. Wait until")
+        self.assertNotContains(response, "Start Flow")
+
+        # clear that start and try to start the IVR flow
+        FlowStart.objects.all().delete()
+        ivr_bcast_url = reverse("flows.flow_broadcast", args=[ivr_flow.id])
+
+        # shouldn't be able to since we don't have a call channel
+        response = self.requestView(ivr_bcast_url, self.admin)
+        self.assertContains(
+            response, 'To get started, <a href="/channels/channel/claim/">add a voice channel</a> to your workspace'
+        )
+        self.assertNotContains(response, "Start Flow")
+
+        # if we release our send channel we also can't start a regular messaging flow
+        self.channel.release(self.admin)
+
+        response = self.requestView(broadcast_url, self.admin)
+        self.assertContains(
+            response, 'To get started, <a href="/channels/channel/claim/">add a channel</a> to your workspace'
+        )
+        self.assertNotContains(response, "Start Flow")
+
+    @mock_mailroom
+    def test_broadcast_background_flow(self, mr_mocks):
+        flow = self.create_flow(flow_type=Flow.TYPE_BACKGROUND)
+
+        broadcast_url = reverse("flows.flow_broadcast", args=[flow.id])
+
+        response = self.assertUpdateFetch(
+            broadcast_url,
+            allow_viewers=False,
+            allow_editors=True,
+            form_fields=["mode", "omnibox", "query", "exclude_in_other", "exclude_reruns"],
+        )
+
+        # option to exclude contact in other flows is hidden
+        self.assertNotContains(response, "Exclude contacts currently in a flow")
+
+        # create flow start with a query
+        mr_mocks.parse_query("frank", cleaned='name ~ "frank"', fields=[])
+
+        self.assertUpdateSubmit(broadcast_url, {"mode": "query", "query": "frank", "exclude_reruns": False})
+
+        start = FlowStart.objects.get()
+        self.assertEqual(flow, start.flow)
+        self.assertEqual(FlowStart.STATUS_PENDING, start.status)
+        self.assertTrue(start.restart_participants)  # should default to true
+        self.assertTrue(start.include_active)
+        self.assertEqual('name ~ "frank"', start.query)
+
     @patch("temba.flows.views.uuid4")
     def test_upload_media_action(self, mock_uuid, mr_mocks):
         flow = self.get_flow("color_v13")
@@ -2534,7 +3104,7 @@ class FlowTest(TembaTest):
         self.assertEqual(
             {
                 "status": "failure",
-                "description": "Your flow failed validation. Please refresh your browser.",
+                "description": "Your flow failed validation. Refresh your browser.",
                 "detail": f"unable to read flow: node UUID {mode0_uuid} isn't unique",
             },
             response.json(),
@@ -2552,7 +3122,7 @@ class FlowTest(TembaTest):
         )
 
         self.assertUpdateSubmit(
-            change_url, {"language": "fra"}, form_errors={"language": "Not a valid language."}, object_unchanged=flow
+            change_url, {"language": "fra"}, form_errors={"language": "Not a valid language"}, object_unchanged=flow
         )
 
         self.assertUpdateSubmit(change_url, {"language": "spa"}, success_status=302)
@@ -2624,7 +3194,7 @@ class FlowTest(TembaTest):
 
         # submit with something that's not a valid PO file
         response = self.requestView(step1_url, self.admin, post_data={"po_file": io.BytesIO(b"msgid")})
-        self.assertFormError(response, "form", "po_file", "File doesn't appear to be a valid PO file.")
+        self.assertFormError(response, "form", "po_file", "File doesn't appear to be a valid PO file")
 
         # submit with something that's in the base language of the flow
         po_file = io.BytesIO(
@@ -2642,7 +3212,7 @@ msgstr "Bluuu"
         )
         response = self.requestView(step1_url, self.admin, post_data={"po_file": po_file})
         self.assertFormError(
-            response, "form", "po_file", "Contains translations in English which is the base language of this flow."
+            response, "form", "po_file", "Contains translations in English, which is the base language of this flow"
         )
 
         # submit with something that's in the base language of the flow
@@ -2664,7 +3234,7 @@ msgstr "Bleu"
             response,
             "form",
             "po_file",
-            "Contains translations in French which is not a supported translation language.",
+            "Contains translations in French, which isn't a supported translation language",
         )
 
         # submit with something that doesn't have an explicit language
@@ -3430,7 +4000,7 @@ class ExportFlowResultsTest(TembaTest):
         response = self.client.post(
             reverse("flows.flow_export_results"), {"flows": [flow.id], "group_memberships": [devs.id]}, follow=True
         )
-        self.assertContains(response, "already an export in progress")
+        self.assertContains(response, "An export is already in progress")
 
         # ok, mark that one as finished and try again
         blocking_export.update_status(ExportFlowResultsTask.STATUS_COMPLETE)
