@@ -2049,7 +2049,7 @@ class BroadcastCRUDLTest(TembaTest, CRUDLTestMixin):
                 "omnibox": omnibox_serialize(self.org, [], [], raw_urns=["tel:$$$$$$"], json_encode=True),
             },
         )
-        self.assertFormError(response, "form", "omnibox", "'tel:$$$$$$' is not a valid URN.")
+        self.assertFormError(response, "form", "omnibox", "'tel:$$$$$$' isn't a valid URN")
 
         # if we release our send channel we also can't start send
         self.channel.release(self.admin)
@@ -2456,8 +2456,7 @@ class LabelCRUDLTest(TembaTest, CRUDLTestMixin):
                 response,
                 "form",
                 "name",
-                "This workspace has 2 labels and the limit is 2. "
-                "You must delete existing ones before you can create new ones.",
+                "This workspace has 2 labels and the limit is 2. Delete existing ones before creating new ones.",
             )
 
     def test_delete(self):

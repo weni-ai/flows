@@ -77,10 +77,7 @@ class VonageTypeTest(TembaTest):
         self.assertTrue(response.context["form"].errors)
         self.assertContains(
             response,
-            "There was a problem claiming that number, "
-            "please check the balance on your account. "
-            "Note that you can only claim numbers after "
-            "adding credit to your Vonage account.",
+            "There was a problem claiming that number. Check the balance on your account.",
         )
         Channel.objects.all().delete()
 

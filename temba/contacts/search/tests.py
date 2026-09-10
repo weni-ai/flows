@@ -17,11 +17,11 @@ class SearchExceptionTest(TembaTest):
             ),
             (
                 {"error": "can't convert 'XZ' to a number", "code": "invalid_number", "extra": {"value": "XZ"}},
-                "Unable to convert 'XZ' to a number",
+                "Couldn't convert 'XZ' to a number",
             ),
             (
                 {"error": "can't convert 'AB' to a date", "code": "invalid_date", "extra": {"value": "AB"}},
-                "Unable to convert 'AB' to a date",
+                "Couldn't convert 'AB' to a date",
             ),
             (
                 {

@@ -1127,7 +1127,7 @@ class OrgTest(TembaTest):
 
         email_args = mock_send_temba_email.call_args[0]  # all positional args
 
-        self.assertEqual(email_args[0], "RapidPro Invitation")
+        self.assertEqual(email_args[0], "RapidPro invitation")
         self.assertIn(f"https://app.rapidpro.io/org/join/{invitation.secret}/", email_args[1])
         self.assertNotIn("{{", email_args[1])
         self.assertIn(f"https://app.rapidpro.io/org/join/{invitation.secret}/", email_args[2])
@@ -1264,7 +1264,7 @@ class OrgTest(TembaTest):
         self.login(self.admin)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "If you use the RapidPro Surveyor application to run flows offline")
+        self.assertContains(response, "If you use the RapidPro Surveyor app to run flows offline")
 
         Org.objects.create(
             name="Another Org",
@@ -1673,7 +1673,7 @@ class OrgTest(TembaTest):
         editor_invitation.send()
         email_args = mock_send_temba_email.call_args[0]  # all positional args
 
-        self.assertEqual(email_args[0], "RapidPro Invitation")
+        self.assertEqual(email_args[0], "RapidPro invitation")
         self.assertIn("https://app.rapidpro.io/org/join/%s/" % editor_invitation.secret, email_args[1])
         self.assertNotIn("{{", email_args[1])
         self.assertIn("https://app.rapidpro.io/org/join/%s/" % editor_invitation.secret, email_args[2])
@@ -2090,7 +2090,7 @@ class OrgTest(TembaTest):
                     response,
                     "form",
                     "__all__",
-                    "The Twilio account SID and Token seem invalid. " "Please check them again and retry.",
+                    "The Twilio account SID and token seem invalid. Check them and try again.",
                 )
 
             self.client.post(connect_url, post_data)
@@ -2350,7 +2350,7 @@ class OrgTest(TembaTest):
                 follow=True,
             )
             self.assertEqual(
-                '[{"message": "Couldn\'t send email with SMTP server configuration with error \'SMTP Error\'", "code": ""}]',
+                '[{"message": "Couldn\'t send email with SMTP server configuration. Error: \'SMTP Error\'", "code": ""}]',
                 response.context["form"].errors["__all__"].as_json(),
             )
             self.assertEqual(len(mail.outbox), 0)
@@ -2776,7 +2776,7 @@ class OrgTest(TembaTest):
         # now we can manage our orgs
         response = self.client.get(reverse("orgs.org_sub_orgs"))
         self.assertEqual(200, response.status_code)
-        self.assertContains(response, "Workspaces")
+        self.assertContains(response, "Manage workspaces")
 
         # and add topups
         self.assertContains(response, reverse("orgs.org_transfer_credits"))
@@ -3918,7 +3918,7 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # summary now includes this
         response = self.requestView(home_url, self.admin)
-        self.assertContains(response, "The default flow language is <b>French</b>.")
+        self.assertContains(response, "The default flow language is <b>French</b>")
         self.assertNotContains(response, "Translations are provided in")
 
         # and now give it additional languages
@@ -3934,7 +3934,7 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertEqual(["fra", "hat", "hau"], self.org.flow_languages)
 
         response = self.requestView(home_url, self.admin)
-        self.assertContains(response, "The default flow language is <b>French</b>.")
+        self.assertContains(response, "The default flow language is <b>French</b>")
         self.assertContains(response, "Translations are provided in")
         self.assertContains(response, "<b>Hausa</b>")
 
@@ -4446,8 +4446,8 @@ class BulkExportTest(TembaTest):
         self.login(self.admin)
         response = self.client.get(reverse("orgs.org_export"))
         self.assertContains(response, "Register Patient")
-        self.assertContains(response, "Catch all")
-        self.assertContains(response, "Missed call")
+        self.assertContains(response, "Catch All")
+        self.assertContains(response, "Missed Call")
         self.assertContains(response, "Start Notifications")
         self.assertContains(response, "Stop Notifications")
         self.assertContains(response, "Confirm Appointment")
@@ -4829,7 +4829,7 @@ class StripeCreditsTest(TembaTest):
         # assert we sent our confirmation emai
         self.assertEqual(1, len(mail.outbox))
         email = mail.outbox[0]
-        self.assertEqual("RapidPro Receipt", email.subject)
+        self.assertEqual("RapidPro receipt", email.subject)
         self.assertIn("Rudolph", email.body)
         self.assertIn("Visa", email.body)
         self.assertIn("$20", email.body)
@@ -4869,7 +4869,7 @@ class StripeCreditsTest(TembaTest):
         # assert we sent our confirmation emai
         self.assertEqual(1, len(mail.outbox))
         email = mail.outbox[0]
-        self.assertEqual("RapidPro Receipt", email.subject)
+        self.assertEqual("RapidPro receipt", email.subject)
         self.assertIn("bitcoin", email.body)
         self.assertIn("abcde", email.body)
         self.assertIn("$20", email.body)
@@ -4964,7 +4964,7 @@ class StripeCreditsTest(TembaTest):
         # assert we sent our confirmation email
         self.assertEqual(1, len(mail.outbox))
         email = mail.outbox[0]
-        self.assertEqual("RapidPro Receipt", email.subject)
+        self.assertEqual("RapidPro receipt", email.subject)
         self.assertIn("Rudolph", email.body)
         self.assertIn("Visa", email.body)
         self.assertIn("$20", email.body)

@@ -3312,7 +3312,7 @@ class APITest(APIJSONMixin, TembaTest):
 
         # reject names that exceed the configured maximum length
         response = self.postJSON(url, None, {"name": "x" * 101, "urns": ["tel:+250787000111"]})
-        self.assertResponseError(response, "name", "Contact name cannot exceed 100 characters.")
+        self.assertResponseError(response, "name", "Contact name can't exceed 100 characters")
 
         # reject empty/whitespace-only names when explicitly provided
         response = self.postJSON(url, None, {"name": "   ", "urns": ["tel:+250787000222"]})
@@ -3889,7 +3889,7 @@ class APITest(APIJSONMixin, TembaTest):
 
         # try again with some invalid values
         response = self.postJSON(url, None, {"label": "!@#$%", "value_type": "video"})
-        self.assertResponseError(response, "label", "Can only contain letters, numbers, hyphens and underscores")
+        self.assertResponseError(response, "label", "Can only contain letters, numbers, hyphens and underscores.")
         self.assertResponseError(response, "value_type", '"video" is not a valid choice.')
 
         # try again with a label that would generate an invalid key

@@ -217,7 +217,7 @@ class ChannelTest(TembaTest):
 
     def test_get_channel_type_name(self):
         self.assertEqual(self.tel_channel.get_channel_type_name(), "Android phone")
-        self.assertEqual(self.twitter_channel.get_channel_type_name(), "Twitter Channel")
+        self.assertEqual(self.twitter_channel.get_channel_type_name(), "Twitter channel")
         self.assertEqual(self.unclaimed_channel.get_channel_type_name(), "Vonage Channel")
 
     def test_get_address_display(self):
@@ -693,7 +693,7 @@ class ChannelTest(TembaTest):
         self.assertTrue(len(response.context["latest_sync_events"]) <= 5)
 
         response = self.fetch_protected(reverse("channels.channel_read", args=[self.tel_channel.uuid]), self.admin)
-        self.assertNotContains(response, "Enable Voice")
+        self.assertNotContains(response, "Enable voice calling")
 
         # Add twilio credentials to make sure we can add calling for our android channel
         self.org.config.update({Org.CONFIG_TWILIO_SID: "SID", Org.CONFIG_TWILIO_TOKEN: "TOKEN"})
@@ -701,7 +701,7 @@ class ChannelTest(TembaTest):
 
         response = self.fetch_protected(reverse("channels.channel_read", args=[self.tel_channel.uuid]), self.admin)
         self.assertTrue(self.org.is_connected_to_twilio())
-        self.assertContains(response, "Enable Voice")
+        self.assertContains(response, "Enable voice calling")
 
         two_hours_ago = timezone.now() - timedelta(hours=2)
 
@@ -1637,7 +1637,7 @@ class ChannelEventCRUDLTest(TembaTest):
 
         self.assertEqual(response.context["object_list"].count(), 2)
         self.assertContains(response, "Missed incoming call")
-        self.assertContains(response, "Incoming Call (600 seconds)")
+        self.assertContains(response, "Incoming call (600 seconds)")
 
 
 class SyncEventTest(SmartminTest):

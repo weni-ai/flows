@@ -184,8 +184,8 @@ class InstagramTypeTest(TembaTest):
 
         self.assertEqual(
             response.context["form"].errors["__all__"][0],
-            "Unable to refresh the token because this Facebook user doesn't have permission "
-            "on the linked page. Check that you are still an admin on that page and try again.",
+            "Couldn't refresh the token because this Facebook user doesn't have permission "
+            "on the linked page. Check that you're still an admin on that page and try again.",
         )
 
     @override_settings(FACEBOOK_APPLICATION_ID="FB_APP_ID", FACEBOOK_APPLICATION_SECRET="FB_APP_SECRET")
@@ -404,8 +404,8 @@ class InstagramTypeTest(TembaTest):
 
         self.assertEqual(
             response.context["form"].errors["__all__"][0],
-            "Unable to refresh the token because this Facebook user doesn't have permission "
-            "on the linked page. Check that you are still an admin on that page and try again.",
+            "Couldn't refresh the token because this Facebook user doesn't have permission "
+            "on the linked page. Check that you're still an admin on that page and try again.",
         )
 
     @override_settings(FACEBOOK_APPLICATION_ID="FB_APP_ID", FACEBOOK_APPLICATION_SECRET="FB_APP_SECRET")

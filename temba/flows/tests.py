@@ -2012,7 +2012,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
                 "flow_type": Flow.TYPE_MESSAGE,
             },
             form_errors={
-                "keyword_triggers": '"toooooooooooooolong" must be a single word, less than 16 characters, containing only letter and numbers'
+                "keyword_triggers": '"toooooooooooooolong" must be a single word, less than 16 characters, containing only letters and numbers'
             },
         )
 
@@ -2139,7 +2139,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
             response,
             "form",
             "keyword_triggers",
-            '"this is" must be a single word, less than 16 characters, containing only letter and numbers',
+            '"this is" must be a single word, less than 16 characters, containing only letters and numbers',
         )
 
         # create a new flow with one existing keyword
@@ -2744,7 +2744,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
             broadcast_url,
             {"mode": "select", "omnibox": selection, "exclude_in_other": False, "exclude_reruns": False},
             form_errors={
-                "omnibox": "Selected groups have 2 contacts in total, which exceeds the maximum of 1 contacts. Please select less or smaller groups and try again."
+                "omnibox": "The selected groups have 2 contacts in total, exceeding the maximum of 1. Select fewer or smaller groups and try again."
             },
             object_unchanged=flow,
         )
@@ -3444,7 +3444,7 @@ msgstr "Bluuu"
         )
         response = self.requestView(step1_url, self.admin, post_data={"po_file": po_file})
         self.assertFormError(
-            response, "form", "po_file", "Contains translations in English which is the base language of this flow."
+            response, "form", "po_file", "Contains translations in English, which is the base language of this flow"
         )
 
         # submit with something that's in the base language of the flow

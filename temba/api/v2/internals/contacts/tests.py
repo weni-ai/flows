@@ -428,7 +428,7 @@ class ContactsExportByStatusViewTest(TembaTest):
             ws = wb.active
             # header columns
             headers = [cell.value for cell in list(ws.rows)[0]]
-            self.assertEqual(headers, ["Contact UUID", "Name", "URNs", "Language", "Created on", "Last Seen On"])
+            self.assertEqual(headers, ["Contact UUID", "Name", "URNs", "Language", "Created On", "Last Seen On"])
             # row for c1
             row2 = [cell.value for cell in list(ws.rows)[1]]
             self.assertIn(str(c1.uuid), row2)
@@ -804,7 +804,7 @@ class UpdateContactFieldsViewTest(TembaTest):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
             response.json(),
-            {"contact_fields": {"name": ["Contact name cannot exceed 100 characters."]}},
+            {"contact_fields": {"name": ["Contact name can't exceed 100 characters"]}},
         )
 
     @mock_mailroom

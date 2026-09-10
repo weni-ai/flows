@@ -93,7 +93,7 @@ class GlobalCRUDLTest(TembaTest, CRUDLTestMixin):
         )
         self.assertContains(response, "Acme Ltd")
         self.assertContains(response, "23464373")
-        self.assertContains(response, "1 Use")
+        self.assertContains(response, "1 use")
 
         response = self.client.get(list_url + "?search=access")
         self.assertEqual(list(response.context["object_list"]), [self.global2])
@@ -143,7 +143,7 @@ class GlobalCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"name": "Secret3", "value": "[abc]"},
-            form_errors={"__all__": "Cannot create a new global as limit is 4."},
+            form_errors={"__all__": "Can't create a new global as the limit is 4"},
         )
 
     def test_update(self):

@@ -542,7 +542,7 @@ class CampaignTest(TembaTest):
         self.reminder_flow.refresh_from_db()
         self.assertFalse(self.reminder_flow.is_archived)
         self.assertEqual(
-            "The following flows are still used by campaigns so could not be archived: Reminder Flow",
+            "The following flows are still used by campaigns and couldn't be archived: Reminder Flow",
             response.get("Temba-Toast"),
         )
 
