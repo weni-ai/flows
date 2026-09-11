@@ -336,8 +336,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         if not recipients:
             return []
 
-        urn_field = fields.URNField()
-        urn_field.context = self.context
+        country_code = self.context["org"].default_country_code
         seen = set()
         normalized = []
         for index, recipient in enumerate(recipients):
@@ -345,7 +344,9 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 raise serializers.ValidationError("recipients must contain objects")
             if "urn" not in recipient:
                 raise serializers.ValidationError("recipients[].urn is required")
-            urn = urn_field.to_internal_value(recipient["urn"])
+            if not isinstance(recipient["urn"], str):
+                raise serializers.ValidationError("Not a valid string.")
+            urn = fields.validate_urn(recipient["urn"], country_code=country_code)
             if urn in seen:
                 raise serializers.ValidationError(f"Recipient {urn} is repeated")
             seen.add(urn)
