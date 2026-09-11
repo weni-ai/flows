@@ -58,7 +58,7 @@ class ParameterFormatHelpersTest(TestCase):
     def test_extract_parameter_names_from_components(self):
         self.assertEqual([], extract_parameter_names_from_components(None))
         self.assertEqual(
-            ["nome", "cota"],
+            ["nome", "cota", "extra"],
             extract_parameter_names_from_components(
                 [
                     {"type": "HEADER", "text": "Hi {{ignored}}"},
@@ -169,13 +169,14 @@ class NamedTemplateBroadcastTest(TembaTest):
             self.org,
             template,
             [{"urn": "whatsapp:5511999999999", "variables": {"campanha": "BF4", "nome": "João"}}],
-            {"cota": "045"},
+            {"nome": "Padrão", "cota": "045"},
             extra_urns=["whatsapp:5511777777777"],
         )
         self.assertEqual(2, result["accepted_count"])
         self.assertEqual("045", result["recipient_variables"]["whatsapp:5511999999999"]["cota"])
         self.assertEqual("João", result["recipient_variables"]["whatsapp:5511999999999"]["nome"])
         self.assertNotIn("campanha", result["recipient_variables"]["whatsapp:5511999999999"])
+        self.assertEqual("Padrão", result["recipient_variables"]["whatsapp:5511777777777"]["nome"])
         self.assertEqual("045", result["recipient_variables"]["whatsapp:5511777777777"]["cota"])
 
     def test_whitespace_value_is_not_provided(self):
