@@ -33,8 +33,14 @@ from temba.msgs.usecases.managed_trigger_group import (
     GroupQuotaExceeded,
     prepare_trigger_group_for_broadcast,
 )
+from temba.msgs.usecases.named_template_broadcast import (
+    NamedTemplateBroadcastError,
+    assert_named_template_ready,
+    resolve_named_recipients,
+)
 from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
+from temba.templates.parameter_format import is_named_format
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.triggers.usecases import create_catchall_trigger
 from temba.utils import extract_constants, json, on_transaction_commit
@@ -301,6 +307,7 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     name = serializers.CharField(required=False)
     template_id = serializers.IntegerField(required=False)
     trigger_flow_uuid = serializers.UUIDField(required=False)
+    recipients = serializers.ListField(required=False, child=serializers.DictField(), max_length=1000)
 
     def validate_msg(self, value):
         if not (
@@ -324,11 +331,41 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             raise serializers.ValidationError("direct_send_template_name must be a string")
         return value
 
+    def _validate_recipients(self, data):
+        recipients = data.get("recipients") or []
+        if not recipients:
+            return []
+
+        country_code = self.context["org"].default_country_code
+        seen = set()
+        normalized = []
+        for index, recipient in enumerate(recipients):
+            if not isinstance(recipient, dict):
+                raise serializers.ValidationError("recipients must contain objects")
+            if "urn" not in recipient:
+                raise serializers.ValidationError("recipients[].urn is required")
+            if not isinstance(recipient["urn"], str):
+                raise serializers.ValidationError("Not a valid string.")
+            urn = fields.validate_urn(recipient["urn"], country_code=country_code)
+            if urn in seen:
+                raise serializers.ValidationError(f"Recipient {urn} is repeated")
+            seen.add(urn)
+            variables = recipient.get("variables") or {}
+            if variables is None:
+                variables = {}
+            if not isinstance(variables, dict):
+                raise serializers.ValidationError("recipients[].variables must be an object")
+            if len(variables) > 100:
+                raise serializers.ValidationError("This field can only contain up to 100 items.")
+            normalized.append({"urn": urn, "variables": {str(key): value for key, value in variables.items()}})
+        return normalized
+
     def validate(self, data):
-        if not (data.get("urns") or data.get("contacts") or data.get("groups")):
+        if not (data.get("urns") or data.get("contacts") or data.get("groups") or data.get("recipients")):
             raise serializers.ValidationError("Must provide either urns, contacts or groups")
 
         channel_data = data.get("channel", None)
+        channel = None
         if channel_data:
             try:
                 channel = Channel.objects.get(uuid=channel_data)
@@ -337,6 +374,8 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                     raise serializers.ValidationError("Invalid channel type")
             except Channel.DoesNotExist:
                 raise serializers.ValidationError("Channel not found")
+
+        data["recipients"] = self._validate_recipients(data)
 
         template_data = data.get("msg", {}).get("template", None)
         if template_data is not None:
@@ -393,18 +432,62 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         if name and not channel_data:
             raise serializers.ValidationError("Channel is required to use template name")
 
+        positional_variables = template_data.get("variables", [])
+        named_variables = template_data.get("named_variables")
+        if positional_variables and named_variables:
+            raise serializers.ValidationError("named_variables and variables cannot be used together")
+
         try:
             template = self._get_template(uuid=uuid, name=name, org=self.context.get("org"))
             template_id = template.id
+            parameter_format = template.parameter_format or "positional"
+
+            if is_named_format(parameter_format) and positional_variables:
+                raise serializers.ValidationError(
+                    f"Template {template.uuid} expects named parameters, not the positional variables list"
+                )
+            if not is_named_format(parameter_format) and named_variables:
+                raise serializers.ValidationError(
+                    f"Template {template.uuid} expects positional variables, not named parameters"
+                )
+
+            named_resolution = None
+            extra_urns = list(data.get("urns") or [])
+            if is_named_format(parameter_format):
+                channel = data.get("channel")
+                try:
+                    assert_named_template_ready(template, channel=channel if isinstance(channel, Channel) else None)
+                    if not isinstance(named_variables or {}, dict):
+                        raise NamedTemplateBroadcastError("named_variables must be an object")
+                    named_resolution = resolve_named_recipients(
+                        self.context.get("org"),
+                        template,
+                        data.get("recipients") or [],
+                        named_variables or {},
+                        extra_urns=extra_urns,
+                    )
+                except NamedTemplateBroadcastError as exc:
+                    raise serializers.ValidationError(str(exc))
 
             data["msg"]["template"] = {
                 "name": template.name,
                 "uuid": str(template.uuid),
-                "variables": template_data.get("variables", []),
+                "variables": positional_variables if not is_named_format(parameter_format) else [],
                 "locale": template_data.get("locale", None),
                 "is_carousel": template_data.get("is_carousel", False),
                 "carousel": template_data.get("carousel", []),
             }
+            if is_named_format(parameter_format):
+                data["msg"]["template"]["named_variables"] = named_variables or {}
+                data["msg"]["template"]["parameter_format"] = parameter_format
+            if named_resolution and (data.get("recipients") or extra_urns):
+                data["msg"]["template"]["recipient_variables"] = named_resolution["recipient_variables"]
+                data["named_parameters"] = {
+                    "accepted_count": named_resolution["accepted_count"],
+                    "rejected_count": named_resolution["rejected_count"],
+                    "rejected": named_resolution["rejected"],
+                }
+                data["resolved_urns"] = named_resolution["accepted_urns"]
             data["msg"]["template_id"] = template_id
 
         except Template.DoesNotExist:
@@ -430,6 +513,16 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         contacts = self.validated_data.get("contacts") or []
         groups = self.validated_data.get("groups") or []
         msg = dict(self.validated_data.get("msg") or {})
+
+        resolved_urns = self.validated_data.get("resolved_urns")
+        if resolved_urns is not None:
+            urns = resolved_urns
+            named_parameters = self.validated_data.get("named_parameters")
+            if named_parameters:
+                msg["named_parameters"] = named_parameters
+                template_meta = dict(msg.get("template") or {})
+                template_meta["parameter_format"] = template_meta.get("parameter_format", "named")
+                msg["template"] = template_meta
 
         # Ad-hoc recipients (urns/contacts) are covered by a platform-managed group + Catch All.
         if trigger_flow and (urns or contacts):
@@ -1908,6 +2001,7 @@ class TemplateReadSerializer(ReadSerializer):
                     "variable_count": translation.variable_count,
                     "status": translation.get_status_display(),
                     "channel": {"uuid": translation.channel.uuid, "name": translation.channel.name},
+                    "parameter_names": translation.parameter_names or [],
                 }
             )
 
@@ -1915,7 +2009,7 @@ class TemplateReadSerializer(ReadSerializer):
 
     class Meta:
         model = Template
-        fields = ("uuid", "name", "translations", "created_on", "modified_on")
+        fields = ("uuid", "name", "parameter_format", "translations", "created_on", "modified_on")
 
 
 class TicketerReadSerializer(ReadSerializer):

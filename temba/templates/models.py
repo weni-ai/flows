@@ -60,6 +60,9 @@ class Template(models.Model):
 
     is_active = models.BooleanField(default=True)
 
+    parameter_format = models.CharField(max_length=16, default="positional")
+    parameter_policies = models.JSONField(default=dict, null=True, blank=True)
+
     @classmethod
     def trim(cls, channel):
         org = channel.org
@@ -157,6 +160,9 @@ class TemplateTranslation(models.Model):
     # whether this channel template is active
     is_active = models.BooleanField(default=True)
 
+    # provider-declared body parameter names for named templates, in body order for display only
+    parameter_names = models.JSONField(default=list, null=True, blank=True)
+
     @classmethod
     def trim(cls, channel, existing):
         """
@@ -184,6 +190,8 @@ class TemplateTranslation(models.Model):
         category,
         body=None,
         footer=None,
+        parameter_format=None,
+        parameter_names=None,
     ):
         existing = TemplateTranslation.objects.filter(channel=channel, external_id=external_id).first()
 
@@ -196,6 +204,7 @@ class TemplateTranslation(models.Model):
                     created_on=timezone.now(),
                     modified_on=timezone.now(),
                     category=category,
+                    parameter_format=parameter_format or "positional",
                 )
             else:
                 template.modified_on = timezone.now()
@@ -217,6 +226,7 @@ class TemplateTranslation(models.Model):
                 namespace=namespace,
                 body=body_value,
                 footer=footer_value,
+                parameter_names=list(parameter_names or []),
             )
 
         else:
@@ -266,6 +276,18 @@ class TemplateTranslation(models.Model):
                 template.category = category
                 template.modified_on = timezone.now()
                 template.save(update_fields=["category", "modified_on"])
+
+        if parameter_names is not None:
+            names = list(parameter_names)
+            if existing.parameter_names != names:
+                existing.parameter_names = names
+                existing.save(update_fields=["parameter_names"])
+
+        template = existing.template
+        if parameter_format is not None and template.parameter_format != parameter_format:
+            template.parameter_format = parameter_format
+            template.modified_on = timezone.now()
+            template.save(update_fields=["parameter_format", "modified_on"])
 
         return existing
 
