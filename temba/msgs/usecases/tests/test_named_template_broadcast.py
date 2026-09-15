@@ -10,6 +10,7 @@ from temba.msgs.usecases.named_template_broadcast import (
     NamedTemplateBroadcastError,
     assert_named_template_ready,
     declared_parameter_names,
+    prepare_named_broadcast,
     resolve_named_recipients,
 )
 from temba.templates.models import Template, TemplateTranslation
@@ -127,6 +128,18 @@ class NamedTemplateBroadcastTest(TembaTest):
         self.assertEqual("cota", result["rejected"][0]["parameter"])
         self.assertNotIn("whatsapp:5511888888888", result["recipient_variables"])
         self.assertEqual("045", result["recipient_variables"]["whatsapp:5511999999999"]["cota"])
+
+    def test_required_null_policy_still_requires_parameter(self):
+        template, _ = self._named_template()
+        template.parameter_policies = {"cota": {"required": None}}
+        template.save(update_fields=["parameter_policies"])
+        with self.assertRaises(NamedTemplateBroadcastError):
+            resolve_named_recipients(
+                self.org,
+                template,
+                [{"urn": "whatsapp:5511888888888", "variables": {"nome": "Ana"}}],
+                {},
+            )
 
     def test_rejects_when_every_recipient_is_held_back(self):
         template, _ = self._named_template()
@@ -282,6 +295,11 @@ class NamedTemplateBroadcastTest(TembaTest):
         with self.assertRaises(NamedTemplateBroadcastError):
             assert_named_template_ready(wwc_template, channel=None)
 
+    def test_prepare_named_broadcast_rejects_non_object_variables(self):
+        template, channel = self._named_template()
+        with self.assertRaises(NamedTemplateBroadcastError):
+            prepare_named_broadcast(self.org, template, channel, [], ["João"])
+
 
 class NamedTemplateGetOrCreateTest(TembaTest):
     def test_preserves_names_when_caller_omits_them(self):
@@ -340,6 +358,44 @@ class NamedTemplateGetOrCreateTest(TembaTest):
         )
         updated.refresh_from_db()
         self.assertEqual(["nome", "cota"], updated.parameter_names)
+
+    def test_updates_parameter_format_on_existing_translation(self):
+        channel = self.create_channel("WAC", "WA Cloud", "1234")
+        created = TemplateTranslation.get_or_create(
+            channel,
+            "fmt_tpl",
+            "por",
+            "BR",
+            "Olá {{nome}}",
+            1,
+            TemplateTranslation.STATUS_APPROVED,
+            "ext-fmt",
+            "",
+            "UTILITY",
+            body="Olá {{nome}}",
+            parameter_format="positional",
+            parameter_names=["nome"],
+        )
+        self.assertEqual("positional", created.template.parameter_format)
+
+        updated = TemplateTranslation.get_or_create(
+            channel,
+            "fmt_tpl",
+            "por",
+            "BR",
+            "Olá {{nome}}",
+            1,
+            TemplateTranslation.STATUS_APPROVED,
+            "ext-fmt",
+            "",
+            "UTILITY",
+            body="Olá {{nome}}",
+            parameter_format="named",
+            parameter_names=["nome"],
+        )
+        updated.template.refresh_from_db()
+        self.assertEqual("named", updated.template.parameter_format)
+        self.assertEqual(["nome"], updated.parameter_names)
 
 
 class NamedTemplateWriteSerializerTest(TembaTest):
@@ -453,6 +509,34 @@ class NamedTemplateWriteSerializerTest(TembaTest):
             }
         )
         self.assertFalse(ser.is_valid())
+
+        ser = self._serializer({**base, "recipients": [{"urn": "whatsapp:5511999999999", "variables": None}]})
+        self.assertTrue(ser.is_valid(), ser.errors)
+
+    def test_resolves_named_broadcast_for_urns_without_recipients(self):
+        template, channel = self._named_template()
+        ser = self._serializer(
+            {
+                "channel": str(channel.uuid),
+                "urns": ["whatsapp:5511777777777"],
+                "msg": {"template": {"uuid": str(template.uuid), "named_variables": {"nome": "João", "cota": "1"}}},
+            }
+        )
+        self.assertTrue(ser.is_valid(), ser.errors)
+        self.assertIn("recipient_variables", ser.validated_data["msg"]["template"])
+        self.assertEqual(["whatsapp:5511777777777"], ser.validated_data["resolved_urns"])
+
+    def test_rejects_unknown_template_name(self):
+        template, channel = self._named_template()
+        ser = self._serializer(
+            {
+                "channel": str(channel.uuid),
+                "urns": ["whatsapp:5511999999999"],
+                "msg": {"template": {"name": "missing-template-name-xyz"}},
+            }
+        )
+        self.assertFalse(ser.is_valid())
+        self.assertIn("not found", str(ser.errors))
 
     def test_rejects_unsupported_channel_and_unready_template(self):
         wwc = self.create_channel("WWC", "Chat", "chat-1")

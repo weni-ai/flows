@@ -35,8 +35,7 @@ from temba.msgs.usecases.managed_trigger_group import (
 )
 from temba.msgs.usecases.named_template_broadcast import (
     NamedTemplateBroadcastError,
-    assert_named_template_ready,
-    resolve_named_recipients,
+    prepare_named_broadcast,
 )
 from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
@@ -296,10 +295,13 @@ class WhatsappBroadcastReadSerializer(ReadSerializer):
 
 
 class WhatsappBroadcastWriteSerializer(WriteSerializer):
+    MAX_RECIPIENTS_PER_BROADCAST = 1000
+    MAX_VARIABLES_PER_RECIPIENT = 100
+
     # WhatsApp broadcasts allow larger recipient lists than the default API limit
     # to support bulk sends without forcing clients to paginate small batches.
-    urns = fields.URNListField(required=False, max_items=1000)
-    contacts = fields.ContactField(many=True, required=False, max_items=1000)
+    urns = fields.URNListField(required=False, max_items=MAX_RECIPIENTS_PER_BROADCAST)
+    contacts = fields.ContactField(many=True, required=False, max_items=MAX_RECIPIENTS_PER_BROADCAST)
     groups = fields.ContactGroupField(many=True, required=False)
     msg = serializers.DictField(required=True)
     channel = serializers.UUIDField(required=False)
@@ -307,7 +309,9 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     name = serializers.CharField(required=False)
     template_id = serializers.IntegerField(required=False)
     trigger_flow_uuid = serializers.UUIDField(required=False)
-    recipients = serializers.ListField(required=False, child=serializers.DictField(), max_length=1000)
+    recipients = serializers.ListField(
+        required=False, child=serializers.DictField(), max_length=MAX_RECIPIENTS_PER_BROADCAST
+    )
 
     def validate_msg(self, value):
         if not (
@@ -363,8 +367,10 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 variables = {}
             if not isinstance(variables, dict):
                 raise serializers.ValidationError("recipients[].variables must be an object")
-            if len(variables) > 100:
-                raise serializers.ValidationError("This field can only contain up to 100 items.")
+            if len(variables) > self.MAX_VARIABLES_PER_RECIPIENT:
+                raise serializers.ValidationError(
+                    f"This field can only contain up to {self.MAX_VARIABLES_PER_RECIPIENT} items."
+                )
             normalized.append({"urn": urn, "variables": {str(key): value for key, value in variables.items()}})
         return normalized
 
@@ -468,14 +474,12 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             if is_named_format(parameter_format):
                 channel = data.get("channel")
                 try:
-                    assert_named_template_ready(template, channel=channel if isinstance(channel, Channel) else None)
-                    if not isinstance(named_variables or {}, dict):
-                        raise NamedTemplateBroadcastError("named_variables must be an object")
-                    named_resolution = resolve_named_recipients(
+                    named_resolution = prepare_named_broadcast(
                         self.context.get("org"),
                         template,
+                        channel if isinstance(channel, Channel) else None,
                         data.get("recipients") or [],
-                        named_variables or {},
+                        named_variables,
                         extra_urns=extra_urns,
                     )
                 except NamedTemplateBroadcastError as exc:
