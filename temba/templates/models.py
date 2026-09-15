@@ -2,7 +2,7 @@ import uuid
 
 from django_countries.fields import CountryField
 
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 
@@ -277,17 +277,18 @@ class TemplateTranslation(models.Model):
                 template.modified_on = timezone.now()
                 template.save(update_fields=["category", "modified_on"])
 
-        if parameter_names is not None:
-            names = list(parameter_names)
-            if existing.parameter_names != names:
-                existing.parameter_names = names
-                existing.save(update_fields=["parameter_names"])
+        with transaction.atomic():
+            if parameter_names is not None:
+                names = list(parameter_names)
+                if existing.parameter_names != names:
+                    existing.parameter_names = names
+                    existing.save(update_fields=["parameter_names"])
 
-        template = existing.template
-        if parameter_format is not None and template.parameter_format != parameter_format:
-            template.parameter_format = parameter_format
-            template.modified_on = timezone.now()
-            template.save(update_fields=["parameter_format", "modified_on"])
+            template = existing.template
+            if parameter_format is not None and template.parameter_format != parameter_format:
+                template.parameter_format = parameter_format
+                template.modified_on = timezone.now()
+                template.save(update_fields=["parameter_format", "modified_on"])
 
         return existing
 

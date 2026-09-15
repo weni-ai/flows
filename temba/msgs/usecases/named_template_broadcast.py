@@ -14,7 +14,7 @@ class NamedTemplateBroadcastError(Exception):
 
 
 def declared_parameter_names(template):
-    translations = list(template.translations.filter(is_active=True))
+    translations = list(template.translations.filter(is_active=True).only("language", "parameter_names"))
     if not translations:
         return []
 
@@ -174,3 +174,16 @@ def resolve_named_recipients(org, template, recipients, batch_named_variables, e
         "accepted_count": len(accepted),
         "rejected_count": len(rejected),
     }
+
+
+def prepare_named_broadcast(org, template, channel, recipients, named_variables, extra_urns=None):
+    assert_named_template_ready(template, channel=channel)
+    if not isinstance(named_variables or {}, dict):
+        raise NamedTemplateBroadcastError("named_variables must be an object")
+    return resolve_named_recipients(
+        org,
+        template,
+        recipients,
+        named_variables or {},
+        extra_urns=extra_urns,
+    )
