@@ -1,3 +1,7 @@
+3.97.1
+----------
+* feat: Remove channel type validation in whatsapp broadcast API
+
 3.97.0
 ----------
 * feat: add WA Conversation Handovers app
