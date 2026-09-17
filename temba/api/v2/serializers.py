@@ -33,10 +33,7 @@ from temba.msgs.usecases.managed_trigger_group import (
     GroupQuotaExceeded,
     prepare_trigger_group_for_broadcast,
 )
-from temba.msgs.usecases.named_template_broadcast import (
-    NamedTemplateBroadcastError,
-    prepare_named_broadcast,
-)
+from temba.msgs.usecases.named_template_broadcast import NamedTemplateBroadcastError, prepare_named_broadcast
 from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.templates.parameter_format import is_named_format
