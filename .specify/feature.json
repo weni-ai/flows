@@ -1,1 +1,3 @@
-{"feature_directory":"specs/007-broadcast-trigger-group"}
+{
+  "feature_directory": "specs/008-named-template-variables"
+}
