@@ -32,7 +32,7 @@ Existing `temba.templates.models.TemplateTranslation`.
 
 | Field | Type | Rules |
 | --- | --- | --- |
-| `parameter_names` | `JSONField`, default `[]` | Ordered list of provider names for **display**. Order MUST NOT bind values. |
+| `parameter_names` | `JSONField`, default `[]` | Ordered list of provider names for **display**, in BODY placeholder order. Example-only names are ignored. Order MUST NOT bind values. |
 
 `variable_count` for named templates is `len(parameter_names)`; positional templates keep today's `{{N}}` max-index count.
 
