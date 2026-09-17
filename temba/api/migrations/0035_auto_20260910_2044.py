@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0034_delete_webhookresult'),
+        ("api", "0034_delete_webhookresult"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='resthook',
-            name='slug',
-            field=models.SlugField(help_text='A label for this event'),
+            model_name="resthook",
+            name="slug",
+            field=models.SlugField(help_text="A label for this event"),
         ),
         migrations.AlterField(
-            model_name='resthooksubscriber',
-            name='target_url',
-            field=models.URLField(help_text='URL called when the ruleset is triggered'),
+            model_name="resthooksubscriber",
+            name="target_url",
+            field=models.URLField(help_text="URL called when the ruleset is triggered"),
         ),
     ]

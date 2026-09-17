@@ -6,13 +6,15 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('apks', '0004_squashed'),
+        ("apks", "0004_squashed"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='apk',
-            name='apk_type',
-            field=models.CharField(choices=[('R', 'Relayer application APK'), ('M', 'Message Pack application APK')], max_length=1),
+            model_name="apk",
+            name="apk_type",
+            field=models.CharField(
+                choices=[("R", "Relayer application APK"), ("M", "Message Pack application APK")], max_length=1
+            ),
         ),
     ]

@@ -140,6 +140,7 @@ For staged Python files only, the repository also provides `pre-commit.sh`
 Do NOT commit auto-generated migration files unless the model change is
 intentional and part of the same change set.
 
+
 - Python code MUST follow existing project formatting and lint conventions.
 - New channel types MUST mirror the structure and test coverage of a
   comparable existing type in `temba/channels/types/`.
