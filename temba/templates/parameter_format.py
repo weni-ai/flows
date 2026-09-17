@@ -20,16 +20,34 @@ def is_named_format(value):
     return normalize_parameter_format(value) == PARAMETER_FORMAT_NAMED
 
 
+def _is_named_param(name):
+    return bool(name) and not name.isdigit() and bool(NAMED_PARAM_RE.match(name))
+
+
 def extract_parameter_names(text):
     names = []
     seen = set()
     for raw in PLACEHOLDER_RE.findall(text or ""):
         name = raw.strip()
-        if not name or name.isdigit() or not NAMED_PARAM_RE.match(name):
+        if not _is_named_param(name) or name in seen:
             continue
-        if name not in seen:
-            names.append(name)
-            seen.add(name)
+        names.append(name)
+        seen.add(name)
+    return names
+
+
+def _example_parameter_names(named_examples):
+    names = []
+    seen = set()
+    for item in named_examples or []:
+        raw = (item or {}).get("param_name")
+        if not isinstance(raw, str):
+            continue
+        name = raw.strip()
+        if not _is_named_param(name) or name in seen:
+            continue
+        names.append(name)
+        seen.add(name)
     return names
 
 
@@ -39,15 +57,11 @@ def extract_parameter_names_from_components(components):
     for component in components or []:
         if (component.get("type") or "").upper() != "BODY":
             continue
-        example = component.get("example") or {}
-        named_examples = example.get("body_text_named_params") or []
-        if named_examples:
-            for item in named_examples:
-                name = (item or {}).get("param_name")
-                if name and name not in seen:
-                    names.append(name)
-                    seen.add(name)
-        for name in extract_parameter_names(component.get("text")):
+        body_names = extract_parameter_names(component.get("text"))
+        example_names = _example_parameter_names((component.get("example") or {}).get("body_text_named_params"))
+        # Body placeholders are authoritative (order and membership). Examples fill in
+        # only when the body has no named placeholders, so we never record example-only names.
+        for name in body_names or example_names:
             if name not in seen:
                 names.append(name)
                 seen.add(name)
