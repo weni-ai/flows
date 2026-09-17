@@ -16,7 +16,7 @@ from ...views import ClaimViewMixin, UpdateTelChannelForm
 class ClaimView(ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
         claim_code = forms.CharField(max_length=12, help_text=_("The claim code from your Android phone"))
-        phone_number = forms.CharField(max_length=15, help_text=_("The phone number of the phone"))
+        phone_number = forms.CharField(max_length=15, help_text=_("The phone number of this device"))
 
         def __init__(self, *args, **kwargs):
             self.org = kwargs.pop("org")
@@ -30,7 +30,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             channel = Channel.objects.filter(claim_code=claim_code, is_active=True).first()
 
             if not channel:
-                raise forms.ValidationError(_("Invalid claim code, please check and try again."))
+                raise forms.ValidationError(_("Invalid claim code. Check and try again."))
             else:
                 self.cleaned_data["channel"] = channel
 
@@ -46,23 +46,21 @@ class ClaimView(ClaimViewMixin, SmartFormView):
                 try:
                     normalized = phonenumbers.parse(number, channel.country.code)
                     if not phonenumbers.is_possible_number(normalized):
-                        raise forms.ValidationError(_("Invalid phone number, try again."))
+                        raise forms.ValidationError(_("Invalid phone number. Try again."))
                 except Exception:  # pragma: no cover
-                    raise forms.ValidationError(_("Invalid phone number, try again."))
+                    raise forms.ValidationError(_("Invalid phone number. Try again."))
 
                 number = phonenumbers.format_number(normalized, phonenumbers.PhoneNumberFormat.E164)
 
                 # ensure no other active channel has this number
                 if self.org.channels.filter(address=number, is_active=True).exclude(pk=channel.pk).exists():
-                    raise forms.ValidationError(
-                        _("Another channel has this number. Please remove that channel first.")
-                    )
+                    raise forms.ValidationError(_("Another channel has this number. Remove that channel first."))
 
             return number
 
     fields = ("claim_code", "phone_number")
     form_class = Form
-    title = _("Connect Android Channel")
+    title = _("Connect Android channel")
     permission = "channels.channel_claim"
 
     def get_form_kwargs(self):

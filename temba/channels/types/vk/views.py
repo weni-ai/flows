@@ -10,10 +10,10 @@ from ...views import ClaimViewMixin
 class ClaimView(ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
         community_access_token = forms.CharField(
-            min_length=32, required=True, help_text=_("The Community Access Token")
+            min_length=32, required=True, help_text=_("The community access token")
         )
-        community_name = forms.CharField(required=True, help_text=_("The name of the Community"))
-        community_id = forms.IntegerField(required=True, help_text=_("The Community ID"))
+        community_name = forms.CharField(required=True, help_text=_("The name of the community"))
+        community_id = forms.IntegerField(required=True, help_text=_("The community ID"))
         callback_verification_string = forms.CharField(required=True, help_text=_("The callback verification string"))
 
     form_class = Form

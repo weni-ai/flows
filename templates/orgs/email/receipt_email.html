@@ -10,18 +10,18 @@
 Hi {{ customer }},
 <br/>
 <br/>
-This is a receipt for your {{ brand_name }} purchase for {{ credits }} credits.  This is only a receipt, no payment is due. If you have any questions, please contact us anytime at {{ brand_support }}.  You can view your top ups at any time by visiting your top up page.
+This is a receipt for your {{ brand_name }} purchase of {{ credits }} credits. No payment is due. If you have any questions, contact us at {{ brand_support }}. You can view your top-ups at any time by visiting your top-up page.
 <br/>
-Thanks again for your support!
+Thanks for your support!
 <br/>
 <br/>
 -----------------------------------------------------------------------------------------------
 {{ brand_name }} Receipt
 -----------------------------------------------------------------------------------------------
 <br/>
-Invoice Details
+Invoice details
 <br/>
-Id: {{ charge_id }}
+ID: {{ charge_id }}
 <br/>
 Date: {{ charge_date }}
 <br/>
@@ -34,11 +34,11 @@ Credits: {{ credits }}
 Amount: USD ${{ amount }}
 <br/>
 <br/>
-Charge Details
+Charge details
 <br/>
 Name: {{ cc_name }}
 <br/>
-Credit Card: {{ cc_type }} X{{ cc_last4 }}
+Credit card: {{ cc_type }} X{{ cc_last4 }}
 <br/>
 <br/>
 {% endblocktrans %}

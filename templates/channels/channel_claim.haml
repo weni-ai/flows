@@ -2,14 +2,13 @@
 -load i18n compress temba
 
 -block title
-  -trans "Add a Channel"
+  -trans "Add a channel"
 
 -block content
   -blocktrans trimmed with name=brand.name
-    To get started you need to add a channel to your workspace. A channel is a phone number or social network
-    account which {{ name }} can use to send and receive messages on your behalf. You can choose to use an
-    Android phone and your own cell phone plan, or we can connect you with a service provider in your country
-    directly.
+    To get started, add a channel to your workspace. A channel is a phone number or social network account which
+    {{ name }} can use to send and receive messages on your behalf. You can use an Android phone and your own cell
+    phone plan, or we can connect you directly with a service provider in your country.
 
   .channel-options.mt-8
     .title
@@ -38,17 +37,17 @@
           .text-base.absolute.text-gray-100.bg-icon.icon-channel-android
         .flex.flex-col.mx-20.relative
           .title
-            -trans "Android Phone"
+            -trans "Android phone"
 
           .mt-2
             -blocktrans trimmed
-              We recommend using an Android phone with a local sim card for your country. This phone
-              will send and receive messages for you. You will only need one phone per country depending on
-              message volume. Don't worry! The people you are texting with can still use basic phones.
+              We recommend using an Android phone with a local SIM card for your country. This phone can send and
+              receive messages. Depending on your message volume, you'll typically need only one phone per country.
+              Don't worry! Your recipients can still use basic phones.
 
     .bg-gray-200.-mx-128.px-128.py-12.mt-16(style="{% if use_weni_layout%}background-color: white{%endif%}")
       .title.mb-4
-        -trans "Social Network Channels"
+        -trans "Social network channels"
 
       -for ch_type in channel_types.SOCIAL_MEDIA
         -if ch_type.has_claim_view
@@ -63,7 +62,7 @@
                   {% include ch_type.get_claim_blurb %}
 
       .title.mb-4.mt-8
-        -trans "SMS and Voice Channels"
+        -trans "SMS and voice channels"
 
       -if recommended_channels
         .card.link(href="{% url 'channels.types.android.claim' %}" onclick="goto(event, this)")
@@ -71,7 +70,7 @@
             .text-base.absolute.text-gray-100.bg-icon.icon-channel-android
           .flex.flex-col.mx-20.relative
             .title
-              -trans "Android Phone"
+              -trans "Android phone"
 
             .mt-2
               -blocktrans trimmed
@@ -93,7 +92,7 @@
 
 
       .title.mt-8
-        -trans "API Channels"
+        -trans "API channels"
 
       -for ch_type in channel_types.API
         -if ch_type.has_claim_view
@@ -110,7 +109,7 @@
       -if only_regional_channels
 
         .title.mt-8
-          -trans "All Channels"
+          -trans "All channels"
 
         {% url 'channels.channel_claim_all' as claim_all_url %}
         -blocktrans trimmed

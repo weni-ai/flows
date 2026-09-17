@@ -10,7 +10,7 @@ from temba.classifiers.views import BaseConnectView
 class ConnectView(BaseConnectView):
     class Form(forms.Form):
         name = forms.CharField(help_text=_("The name of your bot"))
-        access_token = forms.CharField(help_text=_("Access token for your bot, leave out leading Bearer"))
+        access_token = forms.CharField(help_text=_("Access token for your bot. Leave out the leading Bearer."))
 
         def clean(self):
             cleaned = super().clean()
@@ -25,7 +25,7 @@ class ConnectView(BaseConnectView):
             )
 
             if response.status_code != 200:
-                raise forms.ValidationError(_("Unable to access bothub with credentials, please check and try again"))
+                raise forms.ValidationError(_("Couldn't access bothub with credentials. Check and try again."))
 
             return cleaned
 

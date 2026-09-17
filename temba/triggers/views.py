@@ -41,20 +41,20 @@ class BaseTriggerForm(forms.ModelForm):
 
     groups = TembaMultipleChoiceField(
         queryset=ContactGroup.user_groups.none(),
-        label=_("Groups To Include"),
-        help_text=_("Only includes contacts in these groups."),
+        label=_("Groups to include"),
+        help_text=_("Only includes contacts in these groups"),
         required=False,
         widget=SelectMultipleWidget(
-            attrs={"icons": True, "placeholder": _("Optional: Select contact groups"), "searchable": True}
+            attrs={"icons": True, "placeholder": _("Optional: select contact groups"), "searchable": True}
         ),
     )
     exclude_groups = TembaMultipleChoiceField(
         queryset=ContactGroup.user_groups.none(),
-        label=_("Groups To Exclude"),
-        help_text=_("Excludes contacts in these groups."),
+        label=_("Groups to exclude"),
+        help_text=_("Excludes contacts in these groups"),
         required=False,
         widget=SelectMultipleWidget(
-            attrs={"icons": True, "placeholder": _("Optional: Select contact groups"), "searchable": True}
+            attrs={"icons": True, "placeholder": _("Optional: select contact groups"), "searchable": True}
         ),
     )
 
@@ -96,7 +96,7 @@ class BaseTriggerForm(forms.ModelForm):
 
         if not self.trigger_type.is_valid_keyword(keyword):
             raise forms.ValidationError(
-                _("Must be a single word containing only letters and numbers, or a single emoji character.")
+                _("Must be a single word containing only letters and numbers, or a single emoji character")
             )
 
         return keyword.lower()
@@ -108,11 +108,11 @@ class BaseTriggerForm(forms.ModelForm):
         exclude_groups = cleaned_data.get("exclude_groups", [])
 
         if set(groups).intersection(exclude_groups):
-            raise forms.ValidationError(_("Can't include and exclude the same group."))
+            raise forms.ValidationError(_("Can't include and exclude the same group"))
 
         # only check for conflicts if user is submitting valid data for all fields
         if not self.errors and self.get_conflicts(cleaned_data):
-            raise forms.ValidationError(_("There already exists a trigger of this type with these options."))
+            raise forms.ValidationError(_("A trigger of this type with these options already exists"))
 
         return cleaned_data
 
@@ -142,7 +142,7 @@ class RegisterTriggerForm(BaseTriggerForm):
     keyword = forms.CharField(
         max_length=16,
         required=True,
-        label=_("Join Keyword"),
+        label=_("Join keyword"),
         help_text=_("The first word of the message"),
         widget=InputWidget(),
     )
@@ -150,7 +150,7 @@ class RegisterTriggerForm(BaseTriggerForm):
     action_join_group = AddNewGroupChoiceField(
         ContactGroup.user_groups.none(),
         required=True,
-        label=_("Group to Join"),
+        label=_("Group to join"),
         help_text=_("The group the contact will join when they send the above keyword"),
         widget=SelectWidget(),
     )
@@ -202,11 +202,11 @@ class TriggerCRUDL(SmartCRUDL):
     )
 
     class Create(FormaxMixin, OrgFilterMixin, OrgPermsMixin, SmartTemplateView):
-        title = _("Create Trigger")
+        title = _("Create trigger")
 
         def derive_formax_sections(self, formax, context):
             def add_section(name, url, icon):
-                formax.add_section(name, reverse(url), icon=icon, action="redirect", button=_("Create Trigger"))
+                formax.add_section(name, reverse(url), icon=icon, action="redirect", button=_("Create trigger"))
 
             org_schemes = self.org.get_schemes(Channel.ROLE_RECEIVE)
             add_section("trigger-keyword", "triggers.trigger_create_keyword", "icon-tree")
@@ -453,7 +453,7 @@ class TriggerCRUDL(SmartCRUDL):
         """
 
         bulk_actions = ("restore",)
-        title = _("Archived Triggers")
+        title = _("Archived triggers")
 
         def get_queryset(self, *args, **kwargs):
             return super().get_queryset(*args, **kwargs).filter(is_archived=True)

@@ -23,7 +23,7 @@
           API Token: {{ request.user.api_token }}
       -else
         %li.pull-right 
-          -trans "Log in to get your API Token"
+          -trans "Log in to get your API token"
 
   .flex.justify-between.items-center.pb-1.mb-4(style="position: relative;")
     %h1.page-title.leading-tight API Explorer
@@ -43,7 +43,7 @@
       .endpoint.bg-white.border-t.mt-6(class="endpoint-{{ endpoint.method|lower }}")
         -if endpoint.params
           .title.my-4
-            -trans "Query String Parameters"
+            -trans "Query string parameters"
           %table
             .tbody
               -for item in endpoint.params
@@ -56,7 +56,7 @@
                       (optional)
         -if endpoint.fields
           .title.my-4
-            -trans "Post Body Fields"
+            -trans "Post body fields"
           %table
             .tbody
               -for item in endpoint.fields
@@ -97,7 +97,7 @@
           -if endpoint.params
             .form-group.mt-4.items-center(class="md:flex")
               %label.control-label.self-start.pt-4.w-56.pr-6(class="md:text-right")
-                -trans "Query String"
+                -trans "Query string"
               .flex-grow
                 %textarea.textinput.p-2.rounded.request-query(id="request-query-{{ endpoint.slug }}" rows="1" )<
                   {{ endpoint.example.query }}
@@ -105,7 +105,7 @@
           -if endpoint.fields
             .form-group.mt-4.items-center(class="md:flex")
               %label.control-label.self-start.pt-4.w-56.pr-6(class="md:text-right")
-                -trans "Post Body"
+                -trans "Post body"
               .flex-grow
                 %textarea.textinput.p-2.rounded.request-body(id="request-body-{{ endpoint.slug }}" rows="5")<
                   {{ endpoint.example.body }}
@@ -113,7 +113,7 @@
         .request-buttons.flex.justify-between.items-center.mt-4.h-12
           .pull-left
             %a{ href: '{{ endpoint.url }}' }
-              -trans "View Full Documentation"
+              -trans "View full documentation"
 
           -if user.api_token
             .button-primary(onclick='javascript:onRequest("{{ endpoint.slug }}", "{{ endpoint.method }}", "{{ endpoint.url }}.json")') {{ endpoint.method|upper }}

@@ -150,7 +150,7 @@ class ClassifierCRUDLTest(TembaTest, CRUDLTestMixin):
             # request a sync
             response = self.client.post(reverse("classifiers.classifier_sync", args=[self.c1.id]), follow=True)
             self.assertEqual(200, response.status_code)
-            self.assertContains(response, "Your classifier has been synced.")
+            self.assertContains(response, "Your classifier has been synced")
 
             mock_sync.assert_called_once()
 
@@ -158,7 +158,7 @@ class ClassifierCRUDLTest(TembaTest, CRUDLTestMixin):
 
             response = self.client.post(reverse("classifiers.classifier_sync", args=[self.c1.id]), follow=True)
             self.assertEqual(200, response.status_code)
-            self.assertContains(response, "Unable to sync classifier. See the log for details.")
+            self.assertContains(response, "Couldn&#x27;t sync classifier. See the log for details.")
 
     def test_read(self):
         read_url = reverse("classifiers.classifier_read", args=[self.c1.uuid])
@@ -175,7 +175,7 @@ class ClassifierCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # fetch delete modal
         response = self.assertDeleteFetch(delete_url)
-        self.assertContains(response, "You are about to delete")
+        self.assertContains(response, "You're about to delete")
 
         response = self.assertDeleteSubmit(delete_url, object_deactivated=self.c2, success_status=200)
         self.assertEqual("/org/home/", response["Temba-Success"])

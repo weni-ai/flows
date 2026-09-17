@@ -3,25 +3,25 @@
 -load smartmin i18n
 
 -block login-title
-  -trans "Login Failure" 
+  -trans "Failed to log in" 
 
 -block login-content
   -blocktrans
-    Sorry, you cannot log in at this time because we received {{failed_login_limit}} incorrect login attempts.
+    You can't log in right now because we received {{failed_login_limit}} incorrect login attempts.
 
   -if lockout_timeout >= 0
     -blocktrans
-      Please wait {{lockout_timeout}} minutes before to try log in again.
+      Wait {{lockout_timeout}} minutes before trying to log in again.
 
   -if allow_email_recovery
-    -trans "Alternatively, you can fill out the form below to have your password reset via e-mail."
+    -trans "Alternatively, you can complete the form below to reset your password via email."
   -else
-    -trans "Please contact the website administrator to have your password reset."
+    -trans "Contact the website administrator to reset your password."
 
   -if allow_email_recovery
     %form.mt-8(method="post" action="{% url 'users.user_forget' %}")
       {% csrf_token %}
-      %temba-textinput(name="email" placeholder='{{_("Email Address")}}')
+      %temba-textinput(name="email" placeholder='{{_("Email address")}}')
       .mt-4
         %input.button-primary(type="submit" value='{{_("Reset")}}')
 

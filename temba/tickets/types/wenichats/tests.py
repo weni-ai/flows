@@ -98,7 +98,7 @@ class WeniChatsViewTest(WeniChatsMixin):
         self.assertFalse(form.is_valid())
 
         with self.assertRaisesMessage(
-            ValidationError, "A Weni Chats ticketer for this sector already exists in this workspace."
+            ValidationError, "A Weni Chats ticketing service for this sector already exists in this workspace"
         ):
             form.clean()
 
@@ -119,7 +119,7 @@ class WeniChatsViewTest(WeniChatsMixin):
         with self.assertRaises(ValidationError) as context:
             form.clean()
 
-        expected_message = "A Weni Chats ticketer for this sector already exists in another workspace."
+        expected_message = "A Weni Chats ticketing service for this sector already exists in another workspace"
         self.assertIn(expected_message, str(context.exception))
 
     @patch("requests.get")
@@ -134,7 +134,7 @@ class WeniChatsViewTest(WeniChatsMixin):
         with self.assertRaises(Exception) as context:
             self.client.post(self.connect_url, data=form_data)
 
-        expected_message = "This ticketer integration with Weni Chats couldn't be created, check if all fields is correct and try again."
+        expected_message = "This ticketing service integration with Weni Chats couldn't be created. Check that all fields are correct and try again."
         self.assertEqual(expected_message, str(context.exception))
 
     @patch("requests.get")
@@ -150,7 +150,5 @@ class WeniChatsViewTest(WeniChatsMixin):
         with self.assertRaises(Exception) as context:
             self.client.post(self.connect_url, data=form_data)
 
-        expected_message = (
-            "This ticketer integration with Weni Chats couldn't be created, the defined sector not exists."
-        )
+        expected_message = "This ticketing service integration with Weni Chats couldn't be created. The specified sector doesn't exist."
         self.assertEqual(expected_message, str(context.exception))

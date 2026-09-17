@@ -15,7 +15,7 @@ class ClaimView(AuthenticatedExternalClaimView):
             help_text=_("The country this phone number is used in"),
         )
         number = forms.CharField(
-            max_length=14, min_length=1, label=_("Number"), help_text=_("The short code you are connecting with.")
+            max_length=14, min_length=1, label=_("Number"), help_text=_("The short code you're connecting")
         )
         url = ExternalURLField(label=_("URL"), help_text=_("The URL provided to deliver messages"))
         username = forms.CharField(label=_("Username"), help_text=_("The username provided to use their API"))

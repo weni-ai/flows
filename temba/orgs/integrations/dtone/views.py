@@ -9,8 +9,8 @@ from .client import DTOneClient
 
 class AccountView(IntegrationFormaxView):
     class Form(IntegrationFormaxView.Form):
-        api_key = forms.CharField(label=_("API Key"), required=False)
-        api_secret = forms.CharField(label=_("API Secret"), required=False)
+        api_key = forms.CharField(label=_("API key"), required=False)
+        api_secret = forms.CharField(label=_("API secret"), required=False)
         disconnect = forms.CharField(widget=forms.HiddenInput, max_length=6, required=False)
 
         def clean(self):
@@ -25,7 +25,7 @@ class AccountView(IntegrationFormaxView):
                     client.get_balances()
                 except DTOneClient.Exception:
                     raise forms.ValidationError(
-                        _("Your DT One API key and secret seem invalid. Please check them again and retry.")
+                        _("Your DT One API key and secret seem invalid. Check them and try again.")
                     )
 
     form_class = Form

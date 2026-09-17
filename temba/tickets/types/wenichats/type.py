@@ -19,7 +19,9 @@ class WeniChatsType(TicketerType):
 
     connect_view = ConnectView
     # TODO: improve descriptiton
-    connect_blurb = _("%(link)s wheni chats ticketer.") % {"link": '<a href="https://chats.weni.ai/">Weni Chats</a>'}
+    connect_blurb = _("%(link)s Weni Chats ticketing service.") % {
+        "link": '<a href="https://chats.weni.ai/">Weni Chats</a>'
+    }
 
     def is_available_to(self, user):
         return True

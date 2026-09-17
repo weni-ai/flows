@@ -19,7 +19,7 @@ class AfricasTalkingType(ChannelType):
     name = "Africa's Talking"
     icon = "icon-channel-external"
 
-    claim_blurb = _("You can purchase a short code from %(link)s and connect it in a few simple steps.") % {
+    claim_blurb = _("You can purchase a short code from %(link)s and connect it in a few steps.") % {
         "link": """<a href="http://africastalking.com">Africa's Talking</a>"""
     }
     claim_view = ClaimView
@@ -29,8 +29,7 @@ class AfricasTalkingType(ChannelType):
     attachment_support = False
 
     configuration_blurb = _(
-        "To finish configuring your Africa's Talking connection you'll need to set the following callback URLs on the "
-        "Africa's Talking website under your account."
+        "To finish configuring your Africa's Talking connection, you'll need to set the following callback URLs on the Africa's Talking website under your account."
     )
 
     configuration_urls = (
@@ -38,16 +37,14 @@ class AfricasTalkingType(ChannelType):
             label=_("Callback URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.at' channel.uuid 'receive' %}",
             description=_(
-                "You can set the callback URL on your Africa's Talking account by visiting the SMS Dashboard page, "
-                "then clicking on Callback URL."
+                "You can set the callback URL on your Africa's Talking account by visiting the SMS Dashboard page, then clicking Callback URL."
             ),
         ),
         dict(
             label=_("Delivery URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.at' channel.uuid 'status' %}",
             description=_(
-                "You can set the delivery URL on your Africa's Talking account by visiting the SMS Dashboard page, "
-                "then clicking on Delivery Reports."
+                "You can set the delivery URL on your Africa's Talking account by visiting the SMS Dashboard page, then clicking Delivery Reports."
             ),
         ),
     )

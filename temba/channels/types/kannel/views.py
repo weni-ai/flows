@@ -28,28 +28,23 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             max_length=1024,
             label=_("Send URL"),
             help_text=_(
-                "The publicly accessible URL for your Kannel instance for sending. "
-                "ex: https://kannel.macklemore.co/cgi-bin/sendsms"
+                "The publicly accessible URL for your Kannel instance for sending. Example: https://kannel.macklemore.co/cgi-bin/sendsms"
             ),
         )
         username = forms.CharField(
             max_length=64,
             required=False,
-            help_text=_(
-                "The username to use to authenticate to Kannel, if left blank we " "will generate one for you"
-            ),
+            help_text=_("The username to use to authenticate to Kannel, if left blank one will be generated for you"),
         )
         password = forms.CharField(
             max_length=64,
             required=False,
-            help_text=_(
-                "The password to use to authenticate to Kannel, if left blank we " "will generate one for you"
-            ),
+            help_text=_("The password to use to authenticate to Kannel, if left blank one will be generated for you"),
         )
         encoding = forms.ChoiceField(
             choices=Channel.ENCODING_CHOICES,
             label=_("Encoding"),
-            help_text=_("What encoding to use for outgoing messages"),
+            help_text=_("The encoding to use for outgoing messages"),
         )
         verify_ssl = forms.BooleanField(
             initial=True,
@@ -60,7 +55,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
         use_national = forms.BooleanField(
             initial=False,
             required=False,
-            label=_("Use National Numbers"),
+            label=_("Use national numbers"),
             help_text=_("Use only the national number (no country code) when " "sending (not recommended)"),
         )
 

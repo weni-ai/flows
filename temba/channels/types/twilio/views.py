@@ -199,10 +199,7 @@ class ClaimView(BaseClaimNumberMixin, SmartFormView):
 
             else:  # pragma: no cover
                 raise Exception(
-                    _(
-                        "Short code not found on your Twilio Account. "
-                        "Please check you own the short code and Try again"
-                    )
+                    _("Short code not found on your Twilio account. Check you own the short code and try again.")
                 )
         else:
             twilio_phone = next(twilio_phones, None)
@@ -308,9 +305,9 @@ class SearchView(OrgPermsMixin, SmartFormView):
 
         if not numbers:
             if data["country"] in ["CA", "US"]:
-                msg = _("Sorry, no numbers found, please enter another area code and try again.")
+                msg = _("No numbers found. Enter another area code and try again.")
             else:
-                msg = _("Sorry, no numbers found, please enter another pattern and try again.")
+                msg = _("No numbers found. Enter another pattern and try again.")
             return JsonResponse({"error": str(msg)})
 
         return JsonResponse(numbers, safe=False)

@@ -71,7 +71,7 @@ class ZendeskTypeTest(TembaTest):
 
         # try with invalid subdomain
         response = self.client.post(connect_url, {"subdomain": "%x.&y"})
-        self.assertFormError(response, "form", "subdomain", ["Not a valid subdomain name."])
+        self.assertFormError(response, "form", "subdomain", ["Not a valid subdomain name"])
 
         # try with subdomain already taken by this org
         Ticketer.create(
@@ -79,13 +79,13 @@ class ZendeskTypeTest(TembaTest):
         )
         response = self.client.post(connect_url, {"subdomain": "chispa"})
         self.assertFormError(
-            response, "form", "subdomain", ["There is already a ticketing service configured for this subdomain."]
+            response, "form", "subdomain", ["A ticketing service configured for this subdomain already exists"]
         )
 
         # dedup must also catch the same subdomain typed with different casing or whitespace
         response = self.client.post(connect_url, {"subdomain": "  ChispA  "})
         self.assertFormError(
-            response, "form", "subdomain", ["There is already a ticketing service configured for this subdomain."]
+            response, "form", "subdomain", ["A ticketing service configured for this subdomain already exists"]
         )
 
         # submitting with valid subdomain redirects us to Zendesk
@@ -106,7 +106,7 @@ class ZendeskTypeTest(TembaTest):
             mock_get_oauth_token.side_effect = ClientError("boom")
 
             response = self.client.get(connect_url + "?code=please&state=temba")
-            self.assertContains(response, "Unable to request OAuth token.")
+            self.assertContains(response, "Couldn&#x27;t request OAuth token")
 
             # but if it succeeds...
             mock_get_oauth_token.side_effect = None
@@ -238,7 +238,7 @@ class ZendeskTypeTest(TembaTest):
                 "zendesk_access_token": "sesame",
             },
         )
-        self.assertFormError(response, "form", "secret", "Secret is incorrect.")
+        self.assertFormError(response, "form", "secret", "Secret is incorrect")
 
         # secret lookup must tolerate Zendesk POSTing the subdomain with a different casing
         # than what we have stored (we store everything lowercase, but Zendesk's POST is the
