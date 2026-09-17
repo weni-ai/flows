@@ -59,7 +59,7 @@ class ParameterFormatHelpersTest(TestCase):
     def test_extract_parameter_names_from_components(self):
         self.assertEqual([], extract_parameter_names_from_components(None))
         self.assertEqual(
-            ["nome", "cota", "extra"],
+            ["nome", "extra"],
             extract_parameter_names_from_components(
                 [
                     {"type": "HEADER", "text": "Hi {{ignored}}"},
@@ -79,8 +79,43 @@ class ParameterFormatHelpersTest(TestCase):
             ),
         )
         self.assertEqual(
+            ["nome", "total"],
+            extract_parameter_names_from_components(
+                [
+                    {
+                        "type": "BODY",
+                        "text": "Olá {{nome}} {{total}}",
+                        "example": {
+                            "body_text_named_params": [
+                                {"param_name": "quota"},
+                                {"param_name": "nome"},
+                            ]
+                        },
+                    }
+                ]
+            ),
+        )
+        self.assertEqual(
             ["data"],
             extract_parameter_names_from_components([{"type": "BODY", "text": "vence {{data}}"}]),
+        )
+        self.assertEqual(
+            ["nome", "cota"],
+            extract_parameter_names_from_components(
+                [
+                    {
+                        "type": "BODY",
+                        "text": "sem placeholders nomeados",
+                        "example": {
+                            "body_text_named_params": [
+                                {"param_name": "nome"},
+                                {"param_name": "2fa_code"},
+                                {"param_name": "cota"},
+                            ]
+                        },
+                    }
+                ]
+            ),
         )
 
     def test_has_placeholders(self):

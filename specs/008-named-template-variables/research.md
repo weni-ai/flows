@@ -14,9 +14,9 @@
 
 ## Decision: Parameter names come from the provider payload when format is named
 
-- **Decision**: When format is `named`, derive names from `example.body_text_named_params` first, then from named placeholders in the body text. Do not run the positional `{{N}}` max-index extractor on named templates.
-- **Rationale**: FR-016. Today's positional regex yields 0 for `{{nome}}`, which is the active defect.
-- **Alternatives considered**: Require Integrations to always send an explicit name list — still do that when present; Flows must not record zero names for a named body if the payload already contains them.
+- **Decision**: When format is `named`, derive names from named placeholders in the BODY text (body order). Use `example.body_text_named_params` only as fallback when the body has no named placeholders. Do not union the two sources. Do not run the positional `{{N}}` max-index extractor on named templates.
+- **Rationale**: FR-016. Body text is the set a send actually has to satisfy; Meta documents that example values can appear in any order. Unioning example-only names (e.g. `quota` in examples, `total` in the body) would mark a phantom parameter required at dispatch.
+- **Alternatives considered**: Examples-first then append body leftovers — rejected after Integrations review of PR #876. Require Integrations to always send an explicit name list — still do that when present; Flows must not record zero names for a named template if examples are the only source.
 
 ## Decision: `get_or_create` only writes format/names when the caller passes them
 
