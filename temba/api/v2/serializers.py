@@ -527,6 +527,11 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         contacts = self.validated_data.get("contacts") or []
         groups = self.validated_data.get("groups") or []
         msg = dict(self.validated_data.get("msg") or {})
+        print(
+            "[whatsapp broadcast save] ig_comment_id=%r ig_response_type=%r msg=%r"
+            % (msg.get("ig_comment_id"), msg.get("ig_response_type"), msg),
+            flush=True,
+        )
 
         resolved_urns = self.validated_data.get("resolved_urns")
         if resolved_urns is not None:
