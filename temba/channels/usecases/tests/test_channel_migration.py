@@ -1,11 +1,7 @@
 import uuid
 
 from temba.channels.usecases.channel_migration import MigrateChannelUseCase
-from temba.channels.usecases.exceptions import (
-    ChannelNotFoundError,
-    ChannelOrgMismatchError,
-    DestOrgNotFoundError,
-)
+from temba.channels.usecases.exceptions import ChannelNotFoundError, ChannelOrgMismatchError, DestOrgNotFoundError
 from temba.templates.models import Template, TemplateTranslation
 from temba.tests.base import TembaTest
 

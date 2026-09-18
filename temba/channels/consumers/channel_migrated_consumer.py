@@ -5,14 +5,9 @@ from sentry_sdk import capture_exception
 from weni.eda.django.consumers import EDAConsumer
 from weni.eda.messages import Message
 
-from temba.channels.clients.integrations import (
-    IntegrationsInternalClient,
-    STATUS_ERROR,
-    STATUS_SUCCESS,
-)
+from temba.channels.clients.integrations import STATUS_ERROR, STATUS_SUCCESS, IntegrationsInternalClient
 from temba.channels.usecases.channel_migration import MigrateChannelUseCase
 from temba.channels.usecases.exceptions import ChannelMigrationError
-
 
 logger = logging.getLogger(__name__)
 

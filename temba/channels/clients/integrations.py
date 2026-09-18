@@ -3,9 +3,9 @@ from typing import Optional, Union
 from uuid import UUID
 
 import requests
+from weni.internal.clients.base import BaseInternalClient
 
 from django.conf import settings
-from weni.internal.clients.base import BaseInternalClient
 
 logger = logging.getLogger(__name__)
 
