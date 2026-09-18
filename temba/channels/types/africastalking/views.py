@@ -32,7 +32,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             initial=False, required=False, help_text=_("Whether this short code is shared with others")
         )
         username = forms.CharField(max_length=32, help_text=_("Your username on Africa's Talking"))
-        api_key = forms.CharField(max_length=64, help_text=_("Your api key, should be 64 characters"))
+        api_key = forms.CharField(max_length=64, help_text=_("Your API key (should be 64 characters)"))
 
     form_class = Form
 

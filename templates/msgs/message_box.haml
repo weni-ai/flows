@@ -22,25 +22,25 @@
   #numeric-form.hide
     %form
       %label
-        -trans "Numeric Value:"
+        -trans "Numeric value:"
       %input#number{type:"text"}
     .error
 
   #pjax
     -block pjax
       -if org_perms.msgs.msg_update
-        %temba-dialog#delete-confirmation.hide(header='{{ _("Delete Selected Messages")|escapejs }}' primaryButtonName='{{ _("Delete")|escapejs }}' destructive='true')
+        %temba-dialog#delete-confirmation.hide(header='{{ _("Delete selected messages")|escapejs }}' primaryButtonName='{{ _("Delete")|escapejs }}' destructive='true')
           .p-6
-            -trans "Are you sure you want to delete the selected messages? This cannot be undone."
+            -trans "Are you sure you want to delete the selected messages? This action can't be undone."
 
       .lp-frame
         .left
           .flex.flex-col
             -if org_perms.msgs.broadcast_send
               .w-64.mr-5
-                %temba-modax#send-message-modal{ header:'{% trans "Send Message" %}', endpoint:"{% url 'msgs.broadcast_send' %}" }
+                %temba-modax#send-message-modal{ header:'{% trans "Send message" %}', endpoint:"{% url 'msgs.broadcast_send' %}" }
                   .button-primary.block(onclick="handleSendMessageClicked()")
-                    -trans "Send Message"
+                    -trans "Send message"
 
             .lp-nav.upper
               - for folder in folders
@@ -85,17 +85,17 @@
 
             .flex-grow
               -if org_perms.msgs.label_create
-                %temba-modax#create-label-modal{ header:'{% trans "Create Label" %}', endpoint:"{% url 'msgs.label_create' %}", "-temba-loaded": "handleCreateLabelModalLoaded", "-temba-submitted": "handleCreateLabelModalSubmitted"}
+                %temba-modax#create-label-modal{ header:'{% trans "Create label" %}', endpoint:"{% url 'msgs.label_create' %}", "-temba-loaded": "handleCreateLabelModalLoaded", "-temba-submitted": "handleCreateLabelModalSubmitted"}
                   .button-light.block.mt-3
-                    - trans "Create Label"
+                    - trans "Create label"
                   
               -if org_perms.msgs.label_create_folder
-                %temba-modax{ header:'{% trans "Create Folder" %}', endpoint:"{% url 'msgs.label_create_folder' %}"}
+                %temba-modax{ header:'{% trans "Create folder" %}', endpoint:"{% url 'msgs.label_create_folder' %}"}
                   .button-light.block.mt-3
-                    -trans "Create Folder"
+                    -trans "Create folder"
                 
               .mt-3.button-light.block.mt-3(onclick="goto(event)" href="{% url 'archives.archive_message' %}")
-                -trans "Message Archives"
+                -trans "Message archives"
 
         -if has_messages
           .right
@@ -107,7 +107,7 @@
                       - if 'unlabel' in actions
                         .button-action.object-btn-unlabel
                           .glyph.icon-box
-                          -trans "Remove Label"
+                          -trans "Remove label"
 
                       - if 'archive' in actions
                         .button-action(onclick='runActionOnObjectRows("archive")')
@@ -166,7 +166,7 @@
                                 %li.separator.-mx-4.border-b.my-3
                               %li
                                 .lbl-menu.add-label.linked{onclick:"handleAddLabelClicked()"}
-                                  -trans "New Label..."
+                                  -trans "New label..."
               .flex-grow.ml-2.items-center
                 -block title-text
                   .page-title.leading-tight
@@ -227,29 +227,29 @@
                       -if not paginator or paginator.num_pages <= 1                        
                         -if search
                           -blocktrans trimmed with results_count=paginator.count|intcomma count cc=paginator.count
-                            Found {{ results_count }} message in last 15 days matching <i>{{search}}</i>.
+                            Found {{ results_count }} message in the last 15 days matching <i>{{search}}</i>
                             -plural
-                              Found {{ results_count }} messages in last 15 days matching <i>{{search}}</i>.
+                              Found {{ results_count }} messages in the last 15 days matching <i>{{search}}</i>
                         -else
                           -if start_date
                             -blocktrans trimmed with results_count=paginator.count|intcomma count cc=paginator.count
-                              {{ results_count }} message since {{ start_date}}.
+                              {{ results_count }} message since {{ start_date}}
                               -plural
-                                {{ results_count }} messages since {{ start_date}}.
+                                {{ results_count }} messages since {{ start_date}}
 
                       - else
 
                         -if search
                           -blocktrans trimmed with results_count=paginator.count|intcomma start=page_obj.start_index|intcomma end=page_obj.end_index|intcomma count cc=paginator.count 
-                            Found {{ results_count }} message in last 15 days matching <i>{{search}}</i>.
+                            {{ start }} - {{ end }} of {{ results_count }} result for <i>{{search}}</i> since {{start_date}}
                             -plural
-                              {{ start }} - {{ end }} of {{ results_count }} results for <i>{{search}}</i> since {{start_date}}.
+                              {{ start }} - {{ end }} of {{ results_count }} results for <i>{{search}}</i> since {{start_date}}
                         -else
                           -if start_date
                             -blocktrans trimmed with results_count=paginator.count|intcomma start=page_obj.start_index|intcomma end=page_obj.end_index|intcomma count cc=paginator.count 
-                              {{ results_count }} message since {{ start_date}}.
+                              {{ start }} - {{ end }} of {{ results_count }} message since {{ start_date}}
                               -plural
-                                {{ start }} - {{ end }} of {{ results_count }} messages since {{ start_date}}.
+                                {{ start }} - {{ end }} of {{ results_count }} messages since {{ start_date}}
                                   
                     .flex-grow
                       -include "includes/pages.html"

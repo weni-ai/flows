@@ -13,9 +13,9 @@ from temba.utils.views import ComponentFormMixin
 
 class ConnectView(BaseConnectView):
     class Form(BaseConnectView.Form):
-        name = forms.CharField(label=_("Name"), help_text=_("Name for this ticketer"))
-        oauth_token = forms.CharField(label=_("OAuth Token"), help_text=_("OAuth Token"))
-        freshchat_domain = forms.CharField(label=_("Freshchat Domain"), help_text=_("Freshchat Domain"))
+        name = forms.CharField(label=_("Name"), help_text=_("Name for this ticketing service"))
+        oauth_token = forms.CharField(label=_("OAuth token"), help_text=_("OAuth token"))
+        freshchat_domain = forms.CharField(label=_("Freshchat domain"), help_text=_("Freshchat domain"))
 
         def clean(self):
             from .type import FreshchatType
@@ -27,11 +27,11 @@ class ConnectView(BaseConnectView):
 
             oauth_token = self.cleaned_data.get("oauth_token")
             if not oauth_token:
-                errors.append(_("OAuth Token is required"))
+                errors.append(_("OAuth token is required"))
 
             freshchat_domain = self.cleaned_data.get("freshchat_domain")
             if not freshchat_domain:
-                errors.append(_("Freshchat Domain is required"))
+                errors.append(_("Freshchat domain is required"))
 
             if errors:
                 raise forms.ValidationError(errors)
@@ -48,7 +48,7 @@ class ConnectView(BaseConnectView):
 
             if existing_same_org:
                 raise forms.ValidationError(
-                    _("A Freshchat ticketer for this domain already exists in this workspace.")
+                    _("A Freshchat ticketing service for this domain already exists in this workspace")
                 )
 
             # Check if ticketer exists in another workspace
@@ -64,7 +64,7 @@ class ConnectView(BaseConnectView):
 
             if existing_other_org:
                 raise forms.ValidationError(
-                    _("A Freshchat ticketer for this domain already exists in another workspace.")
+                    _("A Freshchat ticketing service for this domain already exists in another workspace")
                 )
 
             return self.cleaned_data

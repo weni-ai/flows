@@ -19,10 +19,10 @@ class ClaimView(AuthenticatedExternalClaimView):
             max_length=14,
             min_length=1,
             label=_("Number"),
-            help_text=_("The phone number or short code you are connecting with country code. " "ex: +250788123124"),
+            help_text=_("The phone number with the country code or short code. Example: +250788123124"),
         )
-        username = forms.CharField(label=_("Account Number"), help_text=_("Your Yo! account YBS account number"))
-        password = forms.CharField(label=_("Gateway Password"), help_text=_("Your Yo! SMS Gateway password"))
+        username = forms.CharField(label=_("Account number"), help_text=_("Your Yo! YBS account number"))
+        password = forms.CharField(label=_("Gateway password"), help_text=_("Your Yo! SMS gateway password"))
 
         def clean_number(self):
             number = self.data["number"]
@@ -40,7 +40,7 @@ class ClaimView(AuthenticatedExternalClaimView):
                 return phonenumbers.format_number(cleaned, phonenumbers.PhoneNumberFormat.E164)
             except Exception:  # pragma: needs cover
                 raise forms.ValidationError(
-                    _("Invalid phone number, please include the country code. ex: +250788123123")
+                    _("Invalid phone number. Include the country code. Example: +250788123123")
                 )
 
     form_class = YoClaimForm

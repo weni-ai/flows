@@ -40,7 +40,7 @@ class ApkTest(TembaTest):
         self.login(self.superuser)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Relayer Application APK")
+        self.assertContains(response, "Relayer application APK")
 
     def test_create(self):
         url = reverse("apks.apk_create")
@@ -74,4 +74,4 @@ class ApkTest(TembaTest):
         self.login(self.superuser)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Relayer Application APK")
+        self.assertContains(response, "Relayer application APK")

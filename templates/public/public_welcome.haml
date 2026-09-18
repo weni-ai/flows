@@ -13,12 +13,12 @@
 -block content
   -if 'success' in request.GET.keys
     .page-title
-      -trans "Your channel is now connected."
+      -trans "Your channel is now connected"
     -blocktrans with name=brand.name
       You can now start flows through {{name}}.
   -else
     .page-title
-      -trans "Getting Started"
+      -trans "Getting started"
     -blocktrans
       Here's a short introduction to help you get started.
 
@@ -32,20 +32,20 @@
             %a(href="{% url 'flows.flow_list' %}")
               -trans "Flows"
           -blocktrans
-            Using a simple drag-and-drop interface, anybody can design a custom SMS application
-            that is tailored to their needs. Design a flow in minutes and start getting responses
+            Using a simple drag-and-drop interface, anyone can design a custom SMS application
+            tailored to their needs. Design a flow in minutes and start getting responses
             instantly. Once people start interacting with your flow, use real-time analytics to
             see how things are going.
 
           -trans "To learn more about flows, visit the"
-            <a href="{% non_ssl_brand_url 'public.video_list'%}">{% trans "learning center" %}</a>.
+            <a href="{% non_ssl_brand_url 'public.video_list'%}">{% trans "Learning Center" %}</a>.
     
           .mt-6
-            %temba-modax.inline-block.mb-1(endpoint="{% url 'flows.flow_create'%}" header='{{_("Create Flow")|escapejs}}')
+            %temba-modax.inline-block.mb-1(endpoint="{% url 'flows.flow_create'%}" header='{{_("Create flow")|escapejs}}')
               .button-primary.lift.inline-block
-                -trans "Create Flow"
+                -trans "Create flow"
             .button-light.lift.inline-block.mx-1.mb-1(href="{% url 'flows.flow_list' %}" onclick="goto(event)")
-              -trans "Sample Flows"
+              -trans "Sample flows"
             .button-light.lift.inline-block.mb-1(href="{% non_ssl_brand_url 'public.video_list'%}" onclick="goto(event)")
               -trans "Tutorials"
 
@@ -58,7 +58,7 @@
         .-mt-8.mx-20
           .title
             %a(href="{% url 'channels.channel_claim' %}")
-              -trans "Get Connected"
+              -trans "Get connected"
           
           -blocktrans with name=brand.name
             No matter where you are in the world, it's easy to configure {{name}} to work on real phones without delay.
@@ -67,11 +67,11 @@
 
           .mt-2
             -blocktrans
-              You can also use our flow simulator if you don't want to setup a number right away.
+              You can also use our flow simulator if you don't want to set up a number right away.
 
           .mt-6
             .button-primary.lift.inline-block(href="{% url 'channels.channel_claim' %}" onclick="goto(event)")
-                -trans "Add Number"
+                -trans "Add number"
 
   .flex.mt-6
     .summary.card.p-12
@@ -81,7 +81,7 @@
           %a(href="{% url 'contacts.contact_list' %}")
             -trans "Contacts"
         -blocktrans with name=brand.name
-          Before you do anything else in {{name}}, it is helpful to have a list of contacts. This will make it easy to send a message or survey out
+          Before you do anything else in {{name}}, it's helpful to have a list of contacts. This makes it easy to send a message or survey
           to a wide distribution list.
 
           For example, you might have groups
@@ -89,23 +89,23 @@
           {{name}} by uploading an Excel file using our
           %a{href:'{{STATIC_URL}}/examples/contacts.xls'}
             template
-          as a guide. We'll create a group for you automatically for each file you upload. Don't worry, it's easy to add or
-          remove people from groups later if you need to tweak things.
+          as a guide. We'll automatically create a group for each file you upload. Don't worry, it's easy to add or
+          remove people from groups later.
 
         .mt-2
           -blocktrans
-            If you want anybody to be able to join a group using SMS, you can set a <i>join keyword</i>. Anybody who
-            texts with that keyword will automatically be registered into the group.
+            If you want anyone to be able to join a group using SMS, you can set a <i>join keyword</i>. Anyone who
+            texts with that keyword will automatically be added to the group.
 
         .mt-6
           .button-primary.lift.inline-block.mr-1.mb-1(href="{% url 'contacts.contactimport_create' %}" onclick="goto(event)")
-            -trans "Import Contacts"
-          %temba-modax.inline-block.mb-1(endpoint="{% url 'contacts.contact_create'%}" header='{{_("Create Contact")|escapejs}}')
+            -trans "Import contacts"
+          %temba-modax.inline-block.mb-1(endpoint="{% url 'contacts.contact_create'%}" header='{{_("Create contact")|escapejs}}')
             .button-light.lift.inline-block.mr-1{href:"{% url 'contacts.contact_list' %}#contact"}
-              -trans "Create Contact"
-          %temba-modax.inline-block.mb-1(endpoint="{% url 'contacts.contactgroup_create'%}" header='{{_("Create Group")|escapejs}}')
+              -trans "Create contact"
+          %temba-modax.inline-block.mb-1(endpoint="{% url 'contacts.contactgroup_create'%}" header='{{_("Create group")|escapejs}}')
             .button-light.lift.inline-block.mr-1.mb-1{href:"{% url 'contacts.contact_list' %}#group"}
-              -trans "Create Group"
+              -trans "Create group"
       
   .flex.mt-6
     .summary.card.p-12.overflow-hidden
@@ -115,19 +115,18 @@
           %a(href="{% url 'msgs.msg_inbox' %}")
             -trans "Messages"
         -blocktrans with name=brand.name
-          If you use e-mail, reading and writing messages in {{name}} should already be familiar to you. Just like e-mail, you have an Inbox and it's easy to label
-          messages so you can follow up with them later. {{name}} also allows you to schedule a message to be sent later or even as a reminder
-          on a regular schedule.
+          If you use email, reading and writing messages in {{name}} should already be familiar to you. Just like email, you have an Inbox and it's easy to label
+          messages so you can follow up with them later. {{name}} also allows you to schedule a message to be sent later or as a recurring reminder.
 
         .mt-2
           -blocktrans with name=brand.name
-            For example you might have {{name}} send a message every Friday reminding people in the <i>Field Staff</i> group to complete their weekly report.
+            For example, you might have {{name}} send a message every Friday reminding people in the <i>Field Staff</i> group to complete their weekly report.
             If anybody joins the <i>Field Staff</i> group later, they will automatically start receiving the weekly reminder.
 
         .mt-6
-          %temba-modax.inline-block.mb-1(endpoint="{% url 'msgs.broadcast_send'%}" header='{{_("Send Message")|escapejs}}')
+          %temba-modax.inline-block.mb-1(endpoint="{% url 'msgs.broadcast_send'%}" header='{{_("Send message")|escapejs}}')
             .button-primary.lift
-              -trans "Send Message"
+              -trans "Send message"
 
   .flex.mt-6
     .summary.card.p-12.overflow-hidden
@@ -142,7 +141,7 @@
         .mt-2
           -url 'api' as api_url
           -blocktrans with name=brand.name
-            {{name}} also offers a robust REST API to add SMS features to your own website. Have a look through the
+            {{name}} also offers a REST API to add SMS features to your own website. Browse the
             %a{href:'{{api_url}}'}
               API documentation
             to learn more. 
@@ -150,7 +149,7 @@
         .mt-6
           -block account-details
           .button-light.lift.inline-block(href="{% url 'api' %}" onclick="goto(event)")
-            -trans "API Documentation"
+            -trans "API documentation"
 
 
 -block extra-less

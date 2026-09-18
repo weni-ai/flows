@@ -125,8 +125,7 @@ class BaseFlowForm(forms.ModelForm):
         if wrong_format:
             raise forms.ValidationError(
                 _(
-                    '"%(keyword)s" must be a single word, less than %(limit)d characters, containing only letter '
-                    "and numbers"
+                    '"%(keyword)s" must be a single word, less than %(limit)d characters, containing only letters and numbers'
                 )
                 % dict(keyword=", ".join(wrong_format), limit=Trigger.KEYWORD_MAX_LEN)
             )
@@ -370,20 +369,16 @@ class FlowCRUDL(SmartCRUDL):
                 )
 
             except FlowValidationException as e:
-                error = _("Your flow failed validation. Please refresh your browser.")
+                error = _("Your flow failed validation. Refresh your browser.")
                 detail = str(e)
             except FlowVersionConflictException:
                 error = _(
-                    "Your flow has been upgraded to the latest version. "
-                    "In order to continue editing, please refresh your browser."
+                    "Your flow has been upgraded to the latest version. Refresh your browser to continue editing."
                 )
                 detail = None
             except FlowUserConflictException as e:
                 error = (
-                    _(
-                        "%s is currently editing this Flow. "
-                        "Your changes will not be saved until you refresh your browser."
-                    )
+                    _("%s is currently editing this flow. Your changes won't be saved until you refresh your browser.")
                     % e.other_user
                 )
                 detail = None
@@ -391,7 +386,7 @@ class FlowCRUDL(SmartCRUDL):
                 import traceback
 
                 traceback.print_stack(e)
-                error = _("Your flow could not be saved. Please refresh your browser.")
+                error = _("Couldn't save your flow. Refresh your browser.")
                 detail = None
 
             return JsonResponse({"status": "failure", "description": error, "detail": detail}, status=400)
@@ -401,7 +396,7 @@ class FlowCRUDL(SmartCRUDL):
             keyword_triggers = forms.CharField(
                 required=False,
                 label=_("Global keyword triggers"),
-                help_text=_("When a user sends any of these keywords they will begin this flow"),
+                help_text=_("When a user sends any of these keywords, they'll begin this flow"),
                 widget=SelectWidget(
                     attrs={
                         "widget_only": False,
@@ -415,7 +410,7 @@ class FlowCRUDL(SmartCRUDL):
             )
 
             flow_type = forms.ChoiceField(
-                label=_("Flow Type"),
+                label=_("Flow type"),
                 help_text=_("Choose the method for your flow"),
                 choices=Flow.TYPE_CHOICES,
                 widget=SelectWidget(attrs={"widget_only": False}),
@@ -449,7 +444,7 @@ class FlowCRUDL(SmartCRUDL):
         success_url = "uuid@flows.flow_editor"
         success_message = ""
         field_config = dict(
-            name=dict(label=_("Name"), help=_("Choose a name to describe this flow, e.g. Demographic Survey"))
+            name=dict(label=_("Name"), help=_("Choose a name to describe this flow. Example: Demographic Survey"))
         )
 
         def derive_exclude(self):
@@ -551,8 +546,8 @@ class FlowCRUDL(SmartCRUDL):
 
         class SurveyForm(BaseForm):
             contact_creation = forms.ChoiceField(
-                label=_("Create a contact "),
-                help_text=_("Whether surveyor logins should be used as the contact for each run"),
+                label=_("Create a contact"),
+                help_text=_("Specify if surveyor logins should be used as the contact for each run"),
                 choices=((Flow.CONTACT_PER_RUN, _("For each run")), (Flow.CONTACT_PER_LOGIN, _("For each login"))),
                 widget=SelectWidget(attrs={"widget_only": False}),
             )
@@ -587,7 +582,7 @@ class FlowCRUDL(SmartCRUDL):
             keyword_triggers = forms.CharField(
                 required=False,
                 label=_("Global keyword triggers"),
-                help_text=_("When a user sends any of these keywords they will begin this flow"),
+                help_text=_("When a user sends any of these keywords, they'll begin this flow"),
                 widget=SelectWidget(
                     attrs={
                         "widget_only": False,
@@ -635,7 +630,7 @@ class FlowCRUDL(SmartCRUDL):
             keyword_triggers = forms.CharField(
                 required=False,
                 label=_("Global keyword triggers"),
-                help_text=_("When a user sends any of these keywords they will begin this flow"),
+                help_text=_("When a user sends any of these keywords, they'll begin this flow"),
                 widget=SelectWidget(
                     attrs={
                         "widget_only": False,
@@ -841,7 +836,7 @@ class FlowCRUDL(SmartCRUDL):
                 if ignored:
                     flow_names = ", ".join([f.name for f in ignored])
                     raise forms.ValidationError(
-                        _("The following flows are still used by campaigns so could not be archived: %(flows)s"),
+                        _("The following flows are still used by campaigns and couldn't be archived: %(flows)s"),
                         params={"flows": flow_names},
                     )
 
@@ -967,7 +962,7 @@ class FlowCRUDL(SmartCRUDL):
                         title=_("Edit"),
                         style="button-primary",
                         href=f"{reverse('flows.flowlabel_update', args=[label.pk])}",
-                        modax=_("Edit Label"),
+                        modax=_("Edit label"),
                     )
                 )
 
@@ -975,9 +970,9 @@ class FlowCRUDL(SmartCRUDL):
                 links.append(
                     dict(
                         id="delete-label",
-                        title=_("Delete Label"),
+                        title=_("Delete label"),
                         href=f"{reverse('flows.flowlabel_delete', args=[label.pk])}",
-                        modax=_("Delete Label"),
+                        modax=_("Delete label"),
                     )
                 )
 
@@ -1123,10 +1118,10 @@ class FlowCRUDL(SmartCRUDL):
                 links.append(
                     dict(
                         id="start-flow",
-                        title=_("Trigger Flow"),
+                        title=_("Trigger flow"),
                         style="button-primary",
                         href=f"{reverse('flows.flow_broadcast', args=[self.object.pk])}",
-                        modax=_("Trigger Flow"),
+                        modax=_("Trigger flow"),
                     )
                 )
 
@@ -1151,7 +1146,7 @@ class FlowCRUDL(SmartCRUDL):
                         id="edit-flow",
                         title=_("Edit"),
                         href=f"{reverse('flows.flow_update', args=[self.object.pk])}",
-                        modax=_("Edit Flow"),
+                        modax=_("Edit flow"),
                     )
                 )
 
@@ -1164,27 +1159,27 @@ class FlowCRUDL(SmartCRUDL):
                         id="delete-flow",
                         title=_("Delete"),
                         href=f"{reverse('flows.flow_delete', args=[self.object.pk])}",
-                        modax=_("Delete Flow"),
+                        modax=_("Delete flow"),
                     )
                 )
 
             links.append(dict(divider=True)),
 
             if self.has_org_perm("orgs.org_export"):
-                links.append(dict(title=_("Export Definition"), href=f"{reverse('orgs.org_export')}?flow={flow.id}"))
+                links.append(dict(title=_("Export definition"), href=f"{reverse('orgs.org_export')}?flow={flow.id}"))
             if self.has_org_perm("flows.flow_export_translation"):
                 links.append(
                     dict(
                         id="export-translation",
-                        title=_("Export Translation"),
+                        title=_("Export translation"),
                         href=f"{reverse('flows.flow_export_translation', args=[self.object.pk])}",
-                        modax=_("Export Translation"),
+                        modax=_("Export translation"),
                     )
                 )
 
             if self.has_org_perm("flows.flow_import_translation"):
                 links.append(
-                    dict(title=_("Import Translation"), href=reverse("flows.flow_import_translation", args=[flow.id]))
+                    dict(title=_("Import translation"), href=reverse("flows.flow_import_translation", args=[flow.id]))
                 )
 
             user = self.get_user()
@@ -1211,7 +1206,7 @@ class FlowCRUDL(SmartCRUDL):
             def clean_language(self):
                 data = self.cleaned_data["language"]
                 if data and data not in self.user.get_org().flow_languages:
-                    raise ValidationError(_("Not a valid language."))
+                    raise ValidationError(_("Not a valid language"))
 
                 return data
 
@@ -1237,13 +1232,13 @@ class FlowCRUDL(SmartCRUDL):
             language = forms.ChoiceField(
                 required=False,
                 label=_("Language"),
-                help_text=_("Include translations in this language."),
+                help_text=_("Include translations in this language"),
                 choices=(("", "None"),),
                 widget=SelectWidget(),
             )
             include_args = forms.BooleanField(
                 required=False,
-                label=_("Include Arguments"),
+                label=_("Include arguments"),
                 initial=True,
                 help_text=_("Include arguments to tests on splits"),
                 widget=CheckboxWidget(),
@@ -1324,18 +1319,18 @@ class FlowCRUDL(SmartCRUDL):
                     try:
                         po_info = gettext.po_get_info(data.read().decode())
                     except Exception:
-                        raise ValidationError(_("File doesn't appear to be a valid PO file."))
+                        raise ValidationError(_("File doesn't appear to be a valid PO file"))
 
                     if po_info.language_code:
                         if po_info.language_code == self.flow.base_language:
                             raise ValidationError(
-                                _("Contains translations in %(lang)s which is the base language of this flow."),
+                                _("Contains translations in %(lang)s, which is the base language of this flow"),
                                 params={"lang": po_info.language_name},
                             )
 
                         if po_info.language_code not in self.flow.org.flow_languages:
                             raise ValidationError(
-                                _("Contains translations in %(lang)s which is not a supported translation language."),
+                                _("Contains translations in %(lang)s, which isn't a supported translation language"),
                                 params={"lang": po_info.language_name},
                             )
 
@@ -1344,7 +1339,7 @@ class FlowCRUDL(SmartCRUDL):
         class ConfirmForm(forms.Form):
             language = forms.ChoiceField(
                 label=_("Language"),
-                help_text=_("Replace flow translations in this language."),
+                help_text=_("Replace flow translations in this language"),
                 required=True,
                 widget=SelectWidget(),
             )
@@ -1358,7 +1353,7 @@ class FlowCRUDL(SmartCRUDL):
 
                 self.fields["language"].choices = languages.choices(codes=lang_codes)
 
-        title = _("Import Translation")
+        title = _("Import translation")
         submit_button_name = _("Import")
         success_url = "uuid@flows.flow_editor"
 
@@ -1424,7 +1419,7 @@ class FlowCRUDL(SmartCRUDL):
                 queryset=ContactGroup.user_groups.none(),
                 required=False,
                 label=_("Groups"),
-                widget=SelectMultipleWidget(attrs={"placeholder": _("Optional: Group memberships")}),
+                widget=SelectMultipleWidget(attrs={"placeholder": _("Optional: group memberships")}),
             )
 
             contact_fields = forms.ModelMultipleChoiceField(
@@ -1432,7 +1427,7 @@ class FlowCRUDL(SmartCRUDL):
                 required=False,
                 label=("Fields"),
                 widget=SelectMultipleWidget(
-                    attrs={"placeholder": _("Optional: Fields to include"), "searchable": True}
+                    attrs={"placeholder": _("Optional: fields to include"), "searchable": True}
                 ),
             )
 
@@ -1447,14 +1442,14 @@ class FlowCRUDL(SmartCRUDL):
 
             responded_only = forms.BooleanField(
                 required=False,
-                label=_("Responded Only"),
+                label=_("Responded only"),
                 initial=True,
-                help_text=_("Only export results for contacts which responded"),
+                help_text=_("Only export results for contacts who responded"),
                 widget=CheckboxWidget(),
             )
             include_msgs = forms.BooleanField(
                 required=False,
-                label=_("Include Messages"),
+                label=_("Include messages"),
                 help_text=_("Export all messages sent and received in this flow"),
                 widget=CheckboxWidget(),
             )
@@ -1531,8 +1526,8 @@ class FlowCRUDL(SmartCRUDL):
                 messages.info(
                     self.request,
                     _(
-                        "There is already an export in progress, started by %s. You must wait "
-                        "for that export to complete before starting another." % existing.created_by.username
+                        "An export is already in progress, started by %s. Wait for it to complete before starting another."
+                        % existing.created_by.username
                     ),
                 )
             else:
@@ -1560,7 +1555,7 @@ class FlowCRUDL(SmartCRUDL):
                 if not getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):  # pragma: needs cover
                     messages.info(
                         self.request,
-                        _("We are preparing your export. We will e-mail you at %s when it is ready.")
+                        _("Your export is in progress. We'll email you at %s when it's ready.")
                         % self.request.user.username,
                     )
 
@@ -1569,7 +1564,7 @@ class FlowCRUDL(SmartCRUDL):
                     dl_url = reverse("assets.download", kwargs=dict(type="results_export", pk=export.pk))
                     messages.info(
                         self.request,
-                        _("Export complete, you can find it here: %s (production users will get an email)") % dl_url,
+                        _("Export complete. You can find it here: %s (production users will get an email)") % dl_url,
                     )
 
             if "HTTP_X_PJAX" not in self.request.META:
@@ -1755,7 +1750,7 @@ class FlowCRUDL(SmartCRUDL):
                     dict(
                         id="download-results",
                         title=_("Download"),
-                        modax=_("Download Results"),
+                        modax=_("Download results"),
                         href=f"{reverse('flows.flow_export_results')}?ids={self.get_object().pk}",
                     )
                 )
@@ -1763,7 +1758,7 @@ class FlowCRUDL(SmartCRUDL):
             if self.has_org_perm("flows.flow_editor"):
                 links.append(
                     dict(
-                        title=_("Edit Flow"),
+                        title=_("Edit flow"),
                         style="button-primary",
                         href=reverse("flows.flow_editor", args=[self.get_object().uuid]),
                     )
@@ -1894,7 +1889,7 @@ class FlowCRUDL(SmartCRUDL):
                 required=False,
                 widget=OmniboxChoice(
                     attrs={
-                        "placeholder": _("Select contact and groups"),
+                        "placeholder": _("Select contacts and groups"),
                         "groups": True,
                         "contacts": True,
                         "widget_only": True,
@@ -1911,7 +1906,7 @@ class FlowCRUDL(SmartCRUDL):
                 label=_("Exclude contacts currently in a flow"),
                 required=False,
                 initial=False,
-                help_text=_("Any contacts currently in a flow will not be interrupted and not started in this flow."),
+                help_text=_("Any contacts currently in a flow won't be interrupted or started in this flow"),
                 widget=CheckboxWidget(),
             )
 
@@ -1919,9 +1914,7 @@ class FlowCRUDL(SmartCRUDL):
                 label=_("Exclude contacts previously in this flow"),
                 required=False,
                 initial=False,
-                help_text=_(
-                    "Any contacts who have gone through this flow in the last 90 days will not be started again."
-                ),
+                help_text=_("Any contacts who have gone through this flow in the last 90 days won't be started again"),
                 widget=CheckboxWidget(),
             )
 
@@ -1948,9 +1941,9 @@ class FlowCRUDL(SmartCRUDL):
                     query = cleaned_data.get("query")
 
                     if mode == self.MODE_SELECT and not omnibox:
-                        self.add_error("omnibox", _("This field is required."))
+                        self.add_error("omnibox", _("Required field"))
                     elif mode == self.MODE_QUERY and not query:
-                        self.add_error("query", _("This field is required."))
+                        self.add_error("query", _("Required field"))
 
                     max_group_sum_size = getattr(settings, "MANUAL_FLOW_BROADCAST_MAX_GROUP_SUM_SIZE", 0)
                     if max_group_sum_size:
@@ -1960,7 +1953,7 @@ class FlowCRUDL(SmartCRUDL):
                             self.add_error(
                                 "omnibox",
                                 _(
-                                    f"Selected groups have {group_totals_sum} contacts in total, which exceeds the maximum of {max_group_sum_size} contacts. Please select less or smaller groups and try again.",
+                                    f"The selected groups have {group_totals_sum} contacts in total, exceeding the maximum of {max_group_sum_size}. Select fewer or smaller groups and try again.",
                                 ),
                             )
 
@@ -1972,32 +1965,27 @@ class FlowCRUDL(SmartCRUDL):
 
         form_class = Form
         success_message = ""
-        submit_button_name = _("Trigger Flow")
+        submit_button_name = _("Trigger flow")
         success_url = "uuid@flows.flow_editor"
 
         blockers = {
             "already_starting": _(
-                "This flow is already being started - please wait until that process completes before starting "
-                "more contacts."
+                "This flow is already being started. Wait until that process completes before starting more contacts."
             ),
             "no_send_channel": _(
-                'To get started you need to <a href="%(link)s">add a channel</a> to your workspace which will allow '
-                "you to send messages to your contacts."
+                'To get started, <a href="%(link)s">add a channel</a> to your workspace to allow you to send messages to your contacts.'
             ),
             "no_call_channel": _(
-                'To get started you need to <a href="%(link)s">add a voice channel</a> to your workspace which will '
-                "allow you to make and receive calls."
+                'To get started, <a href="%(link)s">add a voice channel</a> to your workspace to allow you to make and receive calls.'
             ),
         }
 
         warnings = {
             "facebook_topic": _(
-                "This flow does not specify a Facebook topic. You may still start this flow but Facebook contacts who "
-                "have not sent an incoming message in the last 24 hours may not receive it."
+                "This flow doesn't specify a Facebook topic. You may still start this flow, but Facebook contacts who haven't sent an incoming message in the last 24 hours may not receive it."
             ),
             "no_templates": _(
-                "This flow does not use message templates. You may still start this flow but WhatsApp contacts who "
-                "have not sent an incoming message in the last 24 hours may not receive it."
+                "This flow doesn't use message templates. You may still start this flow, but WhatsApp contacts who haven't sent an incoming message in the last 24 hours may not receive it."
             ),
         }
 
@@ -2055,12 +2043,10 @@ class FlowCRUDL(SmartCRUDL):
                     template = flow.org.templates.filter(uuid=ref["uuid"]).first()
                     if not template:
                         warnings.append(
-                            _(f"The message template {ref['name']} does not exist on your account and cannot be sent.")
+                            _(f"The message template {ref['name']} doesn't exist on your account and can't be sent.")
                         )
                     elif not template.is_approved():
-                        warnings.append(
-                            _(f"Your message template {template.name} is not approved and cannot be sent.")
-                        )
+                        warnings.append(_(f"Your message template {template.name} isn't approved and can't be sent."))
             return warnings
 
         def save(self, *args, **kwargs):
@@ -2142,7 +2128,7 @@ class FlowLabelForm(forms.ModelForm):
         required=False,
         label=_("Parent"),
         widget=SelectWidget(attrs={"placeholder": _("Select label")}),
-        help_text=_("Optional parent label which can be used to group related labels."),
+        help_text=_("Optional parent label which can be used to group related labels"),
     )
     flows = forms.CharField(required=False, widget=forms.HiddenInput)
 
@@ -2247,7 +2233,7 @@ class FlowStartCRUDL(SmartCRUDL):
     actions = ("list",)
 
     class List(OrgFilterMixin, OrgPermsMixin, SmartListView):
-        title = _("Flow Start Log")
+        title = _("Flow start log")
         ordering = ("-created_on",)
         select_related = ("flow", "created_by")
         paginate_by = 25

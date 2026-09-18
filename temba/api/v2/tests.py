@@ -12,6 +12,7 @@ import iso8601
 import pytz
 from rest_framework import serializers
 from rest_framework.test import APIClient, APIRequestFactory
+from weni_commons.auth import SessionContext, SessionUser
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, Group, User
@@ -57,7 +58,7 @@ from temba.externals.models import ExternalService
 from temba.flows.models import Flow, FlowLabel, FlowRun, FlowStart
 from temba.globals.models import Global
 from temba.locations.models import AdminBoundary, BoundaryAlias
-from temba.msgs.models import Broadcast, Label, Msg
+from temba.msgs.models import Broadcast, Label, ManagedTriggerGroup, Msg
 from temba.orgs.models import Org
 from temba.templates.models import Template, TemplateTranslation
 from temba.tests import AnonymousOrg, TembaTest, matchers, mock_mailroom
@@ -354,7 +355,7 @@ class APITest(APIJSONMixin, TembaTest):
                 "tel:0788 123 123": "tel:+250788123123",  # using org country
                 "tel:(078) 812-3123": "tel:+250788123123",
                 "+250788123123": "whatsapp:250788123123",  # bare phone defaults to whatsapp
-                "0788 123 123": serializers.ValidationError,  # whatsapp paths are not tel-normalized
+                "0788 123 123": "whatsapp:250788123123",  # whatsapp phone paths are tel-normalized without +
                 "whatsapp:6831234": serializers.ValidationError,  # too few digits
                 "whatsapp:BR.35029025746744354": "whatsapp:BR.35029025746744354",
                 "whatsapp:US.ENT.11815799212886844830": "whatsapp:US.ENT.11815799212886844830",
@@ -421,7 +422,7 @@ class APITest(APIJSONMixin, TembaTest):
             serializers.ValidationError, field.to_internal_value, {"eng": "HelloHello1"}
         )  # base lang not provided
 
-    @override_settings(FLOW_START_PARAMS_SIZE=4)
+    @override_settings(FLOW_START_PARAMS_SIZE=4, FLOW_START_PARAM_VALUE_SIZE=640)
     def test_normalize_extra(self):
         self.assertEqual(OrderedDict(), normalize_extra({}))
         self.assertEqual(
@@ -437,6 +438,12 @@ class APITest(APIJSONMixin, TembaTest):
             normalize_extra({"a": 1, "b": 2, "c": 3, "d": 4, "e": 5}),
         )
         self.assertEqual(OrderedDict([("a", "x" * 640)]), normalize_extra({"a": "x" * 641}))
+
+    def test_normalize_extra_param_value_size_default(self):
+        size = settings.FLOW_START_PARAM_VALUE_SIZE
+        self.assertEqual(4096, size)
+        self.assertEqual(OrderedDict([("a", "x" * size)]), normalize_extra({"a": "x" * size}))
+        self.assertEqual(OrderedDict([("a", "x" * size)]), normalize_extra({"a": "x" * (size + 1)}))
 
     def test_authentication(self):
         def request(endpoint, **headers):
@@ -880,13 +887,109 @@ class APITest(APIJSONMixin, TembaTest):
         view = BaseAPIView()
         view.format_kwarg = None
         request = view.initialize_request(django_request)
-        request.user = SimpleNamespace(set_org=Mock(), is_anonymous=False)
+        request.user = SimpleNamespace(set_org=Mock(), is_anonymous=False, is_active=True)
+        request.auth = None
         view.request = request
 
         view.perform_authentication(request)
 
         self.assertEqual(request._org, self.org)
         request.user.set_org.assert_called_once_with(self.org)
+
+    def _make_session_auth_request(self, *, email, project_uuid=None, auth=True):
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = SessionUser(email=email)
+        if project_uuid is not None:
+            request.project_uuid = project_uuid
+        if auth:
+            request.auth = SessionContext(
+                project=project_uuid or "unused",
+                user=email,
+                expire_at="2026-12-31T00:00:00+00:00",
+            )
+        else:
+            request.auth = None
+        view.request = request
+        return view, request
+
+    def test_resolve_session_user_with_org_member(self):
+        """_resolve_session_user replaces SessionUser with the Django member and clears auth."""
+        view, request = self._make_session_auth_request(
+            email=self.admin.email,
+            project_uuid=str(self.org.proj_uuid),
+        )
+
+        view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user, self.admin)
+        self.assertEqual(request.user.get_org(), self.org)
+        self.assertTrue(request.user.using_token)
+
+    def test_resolve_session_user_unknown_email_becomes_anonymous(self):
+        """_resolve_session_user denies when the session email has no Django user."""
+        view, request = self._make_session_auth_request(
+            email="missing@example.com",
+            project_uuid=str(self.org.proj_uuid),
+        )
+
+        view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+        self.assertTrue(request.user.is_anonymous)
+
+    def test_resolve_session_user_non_member_becomes_anonymous(self):
+        """_resolve_session_user denies when the Django user is not in the org."""
+        view, request = self._make_session_auth_request(
+            email=self.admin2.email,
+            project_uuid=str(self.org.proj_uuid),
+        )
+
+        view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+        self.assertTrue(request.user.is_anonymous)
+
+    def test_resolve_session_user_without_project_uuid_becomes_anonymous(self):
+        """_resolve_session_user clears auth and anonymizes when project_uuid is missing."""
+        view, request = self._make_session_auth_request(email=self.admin.email, project_uuid=None)
+
+        view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+        self.assertTrue(request.user.is_anonymous)
+        self.assertFalse(hasattr(request, "_org"))
+
+    def test_resolve_session_user_invalid_project_raises(self):
+        """_resolve_session_user raises InvalidQueryError for an unknown project_uuid."""
+        view, request = self._make_session_auth_request(
+            email=self.admin.email,
+            project_uuid=str(uuid.uuid4()),
+        )
+
+        with self.assertRaises(InvalidQueryError):
+            view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+
+    def test_perform_authentication_routes_session_to_resolve_session_user(self):
+        """perform_authentication calls _resolve_session_user when auth is SessionContext."""
+        view, request = self._make_session_auth_request(
+            email=self.admin.email,
+            project_uuid=str(self.org.proj_uuid),
+        )
+
+        view.perform_authentication(request)
+
+        self.assertIsNone(request.auth)
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user, self.admin)
+        self.assertTrue(request.user.using_token)
 
     def test_permission_classes_allow_jwt_without_api_token(self):
         """HasValidJWT | APIPermission allows access with valid JWT even without API token."""
@@ -1647,7 +1750,10 @@ class APITest(APIJSONMixin, TembaTest):
             },
         )
 
-        self.assertResponseError(response, "non_field_errors", "Invalid channel type")
+        self.assertEqual(response.status_code, 201)
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+        self.assertEqual(self.channel, broadcast.channel)
+        self.assertEqual({"text": "Send a message"}, broadcast.metadata)
 
         # send a msg with a non existing channel
         response = self.postJSON(
@@ -1837,6 +1943,30 @@ class APITest(APIJSONMixin, TembaTest):
             url, None, {"groups": [str(uuid.uuid4()) for _ in range(101)], "msg": {"text": "Bulk"}}
         )
         self.assertResponseError(response, "groups", "This field can only contain up to 100 items.")
+
+    @patch("temba.mailroom.queue_broadcast")
+    @mock_mailroom
+    def test_whatsapp_broadcasts_trigger_flow_with_urns(self, mocks, mock_queue_broadcast):
+        url = reverse("api.v2.whatsapp_broadcasts")
+        self.assertEndpointAccess(url)
+
+        flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5511999999999"],
+                "trigger_flow_uuid": str(flow.uuid),
+                "msg": {"text": "Hello"},
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        self.assertEqual(data["groups"], [])
+        self.assertIn("trigger_group", data["metadata"])
+        association = ManagedTriggerGroup.objects.get(org=self.org, flow=flow)
+        self.assertEqual(str(association.group.uuid), data["metadata"]["trigger_group"]["uuid"])
+        self.assertEqual(association.group.contacts.count(), 1)
 
     def test_archives(self):
         url = reverse("api.v2.archives")
@@ -2134,7 +2264,7 @@ class APITest(APIJSONMixin, TembaTest):
                 {
                     "uuid": event3.uuid,
                     "campaign": {"uuid": campaign3.uuid, "name": "Alerts"},
-                    "relative_to": {"key": "created_on", "label": "Created On"},
+                    "relative_to": {"key": "created_on", "label": "Created on"},
                     "offset": 6,
                     "unit": "hours",
                     "delivery_hour": 12,
@@ -3209,17 +3339,17 @@ class APITest(APIJSONMixin, TembaTest):
 
         # reject names that exceed the configured maximum length
         response = self.postJSON(url, None, {"name": "x" * 101, "urns": ["tel:+250787000111"]})
-        self.assertResponseError(response, "name", "Contact name cannot exceed 100 characters.")
+        self.assertResponseError(response, "name", "Contact name can't exceed 100 characters")
 
         # reject empty/whitespace-only names when explicitly provided
         response = self.postJSON(url, None, {"name": "   ", "urns": ["tel:+250787000222"]})
-        self.assertResponseError(response, "name", "Contact name cannot be empty.")
+        self.assertResponseError(response, "name", "Contact name can't be empty")
 
         # reject tel: URN that passes phonenumbers (4-digit Niue national + 3-digit country code)
         # but has fewer than 8 digits, exercising validate_contact_phone in the URN field
         response = self.postJSON(url, None, {"name": "Niue Phone", "urns": ["tel:+6831234"]})
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Phone number must have at least 8 digits.", response.json()["urns"]["0"])
+        self.assertIn("Phone number must have at least 8 digits", response.json()["urns"]["0"])
 
     @mock_mailroom
     def test_contacts_lean(self, mr_mocks):
@@ -3983,7 +4113,7 @@ class APITest(APIJSONMixin, TembaTest):
 
         # create some globals
         global1 = Global.get_or_create(self.org, self.admin, "org_name", "Org Name", "Acme Ltd")
-        global2 = Global.get_or_create(self.org, self.admin, "access_token", "Access Token", "23464373")
+        global2 = Global.get_or_create(self.org, self.admin, "access_token", "Access token", "23464373")
 
         # on another org
         Global.get_or_create(self.org2, self.admin, "thingy", "Thingy", "xyz")
@@ -4000,7 +4130,7 @@ class APITest(APIJSONMixin, TembaTest):
             [
                 {
                     "key": "access_token",
-                    "name": "Access Token",
+                    "name": "Access token",
                     "value": "23464373",
                     "modified_on": format_datetime(global2.modified_on),
                 },
@@ -4040,7 +4170,7 @@ class APITest(APIJSONMixin, TembaTest):
             [
                 {
                     "key": "access_token",
-                    "name": "Access Token",
+                    "name": "Access token",
                     "value": "23464373",
                     "modified_on": format_datetime(global2.modified_on),
                 },

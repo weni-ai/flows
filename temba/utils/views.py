@@ -186,7 +186,7 @@ class BulkActionMixin:
                 action_error = ", ".join(e.messages)
             except Exception:
                 logger.exception(f"error applying '{action}' to {self.model.__name__} objects")
-                action_error = _("An error occurred while making your changes. Please try again.")
+                action_error = _("An error occurred while applying your changes. Try again.")
 
         response = self.get(request, *args, **kwargs)
         if action_error:

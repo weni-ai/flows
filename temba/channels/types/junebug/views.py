@@ -23,7 +23,7 @@ class ClaimView(AuthenticatedExternalClaimView):
         url = ExternalURLField(
             label=_("URL"),
             help_text=_(
-                "The URL for the Junebug channel. ex: https://junebug.praekelt.org/jb/channels/3853bb51-d38a-4bca-b332-8a57c00f2a48/messages.json"
+                "The URL for the Junebug channel. Example: https://junebug.praekelt.org/jb/channels/3853bb51-d38a-4bca-b332-8a57c00f2a48/messages.json"
             ),
         )
         username = forms.CharField(

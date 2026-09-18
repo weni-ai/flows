@@ -114,6 +114,7 @@ LANGUAGES = (
     ("fr", _("French")),
     ("mn", _("Mongolian")),
     ("pt-br", _("Portuguese")),
+    ("ro", _("Romanian")),
     ("ru", _("Russian")),
 )
 DEFAULT_LANGUAGE = "en-us"
@@ -344,6 +345,7 @@ INSTALLED_APPS = (
     "temba.event_driven",
     "weni.eda.django.eda_app",
     "temba.conversion_events",
+    "temba.wa_conversation_handovers",
 )
 
 # the last installed app that uses smartmin permissions
@@ -1417,6 +1419,9 @@ IP_ADDRESSES = ("172.16.10.10", "162.16.10.20")
 # -----------------------------------------------------------------------------------
 MSG_FIELD_SIZE = os.environ.get("MSG_FIELD_SIZE", 1500)  # used for broadcast text and message campaign events
 FLOW_START_PARAMS_SIZE = 256  # used for params passed to flow start API endpoint
+FLOW_START_PARAM_VALUE_SIZE = int(
+    os.environ.get("FLOW_START_PARAM_VALUE_SIZE", 4096)
+)  # max length of each string in flow start params
 GLOBAL_VALUE_SIZE = 10_000  # max length of global values
 
 ORG_LIMIT_DEFAULTS = {
@@ -1453,6 +1458,12 @@ RETENTION_PERIODS = {
 MAILROOM_URL = None
 MAILROOM_AUTH_TOKEN = None
 
+# Concurrent mailroom contact creates when arming trigger_flow_uuid on a WhatsApp broadcast.
+# Sequential fallback is used inside atomic blocks (Django TestCase) so tests share the transaction.
+WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY = int(
+    os.environ.get("WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY", default=20)
+)
+
 # To allow manage fields to support up to 1000 fields
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 4000
 
@@ -1486,17 +1497,26 @@ FLOWEDITOR_SENTRY_DSN = os.environ.get("FLOWEDITOR_SENTRY_DSN", default="")
 
 INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
 
-# Connect session tokens (weni_commons.auth.SessionTokenAuthentication) and API Gateway (weni_commons.kong.api_gateway_expose)
-WENI_SESSION_TOKEN_ORG_MODEL = "temba.orgs.models.Org"
-WENI_SESSION_TOKEN_ORG_FIELD = "proj_uuid"
-# Defaults match weni-commons (weni_commons.auth.constants); override per environment via env vars.
-WENI_SESSION_TOKEN_DYNAMODB_TABLE = os.environ.get("WENI_SESSION_TOKEN_DYNAMODB_TABLE", default="weni-session-tokens")
+# Connect session tokens (weni_commons.auth.SessionTokenAuthentication).
+# Override per environment via env vars — DynamoDB table/region differ between staging and production.
+WENI_SESSION_TOKEN_DYNAMODB_TABLE = os.environ.get(
+    "WENI_SESSION_TOKEN_DYNAMODB_TABLE", default="arn:aws:dynamodb:sa-east-1:739649339569:table/weni-session-tokens"
+)
 WENI_SESSION_TOKEN_DYNAMODB_REGION = os.environ.get("WENI_SESSION_TOKEN_DYNAMODB_REGION", default="sa-east-1")
 WENI_SESSION_TOKEN_MAX_REDIS_TTL = int(os.environ.get("WENI_SESSION_TOKEN_MAX_REDIS_TTL", default="3600"))
+WENI_SESSION_TOKEN_REDIS_ALIAS = os.environ.get("WENI_SESSION_TOKEN_REDIS_ALIAS", default="default")
+
+# Connect project authorization (weni_commons.auth.ConnectProjectAuthorization).
+# Without WENI_CONNECT_API_URL the permission class denies every request.
+WENI_CONNECT_API_URL = os.environ.get("WENI_CONNECT_API_URL", default="")
+WENI_CONNECT_AUTHORIZATION_TIMEOUT = int(os.environ.get("WENI_CONNECT_AUTHORIZATION_TIMEOUT", default="5"))
+
+# Kong API Gateway (weni_commons.kong) — used by kong_sync / kong_ensure_service.
+# Resolved from Django settings first, then env; no CLI flags needed when these are set.
 KONG_ADMIN_URL = os.environ.get("KONG_ADMIN_URL", default="http://kong-kong-admin.kong.svc:8001")
 KONG_URL_PREFIX = os.environ.get("KONG_URL_PREFIX", default="/flows")
 KONG_SERVICE = os.environ.get("KONG_SERVICE", default="flows-service")
-KONG_SERVICE_URL = os.environ.get("KONG_SERVICE_URL", default="https://flows.cloud.weni.ai")
+KONG_SERVICE_URL = os.environ.get("KONG_SERVICE_URL", default="https://flows.weni.ai")
 
 
 FLOW_PATH_RECENT_RUN_BATCH_SIZE = os.environ.get("FLOW_PATH_RECENT_RUN_BATCH_SIZE", default=50)

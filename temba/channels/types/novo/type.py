@@ -21,8 +21,7 @@ class NovoType(ChannelType):
     name = "Novo"
 
     claim_blurb = _(
-        "If you are based in Trinidad & Tobago, you can purchase a short code from %(link)s and connect it in a few "
-        "simple steps."
+        "If you're based in Trinidad & Tobago, you can purchase a short code from %(link)s and connect it in a few steps."
     ) % {"link": '<a href="http://www.novotechnologyinc.com/">Novo</a>'}
     claim_view = ClaimView
 
@@ -35,7 +34,7 @@ class NovoType(ChannelType):
         dict(
             label=_("Receive URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.nv' channel.uuid 'receive' %}",
-            description=_("To receive incoming messages, you need to set the receive URL for your Novo account."),
+            description=_("To receive incoming messages, you'll need to set the receive URL for your Novo account."),
         ),
     )
 

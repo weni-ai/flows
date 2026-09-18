@@ -14,7 +14,7 @@ class FacebookAppType(ChannelType):
     A Facebook channel
     """
 
-    extra_links = [dict(name=_("Reconnect Facebook Page"), link="channels.types.facebookapp.refresh_token")]
+    extra_links = [dict(name=_("Reconnect Facebook page"), link="channels.types.facebookapp.refresh_token")]
 
     code = "FBA"
     category = ChannelType.Category.SOCIAL_MEDIA
@@ -27,9 +27,7 @@ class FacebookAppType(ChannelType):
     show_config_page = False
 
     claim_blurb = _(
-        "Add a %(link)s bot to send and receive messages on behalf of one of your Facebook pages for free. You will "
-        "need to connect your page by logging into your Facebook and checking the Facebook page to connect. "
-        "On the Facebook page, navigate Settings > Page roles and verify you have an admin page role on the page."
+        "Add a %(link)s bot to send and receive messages on behalf of one of your Facebook pages for free. You'll need to connect your page by logging into Facebook and selecting the page to connect. On the Facebook page, navigate to Settings > Page roles and verify you have an admin role."
     ) % {"link": '<a href="http://facebook.com">Facebook</a>'}
     claim_view = ClaimView
 

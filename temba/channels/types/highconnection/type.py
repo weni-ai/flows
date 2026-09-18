@@ -20,7 +20,7 @@ class HighConnectionType(ChannelType):
     slug = "high_connection"
 
     claim_blurb = _(
-        "If you are based in France, you can purchase a number from %(link)s and connect it in a few simple steps."
+        "If you're based in France, you can purchase a number from %(link)s and connect it in a few steps."
     ) % {"link": '<a href="http://www.highconnexion.com/en/">High Connection</a>'}
     claim_view = AuthenticatedExternalCallbackClaimView
 
@@ -29,8 +29,7 @@ class HighConnectionType(ChannelType):
     attachment_support = False
 
     configuration_blurb = _(
-        "To finish configuring your connection you'll need to notify HighConnection of the following URL for incoming "
-        "(MO) messages."
+        "To finish configuring your connection, you'll need to notify HighConnection of the following URL for incoming (MO) messages."
     )
 
     configuration_urls = (

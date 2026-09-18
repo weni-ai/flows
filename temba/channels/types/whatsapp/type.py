@@ -33,7 +33,7 @@ class WhatsAppType(ChannelType):
     A WhatsApp Channel Type
     """
 
-    extra_links = [dict(name=_("Message Templates"), link="channels.types.whatsapp.templates")]
+    extra_links = [dict(name=_("Message templates"), link="channels.types.whatsapp.templates")]
 
     code = "WA"
     category = ChannelType.Category.SOCIAL_MEDIA
@@ -77,7 +77,7 @@ class WhatsAppType(ChannelType):
         )
 
         if resp.status_code != 200:
-            raise ValidationError(_("Unable to register callbacks: %s") % resp.content)
+            raise ValidationError(_("Couldn't register callbacks: %s") % resp.content)
 
         # update our quotas so we can send at 15/s
         payload = {
@@ -90,7 +90,7 @@ class WhatsAppType(ChannelType):
         )
 
         if resp.status_code != 200:
-            raise ValidationError(_("Unable to configure channel: %s") % resp.content)
+            raise ValidationError(_("Couldn't configure channel: %s") % resp.content)
 
         update_api_version(channel)
 

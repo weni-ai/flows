@@ -9,7 +9,7 @@
   -if object_list
     .mt-8.mb-4
       .title
-        -trans "Send History"
+        -trans "Send history"
     %table.list(style='{% if not org_perms.msgs.broadcast_send %}margin-top:10px{% endif %}')
       %tbody
         -for object in object_list

@@ -16,6 +16,7 @@ class CtwaReferralSource(models.Model):
         (SOURCE_TYPE_AD, "Ad"),
         (SOURCE_TYPE_POST, "Post"),
     )
+    LEGACY_SOURCE_ID = "legacy"
 
     org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="ctwa_referral_sources")
     source_id = models.CharField(max_length=64)

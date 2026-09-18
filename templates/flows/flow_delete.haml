@@ -7,10 +7,10 @@
   -with flows=object.dependent_flows.all
     -if flows
       -blocktrans count counter=flows|length
-        There is an active flow using this flow. It cannot be deleted until it is removed from the
+        There's an active flow using this flow. It can't be deleted until it's removed from the
       
       -plural
-        There are {{counter}} flows using this flow. It cannot be deleted until it is removed from the
+        There are {{counter}} active flows using this flow. It can't be deleted until it's removed from the
 
       -for flow in flows
         <a href="{%url 'flows.flow_editor' flow.uuid%}">{{flow.name}}</a>{{forloop|oxford}}
@@ -21,10 +21,10 @@
         flows.
     -else
       -blocktrans
-        You are about to delete
+        You're about to delete
         %span.font-normal
           {{object}}.
-        There is no way to undo this. Are you sure?
+        This action can't be undone. Are you sure you want to continue?
       
       .hidden
         %form(method="POST")

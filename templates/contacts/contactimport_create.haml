@@ -2,13 +2,13 @@
 -load smartmin i18n humanize sms
 
 -block title
-  -trans "Import Contacts"
+  -trans "Import contacts"
 
 
 -block content
   .flex.mb-4.flex-col(style="min-height:41px")  
     -blocktrans trimmed
-      You can import contacts from an Excel spreadsheet or comma separated values file.
+      You can import contacts from an Excel spreadsheet or a comma-separated values file.
 
     %table#example.list.my-6
       %tr
@@ -34,16 +34,16 @@
           Advisors
 
     .title
-      -trans "Supported Fields"
+      -trans "Supported fields"
 
-    -trans "Any columns that do not match the following table will be ignored."
+    -trans "Any columns that don't match the following table will be ignored."
 
     %table.list.my-6
       %tr
         %th.whitespace-nowrap
-          -trans "Column Header"
+          -trans "Column header"
         %th.whitespace-nowrap
-          -trans "Imported As"
+          -trans "Imported as"
         %th.whitespace-nowrap
           -trans "Details"
       %tr
@@ -59,7 +59,8 @@
           -trans "Contact language"
         %td
           -blocktrans trimmed
-            Only valid <a href="https://en.wikipedia.org/wiki/ISO_639-3" target="_new">ISO639-3</a> codes supported.
+            Only valid <a href="https://en.wikipedia.org/wiki/ISO_639-3" target="_new">ISO639-3</a> codes are
+            supported.
 
       -for scheme in urn_schemes
         %tr
@@ -70,7 +71,7 @@
           %td
             -if scheme.0 == 'tel' and org_country
               -blocktrans trimmed with country=org_country.name
-                Numbers without a country code will be treated as local numbers in {{ country }}.
+                Numbers without country codes are treated as local numbers in {{ country }}.
       %tr
         %td.whitespace-nowrap
           Field:<i>custom_field</i>
@@ -78,13 +79,12 @@
           <i>custom_field</i>
         %td
           -blocktrans trimmed
-            If fields don't exist you will have the option to create them or ignore them.
+            If fields don't exist, you'll have the option to create them or ignore them.
 
     %p
       -blocktrans trimmed with sample_url=STATIC_URL|add:"examples/sample_import.xlsx" code=explicit_clear max=max_records|intcomma
-        You can download <a href="{{ sample_url }}">this Excel template</a> as a sample. Imports files can contain a
-        maximum of {{ max }} records. Note that blank values will be ignored. If you want to explicitly clear values
-        use <tt>{{ code }}</tt>.
+        You can download <a href="{{ sample_url }}">this Excel template</a> as a sample. Import files can contain up
+        to {{ max }} records. Blank values will be ignored. To explicitly clear values, use <tt>{{ code }}</tt>.
 
     %form#import-form(method="post" enctype="multipart/form-data")
       -csrf_token
@@ -101,7 +101,7 @@
         #real-button.flex.mb-4
           %input(type="text" id="file-field")
           .button-light.ml-4(style="margin-top:-1px")
-            -trans "Choose File"
+            -trans "Choose file"
 
       .flex
         %input.button-primary(type="submit" value='{% trans "Preview" %}')
