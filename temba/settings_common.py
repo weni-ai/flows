@@ -114,6 +114,7 @@ LANGUAGES = (
     ("fr", _("French")),
     ("mn", _("Mongolian")),
     ("pt-br", _("Portuguese")),
+    ("ro", _("Romanian")),
     ("ru", _("Russian")),
 )
 DEFAULT_LANGUAGE = "en-us"
@@ -344,6 +345,7 @@ INSTALLED_APPS = (
     "temba.event_driven",
     "weni.eda.django.eda_app",
     "temba.conversion_events",
+    "temba.wa_conversation_handovers",
 )
 
 # the last installed app that uses smartmin permissions
@@ -1417,6 +1419,9 @@ IP_ADDRESSES = ("172.16.10.10", "162.16.10.20")
 # -----------------------------------------------------------------------------------
 MSG_FIELD_SIZE = os.environ.get("MSG_FIELD_SIZE", 1500)  # used for broadcast text and message campaign events
 FLOW_START_PARAMS_SIZE = 256  # used for params passed to flow start API endpoint
+FLOW_START_PARAM_VALUE_SIZE = int(
+    os.environ.get("FLOW_START_PARAM_VALUE_SIZE", 4096)
+)  # max length of each string in flow start params
 GLOBAL_VALUE_SIZE = 10_000  # max length of global values
 
 ORG_LIMIT_DEFAULTS = {
@@ -1452,6 +1457,12 @@ RETENTION_PERIODS = {
 # -----------------------------------------------------------------------------------
 MAILROOM_URL = None
 MAILROOM_AUTH_TOKEN = None
+
+# Concurrent mailroom contact creates when arming trigger_flow_uuid on a WhatsApp broadcast.
+# Sequential fallback is used inside atomic blocks (Django TestCase) so tests share the transaction.
+WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY = int(
+    os.environ.get("WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY", default=20)
+)
 
 # To allow manage fields to support up to 1000 fields
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 4000

@@ -20,12 +20,10 @@ class ClaimView(AuthenticatedExternalClaimView):
             max_length=18,
             min_length=1,
             label=_("Number"),
-            help_text=_(
-                "The phone number with country code or short code you are connecting. ex: +250788123124 or 15543"
-            ),
+            help_text=_("The phone number with the country code or short code. Example: +250788123124 or 15543"),
         )
         api_key = forms.CharField(
-            label=_("API Key"), help_text=_("The API key for your integration as provided by Clickatell")
+            label=_("API key"), help_text=_("The API key for your integration as provided by Clickatell")
         )
 
         def clean_number(self):
@@ -37,7 +35,7 @@ class ClaimView(AuthenticatedExternalClaimView):
                     return phonenumbers.format_number(cleaned, phonenumbers.PhoneNumberFormat.E164)
                 except Exception:  # pragma: needs cover
                     raise forms.ValidationError(
-                        _("Invalid phone number, please include the country code. ex: +250788123123")
+                        _("Invalid phone number. Include the country code. Example: +250788123123")
                     )
             else:  # pragma: needs cover
                 return number

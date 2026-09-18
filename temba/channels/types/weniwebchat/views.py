@@ -12,7 +12,7 @@ from ...views import ClaimViewMixin
 class ClaimView(ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
         name = forms.CharField(
-            label=_("Name"), max_length=64, help_text=_("This field will serve as name for your channel")
+            label=_("Name"), max_length=64, help_text=_("This field will serve as the name of your channel")
         )
         base_url = ExternalURLField(label=_("Base URL"), help_text=_("URL where socket communication will take place"))
 

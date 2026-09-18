@@ -79,7 +79,7 @@
         %td
           .whitespace-nowrap.pr-24.contact-field
             .contact-field-value.uppercase.tracking-wider.font-normal.text-xs
-              -trans "Created On"
+              -trans "Created on"
         %td.w-full
           .contact-field-value
             {% format_datetime contact.created_on %}
@@ -87,7 +87,7 @@
         %td
           .whitespace-nowrap.pr-24.contact-field
             .contact-field-value.uppercase.tracking-wider.font-normal.text-xs
-              -trans "Last Seen On"
+              -trans "Last seen on"
         %td.w-full
           .contact-field-value
             -if contact.last_seen_on
@@ -103,7 +103,7 @@
                 -trans "Language"
           %td.w-full
             .contact-field-value.hover-linked
-              -trans 'Edit Contact' as title
+              -trans 'Edit contact' as title
               %temba-modax(header="{{title|escapejs}}" endpoint="{% url 'contacts.contact_update' contact.pk %}")
                 {{contact_language}}
 
@@ -112,7 +112,7 @@
           %td
             .whitespace-nowrap.pr-12.contact-field
               .contact-field-value.uppercase.tracking-wider.font-normal.text-xs
-                -trans "Contact Id"
+                -trans "Contact ID"
           %td.w-full
             .contact-field
               .contact-field-value
@@ -162,9 +162,9 @@
           %td
             .whitespace-nowrap.pr-24.contact-field
               .contact-field-value.uppercase.tracking-wider.font-normal.text-xs
-                -trans "Source Headline"
+                -trans "Source headline"
           %td.w-full
-            .contact-field-value
+            .break-all.contact-field-value
               {{ latest_ctwa_event.referral_source.headline|default:"--" }}
         %tr
           %td
@@ -172,7 +172,7 @@
               .contact-field-value.uppercase.tracking-wider.font-normal.text-xs
                 -trans "Source ID"
           %td.w-full
-            .contact-field-value
+            .break-all.contact-field-value
               {{ latest_ctwa_event.referral_source.source_id }}
         %tr
           %td
@@ -180,7 +180,7 @@
               .contact-field-value.uppercase.tracking-wider.font-normal.text-xs
                 -trans "Source URL"
           %td.w-full
-            .contact-field-value
+            .break-all.contact-field-value
               -if latest_ctwa_event.referral_source.source_url
                 %a.linked{href:"{{ latest_ctwa_event.referral_source.source_url }}", target:"_blank", rel:"noopener noreferrer"}
                   {{ latest_ctwa_event.referral_source.source_url }}
@@ -192,7 +192,7 @@
               .contact-field-value.uppercase.tracking-wider.font-normal.text-xs
                 -trans "CTWA CLID"
           %td.w-full
-            .contact-field-value
+            .break-all.contact-field-value
               {{ latest_ctwa_event.ctwa_clid|default:"--" }}
         %tr
           %td
@@ -200,14 +200,14 @@
               .contact-field-value.uppercase.tracking-wider.font-normal.text-xs
                 -trans "Timestamp"
           %td.w-full
-            .contact-field-value
+            .break-all.contact-field-value
               {% format_datetime latest_ctwa_event.timestamp %}
 
   -if open_tickets
     %table.list.tickets.mt-6
       %thead
         %th(colspan="5")
-          -trans "Open Tickets"
+          -trans "Open tickets"
 
       -for ticket in open_tickets
         %tr.item

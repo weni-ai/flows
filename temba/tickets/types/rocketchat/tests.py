@@ -167,15 +167,15 @@ class RocketChatViewTest(RocketChatMixin):
 
         choices = (c for c in self.secret)
         response = self.client.post(self.connect_url, {**base, "base_url": self.secure_url})
-        self.assertFormError(response, "form", None, "Invalid secret code.")  # Hidden field
+        self.assertFormError(response, "form", None, "Invalid secret code")  # Hidden field
 
         choices = (c for c in self.secret)
         response = self.client.post(self.connect_url, {**base, "secret": "", "base_url": self.secure_url})
-        self.assertFormError(response, "form", None, "Invalid secret code.")  # Hidden field
+        self.assertFormError(response, "form", None, "Invalid secret code")  # Hidden field
 
         choices = (c for c in self.secret)
         response = self.client.post(self.connect_url, {**base, "secret": self.secret2, "base_url": self.secure_url})
-        self.assertFormError(response, "form", None, "Secret code change detected.")  # Hidden field
+        self.assertFormError(response, "form", None, "Secret code change detected")  # Hidden field
 
         choices = (c for c in self.secret)
         response = self.client.post(self.connect_url, {**base, "secret": self.secret})
@@ -213,7 +213,7 @@ class RocketChatViewTest(RocketChatMixin):
         self.new_ticketer({RocketChatType.CONFIG_BASE_URL: data["base_url"]})
         response = self.client.post(self.connect_url, data=data)
         self.assertFormError(
-            response, "form", "base_url", "There is already a ticketing service configured for this URL."
+            response, "form", "base_url", "A ticketing service configured for this URL already exists"
         )
 
     @patch("socket.gethostbyname")
@@ -222,7 +222,7 @@ class RocketChatViewTest(RocketChatMixin):
     def test_settings_exception(self, mock_request, mock_choices, mock_socket):
         mock_socket.return_value = "192.55.123.1"  # Fake IP
         self.check_exceptions(
-            mock_choices, mock_request, "Connection to RocketChat is taking too long.", "Configuration has failed"
+            mock_choices, mock_request, "Connection to Rocket.Chat is taking too long.", "Configuration has failed"
         )
 
 

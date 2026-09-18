@@ -67,4 +67,4 @@ class KaleyraViewTest(TembaTest):
         post_data["number"] = "1234"  # invalid
         response = self.submit_form(post_data)
         self.assertEqual(200, response.status_code)
-        self.assertFormError(response, "form", "number", ["Please enter a valid phone number"])
+        self.assertFormError(response, "form", "number", ["Enter a valid phone number"])

@@ -66,7 +66,5 @@ class TwilioflexViewTest(TwilioflexMixin):
             with self.assertRaises(ValidationError) as cm:
                 form.clean()
 
-            expected_error_message = (
-                "Unable to connect with twilio chat service, please check input fields and try again."
-            )
+            expected_error_message = "Couldn't connect to the Twilio chat service. Check the fields and try again."
             self.assertIn(expected_error_message, str(cm.exception))

@@ -24,7 +24,7 @@ class CampaignForm(forms.ModelForm):
         empty_label=None,
         widget=SelectWidget(attrs={"placeholder": _("Select group"), "searchable": True}),
         label=_("Group"),
-        help_text=_("Only contacts in this group will be included in this campaign's events."),
+        help_text=_("Only contacts in this group will be included in the campaign events."),
     )
 
     def __init__(self, user, *args, **kwargs):
@@ -109,9 +109,9 @@ class CampaignCRUDL(SmartCRUDL):
                     links.append(
                         dict(
                             id="event-add",
-                            title=_("Add Event"),
+                            title=_("Add event"),
                             href=f"{reverse('campaigns.campaignevent_create')}?campaign={self.object.pk}",
-                            modax=_("Add Event"),
+                            modax=_("Add event"),
                         )
                     )
                 if self.has_org_perm("orgs.org_export"):
@@ -125,7 +125,7 @@ class CampaignCRUDL(SmartCRUDL):
                             id="campaign-update",
                             title=_("Edit"),
                             href=reverse("campaigns.campaign_update", args=[self.object.pk]),
-                            modax=_("Update Campaign"),
+                            modax=_("Update campaign"),
                         )
                     )
 
@@ -294,8 +294,8 @@ class CampaignEventForm(forms.ModelForm):
     message_start_mode = forms.ChoiceField(
         choices=(
             (CampaignEvent.MODE_INTERRUPT, _("Stop it and send the message")),
-            (CampaignEvent.MODE_SKIP, _("Skip this message")),
-            (CampaignEvent.MODE_PASSIVE, _("Send the message")),
+            (CampaignEvent.MODE_SKIP, _("Skip message")),
+            (CampaignEvent.MODE_PASSIVE, _("Send message")),
         ),
         required=False,
         widget=SelectWidget(attrs={"widget_only": True}),
@@ -320,12 +320,12 @@ class CampaignEventForm(forms.ModelForm):
                             % dict(language=lang["name"], limit=Msg.MAX_TEXT_LEN)
                         )
             if not data.get("message_start_mode"):
-                self.add_error("message_start_mode", _("This field is required."))
+                self.add_error("message_start_mode", _("Required field"))
         else:
             if not data.get("flow_to_start"):
-                self.add_error("flow_to_start", _("This field is required."))
+                self.add_error("flow_to_start", _("Required field"))
             if not data.get("flow_start_mode"):
-                self.add_error("flow_start_mode", _("This field is required."))
+                self.add_error("flow_start_mode", _("Required field"))
 
         return data
 
@@ -506,7 +506,7 @@ class CampaignEventCRUDL(SmartCRUDL):
                         id="event-update",
                         title=_("Edit"),
                         href=reverse("campaigns.campaignevent_update", args=[campaign_event.pk]),
-                        modax=_("Update Event"),
+                        modax=_("Update event"),
                     )
                 )
 
@@ -516,7 +516,7 @@ class CampaignEventCRUDL(SmartCRUDL):
                         id="event-delete",
                         title="Delete",
                         href=reverse("campaigns.campaignevent_delete", args=[campaign_event.id]),
-                        modax=_("Delete Event"),
+                        modax=_("Delete event"),
                     )
                 )
 
@@ -546,7 +546,7 @@ class CampaignEventCRUDL(SmartCRUDL):
     class Update(OrgObjPermsMixin, ModalMixin, SmartUpdateView):
         success_message = ""
         form_class = CampaignEventForm
-        submit_button_name = _("Update Event")
+        submit_button_name = _("Update event")
 
         default_fields = [
             "event_type",
@@ -658,7 +658,7 @@ class CampaignEventCRUDL(SmartCRUDL):
         form_class = CampaignEventForm
         success_message = ""
         template_name = "campaigns/campaignevent_update.haml"
-        submit_button_name = _("Add Event")
+        submit_button_name = _("Add event")
 
         def pre_process(self, request, *args, **kwargs):
             campaign_id = request.GET.get("campaign", None)

@@ -19,13 +19,12 @@
         -trans "Disable"
 
   .title
-    -trans "Backup Tokens"
+    -trans "Backup tokens"
   .mb-2
     -blocktrans trimmed
-      Below are your backup tokens which you can use if
-      you lose access to the device with which you setup two-factor authentication. Each token can only be used once and
-      tokens which have already been used are showed with a line through them. You should record these tokens in a
-      secure place.
+      Below are your backup tokens, which you can use if you lose access to the device you used to set up two-factor
+      authentication. Each token can only be used once, and tokens that have already been used are shown with a line
+      through them. Record these tokens in a secure place.
 
   .mb-4.p-4.card
 
@@ -39,13 +38,13 @@
   .my-3
 
     -blocktrans trimmed
-      You can generate new backup tokens but remember that the current tokens will be no longer be usable if you do this.
+      You can generate new backup tokens, but the current tokens will no longer be usable if you do.
 
     .mt-3
       %form(action="{% url 'orgs.user_two_factor_tokens'%}" method="POST")
         {% csrf_token %}
-        %input.button-primary(type="submit" value='{{_("Regenerate Tokens")|escapejs }}')
+        %input.button-primary(type="submit" value='{{_("Regenerate tokens")|escapejs }}')
 
 -block summary
   -blocktrans trimmed
-    Two-factor authentication is <b>enabled</b>.
+    Two-factor authentication is <b>enabled</b>

@@ -87,7 +87,7 @@ class BothubTypeTest(TembaTest):
             self.assertEqual(200, response.status_code)
             self.assertFalse(Classifier.objects.all())
 
-            self.assertContains(response, "Unable to access bothub with credentials, please check and try again")
+            self.assertContains(response, "Couldn&#x27;t access bothub with credentials. Check and try again.")
 
         # all good
         with patch("requests.get") as mock_get:

@@ -43,7 +43,7 @@ class SlackTypeTest(TembaTest):
         response = self.client.post(url, {"user_token": "invalid"})
         self.assertEqual(200, response.status_code)
         self.assertEqual(
-            "Your user token is invalid, please check and try again",
+            "Your user token is invalid. Check and try again.",
             response.context["form"].errors["user_token"][0],
         )
 
@@ -51,7 +51,7 @@ class SlackTypeTest(TembaTest):
         response = self.client.post(url, {"bot_token": "invalid"})
         self.assertEqual(200, response.status_code)
         self.assertEqual(
-            "Your bot user token is invalid, please check and try again",
+            "Your bot user token is invalid. Check and try again.",
             response.context["form"].errors["bot_token"][0],
         ),
 
@@ -102,7 +102,7 @@ class SlackTypeTest(TembaTest):
             },
         )
         self.assertEqual(
-            "A slack channel for this bot already exists on your account.",
+            "A Slack channel for this bot already exists on your account.",
             response.context["form"].errors["user_token"][0],
         )
 
