@@ -1,3 +1,7 @@
+3.98.0
+----------
+* feat: Create a hidden WWC Copilot channel when projects are created via EDA with is_live_desk_copilot=True
+
 3.97.1
 ----------
 * feat: Remove channel type validation in whatsapp broadcast API
