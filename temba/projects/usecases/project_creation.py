@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 
 from temba.projects.usecases.authorizations_creation import create_authorizations
 from temba.projects.usecases.channel_creation import create_default_wwc_channel, create_live_desk_copilot_channel
+from temba.projects.usecases.contact_field_creation import create_live_desk_copilot_contact_fields
 from temba.projects.usecases.globals_creation import create_globals
 
 from .interfaces import TemplateTypeIntegrationInterface
@@ -79,6 +80,7 @@ class ProjectCreationUseCase:
 
         if project_dto.is_live_desk_copilot:
             create_live_desk_copilot_channel(project, user)
+            create_live_desk_copilot_contact_fields(project, user)
 
         if extra_fields:
             create_globals(extra_fields, project, user)
