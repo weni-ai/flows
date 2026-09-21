@@ -14,12 +14,12 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             max_length=30,
             min_length=1,
             label=_("Merchant ID"),
-            help_text=_("The merchant id to compose your Merchant URL provided by Novo"),
+            help_text=_("The merchant ID to compose your merchant URL provided by Novo"),
         )
         merchant_secret = forms.CharField(
             max_length=30,
             min_length=1,
-            label=_("Merchant Secret"),
+            label=_("Merchant secret"),
             help_text=_("The merchant secret provided by Novo"),
         )
 

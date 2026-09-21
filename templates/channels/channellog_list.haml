@@ -2,7 +2,7 @@
 -load i18n contacts smartmin humanize temba
 
 -block page-title
-  -trans "Channel Events"
+  -trans "Channel events"
 
 -block title
   %a{ href:"{% url 'channels.channel_read' channel.uuid %}" }
@@ -14,7 +14,7 @@
   -if request.GET.others
     -trans "Interactions"
   -else
-    -trans "Recent Events"
+    -trans "Recent events"
 
 -block content
   #pjax

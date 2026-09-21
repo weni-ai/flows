@@ -4,15 +4,15 @@
 {% block body %}
     <p>
       {% blocktrans trimmed with org_name=org.name brand=branding.name %}
-        We've noticed that the Android phone for {{ org_name }} is getting low on power and isn't plugged in.
-        If it runs out of power then you will stop receiving messages for {{ brand }}.
+        It looks like the Android phone for {{ org_name }} is getting low on power and isn't plugged in. If it runs
+        out of power, you'll stop receiving messages for {{ brand }}.
       {% endblocktrans %}
     </p>
 
     <p>
       {% blocktrans trimmed with power_level=sync.power_level %}
-        Please check on your phone to make sure it is plugged into a reliable power source.
-        The current power level is {{ power_level }}%, you will only receive this notification when the power drops below 25%.
+        Check your phone to make sure it's plugged into a reliable power source. The current power level is
+        {{ power_level }}%. You'll only receive this notification when the power drops below 25%.
       {% endblocktrans %}
     </p>
 
@@ -27,5 +27,5 @@
 
     <p>{% trans "Thanks!" %}</p>
 
-    <p>{% blocktrans with brand=branding.name %}The {{ brand }} Team{% endblocktrans %}</p>
+    <p>{% blocktrans with brand=branding.name %}The {{ brand }} team{% endblocktrans %}</p>
 {% endblock %}

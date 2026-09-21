@@ -21,20 +21,20 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             max_length=14,
             min_length=1,
             label=_("Number"),
-            help_text=_("The phone number or short code you are connecting with country code. " "ex: +250788123124"),
+            help_text=_("The phone number with the country code or short code. Example: +250788123124"),
         )
         sender_id = forms.CharField(
-            label=_("Sender ID"), help_text=_("The sender ID provided by Macrokiosk to use their API")
+            label=_("Sender ID"), help_text=_("The sender ID provided by MACROKIOSK to use their API")
         )
 
         username = forms.CharField(
-            label=_("Username"), help_text=_("The username provided by Macrokiosk to use their API")
+            label=_("Username"), help_text=_("The username provided by MACROKIOSK to use their API")
         )
         password = forms.CharField(
             label=_("Password"), help_text=_("The password provided by Macrokiosk to use their API")
         )
         service_id = forms.CharField(
-            label=_("Service ID"), help_text=_("The Service ID provided by Macrokiosk to use their API")
+            label=_("Service ID"), help_text=_("The service ID provided by MACROKIOSK to use their API")
         )
 
     form_class = MacrokioskClaimForm

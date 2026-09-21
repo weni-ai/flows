@@ -15,7 +15,7 @@ from ...views import ALL_COUNTRIES, ClaimViewMixin, UpdateTelChannelForm
 class ClaimView(ClaimViewMixin, SmartFormView):
     class ClaimForm(ClaimViewMixin.Form):
         scheme = forms.ChoiceField(
-            choices=URN.SCHEME_CHOICES, label=_("URN Type"), help_text=_("The type of URNs handled by this channel")
+            choices=URN.SCHEME_CHOICES, label=_("URN type"), help_text=_("The type of URNs handled by this channel")
         )
 
         number = forms.CharField(
@@ -23,7 +23,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             min_length=1,
             label=_("Number"),
             required=False,
-            help_text=_("The phone number or that this channel will send from"),
+            help_text=_("The phone number that this channel will send from"),
         )
 
         address = forms.CharField(
@@ -44,13 +44,13 @@ class ClaimView(ClaimViewMixin, SmartFormView):
 
         method = forms.ChoiceField(
             choices=(("POST", "HTTP POST"), ("GET", "HTTP GET"), ("PUT", "HTTP PUT")),
-            help_text=_("What HTTP method to use when calling the URL"),
+            help_text=_("The HTTP method to use when calling the URL"),
         )
 
         encoding = forms.ChoiceField(
             choices=Channel.ENCODING_CHOICES,
             label=_("Encoding"),
-            help_text=_("What encoding to use for outgoing messages"),
+            help_text=_("The encoding to use for outgoing messages"),
         )
 
         content_type = forms.ChoiceField(
@@ -60,27 +60,25 @@ class ClaimView(ClaimViewMixin, SmartFormView):
         max_length = forms.IntegerField(
             initial=160,
             validators=[MaxValueValidator(6400), MinValueValidator(60)],
-            help_text=_(
-                "The maximum length of any single message on this channel. " "(longer messages will be split)"
-            ),
+            help_text=_("The maximum length of any single message on this channel. Longer messages will be split."),
         )
 
         send_authorization = forms.CharField(
             max_length=2048,
-            label=_("Authorization Header Value"),
+            label=_("Authorization header value"),
             required=False,
-            help_text=_("The Authorization header value added when calling the URL (if any)"),
+            help_text=_("The authorization header value added when calling the URL (if any)"),
         )
 
         url = ExternalURLField(
             max_length=1024,
             label=_("Send URL"),
-            help_text=_("The URL we will call when sending messages, with variable substitutions"),
+            help_text=_("The URL called when sending messages, with variable substitutions"),
         )
 
         body = forms.CharField(
             max_length=2048,
-            label=_("Request Body"),
+            label=_("Request body"),
             required=False,
             widget=forms.Textarea,
             help_text=_("The request body if any, with variable substitutions (only used for PUT or POST)"),
@@ -88,7 +86,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
 
         mt_response_check = forms.CharField(
             max_length=2048,
-            label=_("MT Response check"),
+            label=_("MT response check"),
             required=False,
             widget=forms.Textarea,
             help_text=_("The content that must be in the response to consider the request successful"),
@@ -98,26 +96,26 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             cleaned_data = super().clean()
             scheme = cleaned_data.get("scheme")
             if scheme == URN.TEL_SCHEME and not cleaned_data.get("number"):
-                raise ValidationError({"number": _("This field is required.")})
+                raise ValidationError({"number": _("Required field")})
             elif scheme != URN.TEL_SCHEME and not cleaned_data.get("address"):
-                raise ValidationError({"address": _("This field is required.")})
+                raise ValidationError({"address": _("Required field")})
 
     class SendClaimForm(ClaimViewMixin.Form):
         url = ExternalURLField(
             max_length=1024,
             label=_("Send URL"),
-            help_text=_("The URL we will POST to when sending messages, with variable substitutions"),
+            help_text=_("The URL to POST to when sending messages, with variable substitutions"),
         )
 
         method = forms.ChoiceField(
             choices=(("POST", "HTTP POST"), ("GET", "HTTP GET"), ("PUT", "HTTP PUT")),
-            help_text=_("What HTTP method to use when calling the URL"),
+            help_text=_("The HTTP method to use when calling the URL"),
         )
 
         encoding = forms.ChoiceField(
             choices=Channel.ENCODING_CHOICES,
             label=_("Encoding"),
-            help_text=_("What encoding to use for outgoing messages"),
+            help_text=_("The encoding to use for outgoing messages"),
         )
 
         content_type = forms.ChoiceField(
@@ -127,21 +125,19 @@ class ClaimView(ClaimViewMixin, SmartFormView):
         max_length = forms.IntegerField(
             initial=160,
             validators=[MaxValueValidator(6400), MinValueValidator(60)],
-            help_text=_(
-                "The maximum length of any single message on this channel. " "(longer messages will be split)"
-            ),
+            help_text=_("The maximum length of any single message on this channel. Longer messages will be split."),
         )
 
         send_authorization = forms.CharField(
             max_length=2048,
-            label=_("Authorization Header Value"),
+            label=_("Authorization header value"),
             required=False,
-            help_text=_("The Authorization header value added when calling the URL (if any)"),
+            help_text=_("The authorization header value added when calling the URL (if any)"),
         )
 
         body = forms.CharField(
             max_length=2048,
-            label=_("Request Body"),
+            label=_("Request body"),
             required=False,
             widget=forms.Textarea,
             help_text=_("The request body if any, with variable substitutions (only used for PUT or POST)"),
@@ -149,7 +145,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
 
         mt_response_check = forms.CharField(
             max_length=2048,
-            label=_("MT Response check"),
+            label=_("MT response check"),
             required=False,
             widget=forms.Textarea,
             help_text=_("The content that must be in the response to consider the request successful"),
@@ -227,7 +223,7 @@ class UpdateForm(UpdateTelChannelForm):
     role = forms.MultipleChoiceField(
         choices=((Channel.ROLE_RECEIVE, _("Receive")), (Channel.ROLE_SEND, _("Send"))),
         widget=SelectMultipleWidget(attrs={"widget_only": True}),
-        label=_("Channel Role"),
+        label=_("Channel role"),
         help_text=_("The roles this channel can fulfill"),
     )
 

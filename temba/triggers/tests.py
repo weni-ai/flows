@@ -488,7 +488,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
             create_url,
             {"keyword": "with spaces", "flow": flow1.id, "match_type": "F"},
             form_errors={
-                "keyword": "Must be a single word containing only letters and numbers, or a single emoji character."
+                "keyword": "Must be a single word containing only letters and numbers, or a single emoji character"
             },
         )
 
@@ -497,7 +497,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
             create_url,
             {"keyword": "keyw!o^rd__", "flow": flow1.id, "match_type": "F"},
             form_errors={
-                "keyword": "Must be a single word containing only letters and numbers, or a single emoji character."
+                "keyword": "Must be a single word containing only letters and numbers, or a single emoji character"
             },
         )
 
@@ -511,7 +511,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
                 "groups": [group1.id, group2.id],
                 "exclude_groups": [group1.id],
             },
-            form_errors={"__all__": "Can't include and exclude the same group."},
+            form_errors={"__all__": "Can't include and exclude the same group"},
         )
 
         # create a trigger with no groups
@@ -540,7 +540,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"keyword": "start", "flow": flow2.id, "match_type": "F"},
-            form_errors={"__all__": "There already exists a trigger of this type with these options."},
+            form_errors={"__all__": "A trigger of this type with these options already exists"},
         )
 
         # works if we specify a group
@@ -555,7 +555,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"keyword": "start", "flow": flow2.id, "match_type": "F", "groups": [group1.id, group2.id]},
-            form_errors={"__all__": "There already exists a trigger of this type with these options."},
+            form_errors={"__all__": "A trigger of this type with these options already exists"},
         )
 
     def test_create_register(self):
@@ -669,7 +669,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
             create_url,
             {},
             form_errors={
-                "__all__": "Must provide at least one group or contact to include.",
+                "__all__": "Must provide at least one group or contact to include",
                 "start_datetime": "This field is required.",
                 "repeat_period": "This field is required.",
                 "flow": "This field is required.",
@@ -680,7 +680,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"start_datetime": "2021-06-24 12:00", "repeat_period": "W", "flow": flow1.id, "groups": [group1.id]},
-            form_errors={"repeat_days_of_week": "Must specify at least one day of the week."},
+            form_errors={"repeat_days_of_week": "Must specify at least one day of the week"},
         )
 
         # try to create a weekly repeating schedule with an invalid day of the week (UI doesn't actually allow this)
@@ -776,7 +776,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"flow": flow2.id, "groups": group1.id},
-            form_errors={"__all__": "There already exists a trigger of this type with these options."},
+            form_errors={"__all__": "A trigger of this type with these options already exists"},
         )
 
         # but can for different group
@@ -821,7 +821,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"flow": flow2.id},
-            form_errors={"__all__": "There already exists a trigger of this type with these options."},
+            form_errors={"__all__": "A trigger of this type with these options already exists"},
         )
 
     @patch("temba.channels.types.facebook.FacebookType.activate_trigger")
@@ -838,7 +838,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
 
         channel1 = self.create_channel("FB", "Facebook Channel", "1234567")
         channel2 = self.create_channel("VP", "Viber Channel", "1234567")
-        self.create_channel("A", "Android Channel", "+1234")
+        self.create_channel("A", "Android channel", "+1234")
 
         response = self.assertCreateFetch(
             create_url,
@@ -868,7 +868,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"channel": channel1.id, "flow": flow1.id},
-            form_errors={"__all__": "There already exists a trigger of this type with these options."},
+            form_errors={"__all__": "A trigger of this type with these options already exists"},
         )
 
         # but can create a different trigger for a different channel
@@ -895,7 +895,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
 
         channel1 = self.create_channel("FB", "Facebook 1", "1234567")
         channel2 = self.create_channel("FB", "Facebook 2", "2345678")
-        self.create_channel("A", "Android Channel", "+1234")
+        self.create_channel("A", "Android channel", "+1234")
 
         response = self.assertCreateFetch(
             create_url,
@@ -925,7 +925,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"channel": channel1.id, "flow": flow1.id, "referrer_id": "234567"},
-            form_errors={"__all__": "There already exists a trigger of this type with these options."},
+            form_errors={"__all__": "A trigger of this type with these options already exists"},
         )
 
         # but can create a different trigger for a different referrer
@@ -1044,7 +1044,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"flow": flow2.id},
-            form_errors={"__all__": "There already exists a trigger of this type with these options."},
+            form_errors={"__all__": "A trigger of this type with these options already exists"},
         )
 
     def test_update_keyword(self):
@@ -1087,7 +1087,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
             update_url,
             {"keyword": "", "flow": flow.id, "match_type": "F"},
             form_errors={
-                "keyword": "Must be a single word containing only letters and numbers, or a single emoji character."
+                "keyword": "Must be a single word containing only letters and numbers, or a single emoji character"
             },
             object_unchanged=trigger,
         )
@@ -1142,7 +1142,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertUpdateSubmit(
             update_url,
             {"start_datetime": "2021-06-24 12:00", "repeat_period": "W", "flow": flow1.id, "groups": [group1.id]},
-            form_errors={"repeat_days_of_week": "Must specify at least one day of the week."},
+            form_errors={"repeat_days_of_week": "Must specify at least one day of the week"},
             object_unchanged=trigger,
         )
 
@@ -1164,7 +1164,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertUpdateSubmit(
             update_url,
             {"start_datetime": "2021-06-24 12:00", "repeat_period": "W", "flow": flow1.id},
-            form_errors={"__all__": "Must provide at least one group or contact to include."},
+            form_errors={"__all__": "Must provide at least one group or contact to include"},
             object_unchanged=trigger,
         )
 
@@ -1238,7 +1238,7 @@ class TriggerCRUDLTest(TembaTest, CRUDLTestMixin):
         mock_deactivate_trigger.side_effect = ValueError("boom")
 
         response = self.client.post(list_url, {"action": "archive", "objects": trigger4.id})
-        self.assertEqual("An error occurred while making your changes. Please try again.", response["Temba-Toast"])
+        self.assertEqual("An error occurred while applying your changes. Try again.", response["Temba-Toast"])
 
     def test_list_redirect_when_no_triggers(self):
         Trigger.objects.all().delete()

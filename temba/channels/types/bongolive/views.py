@@ -19,7 +19,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
         )
 
         number = forms.CharField(
-            max_length=14, min_length=4, label=_("Number"), help_text=_("The number you are connecting.")
+            max_length=14, min_length=4, label=_("Number"), help_text=_("The number you're connecting")
         )
         username = forms.CharField(label=_("Username"), help_text=_("The username for your Bongo Live account"))
         password = forms.CharField(label=_("Password"), help_text=_("The password for your Bongo Live account"))

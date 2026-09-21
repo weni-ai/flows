@@ -20,7 +20,7 @@
   - if org_perms.flows.flowlabel_delete
     .deletion.hide
       .title
-        -trans "Remove Label"
+        -trans "Remove label"
 
       .body
         %p
@@ -28,15 +28,15 @@
         %p
           %b {{ current_label }}
           %p
-            -trans "Once it is removed, it will be gone forever. There is no way to undo this operation."
+            -trans "Once removed, it will be permanently deleted. This action can't be undone."
 
       %a#delete-form.posterize{href:'{% url "flows.flowlabel_delete" current_label.pk %}'}
 
     .deletion-fail.hide
       .title
-        -trans "Remove Label"
+        -trans "Remove label"
 
       .body
         %p
-          -trans "You cannot remove a label which has child labels. Please remove all children first."
+          -trans "You can't remove a label that has child labels. Remove all child labels first."
 

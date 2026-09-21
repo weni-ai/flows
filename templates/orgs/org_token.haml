@@ -13,13 +13,13 @@
 -block form-buttons
     
   .button-light.inline-block(onclick="goto(event)" href="{% url 'api.v2' %}")
-    -trans "API Docs"
+    -trans "API docs"
 
   .button-light.ml-3.inline-block(onclick="goto(event)" href="{% url 'api.v2.explorer' %}")
-    -trans "API Explorer"
+    -trans "API explorer"
 -block summary
   -blocktrans trimmed with token=user.api_token
-    Your API Token is <b>{{ token }}</b>.
+    Your API token is <b>{{ token }}</b>
 
 -block extra-script
   {{block.super}}

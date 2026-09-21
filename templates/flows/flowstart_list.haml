@@ -13,17 +13,17 @@
 -block content
   %div.flex.gap-4.mb-6
     %temba-select#flows.flex-grow(name="flow" label='{{_("Flow")|escapejs}}' searchable="true" onchange="handleSelectChange(this, `flow`)" value="{{ request.GET.flow }}" style="flex-grow: 4;")
-      %temba-option(name='{{_("All Flows")}}' value="")
+      %temba-option(name='{{_("All flows")}}' value="")
       -for flow in flows
         %temba-option(name="{{flow.name}}" value="{{flow.uuid}}")
 
-    %temba-select#groups.flex-grow(name="group" label='{{_("Contact Group")|escapejs}}' searchable="true" onchange="handleSelectChange(this, `group`)" value="{{ request.GET.group }}")
-      %temba-option(name='{{_("All Groups")}}' value="")
+    %temba-select#groups.flex-grow(name="group" label='{{_("Contact group")|escapejs}}' searchable="true" onchange="handleSelectChange(this, `group`)" value="{{ request.GET.group }}")
+      %temba-option(name='{{_("All groups")}}' value="")
       -for group in contact_groups
         %temba-option(name="{{group.name}}" value="{{group.uuid}}")
 
     %temba-select#time.flex-grow(name="time" label='{{_("Time")|escapejs}}' searchable="true" onchange="handleSelectChange(this, `time`)" value="{{ request.GET.time }}")
-      %temba-option(name='{{_("All Time")}}' value="")
+      %temba-option(name='{{_("All time")}}' value="")
       %temba-option(name='{{_("Last minute")}}' value="1")
       %temba-option(name='2 {{_("minutes")}}' value="2")
       %temba-option(name='5 {{_("minutes")}}' value="5")

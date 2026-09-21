@@ -4,11 +4,11 @@
 -block summary
   -if primary_lang
     -blocktrans trimmed with lang=primary_lang
-      The default flow language is <b>{{ lang }}</b>.
+      The default flow language is <b>{{ lang }}</b>
     -if other_langs
       -trans "Translations are provided in"
       -for lang in other_langs
         <b>{{ lang }}</b>{{ forloop|oxford }}
       \.
   -else
-    -trans "Your workspace is configured to use a single language."
+    -trans "Your workspace is configured to use a single language"

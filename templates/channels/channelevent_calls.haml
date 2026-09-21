@@ -12,9 +12,9 @@
   .search-details
     -if search
       -blocktrans trimmed with results_count=paginator.count|intcomma count cc=paginator.count
-        Found {{ results_count }} call in last 90 days for <i>{{search}}</i>.
+        Found {{ results_count }} call in the last 90 days for <i>{{search}}</i>.
         -plural
-          Found {{ results_count }} calls in last 90 days for <i>{{search}}</i>.
+          Found {{ results_count }} calls in last 90 days for <i>{{search}}</i>
 
 -block message-list
   %table.list.object-list.lined.selectable
@@ -33,14 +33,14 @@
           %td.w-full
             - if object.event_type == 'mt_call'
               -blocktrans trimmed with duration=object.extra.duration
-                Outgoing Call ({{duration}} seconds)
+                Outgoing call ({{duration}} seconds)
             - elif object.event_type == 'mo_call'
               -blocktrans trimmed with duration=object.extra.duration
-                Incoming Call ({{duration}} seconds)
+                Incoming call ({{duration}} seconds)
             - elif object.event_type == 'mo_miss'
-              -trans "Missed Incoming Call"
+              -trans "Missed incoming call"
             - elif object.event_type == 'mt_miss'
-              -trans "Missed Outgoing Call"
+              -trans "Missed outgoing call"
             - else
               - get_value object 'event_type'
 
@@ -52,7 +52,7 @@
       -if not object_list
         %tr.empty_list
           %td{ colspan:'99' }
-              -trans "No Matching calls"
+              -trans "No matching calls"
 
   - block paginator
     -include "includes/pagination.haml"

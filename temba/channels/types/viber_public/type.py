@@ -37,7 +37,7 @@ class ViberPublicType(ChannelType):
         "an Android, Windows or iOS device and a Viber account to send and receive messages."
     ) % {"link": '<a href="http://viber.com/en/">Viber</a>'}
 
-    configuration_blurb = _("Your Viber channel is connected. If needed the webhook endpoints are listed below.")
+    configuration_blurb = _("Your Viber channel is connected. If needed, the webhook endpoints are listed below.")
 
     configuration_urls = (
         dict(label=_("Webhook URL"), url="https://{{ channel.callback_domain }}{% url 'courier.vp' channel.uuid %}"),

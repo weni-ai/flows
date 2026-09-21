@@ -12,9 +12,9 @@ class Lead(SmartModel):
 
 class Video(SmartModel):
     name = models.CharField(verbose_name=_("Name"), help_text=_("The name of the video"), max_length=255)
-    summary = models.TextField(verbose_name=_("Summary"), help_text=_("A short blurb about the video"))
+    summary = models.TextField(verbose_name=_("Summary"), help_text=_("A short description of the video"))
     description = models.TextField(verbose_name=_("Description"), help_text="The full description for the video")
     vimeo_id = models.CharField(
-        verbose_name=_("Vimeo ID"), max_length=255, help_text=_("The id vimeo uses for this video")
+        verbose_name=_("Vimeo ID"), max_length=255, help_text=_("The ID that Vimeo uses for this video")
     )
     order = models.IntegerField(default=0)

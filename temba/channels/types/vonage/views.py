@@ -254,7 +254,7 @@ class ClaimView(BaseClaimNumberMixin, SmartFormView):
 
         def clean_phone_number(self):
             if not self.cleaned_data.get("country", None):  # pragma: needs cover
-                raise ValidationError(_("That number is not currently supported."))
+                raise ValidationError(_("That number isn't currently supported."))
 
             phone = self.cleaned_data["phone_number"]
             phone = phonenumbers.parse(phone, self.cleaned_data["country"])
@@ -337,8 +337,7 @@ class ClaimView(BaseClaimNumberMixin, SmartFormView):
             except Exception as e:
                 raise Exception(
                     _(
-                        "There was a problem claiming that number, please check the balance on your account. "
-                        "Note that you can only claim numbers after adding credit to your Vonage account."
+                        "Couldn't claim that number. Check the balance on your account. Note that you can only claim numbers after adding credit to your Vonage account."
                     )
                     + "\n"
                     + str(e)
@@ -374,9 +373,7 @@ class ClaimView(BaseClaimNumberMixin, SmartFormView):
             # shortcodes don't seem to claim correctly, move forward anyways
             if not is_shortcode:
                 raise Exception(
-                    _("There was a problem claiming that number, please check the balance on your account.")
-                    + "\n"
-                    + str(e)
+                    _("There was a problem claiming that number. Check the balance on your account.") + "\n" + str(e)
                 )
 
         if is_shortcode:

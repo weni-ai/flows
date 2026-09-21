@@ -9,8 +9,8 @@
 -block content
 
   -if org_perms.flows.flow_update
-    %temba-modax#export-results{ header:'{% trans "Download Results" %}' }
-    %temba-modax#create-label-modal{ header:'{% trans "Create Label" %}', endpoint:"{% url 'flows.flowlabel_create' %}", "-temba-loaded": "handleCreateLabelModalLoaded", "-temba-submitted": "handleCreateLabelModalSubmitted"}
+    %temba-modax#export-results{ header:'{% trans "Download results" %}' }
+    %temba-modax#create-label-modal{ header:'{% trans "Create label" %}', endpoint:"{% url 'flows.flowlabel_create' %}", "-temba-loaded": "handleCreateLabelModalLoaded", "-temba-submitted": "handleCreateLabelModalSubmitted"}
 
     -if org_has_flows
       -if view.search_fields
@@ -30,7 +30,7 @@
                   %th
                   %th
                   %th.whitespace-nowrap
-                    -trans "Runs / Completion"
+                    -trans "Runs/completion"
 
             %tbody
               -for object in object_list
@@ -73,7 +73,7 @@
               -empty
                 %tr.empty_list
                   %td(colspan='99')
-                    -trans "No matching flows."
+                    -trans "No matching flows"
 
         -block paginator
           -include "includes/pagination.haml"

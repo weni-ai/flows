@@ -109,7 +109,7 @@ class Flow(TembaModel):
 
     TYPE_CHOICES = (
         (TYPE_MESSAGE, _("Messaging")),
-        (TYPE_VOICE, _("Phone Call")),
+        (TYPE_VOICE, _("Phone call")),
         (TYPE_BACKGROUND, _("Background")),
         (TYPE_SURVEY, _("Surveyor")),
     )
@@ -142,7 +142,7 @@ class Flow(TembaModel):
     metadata = JSONAsTextField(null=True, default=dict)
 
     expires_after_minutes = models.IntegerField(
-        default=DEFAULT_EXPIRES_AFTER, help_text=_("Minutes of inactivity that will cause expiration from flow")
+        default=DEFAULT_EXPIRES_AFTER, help_text=_("Minutes of inactivity that will cause expiration from this flow")
     )
 
     ignore_triggers = models.BooleanField(default=False, help_text=_("Ignore keyword triggers while in this flow"))
@@ -154,7 +154,7 @@ class Flow(TembaModel):
         max_length=4,
         null=True,
         blank=True,
-        help_text=_("The authoring language, additional languages can be added later"),
+        help_text=_("The authoring language. Additional languages can be added later."),
         default="base",
     )
 

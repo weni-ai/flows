@@ -53,7 +53,7 @@ class ClaimView(BaseClaimNumberMixin, SmartFormView):
 
         def clean_phone_number(self):
             if not self.cleaned_data.get("country", None):  # pragma: needs cover
-                raise ValidationError(_("That number is not currently supported."))
+                raise ValidationError(_("That number isn't currently supported."))
 
             phone = self.cleaned_data["phone_number"]
             phone = phonenumbers.parse(phone, self.cleaned_data["country"])
@@ -169,9 +169,7 @@ class ClaimView(BaseClaimNumberMixin, SmartFormView):
             )
 
             if response.status_code != 201:  # pragma: no cover
-                raise Exception(
-                    _("There was a problem claiming that number, please check the balance on your account.")
-                )
+                raise Exception(_("There was a problem claiming that number. Check the balance on your account."))
 
             response = requests.get(
                 "https://api.plivo.com/v1/Account/%s/Number/%s/" % (auth_id, plivo_number),
@@ -188,7 +186,7 @@ class ClaimView(BaseClaimNumberMixin, SmartFormView):
             )
 
             if response.status_code != 202:  # pragma: no cover
-                raise Exception(_("There was a problem updating that number, please try again."))
+                raise Exception(_("There was a problem updating that number. Try again."))
 
         phone_number = "+" + plivo_number
         phone = phonenumbers.format_number(

@@ -28,9 +28,9 @@
             .flex.flex-col
               -if org_perms.flows.flow_create
                 .w-64.mr-5
-                  %temba-modax{ header:'{% trans "Create Campaign" %}', endpoint:"/campaign/create/" }
+                  %temba-modax{ header:'{% trans "Create campaign" %}', endpoint:"/campaign/create/" }
                     .button-primary.block
-                      -trans "Create Campaign"
+                      -trans "Create campaign"
               
               .lp-nav.upper
                 -for folder in folders

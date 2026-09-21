@@ -12,23 +12,23 @@ from temba.utils.uuid import uuid4
 class ConnectView(BaseConnectView):
     class Form(BaseConnectView.Form):
         ticketer_name = forms.CharField(
-            label=_("Ticketer Name"),
-            help_text=_("A name to help identify your ticketer"),
+            label=_("Ticketing service name"),
+            help_text=_("A name to help identify your ticketing service"),
         )
         account_sid = forms.CharField(
-            label=_("Authentication User"),
-            help_text=_("Account SID or API Key SID of a twilio account."),
+            label=_("Authentication user"),
+            help_text=_("Account SID or API key SID of a Twilio account"),
         )
         auth_token = forms.CharField(
-            label=_("Authentication Password"),
-            help_text=_("Auth token or API Key Secret of a twilio account."),
+            label=_("Authentication password"),
+            help_text=_("Auth token or API key secret of a Twilio account"),
         )
-        chat_service_sid = forms.CharField(label=_("Chat Service SID"), help_text=_("SID of a Chat service instance."))
+        chat_service_sid = forms.CharField(label=_("Chat service SID"), help_text=_("SID of a chat service instance"))
         flex_flow_sid = forms.CharField(
             label=_("Flex Flow"),
-            help_text=_("a Flex Flow (also called Flex Address) that is of the task type."),
+            help_text=_("A Flex Flow (also called Flex Address) of the task type"),
         )
-        workspace_sid = forms.CharField(label=_("Workspace SID"), help_text=_("SID of a Workspace."))
+        workspace_sid = forms.CharField(label=_("Workspace SID"), help_text=_("SID of a workspace"))
 
         def clean(self):
             account_sid = self.cleaned_data["account_sid"]
@@ -45,7 +45,7 @@ class ConnectView(BaseConnectView):
 
             except Exception:
                 raise ValidationError(
-                    _("Unable to connect with twilio chat service, please check input fields and try again.")
+                    _("Couldn't connect to the Twilio chat service. Check the fields and try again.")
                 )
             return self.cleaned_data
 

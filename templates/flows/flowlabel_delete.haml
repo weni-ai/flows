@@ -4,11 +4,11 @@
 -block modal
   -if object.children.all
     -blocktrans trimmed with name=object.name
-      <b>{{name}}</b> cannot be deleted since it is a parent to other labels.
+      <b>{{name}}</b> can't be deleted since it's a parent to other labels.
 
   -else
     -blocktrans trimmed with name=object.name
-      Are you sure you want to delete <b>{{name}}</b>? This cannot be undone.
+      Are you sure you want to delete <b>{{name}}</b>? This action can't be undone.
 
     .hidden
       %form(method="POST")
