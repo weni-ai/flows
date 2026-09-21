@@ -197,11 +197,13 @@ class ProjectCreationUseCaseTest(TembaTest):
         self.assertIsNotNone(preview_channel)
         self.assertEqual(preview_channel.name, DEFAULT_WWC_CHANNEL_NAME)
         self.assertTrue(preview_channel.config["preview"])
+        self.assertIn("voice_mode", preview_channel.config)
 
         self.assertIsNotNone(copilot_channel)
         self.assertEqual(copilot_channel.name, COPILOT_WWC_CHANNEL_NAME)
         self.assertTrue(copilot_channel.config["is_live_desk_copilot"])
         self.assertFalse(copilot_channel.config.get("preview"))
+        self.assertNotIn("voice_mode", copilot_channel.config)
 
         self.assertEqual(mock_publish_channel_event.call_count, 2)
         mock_publish_channel_event.assert_any_call(preview_channel, action="create")

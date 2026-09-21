@@ -24,16 +24,16 @@ def _build_default_wwc_config(preview: bool = False, is_live_desk_copilot: bool 
         "version": 2,
         "allowed_domains": settings.WENI_WEBCHAT_ALLOWED_DOMAINS,
         "base_url": settings.SOCKET_BASE_URL,
-        "voice_mode": {
+    }
+    if preview:
+        config["preview"] = True
+        config["voice_mode"] = {
             "enabled": True,
             "elevenLabs": {
                 "apiKey": settings.WENI_VOICE_TOKEN,
                 "voiceId": settings.WENI_ELEVENLABS_VOICE_ID,
             },
-        },
-    }
-    if preview:
-        config["preview"] = True
+        }
     if is_live_desk_copilot:
         config["is_live_desk_copilot"] = True
     return config
