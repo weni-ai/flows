@@ -7950,3 +7950,31 @@ class EventsServiceTest(APITest):
         self.assertEqual(results, [{"group_value": "foo", "count": 5}])
         # ensure standard not called when silver=true
         mock_dl_counts.assert_not_called()
+
+
+class OptInGroupAPIProtectionTest(APIJSONMixin, TembaTest):
+    def setUp(self):
+        super().setUp()
+        connection.settings_dict["ATOMIC_REQUESTS"] = False
+
+    def tearDown(self):
+        super().tearDown()
+        connection.settings_dict["ATOMIC_REQUESTS"] = True
+
+    def test_cannot_delete_or_rename_opt_in_group(self):
+        from temba.contacts.usecases.opt_in import ensure_audience
+
+        group = ensure_audience(self.org, self.admin).group
+        self.login(self.admin)
+        url = reverse("api.v2.groups")
+
+        response = self.deleteJSON(url, "uuid=%s" % group.uuid)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("cannot be deleted", response.json()["detail"])
+        group.refresh_from_db()
+        self.assertTrue(group.is_active)
+
+        response = self.postJSON(url, "uuid=%s" % group.uuid, {"name": "Renamed"})
+        self.assertEqual(response.status_code, 400)
+        group.refresh_from_db()
+        self.assertEqual(group.name, "Opt-in")

@@ -8397,3 +8397,9 @@ msgstr ""
 
 msgid "Refresh page"
 msgstr "Atualizar página"
+
+msgid "The Opt-in group cannot be deleted."
+msgstr ""
+
+msgid "The Opt-in group cannot be renamed."
+msgstr ""

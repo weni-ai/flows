@@ -159,6 +159,9 @@ class ContactGroupForm(forms.ModelForm):
         else:
             name = self.cleaned_data["name"].strip()
 
+        if self.instance.pk and self.instance.is_opt_in and name != self.instance.name:
+            raise forms.ValidationError(_("The Opt-in group cannot be renamed."))
+
         # make sure the name isn't already taken
         existing = ContactGroup.get_user_group_by_name(self.org, name)
         if existing and self.instance != existing:
@@ -1331,7 +1334,7 @@ class ContactCRUDL(SmartCRUDL):
             if self.has_org_perm("contacts.contactfield_list") and not is_spa:
                 links.append(dict(title=_("Manage fields"), href=reverse("contacts.contactfield_list")))
 
-            if self.has_org_perm("contacts.contactgroup_update"):
+            if self.has_org_perm("contacts.contactgroup_update") and not self.group.is_opt_in:
                 links.append(
                     dict(
                         id="edit-group",
@@ -1360,7 +1363,7 @@ class ContactCRUDL(SmartCRUDL):
                 )
             )
 
-            if self.has_org_perm("contacts.contactgroup_delete"):
+            if self.has_org_perm("contacts.contactgroup_delete") and not self.group.is_opt_in:
                 links.append(
                     dict(
                         id="delete-group",
@@ -1809,6 +1812,12 @@ class ContactGroupCRUDL(SmartCRUDL):
             kwargs["user"] = self.request.user
             return kwargs
 
+        def post(self, request, *args, **kwargs):
+            self.object = self.get_object()
+            if self.object.is_opt_in:
+                return HttpResponseRedirect(reverse("contacts.contact_filter", args=[self.object.uuid]))
+            return super().post(request, *args, **kwargs)
+
         def form_valid(self, form):
             self.prev_query = self.get_object().query
 
@@ -1847,6 +1856,9 @@ class ContactGroupCRUDL(SmartCRUDL):
             # we need a self.object for get_context_data
             self.object = self.get_object()
             group = self.object
+
+            if group.is_opt_in:
+                return HttpResponseRedirect(smart_url(self.cancel_url, group))
 
             # if there are still dependencies, give up
             triggers = group.triggers.filter(is_archived=False)
