@@ -1,6 +1,10 @@
 3.98.0
 ----------
-* feat: named WhatsApp template parameters — record parameter format/names, accept named broadcast values, resolve per recipient
+* feat: Create a hidden WWC Copilot channel when projects are created via EDA with is_live_desk_copilot=True
+
+3.97.1
+----------
+* feat: Remove channel type validation in whatsapp broadcast API
 
 3.97.0
 ----------

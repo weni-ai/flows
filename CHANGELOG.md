@@ -1,7 +1,3 @@
-v7.1.28
-----------
- * Add Live Desk Copilot WWC channel auto-creation when project is created with is_live_desk_copilot flag
-
 v7.1.27
 ----------
  * Drop no longer used FlowRun.parent
