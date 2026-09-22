@@ -1068,6 +1068,9 @@ class ContactGroupWriteSerializer(WriteSerializer):
         return value
 
     def validate(self, data):
+        if self.instance and self.instance.is_opt_in and data.get("name") != self.instance.name:
+            raise serializers.ValidationError("The Opt-in group cannot be renamed.")
+
         org = self.context["org"]
         org_active_groups_limit = org.get_limit(Org.LIMIT_GROUPS)
 
