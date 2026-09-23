@@ -1965,6 +1965,53 @@ class APITest(APIJSONMixin, TembaTest):
         )
         self.assertResponseError(response, "msg", "ig_response_type is required when ig_comment_id is provided")
 
+        # ig_comment_id must be a string
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["instagram:5678"],
+                "channel": str(ig_channel.uuid),
+                "msg": {
+                    "text": "Thanks for your comment!",
+                    "ig_comment_id": 30065218,
+                    "ig_response_type": "comment",
+                },
+            },
+        )
+        self.assertResponseError(response, "msg", "ig_comment_id must be a string")
+
+        # ig_response_type must be comment or dm_comment
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["instagram:5678"],
+                "channel": str(ig_channel.uuid),
+                "msg": {
+                    "text": "Thanks for your comment!",
+                    "ig_comment_id": "30065218",
+                    "ig_response_type": "invalid",
+                },
+            },
+        )
+        self.assertResponseError(response, "msg", "ig_response_type must be either comment or dm_comment")
+
+        # ig_comment_id is required when ig_response_type is provided
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["instagram:5678"],
+                "channel": str(ig_channel.uuid),
+                "msg": {
+                    "text": "Thanks for your comment!",
+                    "ig_response_type": "comment",
+                },
+            },
+        )
+        self.assertResponseError(response, "msg", "ig_comment_id is required when ig_response_type is provided")
+
         # urns and contacts accept up to 1000 items per request (see WhatsappBroadcastWriteSerializer)
         many_urns = [f"whatsapp:556199{str(i).zfill(7)}" for i in range(1000)]
         response = self.postJSON(url, None, {"urns": many_urns, "msg": {"text": "Bulk"}})
