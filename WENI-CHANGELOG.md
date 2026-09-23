@@ -1,3 +1,7 @@
+3.98.0
+----------
+* feat: add validation for Instagram comment ID and response type in WhatsappBroadcastWriteSerializer- #880
+
 3.97.1
 ----------
 * feat: Remove channel type validation in whatsapp broadcast API
