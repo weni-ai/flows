@@ -267,12 +267,10 @@ class Org(SmartModel):
     DELETE_DELAY_DAYS = 7  # how many days after releasing that an org is deleted
 
     BLOCKER_SUSPENDED = _(
-        "Sorry, your workspace is currently suspended. To re-enable starting flows and sending messages, please "
-        "contact support."
+        "Your workspace is currently suspended. To re-enable starting flows and sending messages, contact Support."
     )
     BLOCKER_FLAGGED = _(
-        "Sorry, your workspace is currently flagged. To re-enable starting flows and sending messages, please "
-        "contact support."
+        "Your workspace is currently flagged. To re-enable starting flows and sending messages, contact Support."
     )
 
     uuid = models.UUIDField(unique=True, default=uuid4)
@@ -282,17 +280,17 @@ class Org(SmartModel):
         verbose_name=_("Plan"),
         max_length=16,
         default=settings.DEFAULT_PLAN,
-        help_text=_("What plan your organization is on"),
+        help_text=_("The plan your organization is on"),
     )
     plan_start = models.DateTimeField(null=True)
     plan_end = models.DateTimeField(null=True)
 
     stripe_customer = models.CharField(
-        verbose_name=_("Stripe Customer"),
+        verbose_name=_("Stripe customer"),
         max_length=32,
         null=True,
         blank=True,
-        help_text=_("Our Stripe customer id for your organization"),
+        help_text=_("The Stripe customer ID for your organization"),
     )
 
     # user role m2ms
@@ -304,22 +302,22 @@ class Org(SmartModel):
     marketing = models.ManyToManyField(User, related_name=OrgRole.MARKETING.rel_name)
 
     language = models.CharField(
-        verbose_name=_("Default Language"),
+        verbose_name=_("Default language"),
         max_length=64,
         null=True,
         choices=settings.LANGUAGES,
         default=settings.DEFAULT_LANGUAGE,
-        help_text=_("The default website language for new users."),
+        help_text=_("The default website language for new users"),
     )
 
     timezone = TimeZoneField(verbose_name=_("Timezone"))
 
     date_format = models.CharField(
-        verbose_name=_("Date Format"),
+        verbose_name=_("Date format"),
         max_length=1,
         choices=DATE_FORMAT_CHOICES,
         default=DATE_FORMAT_DAY_FIRST,
-        help_text=_("Whether day comes first or month comes first in dates"),
+        help_text=_("Specify if the day or month comes first in dates"),
     )
 
     country = models.ForeignKey(
@@ -334,7 +332,7 @@ class Org(SmartModel):
         null=True,
         default=dict,
         verbose_name=_("Configuration"),
-        help_text=_("More Organization specific configuration"),
+        help_text=_("Additional organization-specific configuration"),
     )
 
     slug = models.SlugField(
@@ -343,27 +341,29 @@ class Org(SmartModel):
         null=True,
         blank=True,
         unique=True,
-        error_messages=dict(unique=_("This slug is not available")),
+        error_messages=dict(unique=_("This slug isn't available")),
     )
 
     limits = JSONField(default=dict)
 
     is_anon = models.BooleanField(
-        default=False, help_text=_("Whether this organization anonymizes the phone numbers of contacts within it")
+        default=False, help_text=_("Specify if this organization anonymizes the phone numbers of contacts")
     )
 
-    is_flagged = models.BooleanField(default=False, help_text=_("Whether this organization is currently flagged."))
+    is_flagged = models.BooleanField(default=False, help_text=_("Specify if this organization is currently flagged"))
 
-    is_suspended = models.BooleanField(default=False, help_text=_("Whether this organization is currently suspended."))
+    is_suspended = models.BooleanField(
+        default=False, help_text=_("Specify if this organization is currently suspended")
+    )
 
-    uses_topups = models.BooleanField(default=True, help_text=_("Whether this organization uses topups."))
+    uses_topups = models.BooleanField(default=True, help_text=_("Specify if this organization uses top-ups"))
 
     is_multi_org = models.BooleanField(
-        default=False, help_text=_("Whether this organization can have child workspaces")
+        default=False, help_text=_("Specify if this organization can have child workspaces")
     )
 
     is_multi_user = models.BooleanField(
-        default=False, help_text=_("Whether this organization can have multiple logins")
+        default=False, help_text=_("Specify if this organization can have multiple logins")
     )
 
     flow_languages = ArrayField(models.CharField(max_length=3), default=list)
@@ -387,7 +387,7 @@ class Org(SmartModel):
         help_text=_("The parent org that manages this org"),
     )
 
-    brain_on = models.BooleanField(default=False, help_text=_("Whether this organization use router"))
+    brain_on = models.BooleanField(default=False, help_text=_("Whether this organization uses the router"))
 
     proj_uuid = models.UUIDField(null=True, blank=True)
 
@@ -1414,7 +1414,7 @@ class Org(SmartModel):
         # look up our bundle
         bundle_map = get_bundle_map(self.get_bundles())
         if bundle not in bundle_map:
-            raise ValidationError(_("Invalid bundle: %s, cannot upgrade.") % bundle)
+            raise ValidationError(_("Invalid bundle: %s. Can't upgrade.") % bundle)
         bundle = bundle_map[bundle]
 
         # adds credits to this org
@@ -1490,7 +1490,7 @@ class Org(SmartModel):
 
             branding = self.get_branding()
 
-            subject = _("%(name)s Receipt") % branding
+            subject = _("%(name)s receipt") % branding
             template = "orgs/email/receipt_email"
             to_email = user.email
 
@@ -1510,14 +1510,12 @@ class Org(SmartModel):
 
         except stripe.error.CardError as e:
             logger.warning(f"Error adding credits to org: {str(e)}", exc_info=True)
-            validation_error = _("Sorry, your card was declined, please contact your provider or try another card.")
+            validation_error = _("Your card was declined. Contact your provider or try another card.")
 
         except Exception as e:
             logger.error(f"Error adding credits to org: {str(e)}", exc_info=True)
 
-            validation_error = _(
-                "Sorry, we were unable to process your payment, please try again later or contact us."
-            )
+            validation_error = _("We couldn't process your payment. Try again later or contact us.")
 
         if validation_error is not None:
             raise ValidationError(validation_error)
@@ -2173,7 +2171,7 @@ class Invitation(SmartModel):
             return
 
         branding = self.org.get_branding()
-        subject = _("%(name)s Invitation") % branding
+        subject = _("%(name)s invitation") % branding
         template = "orgs/email/invitation_email"
         to_email = self.email
 
@@ -2217,21 +2215,21 @@ class TopUp(SmartModel):
     price = models.IntegerField(
         null=True,
         blank=True,
-        verbose_name=_("Price Paid"),
-        help_text=_("The price paid for the messages in this top up (in cents)"),
+        verbose_name=_("Price paid"),
+        help_text=_("The price paid for the messages in this top-up (in cents)"),
     )
     credits = models.IntegerField(
-        verbose_name=_("Number of Credits"), help_text=_("The number of credits bought in this top up")
+        verbose_name=_("Number of credits"), help_text=_("The number of credits bought in this top-up")
     )
     expires_on = models.DateTimeField(
-        verbose_name=_("Expiration Date"), help_text=_("The date that this top up will expire")
+        verbose_name=_("Expiration date"), help_text=_("The date that this top up will expire")
     )
     stripe_charge = models.CharField(
-        verbose_name=_("Stripe Charge Id"),
+        verbose_name=_("Stripe charge ID"),
         max_length=32,
         null=True,
         blank=True,
-        help_text=_("The Stripe charge id for this charge"),
+        help_text=_("The Stripe charge ID for this charge"),
     )
     comment = models.CharField(
         max_length=255,
@@ -2295,9 +2293,9 @@ class TopUp(SmartModel):
                 price = -1 if self.price is None else self.price
 
                 if price > 0:
-                    comment = _("Purchased Credits")
+                    comment = _("Purchased credits")
                 elif price == 0:
-                    comment = _("Complimentary Credits")
+                    comment = _("Complimentary credits")
                 else:
                     comment = _("Credits")
 
@@ -2398,7 +2396,7 @@ class Debit(models.Model):
         on_delete=models.PROTECT,
         null=True,
         related_name="debits",
-        help_text=_("The topup these credits are applied against"),
+        help_text=_("The top-up these credits are applied against"),
     )
 
     amount = models.IntegerField(help_text=_("How many credits were debited"))
@@ -2408,7 +2406,7 @@ class Debit(models.Model):
         on_delete=models.PROTECT,
         null=True,
         related_name="allocations",
-        help_text=_("Optional topup that was allocated with these credits"),
+        help_text=_("Optional top-up that was allocated with these credits"),
     )
 
     debit_type = models.CharField(max_length=1, choices=DEBIT_TYPES, null=False, help_text=_("What caused this debit"))
@@ -2462,7 +2460,7 @@ class CreditAlert(SmartModel):
     TYPE_OVER = "O"
     TYPE_LOW = "L"
     TYPE_EXPIRING = "E"
-    TYPES = ((TYPE_OVER, _("Credits Over")), (TYPE_LOW, _("Low Credits")), (TYPE_EXPIRING, _("Credits expiring soon")))
+    TYPES = ((TYPE_OVER, _("Credits over")), (TYPE_LOW, _("Low credits")), (TYPE_EXPIRING, _("Credits expiring soon")))
 
     org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="credit_alerts")
 
@@ -2496,7 +2494,7 @@ class CreditAlert(SmartModel):
             return
 
         branding = self.org.get_branding()
-        subject = _("%(name)s Credits Alert") % branding
+        subject = _("%(name)s credits alert") % branding
         template = "orgs/email/alert_email"
         to_email = admin_emails
 

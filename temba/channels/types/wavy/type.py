@@ -45,7 +45,7 @@ class WavyType(ChannelType):
     }
 
     configuration_blurb = _(
-        "To finish connecting your channel, you need to have Movile/Wavy configure the URL below for your number."
+        "To finish connecting your channel, ask Movile/Wavy to configure the URL below for your number."
     )
 
     configuration_urls = (
@@ -58,16 +58,14 @@ class WavyType(ChannelType):
             label=_("Sent URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.wv' channel.uuid 'sent' %}",
             description=_(
-                "To receive the acknowledgement of sent messages, you need to set the Sent URL for your Movile/Wavy "
-                "account."
+                "To receive acknowledgments for sent messages, set the sent URL for your Movile/Wavy account."
             ),
         ),
         dict(
             label=_("Delivered URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.wv' channel.uuid 'delivered' %}",
             description=_(
-                "To receive delivery of delivered messages, you need to set the Delivered URL for your Movile/Wavy "
-                "account."
+                "To receive delivery of delivered messages, set the delivered URL for your Movile/Wavy account."
             ),
         ),
     )

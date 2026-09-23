@@ -4,7 +4,7 @@
 -block title
   .medium-help.icon-cloud-upload{ style:'float:left;' }
   %h2.header-margin
-    -trans "Airtime Transfer Details"
+    -trans "Airtime transfer details"
 
 -block above-bar
   %a.btn.btn-primary{ href: '{% url "airtime.airtimetransfer_list" %}' } Back
@@ -12,13 +12,13 @@
 -block post-fields
   -if show_logs
     %h3
-      -trans "HTTP Logs"
+      -trans "HTTP logs"
       -for log in object.http_logs.all
         %hr
         %pre.data.prettyprint{ style:'margin-top:10px;' }<
           {{ log.request|default:"" }}
         %pre.data.prettyprint{ style:'margin-top:10px;' }<
-          {% if log.response %}{{ log.response|default:"" }}{% else %}{% trans "No Data" %}{% endif %}
+          {% if log.response %}{{ log.response|default:"" }}{% else %}{% trans "No data" %}{% endif %}
 
 -block extra-script
   {{ block.super }}

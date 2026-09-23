@@ -63,26 +63,26 @@
   #pjax
     -block pjax
       -if org_perms.contacts.contact_delete
-        %temba-dialog#delete-confirmation.hide(header='{{ _("Delete Selected Contacts")|escapejs }}' primaryButtonName='{{ _("Delete")|escapejs }}' destructive='true')
+        %temba-dialog#delete-confirmation.hide(header='{{ _("Delete selected contacts")|escapejs }}' primaryButtonName='{{ _("Delete")|escapejs }}' destructive='true')
           .p-6
-            -trans "Are you sure you want to delete the selected contacts? This cannot be undone."
+            -trans "Are you sure you want to delete the selected contacts? This action can't be undone."
 
-        %temba-dialog#delete-all-confirmation.hide(header='{{ _("Delete All Contacts")|escapejs }}' primaryButtonName='{{ _("Delete")|escapejs }}' destructive='true')
+        %temba-dialog#delete-all-confirmation.hide(header='{{ _("Delete all contacts")|escapejs }}' primaryButtonName='{{ _("Delete")|escapejs }}' destructive='true')
           .p-6
             -blocktrans trimmed with count=paginator.count
-              Are you sure you want to delete all {{ count }} archived contacts? This cannot be undone.
+              Are you sure you want to delete all {{ count }} archived contacts? This action can't be undone.
 
             -if paginator.count > 50
               %br
               %br
               -blocktrans trimmed
-                This operation can take a while to complete. Contacts may remain in this view during the process.
+                This operation may take a while. Contacts may remain in this view during the process.
 
       .lp-frame
         .left
           -if org_perms.contacts.contactimport_create
             .button-primary.block(onclick="goto(event)" href="{% url 'contacts.contactimport_create' %}")
-              -trans "Import Contacts"
+              -trans "Import contacts"
 
           .lp-nav.upper
             -for folder in folders
@@ -94,18 +94,18 @@
           
           .secondary-buttons.mb-6
             -if org_perms.contacts.contact_create
-              %temba-modax#create-label-modal(header='{% trans "Create Contact" %}' endpoint="{% url 'contacts.contact_create' %}")
+              %temba-modax#create-label-modal(header='{% trans "Create contact" %}' endpoint="{% url 'contacts.contact_create' %}")
                 .button-light.block.mt-3
-                  -trans "Create Contact"
+                  -trans "Create contact"
 
             -if org_perms.contacts.contactgroup_create
-              %temba-modax#create-group-modal(header='{% trans "Create Group" %}' endpoint="{% url 'contacts.contactgroup_create' %}" -temba-loaded="handleCreateGroupModalLoaded")
+              %temba-modax#create-group-modal(header='{% trans "Create group" %}' endpoint="{% url 'contacts.contactgroup_create' %}" -temba-loaded="handleCreateGroupModalLoaded")
                 .button-light.block.mt-3
-                  -trans "Create Group"
+                  -trans "Create group"
 
           .lp-nav.upper
             .font-normal.uppercase.text-xs.pb-1.text-gray-500
-              -trans "Smart Groups"
+              -trans "Smart groups"
             .inner-scroll
               -for group in groups
                 -if group.is_dynamic
@@ -160,7 +160,7 @@
                         -if 'unlabel' in actions
                           .button-action(onclick="unlabelObjectRows({{current_group.pk}});")
                             .-mt-1.mr-2.glyph.icon-user-remove
-                            -trans "Remove From Group"
+                            -trans "Remove from group"
 
                         -if 'label' in actions
                           .btn-group
@@ -182,10 +182,10 @@
                                   %li.separator.-mx-4.border-b.my-3
                                 %li
                                   .lbl-menu.add-group.hover-linked(onclick="handleAddGroupClicked()")
-                                    - trans "New Group..."
+                                    - trans "New group..."
 
                         -if org_perms.msgs.broadcast_send and not reply_disabled
-                          %temba-modax#send-message-modal(header='{{_("Send Message")|escapejs}}' endpoint="{% url 'msgs.broadcast_send' %}")
+                          %temba-modax#send-message-modal(header='{{_("Send message")|escapejs}}' endpoint="{% url 'msgs.broadcast_send' %}")
                             .button-action.no-loading(onclick="handleSendMessageClicked()")
                               .mr-2.glyph.icon-bubble-3(style="font-size:14px")
                               -trans "Send"
@@ -214,16 +214,10 @@
                     =search_error
               -elif search
                 .mb-4.ml-1.text-base.leading-relaxed
-                  -if search_phone_fallback
-                    -blocktrans with results_count=paginator.count|intcomma count cc=paginator.count
-                      Found {{ results_count }} contact matching <i>{{search}}</i> (phone after WhatsApp).
-                      -plural
-                        Found {{ results_count }} contacts matching <i>{{search}}</i> (phone after WhatsApp).
-                  -else
-                    -blocktrans with results_count=paginator.count|intcomma count cc=paginator.count
-                      Found {{ results_count }} contact matching <i>{{search}}</i>.
-                      -plural
-                        Found {{ results_count }} contacts matching <i>{{search}}</i>.
+                  -blocktrans with results_count=paginator.count|intcomma count cc=paginator.count
+                    Found {{ results_count }} contact matching <i>{{search}}</i>
+                    -plural
+                      Found {{ results_count }} contacts matching <i>{{search}}</i>.
 
               .shadow.rounded-lg
                 -include "contacts/contact_list_include.haml"
@@ -233,7 +227,7 @@
 
                 -if paginator.is_es_search and not page_obj.has_next_page and page_obj.number == paginator.num_pages and paginator.count > 10000
                   .text-gray-400.text-sm.self-end.mt-2
-                    -trans "To view more than 10,000 search results, save it as a group."
+                    -trans "To view more than 10,000 search results, save them as a group."
                 
           -else
             -include "contacts/empty_include.haml"

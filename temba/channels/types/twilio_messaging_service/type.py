@@ -28,8 +28,7 @@ class TwilioMessagingServiceType(ChannelType):
     ) % {"link": '<a href="https://www.twilio.com/copilot">Twilio Copilot</a>'}
 
     configuration_blurb = _(
-        "To finish configuring your Twilio Messaging Service connection you'll need to add the following URL in your "
-        "Messaging Service Inbound Settings."
+        "To finish configuring your Twilio Messaging Service connection, you'll need to add the following URL in your Messaging Service Inbound Settings."
     )
 
     configuration_urls = (

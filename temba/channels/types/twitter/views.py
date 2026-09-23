@@ -15,11 +15,11 @@ from .client import TwitterClient
 
 class ClaimView(NonAtomicMixin, ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
-        api_key = forms.CharField(label=_("Consumer API Key"))
-        api_secret = forms.CharField(label=_("Consumer API Secret Key"))
-        access_token = forms.CharField(label=_("Access Token"))
-        access_token_secret = forms.CharField(label=_("Access Token Secret"))
-        env_name = forms.CharField(label=_("Environment Name"))
+        api_key = forms.CharField(label=_("Consumer API key"))
+        api_secret = forms.CharField(label=_("Consumer API secret key"))
+        access_token = forms.CharField(label=_("Access token"))
+        access_token_secret = forms.CharField(label=_("Access token secret"))
+        env_name = forms.CharField(label=_("Environment name"))
 
         def clean(self):
             cleaned_data = super().clean()
@@ -33,7 +33,7 @@ class ClaimView(NonAtomicMixin, ClaimViewMixin, SmartFormView):
                 try:
                     client.verify_credentials()
                 except TwythonError:
-                    raise ValidationError(_("The provided Twitter credentials do not appear to be valid."))
+                    raise ValidationError(_("The provided X credentials are invalid"))
 
             return cleaned_data
 
@@ -86,4 +86,4 @@ class UpdateForm(UpdateChannelForm):
         fields = "name", "address", "alert_email"
         readonly = ("address",)
         labels = {"address": _("Handle")}
-        helps = {"address": _("Twitter handle of this channel")}
+        helps = {"address": _("X handle of this channel")}

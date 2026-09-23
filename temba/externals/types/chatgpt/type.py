@@ -26,7 +26,7 @@ class ChatGPTType(ExternalServiceType, ExternalServiceTypeInterface):
     slug = "chatgpt"
     icon = "icon-power-cord"
 
-    connect_blurb = _("chatgpt external service")
+    connect_blurb = _("ChatGPT external service")
 
     def is_available_to(self, user):
         return True

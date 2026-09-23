@@ -72,7 +72,7 @@ class AssetDownloadView(NotificationTargetMixin, SmartTemplateView):
         except (AssetEntityNotFound, AssetFileNotFound):
             file_error = _("File not found")
         except AssetAccessDenied:  # pragma: needs cover
-            file_error = _("You do not have permission to access this file")
+            file_error = _("You don't have permission to access this file")
         else:
             file_error = None
             self.request.user.set_org(asset.org)

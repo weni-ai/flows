@@ -46,19 +46,18 @@ class TwimlAPIType(ChannelType):
     )
 
     configuration_blurb = _(
-        "To finish configuring your TwiML REST API channel you'll need to add the following URL in your TwiML REST API "
-        "instance."
+        "To finish configuring your TwiML REST API channel, add the following URL to your TwiML REST API instance."
     )
 
     configuration_urls = (
         dict(
-            label=_("TwiML REST API Host"),
+            label=_("TwiML REST API host"),
             url="{{ channel.config.send_url }}",
-            description=_("The endpoint which will receive Twilio API requests for this channel."),
+            description=_("The endpoint that will receive Twilio API requests for this channel"),
         ),
         dict(
             label="",
             url="https://{{ channel.callback_domain }}{% url 'courier.tw' channel.uuid 'receive' %}",
-            description=_("Incoming messages for this channel will be sent to this endpoint."),
+            description=_("Incoming messages for this channel will be sent to this endpoint"),
         ),
     )

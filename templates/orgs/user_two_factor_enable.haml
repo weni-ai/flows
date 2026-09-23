@@ -12,9 +12,8 @@
 -block pre-form
   .mb-6
     -blocktrans trimmed with ga_url="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2" authy_url="https://authy.com/"
-      To enable two-factor authentication on your login, use a one-time password (OTP) application such as
-      <a href="{{ ga_url }}">Google Authenticator</a> or <a href="{{ authy_url }}">Authy</a> to scan the QR code
-      below.
+      To enable two-factor authentication, use a one-time password (OTP) app such as <a href="{{ ga_url }}">Google
+      Authenticator</a> or <a href="{{ authy_url }}">Authy</a> to scan the QR code below.
 
   .mb-6.text-center
     %canvas#qr
@@ -41,4 +40,4 @@
 
 -block summary
   -blocktrans trimmed
-    Two-factor authentication is <b>disabled</b>.
+    Two-factor authentication is <b>disabled</b>

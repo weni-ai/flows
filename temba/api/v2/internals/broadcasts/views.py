@@ -11,6 +11,8 @@ from weni.internal.views import InternalGenericViewSet
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction
+from django.utils.decorators import method_decorator
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.v2.internals.broadcasts.context import resolve_org_and_user_internal_whatsapp
@@ -68,6 +70,7 @@ class BroadcastsViewSet(CreateModelMixin, InternalGenericViewSet):
         return super().create(request, *args, **kwargs)
 
 
+@method_decorator(transaction.non_atomic_requests, name="dispatch")
 class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
     # Try JWT first; if not applicable, fall back to OIDC
     authentication_classes = [OptionalJWTAuthentication, InternalOIDCAuthentication]
@@ -75,6 +78,16 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
 
     def post(self, request, *args, **kwargs):
         data = dict(request.data)
+        msg_payload = data.get("msg") or {}
+        print(
+            "[whatsapp broadcast api] ig_comment_id=%r ig_response_type=%r msg_keys=%s"
+            % (
+                msg_payload.get("ig_comment_id"),
+                msg_payload.get("ig_response_type"),
+                sorted(msg_payload.keys()),
+            ),
+            flush=True,
+        )
         project_uuid = data.get("project") or getattr(request, "project_uuid", None)
 
         idem_key = extract_idempotency_key(request)

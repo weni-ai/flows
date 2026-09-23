@@ -57,7 +57,7 @@ class BaseExportTask(TembaModel):
     LOG_PROGRESS_PER_ROWS = 10000
 
     org = models.ForeignKey(
-        "orgs.Org", on_delete=models.PROTECT, related_name="%(class)ss", help_text=_("The organization of the user.")
+        "orgs.Org", on_delete=models.PROTECT, related_name="%(class)ss", help_text=_("The organization of the user")
     )
 
     status = models.CharField(max_length=1, default=STATUS_PENDING, choices=STATUS_CHOICES)

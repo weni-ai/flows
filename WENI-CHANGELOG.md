@@ -1,3 +1,25 @@
+3.98.0
+----------
+* feat: Create a hidden WWC Copilot channel when projects are created via EDA with is_live_desk_copilot=True
+
+3.97.1
+----------
+* feat: Remove channel type validation in whatsapp broadcast API
+
+3.97.0
+----------
+* feat: add WA Conversation Handovers app
+
+3.96.0
+----------
+* feat: Full localization review of the project for the officially supported languages: EN (source), ES, PT and RO.
+
+3.95.0
+----------
+* feat: add speckit
+* feat: add broadcast flows trigger group
+* fix: normalizing whatsapp urn on create
+
 3.94.1
 ----------
 * feat: increase flow start params string limit from 640 to 4096

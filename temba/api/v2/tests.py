@@ -58,7 +58,7 @@ from temba.externals.models import ExternalService
 from temba.flows.models import Flow, FlowLabel, FlowRun, FlowStart
 from temba.globals.models import Global
 from temba.locations.models import AdminBoundary, BoundaryAlias
-from temba.msgs.models import Broadcast, Label, Msg
+from temba.msgs.models import Broadcast, Label, ManagedTriggerGroup, Msg
 from temba.orgs.models import Org
 from temba.templates.models import Template, TemplateTranslation
 from temba.tests import AnonymousOrg, TembaTest, matchers, mock_mailroom
@@ -440,10 +440,9 @@ class APITest(APIJSONMixin, TembaTest):
         self.assertEqual(OrderedDict([("a", "x" * 640)]), normalize_extra({"a": "x" * 641}))
 
     def test_normalize_extra_param_value_size_default(self):
-        size = settings.FLOW_START_PARAM_VALUE_SIZE
-        self.assertEqual(4096, size)
-        self.assertEqual(OrderedDict([("a", "x" * size)]), normalize_extra({"a": "x" * size}))
-        self.assertEqual(OrderedDict([("a", "x" * size)]), normalize_extra({"a": "x" * (size + 1)}))
+        self.assertEqual(4096, settings.FLOW_START_PARAM_VALUE_SIZE)
+        self.assertEqual(OrderedDict([("a", "x" * 4096)]), normalize_extra({"a": "x" * 4096}))
+        self.assertEqual(OrderedDict([("a", "x" * 4096)]), normalize_extra({"a": "x" * 4097}))
 
     def test_authentication(self):
         def request(endpoint, **headers):
@@ -1751,7 +1750,10 @@ class APITest(APIJSONMixin, TembaTest):
             },
         )
 
-        self.assertResponseError(response, "non_field_errors", "Invalid channel type")
+        self.assertEqual(response.status_code, 201)
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+        self.assertEqual(self.channel, broadcast.channel)
+        self.assertEqual({"text": "Send a message"}, broadcast.metadata)
 
         # send a msg with a non existing channel
         response = self.postJSON(
@@ -1927,6 +1929,45 @@ class APITest(APIJSONMixin, TembaTest):
         )
         self.assertResponseError(response, "non_field_errors", "Template with name Away not found.")
 
+        ig_channel = self.create_channel("IG", "Instagram: Demo", "12345", org=self.org)
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["instagram:5678"],
+                "channel": str(ig_channel.uuid),
+                "msg": {
+                    "text": "Thanks for your comment!",
+                    "ig_comment_id": "30065218",
+                    "ig_response_type": "comment",
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+        self.assertEqual(
+            {
+                "text": "Thanks for your comment!",
+                "ig_comment_id": "30065218",
+                "ig_response_type": "comment",
+            },
+            broadcast.metadata,
+        )
+
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["instagram:5678"],
+                "channel": str(ig_channel.uuid),
+                "msg": {
+                    "text": "Thanks for your comment!",
+                    "ig_comment_id": "30065218",
+                },
+            },
+        )
+        self.assertResponseError(response, "msg", "ig_response_type is required when ig_comment_id is provided")
+
         # urns and contacts accept up to 1000 items per request (see WhatsappBroadcastWriteSerializer)
         many_urns = [f"whatsapp:556199{str(i).zfill(7)}" for i in range(1000)]
         response = self.postJSON(url, None, {"urns": many_urns, "msg": {"text": "Bulk"}})
@@ -1941,6 +1982,30 @@ class APITest(APIJSONMixin, TembaTest):
             url, None, {"groups": [str(uuid.uuid4()) for _ in range(101)], "msg": {"text": "Bulk"}}
         )
         self.assertResponseError(response, "groups", "This field can only contain up to 100 items.")
+
+    @patch("temba.mailroom.queue_broadcast")
+    @mock_mailroom
+    def test_whatsapp_broadcasts_trigger_flow_with_urns(self, mocks, mock_queue_broadcast):
+        url = reverse("api.v2.whatsapp_broadcasts")
+        self.assertEndpointAccess(url)
+
+        flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5511999999999"],
+                "trigger_flow_uuid": str(flow.uuid),
+                "msg": {"text": "Hello"},
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        self.assertEqual(data["groups"], [])
+        self.assertIn("trigger_group", data["metadata"])
+        association = ManagedTriggerGroup.objects.get(org=self.org, flow=flow)
+        self.assertEqual(str(association.group.uuid), data["metadata"]["trigger_group"]["uuid"])
+        self.assertEqual(association.group.contacts.count(), 1)
 
     def test_archives(self):
         url = reverse("api.v2.archives")
@@ -2238,7 +2303,7 @@ class APITest(APIJSONMixin, TembaTest):
                 {
                     "uuid": event3.uuid,
                     "campaign": {"uuid": campaign3.uuid, "name": "Alerts"},
-                    "relative_to": {"key": "created_on", "label": "Created On"},
+                    "relative_to": {"key": "created_on", "label": "Created on"},
                     "offset": 6,
                     "unit": "hours",
                     "delivery_hour": 12,
@@ -3313,17 +3378,17 @@ class APITest(APIJSONMixin, TembaTest):
 
         # reject names that exceed the configured maximum length
         response = self.postJSON(url, None, {"name": "x" * 101, "urns": ["tel:+250787000111"]})
-        self.assertResponseError(response, "name", "Contact name cannot exceed 100 characters.")
+        self.assertResponseError(response, "name", "Contact name can't exceed 100 characters")
 
         # reject empty/whitespace-only names when explicitly provided
         response = self.postJSON(url, None, {"name": "   ", "urns": ["tel:+250787000222"]})
-        self.assertResponseError(response, "name", "Contact name cannot be empty.")
+        self.assertResponseError(response, "name", "Contact name can't be empty")
 
         # reject tel: URN that passes phonenumbers (4-digit Niue national + 3-digit country code)
         # but has fewer than 8 digits, exercising validate_contact_phone in the URN field
         response = self.postJSON(url, None, {"name": "Niue Phone", "urns": ["tel:+6831234"]})
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Phone number must have at least 8 digits.", response.json()["urns"]["0"])
+        self.assertIn("Phone number must have at least 8 digits", response.json()["urns"]["0"])
 
     @mock_mailroom
     def test_contacts_lean(self, mr_mocks):
@@ -4087,7 +4152,7 @@ class APITest(APIJSONMixin, TembaTest):
 
         # create some globals
         global1 = Global.get_or_create(self.org, self.admin, "org_name", "Org Name", "Acme Ltd")
-        global2 = Global.get_or_create(self.org, self.admin, "access_token", "Access Token", "23464373")
+        global2 = Global.get_or_create(self.org, self.admin, "access_token", "Access token", "23464373")
 
         # on another org
         Global.get_or_create(self.org2, self.admin, "thingy", "Thingy", "xyz")
@@ -4104,7 +4169,7 @@ class APITest(APIJSONMixin, TembaTest):
             [
                 {
                     "key": "access_token",
-                    "name": "Access Token",
+                    "name": "Access token",
                     "value": "23464373",
                     "modified_on": format_datetime(global2.modified_on),
                 },
@@ -4144,7 +4209,7 @@ class APITest(APIJSONMixin, TembaTest):
             [
                 {
                     "key": "access_token",
-                    "name": "Access Token",
+                    "name": "Access token",
                     "value": "23464373",
                     "modified_on": format_datetime(global2.modified_on),
                 },

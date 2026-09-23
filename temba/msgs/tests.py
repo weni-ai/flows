@@ -831,7 +831,7 @@ class MsgTest(TembaTest):
         old_modified_on = blocking_export.modified_on
 
         response = self.client.post(reverse("msgs.msg_export") + "?l=I", {"export_all": 1}, follow=True)
-        self.assertContains(response, "already an export in progress")
+        self.assertContains(response, "An export is already in progress")
 
         # perform the export manually, assert how many queries
         with self.mockReadOnly():
@@ -2039,7 +2039,7 @@ class BroadcastCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.client.post(
             send_url, {"text": "Broken", "omnibox": omnibox_serialize(self.org, [], [], json_encode=True)}
         )
-        self.assertFormError(response, "form", "omnibox", "At least one recipient is required.")
+        self.assertFormError(response, "form", "omnibox", "At least one recipient is required")
 
         # try to submit with an invalid URN
         response = self.client.post(
@@ -2049,14 +2049,14 @@ class BroadcastCRUDLTest(TembaTest, CRUDLTestMixin):
                 "omnibox": omnibox_serialize(self.org, [], [], raw_urns=["tel:$$$$$$"], json_encode=True),
             },
         )
-        self.assertFormError(response, "form", "omnibox", "'tel:$$$$$$' is not a valid URN.")
+        self.assertFormError(response, "form", "omnibox", "'tel:$$$$$$' isn't a valid URN")
 
         # if we release our send channel we also can't start send
         self.channel.release(self.admin)
 
         response = self.requestView(send_url, self.admin)
         self.assertContains(
-            response, 'To get started you need to <a href="/channels/channel/claim/">add a channel</a>'
+            response, 'To get started, <a href="/channels/channel/claim/">add a channel</a> to your workspace'
         )
         self.assertNotContains(response, "Send")
 
@@ -2456,8 +2456,7 @@ class LabelCRUDLTest(TembaTest, CRUDLTestMixin):
                 response,
                 "form",
                 "name",
-                "This workspace has 2 labels and the limit is 2. "
-                "You must delete existing ones before you can create new ones.",
+                "This workspace has 2 labels and the limit is 2. Delete existing ones before creating new ones.",
             )
 
     def test_delete(self):
@@ -2467,7 +2466,7 @@ class LabelCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # fetch delete modal
         response = self.assertDeleteFetch(delete_url, allow_editors=True)
-        self.assertContains(response, "You are about to delete")
+        self.assertContains(response, "You're about to delete")
 
         # submit to delete it
         response = self.assertDeleteSubmit(delete_url, object_deactivated=label, success_status=200)
@@ -2501,7 +2500,7 @@ class LabelCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # fetch delete modal - which will tell us we can't delete this as it is not empty
         response = self.assertDeleteFetch(delete_url, allow_editors=True)
-        self.assertContains(response, "cannot be deleted as it still contains labels")
+        self.assertContains(response, "be deleted as it still contains labels")
 
         # remove label...
         label1.release(self.admin)
@@ -2518,7 +2517,7 @@ class LabelCRUDLTest(TembaTest, CRUDLTestMixin):
         Label.get_or_create(self.org, self.user, "Spam", folder=folder)
 
         response = self.assertDeleteSubmit(delete_url, object_unchanged=folder, success_status=200)
-        self.assertContains(response, "cannot be deleted as it still contains labels")
+        self.assertContains(response, "be deleted as it still contains labels")
 
     def test_list(self):
         folder = Label.get_or_create_folder(self.org, self.user, "Folder")

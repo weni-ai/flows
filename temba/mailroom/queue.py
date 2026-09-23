@@ -158,6 +158,17 @@ def queue_broadcast(broadcast):
             "queue": queue,
         }
 
+        print(
+            "[whatsapp broadcast queue] broadcast_id=%s ig_comment_id=%r ig_response_type=%r msg=%r"
+            % (
+                broadcast.id,
+                broadcast.metadata.get("ig_comment_id"),
+                broadcast.metadata.get("ig_response_type"),
+                broadcast.metadata,
+            ),
+            flush=True,
+        )
+
         _queue_batch_task(broadcast.org_id, BatchTask.SEND_WHATSAPP_BROADCAST, task, HIGH_PRIORITY)
 
 

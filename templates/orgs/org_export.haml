@@ -3,7 +3,7 @@
 -load temba compress i18n humanize
 
 -block title
-  -trans "Create Export"
+  -trans "Create export"
 
 -block content
 
@@ -11,17 +11,16 @@
     .float-right
       -if not archived
         .button-light{onclick:"goto(event)", href:'?archived=1'}
-          -trans "Show Archived"
+          -trans "Show archived"
 
       -else
         .button-light{onclick:"goto(event)", href:'?'}
-          -trans "Hide Archived"
+          -trans "Hide archived"
 
   .flex.w-full.mb-4.items-end.flex-wrap.justify-end{style:"min-height:41px"}
     -blocktrans trimmed
-      Select all of the items below that you would like to include in your export. We've grouped them
-      together based on which flows and campaigns work with each other. Any related triggers will automatically
-      be included in the export.
+      Select the items below to include in your export. We've grouped them based on which flows and campaigns work
+      together. Any related triggers will automatically be included.
 
   .flex.w-full.mb-4.items-end.flex-wrap.justify-end{style:"min-height:41px"}
     %form.export.w-full{method:'POST'}
@@ -35,7 +34,7 @@
                   -trans "Group"
                   {{ forloop.counter|apnumber|capfirst }}
                 .button-light.select-section.px-3.py-2.text-base.bg-white
-                  -trans "Select Group"
+                  -trans "Select group"
                   {{ forloop.counter|apnumber|capfirst }}
 
             .exportables-grp.px-2
@@ -56,13 +55,13 @@
               .flex.items-center.py-4.px-8
                 .title.flex-grow
                   -if buckets
-                    -trans "Everything Else"
+                    -trans "Everything else"
                   -else
-                    -trans "Flows and Campaigns"
+                    -trans "Flows and campaigns"
 
                 -if buckets
                   .button-light.select-section.px-3.py-2.text-base.bg-white
-                    -trans "Select Everthing Else"
+                    -trans "Select everything else"
 
             .mb-12.exportables-grp.px-2
               -for exportable in singles
@@ -78,7 +77,7 @@
 
       .flex.mb-24.mt-6
         .button-light.select-all
-          -trans "Select All"
+          -trans "Select all"
 
         .ml-4.button-primary.submit
           -trans "Export"

@@ -61,6 +61,8 @@ class TemplateTranslationDetailsSerializer(serializers.Serializer):
             channel=str(instance.channel.uuid),
             language=instance.language,
             variable_count=instance.variable_count,
+            parameter_format=instance.template.parameter_format or "positional",
+            parameters=[{"name": name} for name in (instance.parameter_names or [])],
             header=header_obj,
             body=body_obj,
             footer=footer_obj,
