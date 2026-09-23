@@ -1,6 +1,10 @@
+3.99.0
+----------
+* feat: add validation for Instagram comment ID and response type in WhatsappBroadcastWriteSerializer
+
 3.98.0
 ----------
-* feat: add validation for Instagram comment ID and response type in WhatsappBroadcastWriteSerializer- #880
+* feat: Create a hidden WWC Copilot channel when projects are created via EDA with is_live_desk_copilot=True
 
 3.97.1
 ----------
