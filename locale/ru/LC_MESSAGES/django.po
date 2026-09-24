@@ -7566,3 +7566,9 @@ msgstr "Данные в таблице Excel о веб-перехватчика�
 
 msgid "Data in the Excel spreadsheet about project template messages:"
 msgstr "Данные в таблице Excel о сообщениях шаблона проекта:"
+
+msgid "The Opt-in group cannot be deleted."
+msgstr ""
+
+msgid "The Opt-in group cannot be renamed."
+msgstr ""
