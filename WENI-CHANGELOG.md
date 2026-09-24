@@ -1,6 +1,7 @@
 3.100.0
 ----------
 * feat: named WhatsApp template parameters — record parameter format/names, accept named broadcast values, resolve per recipient
+* fix: Translate global form labels and cancel buttons
 
 3.99.0
 ----------
