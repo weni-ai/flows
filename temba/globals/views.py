@@ -1,9 +1,8 @@
-from gettext import gettext as _
-
 from smartmin.views import SmartCreateView, SmartCRUDL, SmartListView, SmartUpdateView
 
 from django import forms
 from django.urls import reverse
+from django.utils.translation import ugettext_lazy as _
 
 from temba.orgs.models import Org
 from temba.orgs.views import DependencyDeleteModal, DependencyUsagesModal, ModalMixin, OrgObjPermsMixin, OrgPermsMixin
