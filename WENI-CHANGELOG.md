@@ -1,3 +1,7 @@
+3.100.0
+----------
+* feat: named WhatsApp template parameters — record parameter format/names, accept named broadcast values, resolve per recipient
+
 3.99.0
 ----------
 * feat: add validation for Instagram comment ID and response type in WhatsappBroadcastWriteSerializer
