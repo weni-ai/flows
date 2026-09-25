@@ -3613,6 +3613,9 @@ class GroupsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView):
 
         instance = self.get_object()
 
+        if instance.is_opt_in:
+            raise InvalidQueryError("The Opt-in group cannot be deleted.")
+
         # if there are still dependencies, give up
         triggers = instance.triggers.filter(is_archived=False)
         if triggers:
