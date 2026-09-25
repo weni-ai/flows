@@ -4808,28 +4808,29 @@ requests = ">=2.25.0,<3.0"
 
 [[package]]
 name = "weni-rp-apps"
-version = "2.11.1"
+version = "2.11.2"
 description = "Weni apps for Rapidpro Platform"
 optional = false
 python-versions = "<3.13,>=3.10"
 groups = ["main"]
 files = [
-    {file = "weni_rp_apps-2.11.1-py3-none-any.whl", hash = "sha256:7f50b434b13f27714f02e3a3af765854befa6c8c2de3acba876eae046858d265"},
-    {file = "weni_rp_apps-2.11.1.tar.gz", hash = "sha256:1f965010b114c76857b0184e5747c489b027e86001cd7f5dfa1c079df5c7c252"},
+    {file = "weni_rp_apps-2.11.2-py3-none-any.whl", hash = "sha256:3f11f21d05f0fd0c8d64de7b5bb2d848d4bd9d0cc3321ec0855fed1ed135b378"},
+    {file = "weni_rp_apps-2.11.2.tar.gz", hash = "sha256:3ef82a230aaa8de638bea8f8e10bb3b83f8bd27a62c3e6f6dd6a0d06ae0cbf36"},
 ]
 
 [package.dependencies]
-django-csp = ">=3.7,<4.0"
-django-environ = ">=0.7.0,<0.8.0"
-django-templates-macros = ">=0.2,<0.3"
+mozilla-django-oidc = ">=2.0.0,<3.0.0"
 djangogrpcframework = ">=0.2.1,<0.3.0"
-drf-nested-routers = ">=0.93.4,<0.94.0"
+django-environ = ">=0.7.0,<0.8.0"
 elastic-apm = ">=6.4.0,<7.0.0"
 flower = ">=0.9,<0.10"
-grpcio = ">=1.71.0,<2.0.0"
-mozilla-django-oidc = ">=2.0.0,<3.0.0"
+django-templates-macros = ">=0.2,<0.3"
+django-csp = ">=3.7,<4.0"
 pre-commit = ">=2.20.0,<3.0.0"
+drf-nested-routers = ">=0.93.4,<0.94.0"
+grpcio = ">=1.71.0,<2.0.0"
 protobuf = ">=6.30.0,<7.0.0"
+
 
 [[package]]
 name = "werkzeug"
@@ -5142,4 +5143,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.12"
-content-hash = "dd0acb9997889f4f4f5c29ff2c7fcb7a76d4515e97cd5c71948bba75d14d5f51"
+content-hash = "99569b30502e01d9446f371bca377c2982e0ff1d88325e8162e6c6ed53b05374"
