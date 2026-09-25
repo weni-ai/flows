@@ -708,6 +708,7 @@ class BroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
 
 
 @method_decorator(transaction.non_atomic_requests, name="dispatch")
+@api_gateway_expose(alias="broadcasts", methods=["GET", "POST"])
 class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     """
     This endpoint allows you to send new whatsapp message broadcasts and list existing broadcasts in your account.
@@ -1538,7 +1539,6 @@ class CampaignEventsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAP
         }
 
 
-@api_gateway_expose(alias="channels")
 class ChannelsEndpoint(ListAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list channels in your account.
@@ -1890,7 +1890,7 @@ class ClassifiersEndpoint(ListAPIMixin, BaseAPIView):
         }
 
 
-@api_gateway_expose(alias="contacts")
+@api_gateway_expose(alias="contacts", methods=["GET", "POST", "DELETE"])
 class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list, create, update and delete contacts in your account.
@@ -3052,6 +3052,7 @@ class DefinitionsEndpoint(BaseAPIView):
         }
 
 
+@api_gateway_expose(alias="contact-fields", methods=["GET", "POST"])
 class FieldsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list custom contact fields in your account.
@@ -3175,6 +3176,7 @@ class FieldsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
         }
 
 
+@api_gateway_expose(alias="automation-flows", methods=["GET"])
 class FlowsEndpoint(ListAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list flows in your account.
@@ -3840,6 +3842,7 @@ class MediaEndpoint(BaseAPIView):
         return Response(dict(), status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_gateway_expose(alias="messages", methods=["GET"])
 class MessagesEndpoint(ListAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list messages in your account.
@@ -4397,6 +4400,7 @@ class ResthookEventsEndpoint(ListAPIMixin, BaseAPIView):
         }
 
 
+@api_gateway_expose(alias="automation-flow-runs", methods=["GET"])
 class RunsEndpoint(ListAPIMixin, BaseAPIView):
     """
     This endpoint allows you to fetch flow runs. A run represents a single contact's path through a flow and is created
@@ -4560,6 +4564,7 @@ class RunsEndpoint(ListAPIMixin, BaseAPIView):
         }
 
 
+@api_gateway_expose(alias="automation-flow-starts", methods=["GET", "POST"])
 class FlowStartsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list manual flow starts in your account, and add or start contacts in a flow.
@@ -5583,6 +5588,7 @@ class EventsEndpoint(BaseAPIView):
         }
 
 
+@api_gateway_expose(alias="events", methods=["GET"])
 class EventsV2Endpoint(BaseAPIView):
     permission = "orgs.org_api"
 
