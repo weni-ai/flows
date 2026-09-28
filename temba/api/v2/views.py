@@ -5319,7 +5319,7 @@ class UsersEndpoint(ListAPIMixin, BaseAPIView):
             "params": [],
         }
 
-
+@api_gateway_expose(alias="workspace")
 class WorkspaceEndpoint(BaseAPIView):
     """
     This endpoint allows you to view details about your workspace.
@@ -5458,7 +5458,7 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
             "example": {},
         }
 
-
+@api_gateway_expose(alias="whatsapp_flows")
 class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
     """
     This endpoint allows you to fetch the WhatsApp flows that have been synced.
@@ -5530,6 +5530,7 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
         }
 
 
+@api_gateway_expose(alias="events")
 class EventsEndpoint(BaseAPIView):
     permission = "orgs.org_api"
 
