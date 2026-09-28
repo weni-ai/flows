@@ -5,9 +5,6 @@ from temba.contacts.models import URN
 from ...models import ChannelType
 from .views import ClaimView
 
-CONFIG_BASE_URL = "base_url"
-CONFIG_AUTH_TOKEN = "auth_token"
-
 
 class TelephonyPSTNType(ChannelType):
     """

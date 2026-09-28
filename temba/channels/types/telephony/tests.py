@@ -1,11 +1,8 @@
-from unittest.mock import patch
-
 from django.urls import reverse
 
 from temba.tests import TembaTest
 
 from ...models import Channel
-from .type import CONFIG_AUTH_TOKEN, CONFIG_BASE_URL
 
 
 class TelephonyPSTNTypeTest(TembaTest):
@@ -13,8 +10,7 @@ class TelephonyPSTNTypeTest(TembaTest):
         return reverse("channels.types.telephony.claim")
 
     def _post_claim(self, post_data):
-        with patch("socket.gethostbyname", return_value="8.8.8.8"):
-            return self.client.post(self._claim_url(), post_data)
+        return self.client.post(self._claim_url(), post_data)
 
     def test_claim(self):
         Channel.objects.all().delete()
@@ -27,8 +23,6 @@ class TelephonyPSTNTypeTest(TembaTest):
             "name": "Support Line",
             "country": "US",
             "phone_number": "+12065551212",
-            "base_url": "https://google.com",
-            "auth_token": "secret-token",
         }
 
         # FR-005: invalid DIDs must be rejected before channel creation
@@ -46,8 +40,8 @@ class TelephonyPSTNTypeTest(TembaTest):
         self.assertEqual("+12065551212", channel.address)
         self.assertEqual("US", channel.country)
         self.assertEqual(["tel"], channel.schemes)
-        self.assertEqual("https://google.com", channel.config[CONFIG_BASE_URL])
-        self.assertEqual("secret-token", channel.config[CONFIG_AUTH_TOKEN])
+        self.assertFalse(channel.config.get("base_url"))
+        self.assertFalse(channel.config.get("auth_token"))
 
         read_url = reverse("channels.channel_read", args=[channel.uuid])
         self.assertRedirect(response, read_url)
@@ -66,7 +60,6 @@ class TelephonyPSTNTypeTest(TembaTest):
             "name": "Support Line",
             "country": "US",
             "phone_number": "206-555-1212",
-            "base_url": "https://google.com",
         }
 
         response = self._post_claim(post_data)

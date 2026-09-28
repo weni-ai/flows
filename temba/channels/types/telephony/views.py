@@ -5,7 +5,6 @@ from django import forms
 from django.utils.translation import ugettext_lazy as _
 
 from temba.contacts.models import URN
-from temba.utils.fields import ExternalURLField
 
 from ...models import Channel
 from ...views import ALL_COUNTRIES, ClaimViewMixin
@@ -29,15 +28,6 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             label=_("Telephone number (DID)"),
             help_text=_("The inbound number callers dial, in E.164 format (e.g. +12065551212)"),
         )
-        base_url = ExternalURLField(
-            label=_("Voice gateway base URL"),
-            help_text=_("Base URL of the voice gateway that receives outbound agent text for TTS"),
-        )
-        auth_token = forms.CharField(
-            label=_("Gateway auth token"),
-            required=False,
-            help_text=_("Optional bearer token Courier sends when posting to the gateway"),
-        )
 
         def clean_phone_number(self):
             number = self.cleaned_data["phone_number"]
@@ -60,21 +50,15 @@ class ClaimView(ClaimViewMixin, SmartFormView):
     form_class = Form
 
     def form_valid(self, form):
-        from .type import CONFIG_AUTH_TOKEN, CONFIG_BASE_URL
-
         org = self.request.user.get_org()
         data = form.cleaned_data
-
-        config = {CONFIG_BASE_URL: data["base_url"]}
-        if data.get("auth_token"):
-            config[CONFIG_AUTH_TOKEN] = data["auth_token"]
 
         self.object = Channel.create(
             org,
             self.request.user,
             data["country"],
             self.channel_type,
-            config=config,
+            config={},
             name=data["name"],
             address=data["phone_number"],
         )
