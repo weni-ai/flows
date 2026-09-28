@@ -1750,7 +1750,9 @@ class APITest(APIJSONMixin, TembaTest):
             },
         )
 
-        self.assertResponseError(response, "non_field_errors", "Invalid channel type")
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+        self.assertEqual({"text": "Send a message"}, broadcast.metadata)
+        self.assertEqual(self.channel, broadcast.channel)
 
         # send a msg with a non existing channel
         response = self.postJSON(

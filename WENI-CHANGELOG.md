@@ -1,3 +1,7 @@
+3.100.1
+----------
+* feat: Remove channel type validation in whatsapp broadcast API again
+
 3.100.0
 ----------
 * feat: named WhatsApp template parameters — record parameter format/names, accept named broadcast values, resolve per recipient
