@@ -7798,3 +7798,9 @@ msgstr "Data v excelové tabulce o Project Webhoocích:"
 
 msgid "Data in the Excel spreadsheet about project template messages:"
 msgstr "Data v excelové tabulce o zprávách šablony projektu:"
+
+msgid "The Opt-in group cannot be deleted."
+msgstr ""
+
+msgid "The Opt-in group cannot be renamed."
+msgstr ""
