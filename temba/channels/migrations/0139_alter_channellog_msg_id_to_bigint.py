@@ -5,7 +5,7 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("channels", "0137_alter_channel_name"),
+        ("channels", "0138_auto_20260910_2044"),
     ]
 
     operations = [
