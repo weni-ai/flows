@@ -166,6 +166,9 @@
           %td.w-full
             .break-all.contact-field-value
               {{ latest_ctwa_event.referral_source.headline|default:"--" }}
+              -if ctwa_campaign_search
+                %a.linked{href:"{% url 'contacts.contact_list' %}?search={{ ctwa_campaign_search|urlencode }}"}
+                  -trans "View all campaign contacts"
         %tr
           %td
             .whitespace-nowrap.pr-24.contact-field
