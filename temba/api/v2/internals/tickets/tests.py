@@ -8,12 +8,9 @@ from weni.internal.models import TicketerQueue
 
 from django.contrib.auth.models import User
 
+from temba.api.v2.internals.tickets.serializers import UpdateTicketerSerializer, redact_ticketer_config
 from temba.api.v2.validators import LambdaURLValidator
 from temba.mailroom.client import MailroomException
-from temba.api.v2.internals.tickets.serializers import (
-    UpdateTicketerSerializer,
-    redact_ticketer_config,
-)
 from temba.tests import TembaTest
 from temba.tickets.models import Ticket, Ticketer
 
@@ -26,6 +23,25 @@ class TicketerSerializerHelpersTest(TembaTest):
         self.assertEqual(redacted["webhook_secret"], "***")
         self.assertEqual(redacted["base_url"], "https://example.com")
         self.assertEqual(config["api_token"], "secret")
+
+    def test_redact_ticketer_config_masks_extended_keys_without_mutating_input(self):
+        config = {
+            "oauth_token": "o",
+            "secret": "s",
+            "push_token": "p",
+            "auth_token": "a",
+            "admin_auth_token": "aa",
+            "api_key": "k",
+            "project_auth": "pa",
+            "empty_secret": "",
+            "base_url": "https://example.com",
+        }
+        original = dict(config)
+        redacted = redact_ticketer_config(config)
+        for key in ("oauth_token", "secret", "push_token", "auth_token", "admin_auth_token", "api_key", "project_auth"):
+            self.assertEqual(redacted[key], "***", key)
+        self.assertEqual(redacted["base_url"], "https://example.com")
+        self.assertEqual(config, original)
 
     def test_update_serializer_replaces_name_and_config(self):
         ticketer = Ticketer.create(self.org, self.admin, "generic", "Old", {"api_token": "old"})
@@ -316,6 +332,10 @@ class TicketerItemViewTest(TembaTest):
     def item_url(self, ticketer=None):
         return f"{self.url}/{(ticketer or self.ticketer).uuid}"
 
+    def delete_url(self, ticketer=None):
+        params = self.params()
+        return f"{self.item_url(ticketer)}?org={params['org']}&user={params['user']}"
+
     def put_body(self, **overrides):
         body = {
             "user": self.admin.email,
@@ -411,7 +431,7 @@ class TicketerItemViewTest(TembaTest):
             status="O",
         )
 
-        response = self.authenticated_client().delete(self.item_url(), self.params())
+        response = self.authenticated_client().delete(self.delete_url())
 
         self.assertEqual(response.status_code, 204)
         self.ticketer.refresh_from_db()
@@ -423,7 +443,7 @@ class TicketerItemViewTest(TembaTest):
     def test_delete_internal_ticketer_is_400(self):
         internal = Ticketer.create(self.org, self.admin, "internal", "Internal", {})
 
-        response = self.authenticated_client().delete(self.item_url(internal), self.params())
+        response = self.authenticated_client().delete(self.delete_url(internal))
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("ticketer", response.data)
@@ -434,8 +454,8 @@ class TicketerItemViewTest(TembaTest):
     @patch("temba.api.v2.internals.tickets.views.TicketerItemView.authentication_classes", [])
     @patch("temba.api.v2.internals.tickets.views.TicketerItemView.permission_classes", [])
     def test_delete_twice_second_is_404(self, mock_ticket_close):
-        first = self.authenticated_client().delete(self.item_url(), self.params())
-        second = self.authenticated_client().delete(self.item_url(), self.params())
+        first = self.authenticated_client().delete(self.delete_url())
+        second = self.authenticated_client().delete(self.delete_url())
 
         self.assertEqual(first.status_code, 204)
         self.assertEqual(second.status_code, 404)

@@ -141,12 +141,8 @@ class TicketerItemView(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
     permission_classes = [IsAuthenticated]
 
-    def _load(self, request, ticketer_uuid):
-        org, acting_user, error = resolve_org_and_user(
-            request,
-            request.query_params.get("org") or request.data.get("org"),
-            request.query_params.get("user") or request.data.get("user"),
-        )
+    def _load(self, request, ticketer_uuid, source):
+        org, acting_user, error = resolve_org_and_user(request, source.get("org"), source.get("user"))
         if error:
             return None, None, error
 
@@ -157,14 +153,14 @@ class TicketerItemView(APIViewMixin, APIView):
         return ticketer, acting_user, None
 
     def get(self, request: Request, ticketer_uuid):
-        ticketer, _, error = self._load(request, ticketer_uuid)
+        ticketer, _, error = self._load(request, ticketer_uuid, request.query_params)
         if error:
             return error
 
         return Response(TicketerDetailSerializer(ticketer).data, status=status.HTTP_200_OK)
 
     def put(self, request: Request, ticketer_uuid):
-        ticketer, _, error = self._load(request, ticketer_uuid)
+        ticketer, _, error = self._load(request, ticketer_uuid, request.data)
         if error:
             return error
 
@@ -181,7 +177,7 @@ class TicketerItemView(APIViewMixin, APIView):
         return Response(response, status=status.HTTP_200_OK)
 
     def delete(self, request: Request, ticketer_uuid):
-        ticketer, acting_user, error = self._load(request, ticketer_uuid)
+        ticketer, acting_user, error = self._load(request, ticketer_uuid, request.query_params)
         if error:
             return error
 
