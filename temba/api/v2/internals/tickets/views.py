@@ -17,12 +17,16 @@ from temba.api.v2.internals.tickets.serializers import (
     GetDepartmentsSerializer,
     OpenTicketSerializer,
     TicketAssigneeSerializer,
+    TicketerDetailSerializer,
+    TicketerListSerializer,
+    UpdateTicketerSerializer,
 )
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.serializers import TopicReadSerializer
 from temba.api.v2.validators import LambdaURLValidator
 from temba.orgs.models import Org
 from temba.tickets.models import Ticket, Ticketer, Topic
+from temba.tickets.types.internal.type import InternalType
 
 User = get_user_model()
 
@@ -48,40 +52,75 @@ class TicketAssigneeView(APIViewMixin, APIView):
         return Response(response, status=status.HTTP_200_OK)
 
 
+def resolve_org_and_user(request, org_value, user_email):
+    """
+    Resolves the org and acting user and checks the caller may manage ticketers on that org.
+    Returns (org, acting_user, None) on success or (None, None, Response) on failure.
+    """
+    if not org_value:
+        return None, None, Response({"org": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        org = Org.objects.get(proj_uuid=org_value)
+    except (Org.DoesNotExist, django_exceptions.ValidationError, ValueError):
+        return None, None, Response({"org": ["Project not found"]}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        acting_user = User.objects.get(email=user_email)
+    except User.DoesNotExist:
+        return None, None, Response({"user": ["User not found"]}, status=status.HTTP_400_BAD_REQUEST)
+
+    is_internal = request.user.user_permissions.filter(codename="can_communicate_internally").exists()
+    if not is_internal:
+        if request.user.email != acting_user.email:
+            return (
+                None,
+                None,
+                Response(
+                    {"permission": ["Authenticated user must match payload user"]},
+                    status=status.HTTP_403_FORBIDDEN,
+                ),
+            )
+
+        if not request.user.has_org_perm(org, "tickets.ticketer_connect"):
+            return (
+                None,
+                None,
+                Response(
+                    {"permission": ["User lacks tickets.ticketer_connect on this org"]},
+                    status=status.HTTP_403_FORBIDDEN,
+                ),
+            )
+
+    return org, acting_user, None
+
+
+def get_active_ticketer(org, ticketer_uuid):
+    try:
+        return Ticketer.objects.get(uuid=ticketer_uuid, org=org, is_active=True)
+    except (Ticketer.DoesNotExist, django_exceptions.ValidationError, ValueError):
+        return None
+
+
 class CreateTicketerView(APIViewMixin, APIView):
     authentication_classes = [InternalOIDCAuthentication]
     permission_classes = [IsAuthenticated]
 
+    def get(self, request: Request):
+        org, _, error = resolve_org_and_user(
+            request, request.query_params.get("org"), request.query_params.get("user")
+        )
+        if error:
+            return error
+
+        queryset = Ticketer.objects.filter(org=org, is_active=True).order_by("-created_on")
+        serializer = TicketerListSerializer(queryset, many=True)
+        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+
     def post(self, request: Request):
-        project_uuid = request.data.get("org")
-        user_email = request.data.get("user")
-
-        if not project_uuid:
-            return Response({"org": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except (Org.DoesNotExist, django_exceptions.ValidationError, ValueError):
-            return Response({"org": ["Project not found"]}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            acting_user = User.objects.get(email=user_email)
-        except User.DoesNotExist:
-            return Response({"user": ["User not found"]}, status=status.HTTP_400_BAD_REQUEST)
-
-        is_internal = request.user.user_permissions.filter(codename="can_communicate_internally").exists()
-        if not is_internal:
-            if request.user.email != acting_user.email:
-                return Response(
-                    {"permission": ["Authenticated user must match payload user"]},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            if not request.user.has_org_perm(org, "tickets.ticketer_connect"):
-                return Response(
-                    {"permission": ["User lacks tickets.ticketer_connect on this org"]},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+        org, acting_user, error = resolve_org_and_user(request, request.data.get("org"), request.data.get("user"))
+        if error:
+            return error
 
         serializer = CreateTicketerSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -96,6 +135,65 @@ class CreateTicketerView(APIViewMixin, APIView):
         }
 
         return Response(response, status=status.HTTP_201_CREATED)
+
+
+class TicketerItemView(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def _load(self, request, ticketer_uuid):
+        org, acting_user, error = resolve_org_and_user(
+            request,
+            request.query_params.get("org") or request.data.get("org"),
+            request.query_params.get("user") or request.data.get("user"),
+        )
+        if error:
+            return None, None, error
+
+        ticketer = get_active_ticketer(org, ticketer_uuid)
+        if not ticketer:
+            return None, None, Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        return ticketer, acting_user, None
+
+    def get(self, request: Request, ticketer_uuid):
+        ticketer, _, error = self._load(request, ticketer_uuid)
+        if error:
+            return error
+
+        return Response(TicketerDetailSerializer(ticketer).data, status=status.HTTP_200_OK)
+
+    def put(self, request: Request, ticketer_uuid):
+        ticketer, _, error = self._load(request, ticketer_uuid)
+        if error:
+            return error
+
+        serializer = UpdateTicketerSerializer(instance=ticketer, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ticketer = serializer.save()
+
+        response = {
+            "uuid": str(ticketer.uuid),
+            "name": ticketer.name,
+            "ticketer_type": ticketer.ticketer_type,
+            "config": ticketer.config,
+        }
+        return Response(response, status=status.HTTP_200_OK)
+
+    def delete(self, request: Request, ticketer_uuid):
+        ticketer, acting_user, error = self._load(request, ticketer_uuid)
+        if error:
+            return error
+
+        # Ticketer.is_internal compares a type instance to the class and is always False, so compare slugs
+        if ticketer.ticketer_type == InternalType.slug:
+            return Response(
+                {"ticketer": ["Internal ticketers cannot be deleted"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ticketer.release(acting_user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class OpenTicketView(APIViewMixin, APIView, LambdaURLValidator):
