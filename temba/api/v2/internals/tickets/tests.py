@@ -60,6 +60,22 @@ class TicketerSerializerHelpersTest(TembaTest):
         self.assertFalse(serializer.is_valid())
         self.assertIn("ticketer_type", serializer.errors)
 
+    def test_update_serializer_omitted_type_unchanged_for_non_generic(self):
+        ticketer = Ticketer.create(self.org, self.admin, "mailgun", "MG", {})
+        serializer = UpdateTicketerSerializer(
+            instance=ticketer,
+            data={
+                "user": self.admin.email,
+                "org": str(self.org.proj_uuid),
+                "name": "MG Updated",
+                "config": {"base_url": "https://n.example"},
+            },
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated = serializer.update(ticketer, serializer.validated_data)
+        updated.refresh_from_db()
+        self.assertEqual(updated.ticketer_type, "mailgun")
+
 
 class TicketAssigneeViewTest(TembaTest):
     @patch("temba.api.v2.internals.tickets.views.TicketAssigneeView.authentication_classes", [])

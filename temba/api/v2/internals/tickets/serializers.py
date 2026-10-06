@@ -88,11 +88,14 @@ class TicketerDetailSerializer(serializers.ModelSerializer):
 
 
 class UpdateTicketerSerializer(CreateTicketerSerializer):
+    ticketer_type = serializers.CharField(required=False, max_length=16)
+
     def validate(self, attrs):
         instance = self.instance
-        requested_type = attrs.get("ticketer_type")
-        if instance is not None and requested_type and requested_type != instance.ticketer_type:
-            raise serializers.ValidationError({"ticketer_type": ["ticketer_type cannot be changed"]})
+        if instance is not None and "ticketer_type" in self.initial_data:
+            requested_type = attrs.get("ticketer_type")
+            if requested_type and requested_type != instance.ticketer_type:
+                raise serializers.ValidationError({"ticketer_type": ["ticketer_type cannot be changed"]})
         return attrs
 
     def update(self, instance, validated_data):
