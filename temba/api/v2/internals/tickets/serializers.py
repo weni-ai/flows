@@ -57,7 +57,17 @@ class CreateTicketerSerializer(serializers.Serializer):
 
 
 REDACTED_CONFIG_VALUE = "***"
-REDACTED_CONFIG_KEYS = ("api_token", "webhook_secret")
+REDACTED_CONFIG_KEYS = (
+    "api_token",
+    "webhook_secret",
+    "oauth_token",
+    "secret",
+    "push_token",
+    "auth_token",
+    "admin_auth_token",
+    "api_key",
+    "project_auth",
+)
 
 
 def redact_ticketer_config(config):
