@@ -56,6 +56,53 @@ class CreateTicketerSerializer(serializers.Serializer):
         )
 
 
+REDACTED_CONFIG_VALUE = "***"
+REDACTED_CONFIG_KEYS = ("api_token", "webhook_secret")
+
+
+def redact_ticketer_config(config):
+    if not isinstance(config, dict):
+        return {}
+    redacted = dict(config)
+    for key in REDACTED_CONFIG_KEYS:
+        if key in redacted and redacted[key]:
+            redacted[key] = REDACTED_CONFIG_VALUE
+    return redacted
+
+
+class TicketerListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Ticketer
+        fields = ("uuid", "name", "ticketer_type", "created_on")
+
+
+class TicketerDetailSerializer(serializers.ModelSerializer):
+    config = serializers.SerializerMethodField()
+
+    def get_config(self, obj):
+        return redact_ticketer_config(obj.config or {})
+
+    class Meta:
+        model = Ticketer
+        fields = ("uuid", "name", "ticketer_type", "created_on", "modified_on", "config")
+
+
+class UpdateTicketerSerializer(CreateTicketerSerializer):
+    def validate(self, attrs):
+        instance = self.instance
+        requested_type = attrs.get("ticketer_type")
+        if instance is not None and requested_type and requested_type != instance.ticketer_type:
+            raise serializers.ValidationError({"ticketer_type": ["ticketer_type cannot be changed"]})
+        return attrs
+
+    def update(self, instance, validated_data):
+        instance.name = validated_data["name"]
+        instance.config = validated_data["config"]
+        instance.modified_by = self.acting_user
+        instance.save(update_fields=("name", "config", "modified_by", "modified_on"))
+        return instance
+
+
 class OpenTicketSerializer(serializers.Serializer):
     project = serializers.UUIDField()
     ticketer = serializers.UUIDField()

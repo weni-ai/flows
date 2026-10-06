@@ -10,8 +10,55 @@ from django.contrib.auth.models import User
 
 from temba.api.v2.validators import LambdaURLValidator
 from temba.mailroom.client import MailroomException
+from temba.api.v2.internals.tickets.serializers import (
+    UpdateTicketerSerializer,
+    redact_ticketer_config,
+)
 from temba.tests import TembaTest
 from temba.tickets.models import Ticket, Ticketer
+
+
+class TicketerSerializerHelpersTest(TembaTest):
+    def test_redact_ticketer_config_masks_secrets_only(self):
+        config = {"base_url": "https://example.com", "api_token": "secret", "webhook_secret": "hook"}
+        redacted = redact_ticketer_config(config)
+        self.assertEqual(redacted["api_token"], "***")
+        self.assertEqual(redacted["webhook_secret"], "***")
+        self.assertEqual(redacted["base_url"], "https://example.com")
+        self.assertEqual(config["api_token"], "secret")
+
+    def test_update_serializer_replaces_name_and_config(self):
+        ticketer = Ticketer.create(self.org, self.admin, "generic", "Old", {"api_token": "old"})
+        serializer = UpdateTicketerSerializer(
+            data={
+                "user": self.admin.email,
+                "org": str(self.org.proj_uuid),
+                "name": "New",
+                "ticketer_type": "generic",
+                "config": {"base_url": "https://n.example", "api_token": "new"},
+            }
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated = serializer.update(ticketer, serializer.validated_data)
+        updated.refresh_from_db()
+        self.assertEqual(updated.name, "New")
+        self.assertEqual(updated.config["api_token"], "new")
+        self.assertEqual(updated.modified_by, self.admin)
+
+    def test_update_serializer_rejects_type_change(self):
+        ticketer = Ticketer.create(self.org, self.admin, "generic", "Name", {})
+        serializer = UpdateTicketerSerializer(
+            instance=ticketer,
+            data={
+                "user": self.admin.email,
+                "org": str(self.org.proj_uuid),
+                "name": "Name",
+                "ticketer_type": "mailgun",
+                "config": {"base_url": "https://n.example"},
+            },
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("ticketer_type", serializer.errors)
 
 
 class TicketAssigneeViewTest(TembaTest):
