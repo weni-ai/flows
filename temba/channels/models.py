@@ -923,6 +923,10 @@ class Channel(TembaModel, DependencyMixin):
         self.is_active = False
         self.save(update_fields=("is_active", "config", "modified_by", "modified_on"))
 
+        from temba.channels.channel_events import publish_channel_deleted
+
+        publish_channel_deleted(self)
+
         # deactivate any template translations associated with this channel
         from temba.templates.models import Template, TemplateTranslation
 

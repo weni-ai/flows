@@ -2,6 +2,7 @@ import logging
 from datetime import timedelta
 
 import pytz
+from weni.eda.exceptions import EDAPublishingError
 
 from django.conf import settings
 from django.db.models import Count, Sum
@@ -10,6 +11,7 @@ from django.utils.timesince import timesince
 
 from celery import shared_task
 
+from temba.event_driven.publisher.channel_event_publisher import ChannelEventPublisher
 from temba.orgs.models import Org
 from temba.utils.analytics import track
 from temba.utils.celery import nonoverlapping_task
@@ -17,6 +19,22 @@ from temba.utils.celery import nonoverlapping_task
 from .models import Alert, Channel, ChannelCount, ChannelLog, SyncEvent
 
 logger = logging.getLogger(__name__)
+
+
+@shared_task(
+    name="task_publish_channel_event",
+    autoretry_for=(EDAPublishingError,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=5,
+)
+def task_publish_channel_event(event_type: str, data: dict, routing_key: str) -> None:
+    logger.info(
+        f"Publishing {event_type} routing_key={routing_key} "
+        f"channel_type={data.get('channel_type')} channel_uuid={data.get('channel_uuid')} "
+        f"project_uuid={data.get('project_uuid')}"
+    )
+    ChannelEventPublisher().publish(event_type, data, routing_key)
 
 
 @shared_task(track_started=True, name="sync_channel_fcm_task")
