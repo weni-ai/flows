@@ -75,9 +75,16 @@ class Protocol(models.Model):
     timer_deadline = models.DateTimeField(null=True)
     timer_kind = models.CharField(max_length=8, choices=TIMER_KIND_CHOICES, null=True)
     timer_paused = models.BooleanField(default=False)
+    external_id = models.CharField(max_length=255, null=True)
 
     class Meta:
         db_table = "msgs_protocol"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["org", "urn", "external_id"],
+                name="unique_protocol_external_id",
+            )
+        ]
 
 
 class UnreachableException(Exception):
