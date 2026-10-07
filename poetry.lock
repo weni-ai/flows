@@ -1319,18 +1319,6 @@ Django = ">=2.2,<3.0.dev0 || >=3.2.dev0,<5.0"
 pytz = "*"
 
 [[package]]
-name = "djangogrpcframework"
-version = "0.2.1"
-description = "gRPC for Django."
-optional = false
-python-versions = ">=3.6"
-groups = ["main"]
-files = [
-    {file = "djangogrpcframework-0.2.1-py2.py3-none-any.whl", hash = "sha256:c1835bd87ac9bdbdbdb631cd1c12720e711260d316303d19e4c63e53896ff0e6"},
-    {file = "djangogrpcframework-0.2.1.tar.gz", hash = "sha256:f96ae98d463f02745dbac5c18899801b738c79efd198e8cc709a7476533aec97"},
-]
-
-[[package]]
 name = "djangorestframework"
 version = "3.15.1"
 description = "Web APIs for Django, made easy."
@@ -4808,29 +4796,25 @@ requests = ">=2.25.0,<3.0"
 
 [[package]]
 name = "weni-rp-apps"
-version = "2.12.0a0"
+version = "2.13.0a6"
 description = "Weni apps for Rapidpro Platform"
 optional = false
 python-versions = "<3.13,>=3.10"
 groups = ["main"]
 files = [
-    {file = "weni_rp_apps-2.12.0a0-py3-none-any.whl", hash = "sha256:6c4346af4b2fca944ec41085fb06487c4ae144ff225b6d4c9ec9770dbd93b032"},
-    {file = "weni_rp_apps-2.12.0a0.tar.gz", hash = "sha256:e4b4da7739ec119fa7ccac31b076a4072c5a289205586913c131fa198297e62c"},
+    {file = "weni_rp_apps-2.13.0a6-py3-none-any.whl", hash = "sha256:2599e2f46ab578e64adb609b2cb834aaa4b54cfc4bf9740dd9b860c8bac121d8"},
+    {file = "weni_rp_apps-2.13.0a6.tar.gz", hash = "sha256:14edf27d5bf4c612a4bc57b659deb3ef943d562f5c608ac315b39aa12eda88f6"},
 ]
 
 [package.dependencies]
 django-csp = ">=3.7,<4.0"
 django-environ = ">=0.7.0,<0.8.0"
 django-templates-macros = ">=0.2,<0.3"
-djangogrpcframework = ">=0.2.1,<0.3.0"
 drf-nested-routers = ">=0.93.4,<0.94.0"
 elastic-apm = ">=6.4.0,<7.0.0"
 flower = ">=0.9,<0.10"
-grpcio = ">=1.71.0,<2.0.0"
 mozilla-django-oidc = ">=2.0.0,<3.0.0"
 pre-commit = ">=2.20.0,<3.0.0"
-protobuf = ">=6.30.0,<7.0.0"
-weni-commons = ">=1.6.0a2"
 
 [[package]]
 name = "werkzeug"
@@ -5143,4 +5127,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.12"
-content-hash = "c3e8a1d6db98cd73b5c4f6ee7cd53d30c44eb61e3afb6c107849f18237f8a8fc"
+content-hash = "6e229bc9ea574df8454d32ca976f889cac2d6ea93ba4b2a0579aac81d83bbf77"
