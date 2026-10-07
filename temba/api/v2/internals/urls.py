@@ -3,6 +3,7 @@ from .channels.urls import urlpatterns as channels_urlpatterns
 from .contacts.urls import urlpatterns as contacts_urlpatterns
 from .conversion_events.urls import urlpatterns as conversion_events_urlpatterns
 from .flows.urls import urlpatterns as flows_urlpatterns
+from .identity.urls import urlpatterns as identity_urlpatterns
 from .media.urls import urlpatterns as media_urlpatterns
 from .msgs.urls import urlpatterns as msgs_urlpatterns
 from .tickets.urls import urlpatterns as tickets_urlpatterns
@@ -14,5 +15,6 @@ urlpatterns += channels_urlpatterns
 urlpatterns += tickets_urlpatterns
 urlpatterns += contacts_urlpatterns
 urlpatterns += msgs_urlpatterns
+urlpatterns += identity_urlpatterns
 urlpatterns += media_urlpatterns
 urlpatterns += conversion_events_urlpatterns

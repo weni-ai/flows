@@ -35,6 +35,59 @@ from temba.utils.uuid import uuid4
 logger = logging.getLogger(__name__)
 
 
+class Protocol(models.Model):
+    """
+    Unit of service for a channel identity. Lifecycle is owned by mailroom.
+    Flows creates the table and moves contact_id during attach.
+    """
+
+    STATE_OPEN = "open"
+    STATE_CLOSED = "closed"
+    STATE_CHOICES = ((STATE_OPEN, "Open"), (STATE_CLOSED, "Closed"))
+
+    CLOSE_AI_CSAT = "ai_csat"
+    CLOSE_AI_INACTIVITY = "ai_inactivity"
+    CLOSE_HUMAN_INACTIVITY = "human_inactivity"
+    CLOSE_ATTENDANT = "attendant"
+    CLOSE_TICKET_CLOSED = "ticket_closed"
+    CLOSE_REASON_CHOICES = (
+        (CLOSE_AI_CSAT, "AI CSAT"),
+        (CLOSE_AI_INACTIVITY, "AI inactivity"),
+        (CLOSE_HUMAN_INACTIVITY, "Human inactivity"),
+        (CLOSE_ATTENDANT, "Attendant"),
+        (CLOSE_TICKET_CLOSED, "Ticket closed"),
+    )
+
+    TIMER_AI = "ai"
+    TIMER_HUMAN = "human"
+    TIMER_KIND_CHOICES = ((TIMER_AI, "AI"), (TIMER_HUMAN, "Human"))
+
+    uuid = models.UUIDField(unique=True, default=uuid4)
+    org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="protocols")
+    contact = models.ForeignKey(Contact, on_delete=models.PROTECT, related_name="protocols")
+    urn = models.ForeignKey(ContactURN, on_delete=models.PROTECT, related_name="protocols")
+    state = models.CharField(max_length=8, choices=STATE_CHOICES, default=STATE_OPEN)
+    predecessor = models.ForeignKey("self", null=True, on_delete=models.PROTECT, related_name="follow_ups")
+    opened_on = models.DateTimeField(default=timezone.now)
+    closed_on = models.DateTimeField(null=True)
+    close_reason = models.CharField(max_length=32, choices=CLOSE_REASON_CHOICES, blank=True, default="")
+    idle_accumulated = models.IntegerField(default=0)
+    timer_deadline = models.DateTimeField(null=True)
+    timer_kind = models.CharField(max_length=8, choices=TIMER_KIND_CHOICES, blank=True, default="")
+    timer_paused = models.BooleanField(default=False)
+    # NULL, not "", so several protocols without an external id can share an org and URN.
+    external_id = models.CharField(max_length=255, null=True)  # NOSONAR
+
+    class Meta:
+        db_table = "msgs_protocol"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["org", "urn", "external_id"],
+                name="unique_protocol_external_id",
+            )
+        ]
+
+
 class UnreachableException(Exception):
     """
     Exception thrown when a message is being sent to a contact that we don't have a sendable URN for
@@ -556,6 +609,9 @@ class Msg(models.Model):
     delete_from_counts = models.BooleanField(null=True, default=False)
 
     template = models.CharField(max_length=512, null=True)
+
+    # Nullable on purpose: stream inserts from Nexus omit it until that caller sends one.
+    protocol = models.ForeignKey(Protocol, null=True, on_delete=models.PROTECT, related_name="msgs")
 
     # TODO deprecated in favor of delete_from_counts
     DELETE_FOR_ARCHIVE = "A"
