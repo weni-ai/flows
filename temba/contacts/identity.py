@@ -421,11 +421,11 @@ def _event(org, *, actor, anchor_type, urn, protocol_ids, consumer, attachment_s
     ContactIdentityEvent.objects.create(
         org=org,
         actor=actor or "api",
-        anchor_type=anchor_type,
+        anchor_type=anchor_type or "",
         urn=urn,
         affected_protocol_ids=list(protocol_ids or []),
         consumer=consumer,
-        attachment_status=attachment_status,
+        attachment_status=attachment_status or "",
         outcome=outcome,
     )
 

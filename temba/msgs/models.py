@@ -70,12 +70,13 @@ class Protocol(models.Model):
     predecessor = models.ForeignKey("self", null=True, on_delete=models.PROTECT, related_name="follow_ups")
     opened_on = models.DateTimeField(default=timezone.now)
     closed_on = models.DateTimeField(null=True)
-    close_reason = models.CharField(max_length=32, choices=CLOSE_REASON_CHOICES, null=True)
+    close_reason = models.CharField(max_length=32, choices=CLOSE_REASON_CHOICES, blank=True, default="")
     idle_accumulated = models.IntegerField(default=0)
     timer_deadline = models.DateTimeField(null=True)
-    timer_kind = models.CharField(max_length=8, choices=TIMER_KIND_CHOICES, null=True)
+    timer_kind = models.CharField(max_length=8, choices=TIMER_KIND_CHOICES, blank=True, default="")
     timer_paused = models.BooleanField(default=False)
-    external_id = models.CharField(max_length=255, null=True)
+    # NULL, not "", so several protocols without an external id can share an org and URN.
+    external_id = models.CharField(max_length=255, null=True)  # NOSONAR
 
     class Meta:
         db_table = "msgs_protocol"

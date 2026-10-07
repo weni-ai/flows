@@ -1,8 +1,10 @@
 from unittest.mock import patch
 from uuid import uuid4
 
+from django.db import IntegrityError
 from django.urls import reverse
 
+from temba.contacts import identity
 from temba.contacts.models import Contact, ContactAnchor, ContactIdentityEvent, ContactURN
 from temba.msgs.models import Protocol
 from temba.tests.base import TembaTest
@@ -337,3 +339,211 @@ class IdentityAPITest(TembaTest):
                 outcome=ContactIdentityEvent.OUTCOME_DELETED, consumer=contact
             ).exists()
         )
+
+    def test_invalid_anchor_and_tax_document_normalization(self):
+        contact = self.create_contact("Ann", urns=["tel:+250788111026"])
+        invalid = self._post(
+            "internal_identity_attach",
+            {
+                "project_id": str(self.org.proj_uuid),
+                "urn_id": contact.urns.get().id,
+                "anchor": {"type": "passport", "value": "AB1", "verified": True},
+            },
+        )
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(ContactIdentityEvent.objects.count(), 0)
+
+        normalized = self._post(
+            "internal_identity_attach",
+            {
+                "project_id": str(self.org.proj_uuid),
+                "urn_id": contact.urns.get().identity,
+                "anchor": {"type": "tax_document", "value": "123.456.789-01", "verified": True},
+            },
+        )
+        self.assertEqual(normalized.status_code, 200)
+        self.assertEqual(ContactAnchor.objects.get(contact=contact).value, "12345678901")
+
+    def test_unique_anchor_race_records_a_conflict(self):
+        contact = self.create_contact("Ann", urns=["tel:+250788111027"])
+        with patch("temba.contacts.identity._attach_locked", side_effect=IntegrityError):
+            response = self._post(
+                "internal_identity_attach",
+                {
+                    "project_id": str(self.org.proj_uuid),
+                    "urn_id": contact.urns.get().id,
+                    "anchor": {"type": "commerce_user_id", "value": "race", "verified": True},
+                },
+            )
+        self.assertEqual(response.status_code, 409)
+        self.assertTrue(
+            ContactIdentityEvent.objects.filter(
+                outcome=ContactIdentityEvent.OUTCOME_CONFLICT, urn=contact.urns.get()
+            ).exists()
+        )
+        self.assertEqual(identity._protocol_ids(None), [])
+
+    def test_claim_then_verify_promotes_the_same_consumer(self):
+        contact = self.create_contact("Ann", urns=["tel:+250788111028"])
+        claimed = self._post(
+            "internal_identity_attach",
+            {
+                "project_id": str(self.org.proj_uuid),
+                "urn_id": contact.urns.get().id,
+                "anchor": {"type": "commerce_user_id", "value": "shopper", "verified": False},
+            },
+        )
+        self.assertEqual(claimed.json()["outcome"], "claimed")
+        verified = self._post(
+            "internal_identity_attach",
+            {
+                "project_id": str(self.org.proj_uuid),
+                "urn_id": contact.urns.get().id,
+                "anchor": {"type": "commerce_user_id", "value": "shopper", "verified": True},
+            },
+        )
+        self.assertEqual(verified.status_code, 200)
+        self.assertEqual(verified.json()["outcome"], "attached")
+        self.assertTrue(ContactAnchor.objects.get(contact=contact).verified)
+
+    def test_verified_attach_adopts_an_unverified_anchor(self):
+        owner = self.create_contact("Ann", urns=["tel:+250788111029"])
+        visitor = self.create_contact("Bob", urns=["tel:+250788111030"])
+        ContactAnchor.objects.create(
+            org=self.org,
+            contact=owner,
+            anchor_type=ContactAnchor.ANCHOR_COMMERCE_USER_ID,
+            value="shared-shopper",
+            verified=False,
+        )
+        response = self._post(
+            "internal_identity_attach",
+            {
+                "project_id": str(self.org.proj_uuid),
+                "urn_id": visitor.urns.get().id,
+                "anchor": {"type": "commerce_user_id", "value": "shared-shopper", "verified": True},
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["consumer_id"], str(owner.uuid))
+        anchor = ContactAnchor.objects.get(value="shared-shopper")
+        self.assertTrue(anchor.verified)
+        self.assertEqual(anchor.contact_id, owner.id)
+
+    def test_missing_urn_contact_and_unknown_detach_target(self):
+        contact = self.create_contact("Ann", urns=["tel:+250788111031"])
+        urn = contact.urns.get()
+        urn.contact = None
+        urn.save(update_fields=["contact"])
+        missing_contact = self._post(
+            "internal_identity_attach",
+            {
+                "project_id": str(self.org.proj_uuid),
+                "urn_id": urn.id,
+                "anchor": {"type": "commerce_user_id", "value": "orphan", "verified": True},
+            },
+        )
+        self.assertEqual(missing_contact.status_code, 400)
+
+        unknown_urn = self._post(
+            "internal_identity_detach",
+            {"project_id": str(self.org.proj_uuid), "urn_id": 999999999, "privileged": True},
+        )
+        self.assertEqual(unknown_urn.status_code, 400)
+
+        unknown_target = self._post(
+            "internal_identity_detach",
+            {
+                "project_id": str(self.org.proj_uuid),
+                "urn_id": self.create_contact("Bob", urns=["tel:+250788111032"]).urns.get().id,
+                "target_consumer_id": str(uuid4()),
+                "privileged": True,
+            },
+        )
+        self.assertEqual(unknown_target.status_code, 400)
+
+    def test_detach_to_the_same_consumer_and_noop_without_anchors(self):
+        contact = self.create_contact("Ann", urns=["tel:+250788111033"])
+        same = self._post(
+            "internal_identity_detach",
+            {
+                "project_id": str(self.org.proj_uuid),
+                "urn_id": contact.urns.get().id,
+                "target_consumer_id": str(contact.uuid),
+                "privileged": True,
+            },
+        )
+        self.assertEqual(same.status_code, 200)
+        contact.urns.get().refresh_from_db()
+        self.assertEqual(contact.urns.get().contact_id, contact.id)
+
+        bare = self.create_contact("Bob", urns=["tel:+250788111034"])
+        noop = self._post(
+            "internal_identity_detach",
+            {"project_id": str(self.org.proj_uuid), "urn_id": bare.urns.get().id, "privileged": True},
+        )
+        self.assertEqual(noop.json()["outcome"], "noop")
+        bare.urns.get().refresh_from_db()
+        self.assertEqual(bare.urns.get().contact_id, bare.id)
+
+    def test_graph_lookup_validation(self):
+        contact = self.create_contact("Ann", urns=["tel:+250788111035"])
+        missing = self.client.get(reverse("internal_identity_graph") + f"?project_id={self.org.proj_uuid}")
+        self.assertEqual(missing.status_code, 400)
+
+        unknown_urn = self.client.get(
+            reverse("internal_identity_graph") + f"?project_id={self.org.proj_uuid}&urn_id=999999999"
+        )
+        self.assertEqual(unknown_urn.status_code, 400)
+
+        by_consumer = self.client.get(
+            reverse("internal_identity_graph") + f"?project_id={self.org.proj_uuid}&consumer_id={contact.uuid}"
+        )
+        self.assertEqual(by_consumer.status_code, 200)
+        self.assertEqual(by_consumer.json()["consumer_id"], str(contact.uuid))
+
+        unknown_consumer = self.client.get(
+            reverse("internal_identity_graph") + f"?project_id={self.org.proj_uuid}&consumer_id={uuid4()}"
+        )
+        self.assertEqual(unknown_consumer.status_code, 400)
+
+    def test_inactivity_rejects_non_integers_and_human_range(self):
+        saved = self._post(
+            "internal_identity_inactivity",
+            {"project_id": str(self.org.proj_uuid), "human_inactivity_hours": 10},
+        )
+        self.assertEqual(saved.status_code, 200)
+        for payload in (
+            {"ai_inactivity_hours": "nope"},
+            {"human_inactivity_hours": "nope"},
+            {"human_inactivity_hours": 0},
+        ):
+            payload["project_id"] = str(self.org.proj_uuid)
+            rejected = self._post("internal_identity_inactivity", payload)
+            self.assertEqual(rejected.status_code, 400)
+        self.org.refresh_from_db()
+        self.assertEqual(self.org.config["human_inactivity_hours"], 10)
+
+    def test_missing_project_and_unknown_confirmation_urn(self):
+        for name in (
+            "internal_identity_attach",
+            "internal_identity_detach",
+            "internal_identity_inactivity",
+            "internal_identity_confirmation",
+            "internal_identity_forget",
+        ):
+            response = self._post(name, {})
+            self.assertEqual(response.status_code, 400)
+        graph = self.client.get(reverse("internal_identity_graph"))
+        self.assertEqual(graph.status_code, 400)
+
+        unknown = self._post(
+            "internal_identity_confirmation",
+            {"project_id": str(self.org.proj_uuid), "urn_id": 999999999},
+        )
+        self.assertEqual(unknown.status_code, 400)
+        forgotten = self._post(
+            "internal_identity_forget",
+            {"project_id": str(self.org.proj_uuid), "consumer_id": str(uuid4())},
+        )
+        self.assertEqual(forgotten.status_code, 400)
