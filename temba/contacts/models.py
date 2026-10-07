@@ -1678,11 +1678,11 @@ class ContactIdentityEvent(models.Model):
     org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="identity_events")
     actor = models.CharField(max_length=255)
     created_on = models.DateTimeField(default=timezone.now)
-    anchor_type = models.CharField(max_length=32, null=True)
+    anchor_type = models.CharField(max_length=32, blank=True, default="")
     urn = models.ForeignKey(ContactURN, null=True, on_delete=models.PROTECT, related_name="identity_events")
     affected_protocol_ids = JSONField(default=list)
     consumer = models.ForeignKey(Contact, null=True, on_delete=models.PROTECT, related_name="identity_events")
-    attachment_status = models.CharField(max_length=16, null=True)
+    attachment_status = models.CharField(max_length=16, blank=True, default="")
     outcome = models.CharField(max_length=16, choices=OUTCOME_CHOICES)
 
     class Meta:
