@@ -333,5 +333,7 @@ class IdentityAPITest(TembaTest):
         contact.refresh_from_db()
         self.assertEqual(contact.fields, {})
         self.assertTrue(
-            ContactIdentityEvent.objects.filter(outcome=ContactIdentityEvent.OUTCOME_DELETED, consumer=contact).exists()
+            ContactIdentityEvent.objects.filter(
+                outcome=ContactIdentityEvent.OUTCOME_DELETED, consumer=contact
+            ).exists()
         )

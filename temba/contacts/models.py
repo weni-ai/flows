@@ -1651,9 +1651,7 @@ class ContactAnchor(models.Model):
     class Meta:
         db_table = "contacts_anchor"
         constraints = [
-            models.UniqueConstraint(
-                fields=["org", "anchor_type", "value"], name="unique_contact_anchor_per_org"
-            )
+            models.UniqueConstraint(fields=["org", "anchor_type", "value"], name="unique_contact_anchor_per_org")
         ]
 
 

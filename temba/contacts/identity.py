@@ -175,11 +175,7 @@ def _attach_locked(org, urn_id, anchor_type, value, verified, actor):
         return IdentityResult(code="validation", status=400, error="validation")
 
     source = Contact.objects.select_for_update().get(id=urn.contact_id)
-    existing = (
-        ContactAnchor.objects.select_for_update()
-        .filter(org=org, anchor_type=anchor_type, value=value)
-        .first()
-    )
+    existing = ContactAnchor.objects.select_for_update().filter(org=org, anchor_type=anchor_type, value=value).first()
     protocol_ids = _protocol_ids(urn)
 
     if not verified:
@@ -243,9 +239,7 @@ def _attach_locked(org, urn_id, anchor_type, value, verified, actor):
         )
         return _attached(source, protocol_ids)
 
-    ContactAnchor.objects.create(
-        org=org, contact=source, anchor_type=anchor_type, value=value, verified=True
-    )
+    ContactAnchor.objects.create(org=org, contact=source, anchor_type=anchor_type, value=value, verified=True)
     urn.attachment_status = ContactURN.ATTACHMENT_CONFIRMED
     urn.save(update_fields=["attachment_status"])
     _event(
@@ -263,9 +257,7 @@ def _attach_locked(org, urn_id, anchor_type, value, verified, actor):
 
 def _claim(org, urn, source, existing, anchor_type, value, actor, protocol_ids):
     if existing is None:
-        ContactAnchor.objects.create(
-            org=org, contact=source, anchor_type=anchor_type, value=value, verified=False
-        )
+        ContactAnchor.objects.create(org=org, contact=source, anchor_type=anchor_type, value=value, verified=False)
     elif existing.contact_id != source.id:
         # A verified anchor already belongs to someone else. A claim does not merge.
         pass
@@ -397,9 +389,7 @@ def _archive_empty_provisional(contact):
 def _verified_anchor_conflict(source, target):
     if source is None or target is None or source.id == target.id:
         return False
-    source_values = {
-        anchor.anchor_type: anchor.value for anchor in source.anchors.filter(verified=True)
-    }
+    source_values = {anchor.anchor_type: anchor.value for anchor in source.anchors.filter(verified=True)}
     if not source_values:
         return False
     for anchor in target.anchors.filter(verified=True):

@@ -2,8 +2,9 @@
 
 import django.db.models.deletion
 import django.utils.timezone
-import temba.utils.uuid
 from django.db import migrations, models
+
+import temba.utils.uuid
 
 
 class Migration(migrations.Migration):
@@ -20,7 +21,10 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
                 ("uuid", models.UUIDField(default=temba.utils.uuid.uuid4, unique=True)),
-                ("state", models.CharField(choices=[("open", "Open"), ("closed", "Closed")], default="open", max_length=8)),
+                (
+                    "state",
+                    models.CharField(choices=[("open", "Open"), ("closed", "Closed")], default="open", max_length=8),
+                ),
                 ("opened_on", models.DateTimeField(default=django.utils.timezone.now)),
                 ("closed_on", models.DateTimeField(null=True)),
                 (
