@@ -1496,6 +1496,18 @@ class ContactURN(models.Model):
     # optional authentication information stored on this URN
     auth = models.TextField(null=True)
 
+    ATTACHMENT_NOT_ATTACHED = "not-attached"
+    ATTACHMENT_CLAIMED = "claimed"
+    ATTACHMENT_CONFIRMED = "confirmed"
+    ATTACHMENT_STATUS_CHOICES = (
+        (ATTACHMENT_NOT_ATTACHED, "Not attached"),
+        (ATTACHMENT_CLAIMED, "Claimed"),
+        (ATTACHMENT_CONFIRMED, "Confirmed"),
+    )
+    attachment_status = models.CharField(
+        max_length=16, choices=ATTACHMENT_STATUS_CHOICES, default=ATTACHMENT_NOT_ATTACHED
+    )
+
     @classmethod
     def get_or_create(cls, org, contact, urn_as_string, channel=None, auth=None, priority=PRIORITY_HIGHEST):
         urn = cls.lookup(org, urn_as_string)
@@ -1613,6 +1625,70 @@ class ContactURN(models.Model):
                 check=Q(identity=Concat(F("scheme"), Value(":"), F("path"))), name="identity_matches_scheme_and_path"
             ),
         ]
+
+
+class ContactAnchor(models.Model):
+    """
+    Deterministic proof that a contact is a Consumer inside one project.
+    Unique per anchor type and normalized value within the org.
+    """
+
+    ANCHOR_COMMERCE_USER_ID = "commerce_user_id"
+    ANCHOR_VERIFIED_EMAIL = "verified_email"
+    ANCHOR_TAX_DOCUMENT = "tax_document"
+    ANCHOR_TYPE_CHOICES = (
+        (ANCHOR_COMMERCE_USER_ID, "Commerce user id"),
+        (ANCHOR_VERIFIED_EMAIL, "Verified email"),
+        (ANCHOR_TAX_DOCUMENT, "Tax document"),
+    )
+
+    org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="contact_anchors")
+    contact = models.ForeignKey(Contact, on_delete=models.PROTECT, related_name="anchors")
+    anchor_type = models.CharField(max_length=32, choices=ANCHOR_TYPE_CHOICES)
+    value = models.CharField(max_length=255)
+    verified = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "contacts_anchor"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["org", "anchor_type", "value"], name="unique_contact_anchor_per_org"
+            )
+        ]
+
+
+class ContactIdentityEvent(models.Model):
+    """
+    Audit row for attach, detach, conflict, deletion, and no-op.
+    """
+
+    OUTCOME_ATTACHED = "attached"
+    OUTCOME_CLAIMED = "claimed"
+    OUTCOME_DETACHED = "detached"
+    OUTCOME_CONFLICT = "conflict"
+    OUTCOME_DELETED = "deleted"
+    OUTCOME_NOOP = "noop"
+    OUTCOME_CHOICES = (
+        (OUTCOME_ATTACHED, "Attached"),
+        (OUTCOME_CLAIMED, "Claimed"),
+        (OUTCOME_DETACHED, "Detached"),
+        (OUTCOME_CONFLICT, "Conflict"),
+        (OUTCOME_DELETED, "Deleted"),
+        (OUTCOME_NOOP, "No-op"),
+    )
+
+    org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="identity_events")
+    actor = models.CharField(max_length=255)
+    created_on = models.DateTimeField(default=timezone.now)
+    anchor_type = models.CharField(max_length=32, null=True)
+    urn = models.ForeignKey(ContactURN, null=True, on_delete=models.PROTECT, related_name="identity_events")
+    affected_protocol_ids = JSONField(default=list)
+    consumer = models.ForeignKey(Contact, null=True, on_delete=models.PROTECT, related_name="identity_events")
+    attachment_status = models.CharField(max_length=16, null=True)
+    outcome = models.CharField(max_length=16, choices=OUTCOME_CHOICES)
+
+    class Meta:
+        db_table = "contacts_identityevent"
 
 
 class SystemContactGroupManager(models.Manager):

@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from temba.channels.models import Channel
 from temba.contacts.models import URN, Contact, ContactURN
-from temba.msgs.models import Label, Msg
+from temba.msgs.models import Label, Msg, Protocol
 from temba.orgs.models import Org
 
 
@@ -26,6 +26,7 @@ def create_message_db_only(
     labels: Optional[Iterable[str]] = None,
     template: Optional[str | dict] = None,
     metadata: Optional[dict] = None,
+    protocol_id: Optional[str] = None,
 ) -> Msg:
     """
     Creates a message record only, without invoking mailroom/courier.
@@ -110,6 +111,12 @@ def create_message_db_only(
     if isinstance(template, dict):
         template_name = template.get("name")
 
+    protocol = None
+    if protocol_id:
+        protocol = Protocol.objects.filter(org=org, uuid=protocol_id).first()
+        if not protocol:
+            raise ValueError("Protocol not found for this project")
+
     msg = Msg.objects.create(
         org=org,
         contact=contact,
@@ -125,6 +132,7 @@ def create_message_db_only(
         sent_on=sent_on,
         metadata=metadata,
         template=template_name,
+        protocol=protocol,
     )
 
     # attach labels if provided
