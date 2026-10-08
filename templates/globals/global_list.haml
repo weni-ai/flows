@@ -32,7 +32,7 @@
       .lp-frame
         .left
           - if view.add_button and org_perms.globals.global_create
-            %temba-modax#create-global-modal{ header:'{% trans "Create global" %}', endpoint:"{% url 'globals.global_create' %}"}
+            %temba-modax#create-global-modal{ header:'{% trans "Create global" %}', endpoint:"{% url 'globals.global_create' %}", cancelName:'{% trans "Cancel" %}'}
               .button-primary.mb-3.block
                 -trans "Create global"
 
@@ -71,8 +71,8 @@
                 Found {{ results_count }} globals matching <i>{{search}}</i>
 
           -block pre-table
-            %temba-modax(id='update-global' header='{{_("Update global")|escapejs}}')
-            %temba-modax(id='delete-global' header='{{_("Delete global")|escapejs}}')
+            %temba-modax(id='update-global' header='{{_("Update global")|escapejs}}' cancelName='{% trans "Cancel" %}')
+            %temba-modax(id='delete-global' header='{{_("Delete global")|escapejs}}' cancelName='{% trans "Cancel" %}')
             %temba-modax(id='usages-global' header='{{_("Usages")|escapejs}}')
 
           %table.list.object-list.lined{class:"{% if org_perms.contacts.contact_update %}selectable{%endif%}"}

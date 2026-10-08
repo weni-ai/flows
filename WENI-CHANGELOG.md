@@ -1,6 +1,19 @@
-3.99.0
+3.101.0
 ----------
 * feat: add View all campaign contacts link on the CTWA card to search by ctwa_source_id
+
+3.100.1
+----------
+* feat: Remove channel type validation in whatsapp broadcast API again
+
+3.100.0
+----------
+* feat: named WhatsApp template parameters — record parameter format/names, accept named broadcast values, resolve per recipient
+* fix: Translate global form labels and cancel buttons
+
+3.99.0
+----------
+* feat: add validation for Instagram comment ID and response type in WhatsappBroadcastWriteSerializer
 
 3.98.0
 ----------
