@@ -2967,9 +2967,24 @@ class ContactTest(TembaTest):
 
         response = self.fetch_protected(read_url, self.admin)
         self.assertEqual(response.context["latest_ctwa_event"].ctwa_clid, "clid-joe")
+        self.assertEqual(response.context["ctwa_campaign_search"], 'ctwa_source_id = "120226305854810726"')
         self.assertContains(response, "Carrossel Tênis Running 30% OFF")
         self.assertContains(response, "120226305854810726")
         self.assertContains(response, "clid-joe")
+        self.assertContains(response, "View all campaign contacts")
+        self.assertContains(response, reverse("contacts.contact_list"))
+        self.assertContains(response, "ctwa_source_id")
+
+        blank_source, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org,
+            "",
+            CtwaReferralSource.SOURCE_TYPE_POST,
+            headline="Post sem source id",
+        )
+        CTWA.objects.filter(ctwa_clid="clid-joe").update(referral_source=blank_source)
+        response = self.fetch_protected(read_url, self.admin)
+        self.assertIsNone(response.context["ctwa_campaign_search"])
+        self.assertNotContains(response, "View all campaign contacts")
 
     def test_read_with_customer_support(self):
         self.customer_support.is_staff = True

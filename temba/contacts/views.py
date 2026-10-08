@@ -905,6 +905,12 @@ class ContactCRUDL(SmartCRUDL):
             )
 
             context["latest_ctwa_event"] = CTWA.objects.latest_for_contact(contact)
+            context["ctwa_campaign_search"] = None
+            latest_ctwa = context["latest_ctwa_event"]
+            if latest_ctwa is not None and latest_ctwa.referral_source is not None:
+                source_id = (latest_ctwa.referral_source.source_id or "").strip()
+                if source_id:
+                    context["ctwa_campaign_search"] = f"ctwa_source_id = {json.dumps(source_id)}"
 
             # divide contact's URNs into those we can send to, and those we can't
             sendable_schemes = contact.org.get_schemes(Channel.ROLE_SEND)
