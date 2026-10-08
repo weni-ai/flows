@@ -1161,6 +1161,7 @@ CELERY_BEAT_SCHEDULE = {
     "trim-webhook-event": {"task": "trim_webhook_event_task", "schedule": crontab(hour=3, minute=0)},
     "update-org-activity": {"task": "update_org_activity_task", "schedule": crontab(hour=3, minute=5)},
     "update-unique-contact-counts": {"task": "update_unique_contact_counts", "schedule": crontab(hour=8, minute=0)},
+    "validate-datalake-layers": {"task": "validate_datalake_layers_task", "schedule": crontab(minute=30)},
     "refresh-teams-tokens": {"task": "refresh_teams_tokens", "schedule": timedelta(minutes=30)},
     "squash-flow-category-counts": {"task": "squash_flow_category_counts", "schedule": timedelta(seconds=60)},
 }
@@ -1527,6 +1528,12 @@ EVENTS_METRIC_NAME = os.environ.get("EVENTS_METRIC_NAME", default="")
 REDSHIFT_QUERY_BASE_URL = os.environ.get("REDSHIFT_QUERY_BASE_URL", default="")
 REDSHIFT_SECRET = os.environ.get("REDSHIFT_SECRET", default="")
 REDSHIFT_ROLE_ARN = os.environ.get("REDSHIFT_ROLE_ARN", default="")
+DATALAKE_VALIDATION_SLACK_WEBHOOK_URL = os.environ.get("DATALAKE_VALIDATION_SLACK_WEBHOOK_URL", default="")
+DATALAKE_VALIDATION_PROJECTS = [
+    project.strip()
+    for project in os.environ.get("DATALAKE_VALIDATION_PROJECTS", default="").split(",")
+    if project.strip()
+]
 
 # Path to the JWT public key
 BASE_DIR = Path(__file__).resolve().parent.parent
