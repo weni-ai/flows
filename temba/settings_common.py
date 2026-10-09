@@ -1558,6 +1558,13 @@ SOCKET_BASE_URL = os.environ.get("SOCKET_BASE_URL", default="")
 
 USE_EDA = os.environ.get("USE_EDA", "false").lower() in ("true", "1", "yes")
 
+# Off until the exchange and consumer queues exist. Publishing also needs USE_EDA,
+# because the AMQ_* settings the publisher reads are only defined in that block.
+CHANNEL_EVENTS_PUBLISH_ENABLED = os.environ.get(
+    "CHANNEL_EVENTS_PUBLISH_ENABLED", "false"
+).lower() in ("true", "1", "yes")
+CHANNEL_EVENTS_EXCHANGE = os.environ.get("CHANNEL_EVENTS_EXCHANGE", "flows-channel-events.topic")
+
 if USE_EDA:
     _eda_connection_backend = os.environ.get("EDA_CONNECTION_BACKEND")
     if _eda_connection_backend:
