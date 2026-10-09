@@ -8,10 +8,89 @@ from weni.internal.models import TicketerQueue
 
 from django.contrib.auth.models import User
 
+from temba.api.v2.internals.tickets.serializers import UpdateTicketerSerializer, redact_ticketer_config
 from temba.api.v2.validators import LambdaURLValidator
 from temba.mailroom.client import MailroomException
 from temba.tests import TembaTest
 from temba.tickets.models import Ticket, Ticketer
+
+
+class TicketerSerializerHelpersTest(TembaTest):
+    def test_redact_ticketer_config_masks_secrets_only(self):
+        config = {"base_url": "https://example.com", "api_token": "secret", "webhook_secret": "hook"}
+        redacted = redact_ticketer_config(config)
+        self.assertEqual(redacted["api_token"], "***")
+        self.assertEqual(redacted["webhook_secret"], "***")
+        self.assertEqual(redacted["base_url"], "https://example.com")
+        self.assertEqual(config["api_token"], "secret")
+
+    def test_redact_ticketer_config_masks_extended_keys_without_mutating_input(self):
+        config = {
+            "oauth_token": "o",
+            "secret": "s",
+            "push_token": "p",
+            "auth_token": "a",
+            "admin_auth_token": "aa",
+            "api_key": "k",
+            "project_auth": "pa",
+            "empty_secret": "",
+            "base_url": "https://example.com",
+        }
+        original = dict(config)
+        redacted = redact_ticketer_config(config)
+        for key in ("oauth_token", "secret", "push_token", "auth_token", "admin_auth_token", "api_key", "project_auth"):
+            self.assertEqual(redacted[key], "***", key)
+        self.assertEqual(redacted["base_url"], "https://example.com")
+        self.assertEqual(config, original)
+
+    def test_update_serializer_replaces_name_and_config(self):
+        ticketer = Ticketer.create(self.org, self.admin, "generic", "Old", {"api_token": "old"})
+        serializer = UpdateTicketerSerializer(
+            data={
+                "user": self.admin.email,
+                "org": str(self.org.proj_uuid),
+                "name": "New",
+                "ticketer_type": "generic",
+                "config": {"base_url": "https://n.example", "api_token": "new"},
+            }
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated = serializer.update(ticketer, serializer.validated_data)
+        updated.refresh_from_db()
+        self.assertEqual(updated.name, "New")
+        self.assertEqual(updated.config["api_token"], "new")
+        self.assertEqual(updated.modified_by, self.admin)
+
+    def test_update_serializer_rejects_type_change(self):
+        ticketer = Ticketer.create(self.org, self.admin, "generic", "Name", {})
+        serializer = UpdateTicketerSerializer(
+            instance=ticketer,
+            data={
+                "user": self.admin.email,
+                "org": str(self.org.proj_uuid),
+                "name": "Name",
+                "ticketer_type": "mailgun",
+                "config": {"base_url": "https://n.example"},
+            },
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("ticketer_type", serializer.errors)
+
+    def test_update_serializer_omitted_type_unchanged_for_non_generic(self):
+        ticketer = Ticketer.create(self.org, self.admin, "mailgun", "MG", {})
+        serializer = UpdateTicketerSerializer(
+            instance=ticketer,
+            data={
+                "user": self.admin.email,
+                "org": str(self.org.proj_uuid),
+                "name": "MG Updated",
+                "config": {"base_url": "https://n.example"},
+            },
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated = serializer.update(ticketer, serializer.validated_data)
+        updated.refresh_from_db()
+        self.assertEqual(updated.ticketer_type, "mailgun")
 
 
 class TicketAssigneeViewTest(TembaTest):
@@ -179,6 +258,207 @@ class CreateTicketerViewTest(TembaTest):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["name"], "Generic Ticketer")
+
+    def list_params(self):
+        return {"org": str(self.org.proj_uuid), "user": self.admin.email}
+
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_list_ticketers_newest_first_without_config(self):
+        older = Ticketer.create(self.org, self.admin, "generic", "Older", self.config)
+        newer = Ticketer.create(self.org, self.admin, "generic", "Newer", self.config)
+
+        response = self.authenticated_client().get(self.url, self.list_params())
+
+        self.assertEqual(response.status_code, 200)
+        results = response.data["results"]
+        self.assertEqual([r["uuid"] for r in results], [str(newer.uuid), str(older.uuid)])
+        for result in results:
+            self.assertNotIn("config", result)
+            self.assertEqual(set(result.keys()), {"uuid", "name", "ticketer_type", "created_on"})
+
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_list_ticketers_empty(self):
+        response = self.authenticated_client().get(self.url, self.list_params())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {"results": []})
+
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_list_ticketers_excludes_inactive_and_other_orgs(self):
+        active = Ticketer.create(self.org, self.admin, "generic", "Active", self.config)
+        inactive = Ticketer.create(self.org, self.admin, "generic", "Inactive", self.config)
+        inactive.is_active = False
+        inactive.save(update_fields=("is_active",))
+        Ticketer.create(self.org2, self.admin, "generic", "Other org", self.config)
+
+        response = self.authenticated_client().get(self.url, self.list_params())
+
+        self.assertEqual([r["uuid"] for r in response.data["results"]], [str(active.uuid)])
+
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_list_ticketers_requires_org(self):
+        response = self.authenticated_client().get(self.url, {"user": self.admin.email})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("org", response.data)
+
+
+class TicketerItemViewTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.url = "/api/v2/internals/ticketer"
+        self.config = {
+            "base_url": "https://example.com",
+            "api_token": "api-token-123",
+            "webhook_secret": "webhook-secret-123",
+            "skip_webhook_hmac": "true",
+            "project_uuid": str(self.org.proj_uuid),
+            "project_name": "org support",
+        }
+        self.ticketer = Ticketer.create(self.org, self.admin, "generic", "Generic Ticketer", self.config)
+
+    def authenticated_client(self, user=None):
+        client = APIClient()
+        client.force_authenticate(user=user or self.admin)
+        return client
+
+    def params(self, org=None):
+        return {"org": str((org or self.org).proj_uuid), "user": self.admin.email}
+
+    def item_url(self, ticketer=None):
+        return f"{self.url}/{(ticketer or self.ticketer).uuid}"
+
+    def delete_url(self, ticketer=None):
+        params = self.params()
+        return f"{self.item_url(ticketer)}?org={params['org']}&user={params['user']}"
+
+    def put_body(self, **overrides):
+        body = {
+            "user": self.admin.email,
+            "org": str(self.org.proj_uuid),
+            "name": "Renamed Ticketer",
+            "ticketer_type": "generic",
+            "config": json.dumps({"base_url": "https://new.example.com", "api_token": "new-secret-token"}),
+        }
+        body.update(overrides)
+        return body
+
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.permission_classes", [])
+    def test_get_ticketer_redacts_secrets(self):
+        response = self.authenticated_client().get(self.item_url(), self.params())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["uuid"], str(self.ticketer.uuid))
+        self.assertEqual(response.data["name"], "Generic Ticketer")
+        self.assertEqual(response.data["config"]["api_token"], "***")
+        self.assertEqual(response.data["config"]["webhook_secret"], "***")
+        self.assertEqual(response.data["config"]["base_url"], "https://example.com")
+
+        self.ticketer.refresh_from_db()
+        self.assertEqual(self.ticketer.config["api_token"], "api-token-123")
+
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.permission_classes", [])
+    def test_get_ticketer_from_other_org_is_404(self):
+        other = Ticketer.create(self.org2, self.admin, "generic", "Other", self.config)
+        response = self.authenticated_client().get(self.item_url(other), self.params())
+
+        self.assertEqual(response.status_code, 404)
+
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.permission_classes", [])
+    def test_get_inactive_ticketer_is_404(self):
+        self.ticketer.is_active = False
+        self.ticketer.save(update_fields=("is_active",))
+
+        response = self.authenticated_client().get(self.item_url(), self.params())
+
+        self.assertEqual(response.status_code, 404)
+
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.permission_classes", [])
+    def test_put_ticketer_updates_name_and_config(self):
+        response = self.authenticated_client().put(self.item_url(), data=self.put_body())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["uuid"], str(self.ticketer.uuid))
+        self.assertEqual(response.data["name"], "Renamed Ticketer")
+        self.assertEqual(response.data["config"]["api_token"], "new-secret-token")
+
+        self.ticketer.refresh_from_db()
+        self.assertEqual(self.ticketer.name, "Renamed Ticketer")
+        self.assertEqual(self.ticketer.config["api_token"], "new-secret-token")
+        self.assertEqual(self.ticketer.modified_by, self.admin)
+
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.permission_classes", [])
+    def test_put_ticketer_rejects_type_change(self):
+        response = self.authenticated_client().put(self.item_url(), data=self.put_body(ticketer_type="mailgun"))
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("ticketer_type", response.data)
+
+        self.ticketer.refresh_from_db()
+        self.assertEqual(self.ticketer.name, "Generic Ticketer")
+        self.assertEqual(self.ticketer.ticketer_type, "generic")
+
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.permission_classes", [])
+    def test_put_unknown_ticketer_is_404(self):
+        self.ticketer.is_active = False
+        self.ticketer.save(update_fields=("is_active",))
+
+        response = self.authenticated_client().put(self.item_url(), data=self.put_body())
+
+        self.assertEqual(response.status_code, 404)
+
+    @patch("temba.mailroom.client.MailroomClient.ticket_close")
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.permission_classes", [])
+    def test_delete_ticketer_closes_tickets_and_releases(self, mock_ticket_close):
+        contact = self.create_contact("Bob", urns=["twitter:bobby"])
+        ticket = Ticket.objects.create(
+            org=self.org,
+            ticketer=self.ticketer,
+            contact=contact,
+            topic=self.org.default_ticket_topic,
+            body="Where are my cookies?",
+            status="O",
+        )
+
+        response = self.authenticated_client().delete(self.delete_url())
+
+        self.assertEqual(response.status_code, 204)
+        self.ticketer.refresh_from_db()
+        self.assertFalse(self.ticketer.is_active)
+        mock_ticket_close.assert_called_once_with(self.org.id, self.admin.id, [ticket.id], force=True)
+
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.permission_classes", [])
+    def test_delete_internal_ticketer_is_400(self):
+        internal = Ticketer.create(self.org, self.admin, "internal", "Internal", {})
+
+        response = self.authenticated_client().delete(self.delete_url(internal))
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("ticketer", response.data)
+        internal.refresh_from_db()
+        self.assertTrue(internal.is_active)
+
+    @patch("temba.mailroom.client.MailroomClient.ticket_close")
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.permission_classes", [])
+    def test_delete_twice_second_is_404(self, mock_ticket_close):
+        first = self.authenticated_client().delete(self.delete_url())
+        second = self.authenticated_client().delete(self.delete_url())
+
+        self.assertEqual(first.status_code, 204)
+        self.assertEqual(second.status_code, 404)
 
 
 class OpenTicketTest(TembaTest):
