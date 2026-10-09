@@ -28,7 +28,7 @@ class Global(SmartModel, DependencyMixin):
 
     name = models.CharField(verbose_name=_("Name"), max_length=MAX_NAME_LEN)
 
-    value = models.TextField(max_length=MAX_VALUE_LEN)
+    value = models.TextField(verbose_name=_("Value"), max_length=MAX_VALUE_LEN)
 
     @classmethod
     def get_or_create(cls, org, user, key, name, value):

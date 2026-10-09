@@ -1,6 +1,23 @@
-3.98.0
+3.101.0
 ----------
 * feat: Add channel migration consumer for integrations.channel.migrated events
+
+3.100.1
+----------
+* feat: Remove channel type validation in whatsapp broadcast API again
+
+3.100.0
+----------
+* feat: named WhatsApp template parameters — record parameter format/names, accept named broadcast values, resolve per recipient
+* fix: Translate global form labels and cancel buttons
+
+3.99.0
+----------
+* feat: add validation for Instagram comment ID and response type in WhatsappBroadcastWriteSerializer
+
+3.98.0
+----------
+* feat: Create a hidden WWC Copilot channel when projects are created via EDA with is_live_desk_copilot=True
 
 3.97.1
 ----------
