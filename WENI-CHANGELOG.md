@@ -1,3 +1,7 @@
+3.101.0
+----------
+* feat: Add channel migration consumer for integrations.channel.migrated events
+
 3.100.1
 ----------
 * feat: Remove channel type validation in whatsapp broadcast API again
