@@ -1,3 +1,7 @@
+3.100.2
+----------
+* feat: JWT public key to env variable
+
 3.100.1
 ----------
 * feat: Remove channel type validation in whatsapp broadcast API again
