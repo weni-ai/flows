@@ -444,6 +444,11 @@ class IdentityAPITest(TembaTest):
             },
         )
         self.assertEqual(missing_contact.status_code, 400)
+        missing_detach = self._post(
+            "internal_identity_detach",
+            {"project_id": str(self.org.proj_uuid), "urn_id": urn.id, "privileged": True},
+        )
+        self.assertEqual(missing_detach.status_code, 400)
 
         unknown_urn = self._post(
             "internal_identity_detach",

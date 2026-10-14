@@ -1,3 +1,4 @@
+import logging
 import re
 import secrets
 
@@ -7,6 +8,8 @@ from django.utils import timezone
 
 from temba.contacts.models import Contact, ContactAnchor, ContactIdentityEvent, ContactURN
 from temba.msgs.models import Protocol
+
+logger = logging.getLogger(__name__)
 
 CONFIRMATION_TTL = 600
 CONFIRMATION_CODE_RANGE = 1_000_000
@@ -73,6 +76,13 @@ def attach(org, *, urn_id, anchor_type, value, verified, actor):
         with transaction.atomic():
             return _attach_locked(org, urn_id, anchor_type, value, bool(verified), actor or "api")
     except IntegrityError:
+        logger.warning(
+            "IntegrityError during attach for org=%s urn_id=%s anchor_type=%s",
+            org.id,
+            urn_id,
+            anchor_type,
+            exc_info=True,
+        )
         with transaction.atomic():
             urn = _lookup_urn(org, urn_id, lock=False)
             _event(
@@ -91,7 +101,7 @@ def attach(org, *, urn_id, anchor_type, value, verified, actor):
 def detach(org, *, urn_id, target_consumer_id, confirmation_code, actor, privileged):
     with transaction.atomic():
         urn = _lookup_urn(org, urn_id, lock=True)
-        if urn is None:
+        if urn is None or urn.contact_id is None:
             return IdentityResult(code="validation", status=400, error="validation")
         if not privileged and not _confirmation_matches(org, urn, confirmation_code):
             return IdentityResult(code="confirmation_required", status=409, error="confirmation_required")
@@ -170,10 +180,10 @@ def set_inactivity(org, *, ai_inactivity_hours=None, human_inactivity_hours=None
 
 
 def forget_consumer(org, *, consumer_id, actor):
-    contact = Contact.objects.filter(org=org, uuid=str(consumer_id)).first()
-    if contact is None:
-        return IdentityResult(code="validation", status=400, error="validation")
     with transaction.atomic():
+        contact = Contact.objects.select_for_update().filter(org=org, uuid=str(consumer_id)).first()
+        if contact is None:
+            return IdentityResult(code="validation", status=400, error="validation")
         contact.fields = {}
         contact.save(update_fields=["fields"])
         _event(
