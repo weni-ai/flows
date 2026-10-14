@@ -1508,13 +1508,16 @@ class ContactURN(models.Model):
     ATTACHMENT_NOT_ATTACHED = "not-attached"
     ATTACHMENT_CLAIMED = "claimed"
     ATTACHMENT_CONFIRMED = "confirmed"
+    ATTACHMENT_STATUS_MAX_LENGTH = 16
     ATTACHMENT_STATUS_CHOICES = (
         (ATTACHMENT_NOT_ATTACHED, "Not attached"),
         (ATTACHMENT_CLAIMED, "Claimed"),
         (ATTACHMENT_CONFIRMED, "Confirmed"),
     )
     attachment_status = models.CharField(
-        max_length=16, choices=ATTACHMENT_STATUS_CHOICES, default=ATTACHMENT_NOT_ATTACHED
+        max_length=ATTACHMENT_STATUS_MAX_LENGTH,
+        choices=ATTACHMENT_STATUS_CHOICES,
+        default=ATTACHMENT_NOT_ATTACHED,
     )
 
     @classmethod
@@ -1691,7 +1694,7 @@ class ContactIdentityEvent(models.Model):
     urn = models.ForeignKey(ContactURN, null=True, on_delete=models.PROTECT, related_name="identity_events")
     affected_protocol_ids = JSONField(default=list)
     consumer = models.ForeignKey(Contact, null=True, on_delete=models.PROTECT, related_name="identity_events")
-    attachment_status = models.CharField(max_length=16, blank=True, default="")
+    attachment_status = models.CharField(max_length=ContactURN.ATTACHMENT_STATUS_MAX_LENGTH, blank=True, default="")
     outcome = models.CharField(max_length=16, choices=OUTCOME_CHOICES)
 
     class Meta:

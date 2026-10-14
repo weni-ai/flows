@@ -95,11 +95,8 @@ class IdentityConfirmationView(IdentityView):
         org, error = self._org(request)
         if error:
             return error
-        urn = identity._lookup_urn(org, request.data.get("urn_id"), lock=False)
-        if urn is None:
-            return Response({"error": "validation"}, status=400)
-        code = identity.issue_confirmation_code(org, urn)
-        return Response({"confirmation_code": code}, status=201)
+        result = identity.request_confirmation(org, urn_id=request.data.get("urn_id"))
+        return self._respond(result)
 
 
 class IdentityForgetView(IdentityView):

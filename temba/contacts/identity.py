@@ -9,9 +9,14 @@ from temba.contacts.models import Contact, ContactAnchor, ContactIdentityEvent, 
 from temba.msgs.models import Protocol
 
 CONFIRMATION_TTL = 600
+CONFIRMATION_CODE_RANGE = 1_000_000
 AI_INACTIVITY_KEY = "ai_inactivity_hours"
 HUMAN_INACTIVITY_KEY = "human_inactivity_hours"
+AI_INACTIVITY_MIN = 1
+AI_INACTIVITY_MAX = 24
 AI_INACTIVITY_DEFAULT = 1
+HUMAN_INACTIVITY_MIN = 1
+HUMAN_INACTIVITY_MAX = 672
 HUMAN_INACTIVITY_DEFAULT = 96
 
 ANCHOR_TYPES = {
@@ -46,9 +51,16 @@ def normalize_anchor(anchor_type, value):
 
 
 def issue_confirmation_code(org, urn):
-    code = f"{secrets.randbelow(1000000):06d}"
+    code = f"{secrets.randbelow(CONFIRMATION_CODE_RANGE):06d}"
     cache.set(_code_key(org.id, urn.id), code, CONFIRMATION_TTL)
     return code
+
+
+def request_confirmation(org, *, urn_id):
+    urn = _lookup_urn(org, urn_id, lock=False)
+    if urn is None:
+        return IdentityResult(code="validation", status=400, error="validation")
+    return IdentityResult(confirmation_code=issue_confirmation_code(org, urn), status=201)
 
 
 def attach(org, *, urn_id, anchor_type, value, verified, actor):
@@ -89,6 +101,13 @@ def detach(org, *, urn_id, target_consumer_id, confirmation_code, actor, privile
     return result
 
 
+def _graph_contact(org, *, pk=None, uuid=None):
+    queryset = Contact.objects.prefetch_related("anchors", "urns", "protocols").filter(org=org)
+    if pk is not None:
+        return queryset.filter(pk=pk).first()
+    return queryset.filter(uuid=uuid).first()
+
+
 def read_graph(org, *, urn_id=None, consumer_id=None):
     if not urn_id and not consumer_id:
         return IdentityResult(code="validation", status=400, error="validation")
@@ -98,11 +117,11 @@ def read_graph(org, *, urn_id=None, consumer_id=None):
         urn = _lookup_urn(org, urn_id, lock=False)
         if urn is None:
             return IdentityResult(code="validation", status=400, error="validation")
-        contact = urn.contact
+        contact = _graph_contact(org, pk=urn.contact_id)
     else:
-        contact = Contact.objects.filter(org=org, uuid=str(consumer_id)).first()
-        if contact is None:
-            return IdentityResult(code="validation", status=400, error="validation")
+        contact = _graph_contact(org, uuid=str(consumer_id))
+    if contact is None:
+        return IdentityResult(code="validation", status=400, error="validation")
     anchors = [
         {"type": anchor.anchor_type, "value": anchor.value, "verified": anchor.verified}
         for anchor in contact.anchors.all()
@@ -113,7 +132,7 @@ def read_graph(org, *, urn_id=None, consumer_id=None):
     ]
     protocols = [
         {"id": protocol.id, "uuid": str(protocol.uuid), "state": protocol.state, "urn_id": protocol.urn_id}
-        for protocol in Protocol.objects.filter(org=org, contact=contact)
+        for protocol in contact.protocols.all()
     ]
     return IdentityResult(
         consumer_id=str(contact.uuid),
@@ -131,7 +150,7 @@ def set_inactivity(org, *, ai_inactivity_hours=None, human_inactivity_hours=None
             ai_inactivity_hours = int(ai_inactivity_hours)
         except (TypeError, ValueError):
             return IdentityResult(code="validation", status=400, error="validation")
-        if ai_inactivity_hours < 1 or ai_inactivity_hours > 24:
+        if ai_inactivity_hours < AI_INACTIVITY_MIN or ai_inactivity_hours > AI_INACTIVITY_MAX:
             return IdentityResult(code="validation", status=400, error="validation")
         config[AI_INACTIVITY_KEY] = ai_inactivity_hours
     if human_inactivity_hours is not None:
@@ -139,7 +158,7 @@ def set_inactivity(org, *, ai_inactivity_hours=None, human_inactivity_hours=None
             human_inactivity_hours = int(human_inactivity_hours)
         except (TypeError, ValueError):
             return IdentityResult(code="validation", status=400, error="validation")
-        if human_inactivity_hours < 1 or human_inactivity_hours > 672:
+        if human_inactivity_hours < HUMAN_INACTIVITY_MIN or human_inactivity_hours > HUMAN_INACTIVITY_MAX:
             return IdentityResult(code="validation", status=400, error="validation")
         config[HUMAN_INACTIVITY_KEY] = human_inactivity_hours
     org.config = config
@@ -154,18 +173,19 @@ def forget_consumer(org, *, consumer_id, actor):
     contact = Contact.objects.filter(org=org, uuid=str(consumer_id)).first()
     if contact is None:
         return IdentityResult(code="validation", status=400, error="validation")
-    contact.fields = {}
-    contact.save(update_fields=["fields"])
-    _event(
-        org,
-        actor=actor or "api",
-        anchor_type=None,
-        urn=None,
-        protocol_ids=list(Protocol.objects.filter(contact=contact).values_list("id", flat=True)),
-        consumer=contact,
-        attachment_status=None,
-        outcome=ContactIdentityEvent.OUTCOME_DELETED,
-    )
+    with transaction.atomic():
+        contact.fields = {}
+        contact.save(update_fields=["fields"])
+        _event(
+            org,
+            actor=actor or "api",
+            anchor_type=None,
+            urn=None,
+            protocol_ids=list(Protocol.objects.filter(contact=contact).values_list("id", flat=True)),
+            consumer=contact,
+            attachment_status=None,
+            outcome=ContactIdentityEvent.OUTCOME_DELETED,
+        )
     return IdentityResult(consumer_id=str(contact.uuid), outcome=ContactIdentityEvent.OUTCOME_DELETED)
 
 
