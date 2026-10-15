@@ -138,14 +138,14 @@ class MailroomClient:
     def sim_resume(self, payload):
         return self._request("sim/resume", payload, encode_json=True)
 
-    def contact_create(self, org_id: int, user_id: int, contact: ContactSpec):
+    def contact_create(self, org_id: int, user_id: int, contact: ContactSpec, timeout=None):
         payload = {
             "org_id": org_id,
             "user_id": user_id,
             "contact": contact._asdict(),
         }
 
-        return self._request("contact/create", payload)
+        return self._request("contact/create", payload, timeout=timeout)
 
     def contact_modify(self, org_id, user_id, contact_ids, modifiers: list[Modifier]):
         payload = {
@@ -233,7 +233,9 @@ class MailroomClient:
 
         return self._request("ticket/reopen", payload)
 
-    def _request(self, endpoint, payload=None, files=None, post=True, encode_json=False, returns_json=True):
+    def _request(
+        self, endpoint, payload=None, files=None, post=True, encode_json=False, returns_json=True, timeout=None
+    ):
         if logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
             logger.debug("=============== %s request ===============" % endpoint)
             logger.debug(json.dumps(payload, indent=2))
@@ -251,6 +253,8 @@ class MailroomClient:
             kwargs = dict(json=payload)
 
         req_fn = requests.post if post else requests.get
+        if timeout is not None:
+            kwargs["timeout"] = timeout
         response = req_fn("%s/mr/%s" % (self.base_url, endpoint), headers=headers, **kwargs)
 
         return_val = response.json() if returns_json else response.content
