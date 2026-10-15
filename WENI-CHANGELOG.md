@@ -1,3 +1,7 @@
+3.101.0
+----------
+* feat: publish ChangeHistory events (weni-rp-apps 2.12.0, weni-commons 1.6.2) behind CHANGE_HISTORY_ENABLED
+
 3.100.2
 ----------
 * feat: JWT public key to env variable
