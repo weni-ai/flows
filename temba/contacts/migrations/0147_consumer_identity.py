@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("orgs", "0095_auto_20260910_2044"),
-        ("contacts", "0144_auto_20260910_2044"),
+        ("contacts", "0146_contactgroup_one_active_opt_in"),
     ]
 
     operations = [

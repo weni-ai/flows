@@ -10,7 +10,7 @@ def empty_null_strings(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("contacts", "0145_consumer_identity"),
+        ("contacts", "0147_consumer_identity"),
     ]
 
     operations = [

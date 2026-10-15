@@ -10,7 +10,7 @@ import temba.utils.uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("contacts", "0145_consumer_identity"),
+        ("contacts", "0147_consumer_identity"),
         ("orgs", "0095_auto_20260910_2044"),
         ("msgs", "0175_merge_20260910_2109"),
     ]
