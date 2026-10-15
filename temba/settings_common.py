@@ -1588,3 +1588,15 @@ if USE_EDA:
     AMQ_VIRTUAL_HOST = os.environ.get("AMQ_VIRTUAL_HOST", PIKA_EDA_VIRTUAL_HOST)
     AMQ_BROKER_HEARTBEAT = int(os.environ.get("AMQ_BROKER_HEARTBEAT", 300))
     AMQ_BROKER_SSL_SERVER_HOSTNAME = os.environ.get("AMQ_BROKER_SSL_SERVER_HOSTNAME")
+
+# -----------------------------------------------------------------------------------
+# Recent activities / Change history (weni.activities)
+# -----------------------------------------------------------------------------------
+
+RECENT_ACTIVITIES_LEGACY_ENABLED = os.environ.get("RECENT_ACTIVITIES_LEGACY_ENABLED", "true").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+# Publishing requires USE_EDA and the AMQ_* broker settings above
+CHANGE_HISTORY_ENABLED = USE_EDA and os.environ.get("CHANGE_HISTORY_ENABLED", "false").lower() in ("true", "1", "yes")
