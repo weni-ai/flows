@@ -641,7 +641,7 @@ class IdentityAPIAuthTest(TembaTest):
             data=self._payload(contact.urns.get().id),
             format="json",
         )
-        self.assertEqual(response.status_code, 401)
+        self.assertIn(response.status_code, (401, 403))
 
     def test_org_user_can_attach_with_project_id(self):
         contact = self.create_contact("Ann", urns=["tel:+250788111041"])

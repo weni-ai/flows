@@ -468,7 +468,7 @@ def _protocol_ids(urn):
 
 
 def _lookup_urn(org, urn_id, *, lock):
-    queryset = ContactURN.objects.select_related("contact").filter(org=org)
+    queryset = ContactURN.objects.filter(org=org)
     if lock:
         queryset = queryset.select_for_update()
     text = str(urn_id)
