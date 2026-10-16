@@ -1,16 +1,26 @@
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
 from weni.internal.permissions import CanCommunicateInternally
 
+from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.v2.internals.views import APIViewMixin
+from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.contacts import identity
 from temba.orgs.models import Org
 
 
+class IsUserInIdentityProject(IsUserInOrg):
+    """CLI and callers send `project_id`; other internals use `project_uuid`/`project`."""
+
+    PROJECT_UUID_QUERY_KEYS = ("project_uuid", "project", "project_id")
+    PROJECT_UUID_BODY_KEYS = ("project_uuid", "project", "project_id")
+
+
 class IdentityView(APIViewMixin, APIView):
-    authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [CanCommunicateInternally]
+    authentication_classes = [OptionalJWTAuthentication, InternalOIDCAuthentication]
+    permission_classes = [(IsAuthenticated & (CanCommunicateInternally | IsUserInIdentityProject)) | HasValidJWT]
 
     def _org(self, request):
         project_id = None
@@ -24,6 +34,11 @@ class IdentityView(APIViewMixin, APIView):
             return Org.objects.get(proj_uuid=project_id), None
         except Org.DoesNotExist:
             return None, Response({"error": "forbidden"}, status=403)
+
+    def _privileged(self, request):
+        if getattr(request, "jwt_payload", None) is not None:
+            return True
+        return CanCommunicateInternally().has_permission(request, self)
 
     def _respond(self, result):
         if result.code:
@@ -59,7 +74,7 @@ class IdentityDetachView(IdentityView):
             target_consumer_id=request.data.get("target_consumer_id"),
             confirmation_code=request.data.get("confirmation_code"),
             actor=request.data.get("actor") or "api",
-            privileged=bool(request.data.get("privileged")),
+            privileged=self._privileged(request),
         )
         return self._respond(result)
 
