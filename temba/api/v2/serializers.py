@@ -376,17 +376,11 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             raise serializers.ValidationError("Must provide either urns, contacts or groups")
 
         channel_data = data.get("channel", None)
-        ig_comment_id = data.get("msg", {}).get("ig_comment_id")
         channel = None
         if channel_data:
             try:
                 channel = Channel.objects.get(uuid=channel_data)
                 data["channel"] = channel
-                allowed_channel_types = ["WAC", "WWC"]
-                if ig_comment_id:
-                    allowed_channel_types.append("IG")
-                if channel.channel_type not in allowed_channel_types:
-                    raise serializers.ValidationError("Invalid channel type")
             except Channel.DoesNotExist:
                 raise serializers.ValidationError("Channel not found")
 
@@ -532,6 +526,16 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             % (msg.get("ig_comment_id"), msg.get("ig_response_type"), msg),
             flush=True,
         )
+
+        resolved_urns = self.validated_data.get("resolved_urns")
+        if resolved_urns is not None:
+            urns = resolved_urns
+            named_parameters = self.validated_data.get("named_parameters")
+            if named_parameters:
+                msg["named_parameters"] = named_parameters
+                template_meta = dict(msg.get("template") or {})
+                template_meta["parameter_format"] = template_meta.get("parameter_format", "named")
+                msg["template"] = template_meta
 
         resolved_urns = self.validated_data.get("resolved_urns")
         if resolved_urns is not None:

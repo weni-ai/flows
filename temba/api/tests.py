@@ -7,7 +7,7 @@ from rest_framework.test import APIRequestFactory
 
 from django.conf import settings as _dj_settings
 from django.contrib.auth.models import Group
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
 
 from temba.api.auth.jwt import (
@@ -19,6 +19,7 @@ from temba.api.auth.jwt import (
 )
 from temba.api.models import APIToken, Resthook, WebHookEvent
 from temba.api.tasks import trim_webhook_event_task
+from temba.settings_common import load_jwt_public_key
 from temba.tests import TembaTest
 
 
@@ -296,3 +297,24 @@ class JWTAuthCoverageTests(TembaTest):
         self.assertEqual(d1.jwt_payload, {"a": 1})
         self.assertEqual(d2.project_uuid, "p1")
         self.assertEqual(d2.jwt_payload, {"a": 1})
+
+
+class LoadJwtPublicKeyTests(SimpleTestCase):
+    def test_empty_returns_none(self):
+        self.assertIsNone(load_jwt_public_key(None))
+        self.assertIsNone(load_jwt_public_key(""))
+        self.assertIsNone(load_jwt_public_key("   "))
+
+    def test_escaped_newlines_become_real_newlines(self):
+        raw = "-----BEGIN PUBLIC KEY-----\\nABC\\n-----END PUBLIC KEY-----"
+        self.assertEqual(
+            load_jwt_public_key(raw),
+            b"-----BEGIN PUBLIC KEY-----\nABC\n-----END PUBLIC KEY-----",
+        )
+
+    def test_real_newlines_are_preserved_and_outer_whitespace_stripped(self):
+        raw = "\n-----BEGIN PUBLIC KEY-----\nABC\n-----END PUBLIC KEY-----\n"
+        self.assertEqual(
+            load_jwt_public_key(raw),
+            b"-----BEGIN PUBLIC KEY-----\nABC\n-----END PUBLIC KEY-----",
+        )
