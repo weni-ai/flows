@@ -3,7 +3,6 @@ import socket
 import sys
 import urllib
 from datetime import timedelta
-from pathlib import Path
 
 import iptools
 import sentry_sdk
@@ -345,6 +344,7 @@ INSTALLED_APPS = (
     "temba.event_driven",
     "weni.eda.django.eda_app",
     "temba.conversion_events",
+    "temba.wa_conversation_handovers",
 )
 
 # the last installed app that uses smartmin permissions
@@ -1527,17 +1527,20 @@ REDSHIFT_QUERY_BASE_URL = os.environ.get("REDSHIFT_QUERY_BASE_URL", default="")
 REDSHIFT_SECRET = os.environ.get("REDSHIFT_SECRET", default="")
 REDSHIFT_ROLE_ARN = os.environ.get("REDSHIFT_ROLE_ARN", default="")
 
-# Path to the JWT public key
-BASE_DIR = Path(__file__).resolve().parent.parent
 
-JWT_PUBLIC_KEY_PATH = BASE_DIR / "temba" / "jwt_public_key.pem"
+def load_jwt_public_key(raw):
+    """Return the RS256 public key PEM from an env value, or None when unset.
 
-# The public key is loaded a single time at application startup.
-try:
-    with open(JWT_PUBLIC_KEY_PATH, "rb") as f:
-        JWT_PUBLIC_KEY = f.read()
-except FileNotFoundError:
-    JWT_PUBLIC_KEY = None
+    Newlines may be real or escaped as \\n, which is how single-line secrets are stored.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    return raw.replace("\\n", "\n").encode()
+
+
+# JWT public key used to verify RS256 Bearer tokens.
+JWT_PUBLIC_KEY = load_jwt_public_key(os.environ.get("JWT_PUBLIC_KEY", ""))
 
 WENI_VOICE_TOKEN = os.environ.get("WENI_VOICE_TOKEN", default="")
 
@@ -1585,3 +1588,15 @@ if USE_EDA:
     AMQ_VIRTUAL_HOST = os.environ.get("AMQ_VIRTUAL_HOST", PIKA_EDA_VIRTUAL_HOST)
     AMQ_BROKER_HEARTBEAT = int(os.environ.get("AMQ_BROKER_HEARTBEAT", 300))
     AMQ_BROKER_SSL_SERVER_HOSTNAME = os.environ.get("AMQ_BROKER_SSL_SERVER_HOSTNAME")
+
+# -----------------------------------------------------------------------------------
+# Recent activities / Change history (weni.activities)
+# -----------------------------------------------------------------------------------
+
+RECENT_ACTIVITIES_LEGACY_ENABLED = os.environ.get("RECENT_ACTIVITIES_LEGACY_ENABLED", "true").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+# Publishing requires USE_EDA and the AMQ_* broker settings above
+CHANGE_HISTORY_ENABLED = USE_EDA and os.environ.get("CHANGE_HISTORY_ENABLED", "false").lower() in ("true", "1", "yes")
