@@ -51,6 +51,11 @@ class TicketerSerializerHelpersTest(TembaTest):
         self.assertEqual(redacted["base_url"], "https://example.com")
         self.assertEqual(config, original)
 
+    def test_redact_ticketer_config_non_dict_returns_empty(self):
+        self.assertEqual(redact_ticketer_config(None), {})
+        self.assertEqual(redact_ticketer_config("api_token"), {})
+        self.assertEqual(redact_ticketer_config(["api_token"]), {})
+
     def test_update_serializer_replaces_name_and_config(self):
         ticketer = Ticketer.create(self.org, self.admin, "generic", "Old", {"api_token": "old"})
         serializer = UpdateTicketerSerializer(
@@ -267,6 +272,18 @@ class CreateTicketerViewTest(TembaTest):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["name"], "Generic Ticketer")
 
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.CreateTicketerView.permission_classes", [])
+    def test_create_ticketer_without_connect_permission(self):
+        body = self.valid_body()
+        body["user"] = self.editor.email
+
+        response = self.authenticated_client(self.editor).post(self.url, data=body)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["permission"], ["User lacks tickets.ticketer_connect on this org"])
+        self.assertFalse(Ticketer.objects.filter(name="Generic Ticketer").exists())
+
     def list_params(self):
         return {"org": str(self.org.proj_uuid), "user": self.admin.email}
 
@@ -377,6 +394,14 @@ class TicketerItemViewTest(TembaTest):
         response = self.authenticated_client().get(self.item_url(other), self.params())
 
         self.assertEqual(response.status_code, 404)
+
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.authentication_classes", [])
+    @patch("temba.api.v2.internals.tickets.views.TicketerItemView.permission_classes", [])
+    def test_get_ticketer_requires_org(self):
+        response = self.authenticated_client().get(self.item_url(), {"user": self.admin.email})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["org"], ["This field is required."])
 
     @patch("temba.api.v2.internals.tickets.views.TicketerItemView.authentication_classes", [])
     @patch("temba.api.v2.internals.tickets.views.TicketerItemView.permission_classes", [])
