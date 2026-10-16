@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from django.db import IntegrityError
 from django.urls import reverse
+from rest_framework.test import APIClient
 
 from temba.contacts import identity
 from temba.contacts.models import Contact, ContactAnchor, ContactIdentityEvent, ContactURN
@@ -590,3 +591,51 @@ class IdentityAPITest(TembaTest):
             {"project_id": str(self.org.proj_uuid), "consumer_id": str(uuid4())},
         )
         self.assertEqual(forgotten.status_code, 400)
+
+
+class IdentityAPIAuthTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.org.proj_uuid = uuid4()
+        self.org.save()
+        self.org2.proj_uuid = uuid4()
+        self.org2.save()
+        self.api = APIClient()
+
+    def _payload(self, urn_id):
+        return {
+            "project_id": str(self.org.proj_uuid),
+            "urn_id": urn_id,
+            "anchor": {"type": "commerce_user_id", "value": "store-user-auth", "verified": True},
+        }
+
+    def test_unauthenticated_attach_is_rejected(self):
+        contact = self.create_contact("Ann", urns=["tel:+250788111040"])
+        response = self.api.post(
+            reverse("internal_identity_attach"),
+            data=self._payload(contact.urns.get().id),
+            format="json",
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_org_user_can_attach_with_project_id(self):
+        contact = self.create_contact("Ann", urns=["tel:+250788111041"])
+        urn = contact.urns.get()
+        self.api.force_authenticate(user=self.admin)
+        response = self.api.post(
+            reverse("internal_identity_attach"),
+            data=self._payload(urn.id),
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["consumer_id"], str(contact.uuid))
+
+    def test_other_org_user_is_forbidden(self):
+        contact = self.create_contact("Ann", urns=["tel:+250788111042"])
+        self.api.force_authenticate(user=self.admin2)
+        response = self.api.post(
+            reverse("internal_identity_attach"),
+            data=self._payload(contact.urns.get().id),
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
