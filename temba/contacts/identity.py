@@ -12,7 +12,8 @@ from temba.msgs.models import Protocol
 logger = logging.getLogger(__name__)
 
 CONFIRMATION_TTL = 600
-CONFIRMATION_CODE_RANGE = 1_000_000
+CONFIRMATION_CODE_DIGITS = 6
+CONFIRMATION_CODE_RANGE = 10**CONFIRMATION_CODE_DIGITS
 AI_INACTIVITY_KEY = "ai_inactivity_hours"
 HUMAN_INACTIVITY_KEY = "human_inactivity_hours"
 AI_INACTIVITY_MIN = 1
@@ -54,7 +55,7 @@ def normalize_anchor(anchor_type, value):
 
 
 def issue_confirmation_code(org, urn):
-    code = f"{secrets.randbelow(CONFIRMATION_CODE_RANGE):06d}"
+    code = f"{secrets.randbelow(CONFIRMATION_CODE_RANGE):0{CONFIRMATION_CODE_DIGITS}d}"
     cache.set(_code_key(org.id, urn.id), code, CONFIRMATION_TTL)
     return code
 
@@ -291,6 +292,37 @@ def _claim(org, urn, source, existing, anchor_type, value, actor, protocol_ids):
     elif existing.contact_id != source.id:
         # A verified anchor already belongs to someone else. A claim does not merge.
         pass
+    elif urn.attachment_status == ContactURN.ATTACHMENT_CONFIRMED and existing.verified:
+        _event(
+            org,
+            actor=actor,
+            anchor_type=anchor_type,
+            urn=urn,
+            protocol_ids=protocol_ids,
+            consumer=source,
+            attachment_status=ContactURN.ATTACHMENT_CONFIRMED,
+            outcome=ContactIdentityEvent.OUTCOME_NOOP,
+        )
+        return _attached(source, protocol_ids, outcome=ContactIdentityEvent.OUTCOME_NOOP)
+
+    if urn.attachment_status == ContactURN.ATTACHMENT_CONFIRMED:
+        _event(
+            org,
+            actor=actor,
+            anchor_type=anchor_type,
+            urn=urn,
+            protocol_ids=protocol_ids,
+            consumer=source,
+            attachment_status=ContactURN.ATTACHMENT_CONFIRMED,
+            outcome=ContactIdentityEvent.OUTCOME_CLAIMED,
+        )
+        return IdentityResult(
+            consumer_id=str(source.uuid),
+            attachment_status=ContactURN.ATTACHMENT_CONFIRMED,
+            affected_protocol_ids=protocol_ids,
+            outcome=ContactIdentityEvent.OUTCOME_CLAIMED,
+        )
+
     urn.attachment_status = ContactURN.ATTACHMENT_CLAIMED
     urn.save(update_fields=["attachment_status"])
     _event(

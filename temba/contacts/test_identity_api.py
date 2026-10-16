@@ -101,6 +101,44 @@ class IdentityAPITest(TembaTest):
         second.urns.get().refresh_from_db()
         self.assertEqual(second.urns.get().contact_id, second.id)
 
+    def test_unverified_attach_does_not_downgrade_confirmed(self):
+        contact = self.create_contact("Ann", urns=["tel:+250788111032"])
+        urn = contact.urns.get()
+        confirmed = self._post(
+            "internal_identity_attach",
+            {
+                "project_id": str(self.org.proj_uuid),
+                "urn_id": urn.id,
+                "anchor": {"type": "commerce_user_id", "value": "store-user-9", "verified": True},
+            },
+        )
+        self.assertEqual(confirmed.json()["attachment_status"], "confirmed")
+
+        again = self._post(
+            "internal_identity_attach",
+            {
+                "project_id": str(self.org.proj_uuid),
+                "urn_id": urn.id,
+                "anchor": {"type": "commerce_user_id", "value": "store-user-9", "verified": False},
+            },
+        )
+        self.assertEqual(again.status_code, 200)
+        self.assertEqual(again.json()["outcome"], "noop")
+        self.assertEqual(again.json()["attachment_status"], "confirmed")
+        urn.refresh_from_db()
+        self.assertEqual(urn.attachment_status, ContactURN.ATTACHMENT_CONFIRMED)
+
+    def test_confirmation_code_width_follows_the_range(self):
+        contact = self.create_contact("Ann", urns=["tel:+250788111033"])
+        issued = self._post(
+            "internal_identity_confirmation",
+            {"project_id": str(self.org.proj_uuid), "urn_id": contact.urns.get().id},
+        )
+        self.assertEqual(issued.status_code, 201)
+        code = issued.json()["confirmation_code"]
+        self.assertEqual(len(code), identity.CONFIRMATION_CODE_DIGITS)
+        self.assertTrue(code.isdigit())
+
     def test_distinct_verified_anchors_conflict(self):
         first = self.create_contact("Ann", urns=["tel:+250788111014"])
         second = self.create_contact("Bob", urns=["tel:+250788111015"])

@@ -111,10 +111,10 @@ def create_message_db_only(
     if isinstance(template, dict):
         template_name = template.get("name")
 
-    protocol = None
+    protocol_pk = None
     if protocol_id:
-        protocol = Protocol.objects.filter(org=org, uuid=protocol_id).first()
-        if not protocol:
+        protocol_pk = Protocol.objects.filter(org=org, uuid=protocol_id).values_list("id", flat=True).first()
+        if protocol_pk is None:
             raise ValueError("Protocol not found for this project")
 
     msg = Msg.objects.create(
@@ -132,7 +132,7 @@ def create_message_db_only(
         sent_on=sent_on,
         metadata=metadata,
         template=template_name,
-        protocol=protocol,
+        protocol_id=protocol_pk,
     )
 
     # attach labels if provided
