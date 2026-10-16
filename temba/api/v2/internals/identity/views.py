@@ -35,6 +35,11 @@ class IdentityView(APIViewMixin, APIView):
         except Org.DoesNotExist:
             return None, Response({"error": "forbidden"}, status=403)
 
+    def _privileged(self, request):
+        if getattr(request, "jwt_payload", None) is not None:
+            return True
+        return CanCommunicateInternally().has_permission(request, self)
+
     def _respond(self, result):
         if result.code:
             return Response({"error": result.code}, status=result.status)
@@ -69,7 +74,7 @@ class IdentityDetachView(IdentityView):
             target_consumer_id=request.data.get("target_consumer_id"),
             confirmation_code=request.data.get("confirmation_code"),
             actor=request.data.get("actor") or "api",
-            privileged=bool(request.data.get("privileged")),
+            privileged=self._privileged(request),
         )
         return self._respond(result)
 

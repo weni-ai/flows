@@ -1,10 +1,12 @@
 from unittest.mock import patch
 from uuid import uuid4
 
-from django.db import IntegrityError
-from django.urls import reverse
 from rest_framework.test import APIClient
 
+from django.db import IntegrityError
+from django.urls import reverse
+
+from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.contacts import identity
 from temba.contacts.models import Contact, ContactAnchor, ContactIdentityEvent, ContactURN
 from temba.msgs.models import Protocol
@@ -23,6 +25,14 @@ class IdentityAPITest(TembaTest):
 
     def _post(self, name, payload):
         return self.client.post(reverse(name), data=payload, content_type="application/json")
+
+    def _code(self, urn_id):
+        issued = self._post(
+            "internal_identity_confirmation",
+            {"project_id": str(self.org.proj_uuid), "urn_id": urn_id},
+        )
+        self.assertEqual(issued.status_code, 201)
+        return issued.json()["confirmation_code"]
 
     def test_verified_attach_creates_consumer_and_moves_a_second_urn(self):
         first = self.create_contact("Ann", urns=["tel:+250788111010"])
@@ -251,7 +261,12 @@ class IdentityAPITest(TembaTest):
 
         refused = self._post(
             "internal_identity_detach",
-            {"project_id": str(self.org.proj_uuid), "urn_id": urn.id, "target_consumer_id": str(target.uuid)},
+            {
+                "project_id": str(self.org.proj_uuid),
+                "urn_id": urn.id,
+                "target_consumer_id": str(target.uuid),
+                "privileged": True,
+            },
         )
         self.assertEqual(refused.status_code, 409)
         self.assertEqual(refused.json()["error"], "confirmation_required")
@@ -294,7 +309,11 @@ class IdentityAPITest(TembaTest):
         protocol = Protocol.objects.create(org=self.org, contact=source, urn=urn)
         response = self._post(
             "internal_identity_detach",
-            {"project_id": str(self.org.proj_uuid), "urn_id": urn.id, "privileged": True},
+            {
+                "project_id": str(self.org.proj_uuid),
+                "urn_id": urn.id,
+                "confirmation_code": self._code(urn.id),
+            },
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["attachment_status"], "not-attached")
@@ -329,7 +348,7 @@ class IdentityAPITest(TembaTest):
                 "project_id": str(self.org.proj_uuid),
                 "urn_id": urn.id,
                 "target_consumer_id": str(target.uuid),
-                "privileged": True,
+                "confirmation_code": self._code(urn.id),
             },
         )
         self.assertEqual(response.status_code, 409)
@@ -485,23 +504,24 @@ class IdentityAPITest(TembaTest):
         self.assertEqual(missing_contact.status_code, 400)
         missing_detach = self._post(
             "internal_identity_detach",
-            {"project_id": str(self.org.proj_uuid), "urn_id": urn.id, "privileged": True},
+            {"project_id": str(self.org.proj_uuid), "urn_id": urn.id},
         )
         self.assertEqual(missing_detach.status_code, 400)
 
         unknown_urn = self._post(
             "internal_identity_detach",
-            {"project_id": str(self.org.proj_uuid), "urn_id": 999999999, "privileged": True},
+            {"project_id": str(self.org.proj_uuid), "urn_id": 999999999},
         )
         self.assertEqual(unknown_urn.status_code, 400)
 
+        bob_urn = self.create_contact("Bob", urns=["tel:+250788111032"]).urns.get()
         unknown_target = self._post(
             "internal_identity_detach",
             {
                 "project_id": str(self.org.proj_uuid),
-                "urn_id": self.create_contact("Bob", urns=["tel:+250788111032"]).urns.get().id,
+                "urn_id": bob_urn.id,
                 "target_consumer_id": str(uuid4()),
-                "privileged": True,
+                "confirmation_code": self._code(bob_urn.id),
             },
         )
         self.assertEqual(unknown_target.status_code, 400)
@@ -514,7 +534,7 @@ class IdentityAPITest(TembaTest):
                 "project_id": str(self.org.proj_uuid),
                 "urn_id": contact.urns.get().id,
                 "target_consumer_id": str(contact.uuid),
-                "privileged": True,
+                "confirmation_code": self._code(contact.urns.get().id),
             },
         )
         self.assertEqual(same.status_code, 200)
@@ -524,7 +544,11 @@ class IdentityAPITest(TembaTest):
         bare = self.create_contact("Bob", urns=["tel:+250788111034"])
         noop = self._post(
             "internal_identity_detach",
-            {"project_id": str(self.org.proj_uuid), "urn_id": bare.urns.get().id, "privileged": True},
+            {
+                "project_id": str(self.org.proj_uuid),
+                "urn_id": bare.urns.get().id,
+                "confirmation_code": self._code(bare.urns.get().id),
+            },
         )
         self.assertEqual(noop.json()["outcome"], "noop")
         bare.urns.get().refresh_from_db()
@@ -593,6 +617,7 @@ class IdentityAPITest(TembaTest):
         self.assertEqual(forgotten.status_code, 400)
 
 
+@patch("temba.api.v2.internals.identity.views.IdentityView.authentication_classes", [OptionalJWTAuthentication])
 class IdentityAPIAuthTest(TembaTest):
     def setUp(self):
         super().setUp()
@@ -639,3 +664,18 @@ class IdentityAPIAuthTest(TembaTest):
             format="json",
         )
         self.assertEqual(response.status_code, 403)
+
+    def test_org_user_cannot_skip_detach_confirmation(self):
+        contact = self.create_contact("Ann", urns=["tel:+250788111043"])
+        self.api.force_authenticate(user=self.admin)
+        response = self.api.post(
+            reverse("internal_identity_detach"),
+            data={
+                "project_id": str(self.org.proj_uuid),
+                "urn_id": contact.urns.get().id,
+                "privileged": True,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["error"], "confirmation_required")
