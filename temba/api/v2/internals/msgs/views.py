@@ -184,6 +184,7 @@ class MsgStreamView(APIViewMixin, APIView, JWTAuthMixinRequired):
                     labels=data.get("labels"),
                     template=template,
                     metadata=msg_data,
+                    protocol_id=str(data["protocol_id"]) if data.get("protocol_id") else None,
                 )
                 created_ids.append(msg.id)
         except ValueError as e:

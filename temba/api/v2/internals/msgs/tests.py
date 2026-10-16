@@ -8,7 +8,7 @@ from django.utils.http import urlencode
 
 from temba.api.v2.internals.msgs.views import FirstContactsPagination
 from temba.channels.models import Channel
-from temba.msgs.models import Msg
+from temba.msgs.models import Msg, Protocol
 from temba.tests.base import TembaTest
 
 User = get_user_model()
@@ -429,6 +429,56 @@ class TestInternalMessages(TembaTest):
         }
         response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
         self.assertEqual(response.status_code, 400)
+
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_without_protocol_id_stores_null(self):
+        contact = self.create_contact("Ivy", urns=["tel:+250788000999"])
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "out",
+            "contact_uuid": str(contact.uuid),
+            "text": "stream without protocol",
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        msg = Msg.objects.get(id=response.json()["ids"][0])
+        self.assertIsNone(msg.protocol_id)
+
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_with_protocol_id_of_same_project(self):
+        contact = self.create_contact("Jade", urns=["tel:+250788001000"])
+        urn = contact.urns.get()
+        protocol = Protocol.objects.create(org=self.org, contact=contact, urn=urn)
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "out",
+            "contact_uuid": str(contact.uuid),
+            "text": "stream with protocol",
+            "protocol_id": str(protocol.uuid),
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        msg = Msg.objects.get(id=response.json()["ids"][0])
+        self.assertEqual(msg.protocol_id, protocol.id)
+
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
+    @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])
+    def test_stream_rejects_protocol_from_another_project(self):
+        contact = self.create_contact("Kim", urns=["tel:+250788001001"])
+        other = self.create_contact("Lee", urns=["tel:+250788001002"], org=self.org2)
+        protocol = Protocol.objects.create(org=self.org2, contact=other, urn=other.urns.get())
+        payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "direction": "out",
+            "contact_uuid": str(contact.uuid),
+            "text": "foreign protocol",
+            "protocol_id": str(protocol.uuid),
+        }
+        response = self.client.post(reverse("internal_messages_stream"), data=payload, content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Protocol not found", response.json()["error"])
 
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.authentication_classes", [])
     @patch("temba.api.v2.internals.msgs.views.MsgStreamView.permission_classes", [])

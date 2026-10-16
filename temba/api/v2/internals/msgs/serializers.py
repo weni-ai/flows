@@ -48,6 +48,7 @@ class MsgStreamSerializer(serializers.Serializer):
     status = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     visibility = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     labels = serializers.ListField(child=serializers.UUIDField(), required=False)
+    protocol_id = serializers.UUIDField(required=False, allow_null=True)
 
     def validate(self, data):
         # require at least one contact identifier
