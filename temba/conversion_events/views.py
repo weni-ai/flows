@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 
 import requests
 from rest_framework import viewsets
@@ -9,14 +9,32 @@ from weni_datalake_sdk.paths.events_path import EventPath
 from django.conf import settings
 from django.http import JsonResponse
 
-from .jwt_auth import JWTModuleAuthMixin
+from .courier_auth import ConversionEventAuthMixin
 from .models import CTWA
 from .serializers import ConversionEventSerializer
+from .urns import whatsapp_urn_variants
+
+COURIER_ONLY_EVENT_TYPES = {"conversation_started"}
+
+CTWA_DATALAKE_VALUE_MAP = {
+    "conversation_started": "conversation_started",
+    "lead": "lead_qualified",
+    "purchase": "purchase_completed",
+}
 
 logger = logging.getLogger(__name__)
 
 
-class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
+def format_datalake_event_date(dt):
+    """Return an ISO-8601 UTC string for weni_datalake_sdk send_event_data."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=dt_timezone.utc)
+    else:
+        dt = dt.astimezone(dt_timezone.utc)
+    return dt.isoformat().replace("+00:00", "Z")
+
+
+class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
     """
     API endpoint to receive conversion events (lead/purchase)
     and send to Meta Conversion API and/or Weni Datalake
@@ -51,22 +69,30 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
             contact_urn = validated_data["contact_urn"]
             payload = validated_data.get("payload", {})
 
+            if self.courier_authenticated and event_type not in COURIER_ONLY_EVENT_TYPES:
+                return JsonResponse(
+                    {
+                        "error": "Forbidden",
+                        "detail": "Fixed token authentication is only allowed for conversation_started events",
+                    },
+                    status=403,
+                )
+
             # Get CTWA data for Meta sending
             ctwa_data = self._get_ctwa_data(channel_uuid, contact_urn)
             meta_success = None
             meta_error = None
+            dataset_id = None
 
-            # If we have CTWA data, try to send to Meta
-            if ctwa_data:
+            # Meta CAPI requires ctwa_clid; conversation_started is Datalake-only
+            if event_type != "conversation_started" and ctwa_data and ctwa_data.ctwa_clid:
                 dataset_id = self._get_channel_dataset_id(channel_uuid)
                 if dataset_id:
-                    # Build payload for Meta Conversion API
                     meta_payload = self._build_meta_payload(
                         event_type,
                         ctwa_data,
                         payload,
                     )
-                    # Send to Meta
                     meta_success, meta_error = self._send_to_meta(meta_payload, dataset_id)
 
             # Always send to Datalake regardless of CTWA status
@@ -91,7 +117,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                     status=200,
                 )
             elif datalake_success:  # If Datalake succeeds but Meta failed or wasn't attempted
-                if ctwa_data and dataset_id:  # Meta was attempted but failed
+                if ctwa_data and ctwa_data.ctwa_clid and dataset_id:  # Meta was attempted but failed
                     logger.warning(
                         f"[PARTIAL] Datalake succeeded but Meta failed for event {event_type} on channel {channel_uuid}. Meta error: {meta_error}"
                     )
@@ -107,7 +133,7 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
                     status=200,
                 )
             else:  # Datalake failed
-                if ctwa_data and dataset_id:  # Both services failed
+                if ctwa_data and ctwa_data.ctwa_clid and dataset_id:  # Both services failed
                     logger.error(
                         f"[FAILURE] Both services failed for event {event_type} on channel {channel_uuid}. "
                         f"Meta error: {meta_error}, Datalake error: {datalake_error}"
@@ -147,46 +173,10 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
     def _get_ctwa_data(self, channel_uuid, contact_urn):
         """Get CTWA data for lookup using both channel_uuid and contact_urn"""
         try:
-            # If it's not a WhatsApp URN, just do a normal lookup
-            if not contact_urn.startswith("whatsapp:"):
-                return (
-                    CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn=contact_urn)
-                    .order_by("-timestamp")
-                    .first()
-                )
-
-            # For WhatsApp URNs, try both with and without the extra 9 if it's a Brazilian number
-            # Split the URN into prefix and number
-            prefix, number = contact_urn.split(":", 1)
-
-            # Only handle the extra 9 for Brazilian numbers
-            if number.startswith("55"):
-                # Remove country code (55) and DDD (2 digits) to check remaining length
-                remaining_digits = number[4:]  # After 55 + DDD
-
-                # If we have more than 8 digits after DDD, it means we have the extra 9
-                if len(remaining_digits) > 8:  # Has the extra 9
-                    # Generate version without the extra 9
-                    other_number = number[:4] + remaining_digits[1:]  # Remove first digit after DDD (the 9)
-                    numbers = [number, other_number]
-                else:  # Doesn't have the extra 9
-                    # Generate version with the extra 9
-                    other_number = number[:4] + "9" + remaining_digits  # Add 9 after DDD
-                    numbers = [number, other_number]
-
-                # Create both URNs for lookup
-                urns = [f"{prefix}:{num}" for num in numbers]
-
-                # Try to find CTWA data for either URN
-                return (
-                    CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn__in=urns).order_by("-timestamp").first()
-                )
-
-            # For non-BR numbers or if we can't handle the number format, just do a normal lookup
-            return (
-                CTWA.objects.filter(channel_uuid=channel_uuid, contact_urn=contact_urn).order_by("-timestamp").first()
+            return CTWA.objects.latest_for_urns(
+                channel_uuids=[channel_uuid],
+                contact_urns=whatsapp_urn_variants(contact_urn),
             )
-
         except Exception as e:
             logger.error(f"Error fetching CTWA data: {str(e)}")
             return None
@@ -274,48 +264,95 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
         except Exception as e:
             return False, f"Error sending to Meta: {str(e)}"
 
-    def _send_to_datalake(self, event_type, channel_uuid, contact_urn, ctwa_data, payload):
-        """Send event to Weni Datalake"""
+    def _get_channel_and_org(self, channel_uuid):
+        from temba.channels.models import Channel
+        from temba.orgs.models import Org
+
         try:
-            # Get channel and org data
-            from temba.channels.models import Channel
-            from temba.orgs.models import Org
+            channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only("org_id", "config").first()
+            if not channel:
+                return None, None, "Channel not found"
 
-            try:
-                channel = Channel.objects.filter(uuid=channel_uuid, is_active=True).only("org_id", "config").first()
-                if not channel:
-                    return False, "Channel not found"
-            except Exception:
-                return False, "Channel not found"
+        except Exception:
+            logger.exception("Channel lookup failed")
+            return None, None, "Channel not found"
 
-            try:
-                org = Org.objects.filter(id=channel.org_id).only("proj_uuid").first()
-                if not org or not org.proj_uuid:
-                    return False, "Organization not found"
-            except Exception:
-                return False, "Organization not found"
+        try:
+            org = Org.objects.filter(id=channel.org_id).only("proj_uuid").first()
+            if not org or not org.proj_uuid:
+                return None, None, "Organization not found"
+        except Exception:
+            return None, None, "Organization not found"
 
-            # Start with all payload data in metadata
+        return channel, org, None
+
+    def _resolve_waba_id(self, ctwa_data, channel):
+        if ctwa_data and ctwa_data.waba:
+            return ctwa_data.waba
+        if channel.config and channel.config.get("wa_waba_id"):
+            return channel.config["wa_waba_id"]
+        return None
+
+    def _send_to_datalake(self, event_type, channel_uuid, contact_urn, ctwa_data, payload):
+        """Send event to Weni Datalake (legacy table + best-effort CTWA table)."""
+        channel, org, lookup_error = self._get_channel_and_org(channel_uuid)
+        if lookup_error:
+            return False, lookup_error
+
+        legacy_success, legacy_error = self._send_legacy_datalake(
+            event_type=event_type,
+            channel_uuid=channel_uuid,
+            contact_urn=contact_urn,
+            ctwa_data=ctwa_data,
+            payload=payload,
+            channel=channel,
+            org=org,
+        )
+        if not legacy_success:
+            return legacy_success, legacy_error
+
+        ctwa_success, ctwa_error = self._send_ctwa_datalake(
+            event_type=event_type,
+            channel_uuid=channel_uuid,
+            contact_urn=contact_urn,
+            ctwa_data=ctwa_data,
+            payload=payload,
+            channel=channel,
+            org=org,
+        )
+        if not ctwa_success and ctwa_error:
+            logger.warning(
+                f"[PARTIAL] Legacy Datalake succeeded but CTWA table failed for event {event_type} "
+                f"on channel {channel_uuid}. CTWA error: {ctwa_error}"
+            )
+
+        return True, None
+
+    def _send_legacy_datalake(self, event_type, channel_uuid, contact_urn, ctwa_data, payload, channel, org):
+        """Send event to the legacy Weni Datalake table."""
+        try:
             metadata = payload.copy() if payload else {}
-
-            # Add required fields to metadata
             metadata["channel"] = str(channel_uuid)
 
-            # Add waba_id from channel config if available
             if channel.config and "wa_waba_id" in channel.config:
                 metadata["waba_id"] = channel.config["wa_waba_id"]
 
-            # Add CTWA ID only if available
             if ctwa_data:
-                metadata["ctwa_id"] = ctwa_data.ctwa_clid
+                if ctwa_data.ctwa_clid:
+                    metadata["ctwa_id"] = ctwa_data.ctwa_clid
+                if ctwa_data.referral_source:
+                    metadata["referral_source_id"] = ctwa_data.referral_source.source_id
+                    metadata["referral_source_type"] = ctwa_data.referral_source.source_type
+                if ctwa_data.message_id:
+                    metadata["message_id"] = ctwa_data.message_id
 
             data = {
                 "event_name": f"conversion_{event_type}",
                 "key": "capi",
-                "value": event_type,  # "lead" or "purchase"
+                "value": event_type,
                 "value_type": "string",
-                "date": datetime.now().timestamp(),
-                "project": str(org.proj_uuid),  # Using org proj_uuid as project identifier
+                "date": format_datalake_event_date(datetime.now()),
+                "project": str(org.proj_uuid),
                 "contact_urn": contact_urn,
                 "metadata": metadata,
             }
@@ -326,4 +363,83 @@ class ConversionEventView(JWTModuleAuthMixin, viewsets.ModelViewSet):
         except Exception as e:
             error_msg = f"Error sending to Datalake: {str(e)}"
             logger.error(error_msg)
+            return False, error_msg
+
+    def _can_send_ctwa_datalake(self, ctwa_data, channel, channel_uuid):
+        if not ctwa_data:
+            return False
+
+        waba_id = self._resolve_waba_id(ctwa_data, channel)
+        referral_source = ctwa_data.referral_source
+
+        required_fields = {
+            "ctwa_clid": ctwa_data.ctwa_clid,
+            "message_id": ctwa_data.message_id,
+            "campaign_source": referral_source.source_id if referral_source else None,
+            "waba_id": waba_id,
+            "channel": str(channel_uuid),
+        }
+        missing = [field for field, value in required_fields.items() if not value]
+        if missing:
+            logger.warning(f"Skipping CTWA Datalake event due to missing required fields: {', '.join(missing)}")
+            return False
+
+        return True
+
+    def _build_ctwa_datalake_payload(self, event_type, channel_uuid, contact_urn, ctwa_data, channel, org, payload):
+        ctwa_value = CTWA_DATALAKE_VALUE_MAP.get(event_type)
+        if not ctwa_value:
+            return None
+
+        waba_id = self._resolve_waba_id(ctwa_data, channel)
+        metadata = {
+            "external_msg_id": ctwa_data.message_id,
+            "ctwa_id": ctwa_data.ctwa_clid,
+            "campaign_source": ctwa_data.referral_source.source_id,
+            "waba_id": waba_id,
+            "channel": str(channel_uuid),
+        }
+
+        if event_type == "purchase" and payload:
+            value = payload.get("value")
+            if value is not None:
+                try:
+                    metadata["order_value"] = float(value)
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid order_value format in purchase event: {value}")
+
+        return {
+            "event_name": "ctwa",
+            "key": "capi",
+            "value": ctwa_value,
+            "contact_urn": contact_urn,
+            "project": str(org.proj_uuid),
+            "date": format_datalake_event_date(ctwa_data.timestamp),
+            "metadata": metadata,
+        }
+
+    def _send_ctwa_datalake(self, event_type, channel_uuid, contact_urn, ctwa_data, payload, channel, org):
+        """Send event to the CTWA Weni Datalake table when required fields are available."""
+        if not self._can_send_ctwa_datalake(ctwa_data, channel, channel_uuid):
+            return True, None
+
+        try:
+            data = self._build_ctwa_datalake_payload(
+                event_type=event_type,
+                channel_uuid=channel_uuid,
+                contact_urn=contact_urn,
+                ctwa_data=ctwa_data,
+                channel=channel,
+                org=org,
+                payload=payload,
+            )
+            if not data:
+                return True, None
+
+            send_event_data(EventPath, data)
+            return True, None
+
+        except Exception as e:
+            error_msg = f"Error sending to CTWA Datalake: {str(e)}"
+            logger.exception(error_msg)
             return False, error_msg

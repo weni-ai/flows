@@ -28,7 +28,7 @@ class Policy(SmartModel):
 
     summary = models.TextField(null=True, blank=True, help_text=_("Summary of policy changes (Markdown permitted)"))
 
-    requires_consent = models.BooleanField(default=True, help_text=_("Is Consent Required?"))
+    requires_consent = models.BooleanField(default=True, help_text=_("Is consent required?"))
 
     def get_rendered_body(self):
         return mark_safe(markdown.markdown(self.body))

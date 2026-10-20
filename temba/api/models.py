@@ -84,7 +84,7 @@ class Resthook(SmartModel):
         help_text=_("The organization this resthook belongs to"),
     )
 
-    slug = models.SlugField(help_text=_("A simple label for this event"))
+    slug = models.SlugField(help_text=_("A label for this event"))
 
     @classmethod
     def get_or_create(cls, org, slug, user):
@@ -127,7 +127,7 @@ class ResthookSubscriber(SmartModel):
         Resthook, on_delete=models.PROTECT, related_name="subscribers", help_text=_("The resthook being subscribed to")
     )
 
-    target_url = models.URLField(help_text=_("The URL that we will call when our ruleset is reached"))
+    target_url = models.URLField(help_text=_("URL called when the ruleset is triggered"))
 
     def as_json(self):  # pragma: needs cover
         return dict(id=self.id, resthook=self.resthook.slug, target_url=self.target_url, created_on=self.created_on)

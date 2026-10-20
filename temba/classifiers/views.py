@@ -62,7 +62,7 @@ class ClassifierCRUDL(SmartCRUDL):
                 {
                     "id": "connect",
                     "href": reverse("classifiers.classifier_connect"),
-                    "name": _("Add Classifier"),
+                    "name": _("Add classifier"),
                 }
             )
 
@@ -71,7 +71,7 @@ class ClassifierCRUDL(SmartCRUDL):
     class Delete(DependencyDeleteModal):
         cancel_url = "uuid@classifiers.classifier_read"
         success_url = "@orgs.org_home"
-        success_message = _("Your classifier has been deleted.")
+        success_message = _("Your classifier has been deleted")
 
     class Read(SpaMixin, OrgObjPermsMixin, SmartReadView):
         slug_url_kwarg = "uuid"
@@ -106,9 +106,9 @@ class ClassifierCRUDL(SmartCRUDL):
 
             try:
                 self.object.sync()
-                messages.info(self.request, _("Your classifier has been synced."))
+                messages.info(self.request, _("Your classifier has been synced"))
             except Exception:
-                messages.error(self.request, _("Unable to sync classifier. See the log for details."))
+                messages.error(self.request, _("Couldn't sync classifier. See the log for details."))
 
             return HttpResponseRedirect(self.get_success_url())
 

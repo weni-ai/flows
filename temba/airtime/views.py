@@ -15,7 +15,7 @@ class AirtimeCRUDL(SmartCRUDL):
     actions = ("list", "read")
 
     class List(OrgPermsMixin, SmartListView):
-        title = _("Recent Airtime Transfers")
+        title = _("Recent airtime transfers")
         fields = ("status", "contact", "recipient", "currency", "actual_amount", "created_on")
         field_config = {"created_on": {"label": "Time"}, "actual_amount": {"label": "Amount"}}
         link_fields = ("status", "contact")
@@ -46,7 +46,7 @@ class AirtimeCRUDL(SmartCRUDL):
             return context
 
     class Read(OrgObjPermsMixin, SmartReadView):
-        title = _("Airtime Transfer Details")
+        title = _("Airtime transfer details")
         fields = (
             "status",
             "sender",

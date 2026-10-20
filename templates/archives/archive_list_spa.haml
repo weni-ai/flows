@@ -16,12 +16,12 @@
     {% endblocktrans %}
 
     {% blocktrans trimmed with counter=record_count|intcomma count num=record_count %}
-    containing {{ counter }} record.
+    containing {{ counter }} record
     {% plural %}
-    containing {{ counter }} records.
+    containing {{ counter }} records
     {% endblocktrans %}
   -else
-    -trans "You do not have any message or run archives yet."
+    -trans "You don't have any messages or run archives yet"
 
 -block content
   -if object_list
@@ -56,8 +56,8 @@
   -else
 
     -blocktrans trimmed
-      No archives found. Archives are created after 90 days of inactivity for messages and flow runs. Check back later to
-      see a list of all archives.
+      No archives found. Archives are created after 90 days of inactivity for messages and flow runs. Check back later
+      to see the full list of archives.
 
 
   -block paginator

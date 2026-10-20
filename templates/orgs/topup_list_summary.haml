@@ -9,13 +9,13 @@
       .errored
         -trans "You have"
         %b {{ credits|intcomma }}
-        -trans "credits remaining."
+        -trans "credits remaining"
     -else
       -trans "You have"
       %b {{ credits|intcomma }}
-      -trans "credits remaining."
+      -trans "credits remaining"
 
   .extra
-    -trans "You have used"
+    -trans "You've used"
     {{ user_org.get_credits_used|intcomma }}
-    -trans "credits since signing up."
+    -trans "credits since signing up"

@@ -40,6 +40,7 @@ from temba.utils.urns import ParsedURN, parse_number, parse_urn
 from temba.utils.uuid import uuid4
 
 from .search import SearchException, elastic, parse_query
+from .validators import CONTACT_NAME_MAX_LEN
 
 logger = logging.getLogger(__name__)
 
@@ -81,8 +82,8 @@ class URN:
         (TEL_SCHEME, _("Phone number")),
         (FACEBOOK_SCHEME, _("Facebook identifier")),
         (INSTAGRAM_SCHEME, _("Instagram identifier")),
-        (TWITTER_SCHEME, _("Twitter handle")),
-        (TWITTERID_SCHEME, _("Twitter ID")),
+        (TWITTER_SCHEME, _("X handle")),
+        (TWITTERID_SCHEME, _("X ID")),
         (VIBER_SCHEME, _("Viber identifier")),
         (LINE_SCHEME, _("LINE identifier")),
         (TELEGRAM_SCHEME, _("Telegram identifier")),
@@ -95,13 +96,31 @@ class URN:
         (FRESHCHAT_SCHEME, _("Freshchat identifier")),
         (VK_SCHEME, _("VK identifier")),
         (ROCKETCHAT_SCHEME, _("RocketChat identifier")),
-        (DISCORD_SCHEME, _("Discord Identifier")),
-        (WENIWEBCHAT_SCHEME, _("WeniWebChat Identifier")),
-        (SLACK_SCHEME, _("Slack Identifier")),
-        (TEAMS_SCHEME, _("Teams Identifier")),
+        (DISCORD_SCHEME, _("Discord identifier")),
+        (WENIWEBCHAT_SCHEME, _("Weni Web Chat identifier")),
+        (SLACK_SCHEME, _("Slack identifier")),
+        (TEAMS_SCHEME, _("Teams identifier")),
     )
 
     VALID_SCHEMES = {s[0] for s in SCHEME_CHOICES}
+
+    DEFAULT_PHONE_SCHEME = WHATSAPP_SCHEME
+
+    PHONE_COLUMN_HEADERS = frozenset(
+        {
+            "phone",
+            "mobile",
+            "telephone",
+            "cell",
+            "cellphone",
+            "cell phone",
+            "phone number",
+            "mobile number",
+            "contact phone",
+            "contact mobile",
+            "number",
+        }
+    )
 
     FACEBOOK_PATH_REF_PREFIX = "ref:"
 
@@ -144,15 +163,16 @@ class URN:
 
         if scheme in [cls.TEL_SCHEME, cls.WHATSAPP_SCHEME] and formatted:
             try:
+                parse_path = path
                 # whatsapp scheme is E164 without a leading +, add it so parsing works
-                if scheme == cls.WHATSAPP_SCHEME:
-                    path = "+" + path
+                if scheme == cls.WHATSAPP_SCHEME and path.isdigit():
+                    parse_path = "+" + path
 
-                if path and path[0] == "+":
+                if parse_path and parse_path[0] == "+":
                     phone_format = phonenumbers.PhoneNumberFormat.NATIONAL
                     if international:
                         phone_format = phonenumbers.PhoneNumberFormat.INTERNATIONAL
-                    return phonenumbers.format_number(phonenumbers.parse(path, None), phone_format)
+                    return phonenumbers.format_number(phonenumbers.parse(parse_path, None), phone_format)
             except phonenumbers.NumberParseException:  # pragma: no cover
                 pass
 
@@ -211,9 +231,13 @@ class URN:
                 except ValueError:
                     return False
 
-        # telegram, whatsapp and instagram use integer ids
-        elif scheme in [cls.TELEGRAM_SCHEME, cls.WHATSAPP_SCHEME, cls.INSTAGRAM_SCHEME]:
+        # telegram and instagram use integer ids
+        elif scheme in [cls.TELEGRAM_SCHEME, cls.INSTAGRAM_SCHEME]:
             return regex.match(r"^[0-9]+$", path, regex.V0)
+
+        # whatsapp supports phone digits and Meta BSUID paths (portfolio and parent), aligned with gocommon
+        elif scheme == cls.WHATSAPP_SCHEME:
+            return regex.match(r"^([0-9]+|[A-Z]{2}\.(ENT\.)?[a-zA-Z0-9]+)$", path, regex.V0)
 
         # validate Viber URNS look right (this is a guess)
         elif scheme == cls.VIBER_SCHEME:  # pragma: needs cover
@@ -238,6 +262,38 @@ class URN:
         return True
 
     @classmethod
+    def _normalize_twitter_path(cls, norm_path):
+        norm_path = norm_path.lower()
+        if norm_path[0:1] == "@":  # strip @ prefix if provided
+            norm_path = norm_path[1:]
+        return norm_path.lower()  # Twitter handles are case-insensitive, so we always store as lowercase
+
+    @classmethod
+    def _normalize_twitterid_display(cls, display):
+        if not display:
+            return display
+
+        display = str(display).strip().lower()
+        if display and display[0] == "@":
+            display = display[1:]
+        return display
+
+    @classmethod
+    def _normalize_path_for_scheme(cls, scheme, norm_path, display, country_code):
+        if scheme == cls.TEL_SCHEME:
+            return cls.normalize_number(norm_path, country_code), display
+        if scheme == cls.WHATSAPP_SCHEME and cls.is_phone_based_path(norm_path):
+            # WhatsApp phone ids are E.164 without a leading +
+            return cls.normalize_number(norm_path, country_code).lstrip("+"), display
+        if scheme == cls.TWITTER_SCHEME:
+            return cls._normalize_twitter_path(norm_path), display
+        if scheme == cls.TWITTERID_SCHEME:
+            return norm_path, cls._normalize_twitterid_display(display)
+        if scheme == cls.EMAIL_SCHEME:
+            return norm_path.lower(), display
+        return norm_path, display
+
+    @classmethod
     def normalize(cls, urn, country_code=None):
         """
         Normalizes the path of a URN string. Should be called anytime looking for a URN match.
@@ -246,22 +302,7 @@ class URN:
         country_code = str(country_code) if country_code else ""
         norm_path = str(path).strip()
 
-        if scheme == cls.TEL_SCHEME:
-            norm_path = cls.normalize_number(norm_path, country_code)
-        elif scheme == cls.TWITTER_SCHEME:
-            norm_path = norm_path.lower()
-            if norm_path[0:1] == "@":  # strip @ prefix if provided
-                norm_path = norm_path[1:]
-            norm_path = norm_path.lower()  # Twitter handles are case-insensitive, so we always store as lowercase
-
-        elif scheme == cls.TWITTERID_SCHEME:
-            if display:
-                display = str(display).strip().lower()
-                if display and display[0] == "@":
-                    display = display[1:]
-
-        elif scheme == cls.EMAIL_SCHEME:
-            norm_path = norm_path.lower()
+        norm_path, display = cls._normalize_path_for_scheme(scheme, norm_path, display, country_code)
 
         return cls.from_parts(scheme, norm_path, query, display)
 
@@ -308,6 +349,75 @@ class URN:
     @classmethod
     def from_tel(cls, path):
         return cls.from_parts(cls.TEL_SCHEME, path)
+
+    @classmethod
+    def from_whatsapp(cls, path):
+        return cls.from_parts(cls.WHATSAPP_SCHEME, path)
+
+    @classmethod
+    def is_phone_based_path(cls, path):
+        return bool(path) and path[0] in "+0123456789"
+
+    @classmethod
+    def is_whatsapp_bsuid_path(cls, path):
+        """
+        Returns whether the path is a Meta WhatsApp BSUID (portfolio or parent), not a phone number.
+        """
+        return bool(regex.match(r"^[A-Z]{2}\.(ENT\.)?[a-zA-Z0-9]+$", path, regex.V0))
+
+    @classmethod
+    def paired_phone_urns(cls, value, country_code=None):
+        """
+        Returns normalized whatsapp and tel URNs for the same phone number input.
+        """
+        country_code = str(country_code) if country_code else ""
+        whatsapp = cls.normalize(cls.from_parts(cls.WHATSAPP_SCHEME, value), country_code)
+        tel = cls.normalize(cls.from_parts(cls.TEL_SCHEME, value), country_code)
+        return [whatsapp, tel]
+
+    @classmethod
+    def looks_like_phone(cls, value, country_code=None):
+        """
+        Returns whether the given value appears to be a phone number without an explicit URN scheme.
+        """
+        if not isinstance(value, str):
+            return False
+
+        value = value.strip()
+        if not value or ":" in value:
+            return False
+
+        if not any(c.isdigit() for c in value):
+            return False
+
+        # non-phone identifiers such as BSUIDs require an explicit scheme
+        if regex.match(r"^[A-Z]{2}\.", value, regex.V0):
+            return False
+
+        try:
+            parse_number(cls.normalize_number(value, country_code or ""), country_code)
+            return True
+        except ValueError:
+            return False
+
+    @classmethod
+    def ensure_scheme(cls, value, country_code=None, default_phone_scheme=None):
+        """
+        Returns a URN string, inferring the default phone scheme when no scheme is provided.
+        """
+        if default_phone_scheme is None:
+            default_phone_scheme = cls.DEFAULT_PHONE_SCHEME
+
+        value = str(value).strip()
+
+        if ":" in value:
+            return value
+
+        if cls.looks_like_phone(value, country_code):
+            phone = value.lstrip("+")
+            return cls.from_parts(default_phone_scheme, phone)
+
+        raise ValueError("URN strings must contain scheme and path components")
 
     @classmethod
     def from_twitterid(cls, id, screen_name=None):
@@ -411,7 +521,7 @@ class ContactField(SmartModel, DependencyMixin):
     TYPE_CHOICES = (
         (TYPE_TEXT, _("Text")),
         (TYPE_NUMBER, _("Number")),
-        (TYPE_DATETIME, _("Date & Time")),
+        (TYPE_DATETIME, _("Date and time")),
         (TYPE_STATE, _("State")),
         (TYPE_DISTRICT, _("District")),
         (TYPE_WARD, _("Ward")),
@@ -439,9 +549,9 @@ class ContactField(SmartModel, DependencyMixin):
     SYSTEM_FIELDS = {
         KEY_ID: dict(label="ID", value_type=TYPE_NUMBER),
         KEY_NAME: dict(label="Name", value_type=TYPE_TEXT),
-        KEY_CREATED_ON: dict(label=_("Created On"), value_type=TYPE_DATETIME),
+        KEY_CREATED_ON: dict(label=_("Created on"), value_type=TYPE_DATETIME),
         KEY_LANGUAGE: dict(label="Language", value_type=TYPE_TEXT),
-        KEY_LAST_SEEN_ON: dict(label=_("Last Seen On"), value_type=TYPE_DATETIME),
+        KEY_LAST_SEEN_ON: dict(label=_("Last seen on"), value_type=TYPE_DATETIME),
     }
 
     EXPORT_KEY = "key"
@@ -505,7 +615,7 @@ class ContactField(SmartModel, DependencyMixin):
     @classmethod
     def is_valid_label(cls, label):
         label = label.strip()
-        return regex.match(r"^[A-Za-z0-9\- ]+$", label, regex.V0) and len(label) <= cls.MAX_LABEL_LEN
+        return regex.match(r"^[A-Za-z0-9\-_ ]+$", label, regex.V0) and len(label) <= cls.MAX_LABEL_LEN
 
     @classmethod
     def get_or_create(cls, org, user, key, label=None, show_in_table=None, value_type=None, priority=None):
@@ -1068,7 +1178,7 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
         try:
             response = client.contact_modify(org.id, user.id, [c.id for c in contacts], mods)
         except mailroom.MailroomException as e:
-            logger.error(f"Contact update failed: {str(e)}", exc_info=True)
+            logger.error(f"Failed to update contacts: {str(e)}", exc_info=True)
             raise e
 
         def modified(contact):
@@ -1426,7 +1536,7 @@ class ContactURN(models.Model):
             urn_as_string = URN.normalize(urn_as_string, country_code)
 
         identity = URN.identity(urn_as_string)
-        (scheme, path, query, display) = URN.to_parts(urn_as_string)
+        scheme, path, query, display = URN.to_parts(urn_as_string)
 
         existing = cls.objects.filter(org=org, identity=identity).select_related("contact").first()
 
@@ -1522,6 +1632,11 @@ class ContactGroup(TembaModel, DependencyMixin):
 
     MAX_NAME_LEN = 64
 
+    # Smart group for WhatsApp BSUID contacts that do not yet have a phone-number WhatsApp URN.
+    # Uses goflow: has a BSUID WhatsApp URN and no phone-number WhatsApp URN (whatsapp:5561…).
+    WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME = "WhatsApp contacts without phone"
+    WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY = 'whatsapp_bsuid != "" AND whatsapp_phone = ""'
+
     TYPE_ACTIVE = "A"
     TYPE_BLOCKED = "B"
     TYPE_STOPPED = "S"
@@ -1613,6 +1728,43 @@ class ContactGroup(TembaModel, DependencyMixin):
         Returns the user group with the passed in name
         """
         return cls.user_groups.filter(name__iexact=cls.clean_name(name), org=org, is_active=True).first()
+
+    @classmethod
+    def get_whatsapp_contacts_without_phone(cls, org):
+        """
+        Returns the org's WhatsApp contacts without phone smart group, if it exists.
+        """
+        return cls.get_user_group_by_name(org, cls.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME)
+
+    @classmethod
+    def ensure_whatsapp_contacts_without_phone_query(cls, org, user=None):
+        """
+        If the smart group exists with an outdated query, update it and re-evaluate membership.
+        """
+        group = cls.get_whatsapp_contacts_without_phone(org)
+        if not group:
+            return None
+
+        if group.query != cls.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY:
+            if group.status == cls.STATUS_EVALUATING:
+                return group
+            group.update_query(cls.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY)
+
+        return group
+
+    @classmethod
+    def create_whatsapp_contacts_without_phone(cls, org, user):
+        """
+        Creates the WhatsApp contacts without phone smart group for the org,
+        or refreshes its query if it already exists.
+        """
+        existing = cls.get_whatsapp_contacts_without_phone(org)
+        if existing:
+            return cls.ensure_whatsapp_contacts_without_phone_query(org, user)
+
+        return cls.create_dynamic(
+            org, user, cls.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME, cls.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY
+        )
 
     @classmethod
     def get_user_groups(cls, org, dynamic=None, ready_only=True):
@@ -2190,12 +2342,22 @@ class ContactImport(SmartModel):
         try:
             headers = [str(h).strip() for h in next(data)]
         except StopIteration:
-            raise ValidationError(_("Import file appears to be empty."))
+            raise ValidationError(_("Import file appears to be empty"))
 
         if any([h == "" for h in headers]):
-            raise ValidationError(_("Import file contains an empty header."))
+            raise ValidationError(_("Import file contains an empty header"))
 
         mappings = cls._auto_mappings(org, headers)
+
+        # locate the optional name column so we can validate its values per row
+        name_col_index = next(
+            (
+                idx
+                for idx, item in enumerate(mappings)
+                if item["mapping"].get("type") == "attribute" and item["mapping"].get("name") == "name"
+            ),
+            None,
+        )
 
         # iterate over rest of the rows to do row-level validation
         seen_uuids = set()
@@ -2207,26 +2369,39 @@ class ContactImport(SmartModel):
             if uuid:
                 if uuid in seen_uuids:
                     raise ValidationError(
-                        _("Import file contains duplicated contact UUID '%(uuid)s'."), params={"uuid": uuid}
+                        _("Import file contains duplicated contact UUID '%(uuid)s'"), params={"uuid": uuid}
                     )
                 seen_uuids.add(uuid)
             for urn in urns:
                 if urn in seen_urns:
                     raise ValidationError(
-                        _("Import file contains duplicated contact URN '%(urn)s'."), params={"urn": urn}
+                        _("Import file contains duplicated contact URN '%(urn)s'"), params={"urn": urn}
                     )
                 seen_urns.add(urn)
+
+            # validate the name column value when present (blank means "leave unchanged")
+            if name_col_index is not None and name_col_index < len(row):
+                raw_name = row[name_col_index]
+                if (
+                    raw_name
+                    and raw_name != ContactImport.EXPLICIT_CLEAR
+                    and len(str(raw_name).strip()) > CONTACT_NAME_MAX_LEN
+                ):
+                    raise ValidationError(
+                        _("Import file contains a contact name longer than %(max)d characters at row %(row)d"),
+                        params={"max": CONTACT_NAME_MAX_LEN, "row": num_records + 2},
+                    )
 
             # check if we exceed record limit
             num_records += 1
             if num_records > ContactImport.MAX_RECORDS:
                 raise ValidationError(
-                    _("Import files can contain a maximum of %(max)d records."),
+                    _("Import files can contain a maximum of %(max)d records"),
                     params={"max": ContactImport.MAX_RECORDS},
                 )
 
         if num_records == 0:
-            raise ValidationError(_("Import file doesn't contain any records."))
+            raise ValidationError(_("Import file doesn't contain any records"))
 
         file.seek(0)  # seek back to beginning so subsequent reads work
 
@@ -2276,6 +2451,8 @@ class ContactImport(SmartModel):
 
                 if attribute in ("uuid", "name", "language"):
                     mapping = {"type": "attribute", "name": attribute}
+                elif attribute in URN.PHONE_COLUMN_HEADERS:
+                    mapping = {"type": "scheme", "scheme": URN.DEFAULT_PHONE_SCHEME}
             elif header_prefix == "urn" and header_name:
                 mapping = {"type": "scheme", "scheme": header_name.lower()}
             elif header_prefix == "field" and header_name:
@@ -2310,21 +2487,19 @@ class ContactImport(SmartModel):
             elif mapping["type"] == "scheme":
                 has_urn = True
                 if mapping["scheme"] not in URN.VALID_SCHEMES:
-                    raise ValidationError(_("Header '%(header)s' is not a valid URN type."), params={"header": header})
+                    raise ValidationError(_("Header '%(header)s' isn't a valid URN type"), params={"header": header})
             elif mapping["type"] == "new_field":
                 if not ContactField.is_valid_key(mapping["key"]):
-                    raise ValidationError(
-                        _("Header '%(header)s' is not a valid field name."), params={"header": header}
-                    )
+                    raise ValidationError(_("Header '%(header)s' isn't a valid field name"), params={"header": header})
 
             if mapping != ContactImport.MAPPING_IGNORE:
                 non_ignored_mappings.append(mapping)
 
         if not (has_uuid or has_urn):
-            raise ValidationError(_("Import files must contain either UUID or a URN header."))
+            raise ValidationError(_("Import files must contain either UUID or a URN header"))
 
         if has_uuid and len(non_ignored_mappings) == 1:
-            raise ValidationError(_("Import files must contain columns besides UUID."))
+            raise ValidationError(_("Import files must contain columns besides UUID"))
 
     def start_async(self):
         from .tasks import import_contacts_task

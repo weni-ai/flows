@@ -45,6 +45,20 @@ def fail_old_messages():  # pragma: needs cover
     Msg.fail_old_messages()
 
 
+@shared_task(track_started=True, name="fail_channel_outgoing_messages")
+def fail_channel_outgoing_messages(channel_id):
+    """
+    Marks queued/pending/errored outgoing messages for a channel as failed.
+    Intended to be called when a channel is released.
+    """
+    statuses = (Msg.STATUS_QUEUED, Msg.STATUS_PENDING, Msg.STATUS_ERRORED)
+    (
+        Msg.objects.filter(channel_id=channel_id, direction=Msg.DIRECTION_OUT, status__in=statuses).update(
+            status=Msg.STATUS_FAILED
+        )
+    )
+
+
 @nonoverlapping_task(track_started=True, name="collect_message_metrics_task", time_limit=900)
 def collect_message_metrics_task():  # pragma: needs cover
     """

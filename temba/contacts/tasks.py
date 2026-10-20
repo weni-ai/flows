@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import timedelta
 
 import iso8601
@@ -6,12 +7,17 @@ import pytz
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.files import File
 from django.utils import timezone
 
 from celery import shared_task
 
+from temba.api.v2.internals.contacts.services import ContactDownloadByStatusService
+from temba.assets.models import get_asset_store
+from temba.notifications.models import Notification
 from temba.utils import chunk_list
 from temba.utils.celery import nonoverlapping_task
+from temba.utils.export import BaseExportTask, TableExporter
 
 from .models import Contact, ContactGroup, ContactGroupCount, ContactImport, ExportContactsTask
 from .search import elastic
@@ -46,6 +52,73 @@ def export_contacts_task(task_id):
     Export contacts to a file and e-mail a link to the user
     """
     ExportContactsTask.objects.select_related("org", "created_by").get(id=task_id).perform()
+
+
+@shared_task(track_started=True, name="export_contacts_by_status_task")
+def export_contacts_by_status_task(export_id: int, broadcast_id: int, msg_status: str):
+    try:
+        export = ExportContactsTask.objects.select_related("org", "created_by").get(id=export_id)
+    except ExportContactsTask.DoesNotExist:
+        return
+
+    try:
+        export.status = BaseExportTask.STATUS_PROCESSING
+        export.save(update_fields=("status", "modified_on"))
+
+        contact_ids = ContactDownloadByStatusService.get_contact_ids_by_broadcast_status(
+            broadcast_id=broadcast_id, msg_status=msg_status
+        )
+
+        fields, _, group_fields = export.get_export_fields_and_schemes()
+        exporter = TableExporter(export, "Contact", [f["label"] for f in fields] + [g["label"] for g in group_fields])
+
+        def chunk_list_local(items, size):
+            for i in range(0, len(items), size):
+                yield items[i : i + size]
+
+        include_group_memberships = bool(export.group_memberships.exists())
+        for batch_ids in chunk_list_local(contact_ids, 1000):
+            batch_contacts = (
+                Contact.objects.filter(id__in=batch_ids).prefetch_related("org", "all_groups").using("readonly")
+            )
+            contact_by_id = {c.id: c for c in batch_contacts}
+            Contact.bulk_urn_cache_initialize(batch_contacts, using="readonly")
+
+            for cid in batch_ids:
+                contact = contact_by_id.get(cid)
+                if not contact:
+                    continue
+                values = []
+                for field in fields:
+                    value = export.get_field_value(field, contact)
+                    values.append(export.prepare_value(value))
+
+                group_values = []
+                if include_group_memberships:
+                    contact_groups_ids = [g.id for g in contact.all_groups.all()]
+                    for col in range(len(group_fields)):
+                        field = group_fields[col]
+                        group_values.append(field["group_id"] in contact_groups_ids)
+
+                exporter.write_row(values + group_values)
+
+        temp_file, extension = exporter.save_file()
+
+        # save to asset store (wrap temp file with Django File like BaseExportTask.perform does)
+        get_asset_store(model=ExportContactsTask).save(export.id, File(temp_file), extension)
+
+        if hasattr(temp_file, "delete"):
+            if temp_file.delete is False:  # pragma: no cover
+                os.unlink(temp_file.name)
+        else:  # pragma: no cover
+            os.unlink(temp_file.name)
+
+        export.status = BaseExportTask.STATUS_COMPLETE
+        export.save(update_fields=("status", "modified_on"))
+        Notification.export_finished(export)
+    except Exception:
+        export.status = BaseExportTask.STATUS_FAILED
+        export.save(update_fields=("status", "modified_on"))
 
 
 @nonoverlapping_task(track_started=True, name="release_group_task")

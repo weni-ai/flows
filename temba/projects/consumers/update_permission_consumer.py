@@ -1,16 +1,14 @@
-import amqp
 from sentry_sdk import capture_exception
+from weni.eda.django.consumers import EDAConsumer
+from weni.eda.messages import Message
 
-from temba.event_driven.consumers import EDAConsumer
-from temba.event_driven.parsers.json_parser import JSONParser
 from temba.projects.usecases.permission_update import update_permission
 
 
 class UpdatePermissionConsumer(EDAConsumer):
-    def consume(self, message: amqp.Message):  # pragma: no cover
-        print(f"[UpdatePermission] - Consuming a message. Body: {message.body}")
+    def consume(self, message: Message):  # pragma: no cover
         try:
-            body = JSONParser.parse(message.body)
+            body = message.json()
 
             update_permission(
                 project_uuid=body.get("project"),  # project_uuid
@@ -19,9 +17,7 @@ class UpdatePermissionConsumer(EDAConsumer):
                 role=body.get("role"),
             )
 
-            message.channel.basic_ack(message.delivery_tag)
-
+            self.ack()
         except Exception as exception:
             capture_exception(exception)
-            message.channel.basic_reject(message.delivery_tag, requeue=False)
-            print(f"[UpdatePermission] - Message rejected by: {exception}")
+            raise

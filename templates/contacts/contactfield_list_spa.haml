@@ -8,12 +8,13 @@
           .mb-4
             %temba-alert(level="warning")
               -blocktrans trimmed with limit=total_limit
-                You have reached the limit of {{ limit }} fields per workspace. Please remove fields that you are no longer using.
+                You've reached the limit of {{ limit }} fields per workspace. Remove fields you're no longer using.
         -elif total_count >= total_limit|add:-10
           .mb-4
             %temba-alert(level="warning")
               -blocktrans trimmed with limit=total_limit
-                You are approaching the limit of {{ limit }} fields per workspace. You should remove fields that you are no longer using.
+                You're approaching the limit of {{ limit }} fields per workspace. Remove fields you're no longer
+                using.
 
         -if view.search_fields
           %form#search-form.mb-4(method="get")
@@ -22,14 +23,15 @@
         -else
           -if not is_spa
             .title
-              -trans "Featured Fields"
+              -trans "Featured fields"
           .my-4
             -blocktrans trimmed
-              Featured fields are shown prominently on contact pages. Drag to reorder the fields that you would most like to see at glance.
+              Featured fields are displayed prominently on contact pages. Drag to reorder the fields that you want to
+              see at a glance.
 
         -block pre-table
-          %temba-modax(id='update-field' header='{{_("Update Field")|escapejs}}')
-          %temba-modax(id='delete-modal' header='{{_("Delete Field")|escapejs}}')
+          %temba-modax(id='update-field' header='{{_("Update field")|escapejs}}')
+          %temba-modax(id='delete-modal' header='{{_("Delete field")|escapejs}}')
           %temba-modax(id='usages-modal' header='{{_("Usages")|escapejs}}')
         
         - block table
@@ -66,9 +68,9 @@
                           .uses(onclick='event.stopPropagation(); showFieldUsagesModal("{{ obj.uuid }}");')
                             .lbl.linked
                               {% blocktrans trimmed count counter=obj.flow_count|add:obj.campaign_count|add:obj.contactgroup_count %}
-                                {{counter}} Use
+                                {{counter}} use
                               {% plural %}
-                                {{counter}} Uses
+                                {{counter}} uses
                               {% endblocktrans %}
                     %td.w-32
                       .text-right

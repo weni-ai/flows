@@ -6,7 +6,7 @@ import pytz
 
 from temba.tests import TembaTest
 from temba.tests.s3 import MockEventStream, MockS3Client
-from temba.utils.s3 import EventStreamReader, compile_select, get_body, split_url
+from temba.utils.s3 import EventStreamReader, compile_select, get_body, matches_where, split_url
 
 
 class S3Test(TembaTest):
@@ -85,3 +85,49 @@ class SelectTest(TembaTest):
             "SELECT s.* FROM s3object s WHERE '1ccf09f6-3fe8-4c0d-a073-981632be5a30' IN s.labels[*].uuid[*]",
             compile_select(where={"__raw__": "'1ccf09f6-3fe8-4c0d-a073-981632be5a30' IN s.labels[*].uuid[*]"}),
         )
+
+    def test_matches_where(self):
+        record = {
+            "id": 123,
+            "responded": True,
+            "flow": {"uuid": "1234", "name": "Test"},
+            "created_on": "2021-09-28T18:27:30.123456+00:00",
+        }
+
+        # no where always matches
+        self.assertTrue(matches_where(record))
+        self.assertTrue(matches_where(record, where={}))
+
+        # exact match on top-level and nested fields
+        self.assertTrue(matches_where(record, where={"id": 123}))
+        self.assertFalse(matches_where(record, where={"id": 456}))
+        self.assertTrue(matches_where(record, where={"responded": True}))
+        self.assertTrue(matches_where(record, where={"flow__uuid": "1234"}))
+        self.assertFalse(matches_where(record, where={"flow__uuid": "9999"}))
+
+        # comparison lookups
+        self.assertTrue(matches_where(record, where={"id__gt": 100}))
+        self.assertFalse(matches_where(record, where={"id__gt": 200}))
+        self.assertTrue(matches_where(record, where={"id__gte": 123, "id__lte": 123}))
+
+        # IN lookup
+        self.assertTrue(matches_where(record, where={"flow__uuid__in": ("1234", "2345")}))
+        self.assertFalse(matches_where(record, where={"flow__uuid__in": ("2345",)}))
+
+        # datetime values compared against ISO string fields
+        self.assertTrue(matches_where(record, where={"created_on__gt": datetime(2021, 9, 28, 0, 0, 0, 0, pytz.UTC)}))
+        self.assertFalse(matches_where(record, where={"created_on__gt": datetime(2021, 9, 29, 0, 0, 0, 0, pytz.UTC)}))
+
+        # all conditions must match
+        self.assertTrue(matches_where(record, where={"flow__uuid": "1234", "responded": True}))
+        self.assertFalse(matches_where(record, where={"flow__uuid": "1234", "responded": False}))
+
+        # a missing field never matches any lookup, consistently across operators
+        self.assertFalse(matches_where(record, where={"missing__gt": 1}))
+        self.assertFalse(matches_where(record, where={"missing": None}))
+        self.assertFalse(matches_where(record, where={"missing__in": (1, 2)}))
+        self.assertFalse(matches_where(record, where={"missing__in": (None, 1)}))
+
+        # raw expressions can't be evaluated locally
+        with self.assertRaises(ValueError):
+            matches_where(record, where={"__raw__": "s.id < 3"})

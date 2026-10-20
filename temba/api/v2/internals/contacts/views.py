@@ -5,7 +5,6 @@ from typing import Optional
 
 import pyexcel
 from rest_framework import status
-from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
 from rest_framework.pagination import CursorPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -15,26 +14,33 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
 from weni.internal.permissions import CanCommunicateInternally
+from weni_commons.auth import CanCommunicateInternally as WeniCanCommunicateInternally, WeniAuthentication
+from weni_commons.auth.helpers import get_auth_context
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import exceptions as django_exceptions
 from django.core.exceptions import ValidationError
 from django.core.files import File
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Sum, Value
 from django.db.models.functions import Coalesce
+from django.db.transaction import on_commit as on_transaction_commit
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
+from django.utils.decorators import method_decorator
 
+from temba.api.auth.jwt import BaseJWTAuthentication, OptionalJWTAuthentication, RequiredJWTAuthentication
 from temba.api.v2.internals.contacts.serializers import (
+    CleanContactFieldsSerializer,
     ContactWithMessagesListSerializer,
     InternalContactFieldsValuesSerializer,
     InternalContactSerializer,
 )
-from temba.api.v2.internals.contacts.services import ContactImportDeduplicationService
+from temba.api.v2.internals.contacts.services import CleanContactFieldsService, ContactImportDeduplicationService
+from temba.api.v2.internals.helpers import get_object_or_404
 from temba.api.v2.internals.views import APIViewMixin
-from temba.api.v2.permissions import IsUserInOrg
+from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.api.v2.serializers import (
     ContactFieldReadSerializer,
     ContactFieldWriteSerializer,
@@ -42,7 +48,9 @@ from temba.api.v2.serializers import (
 )
 from temba.api.v2.validators import LambdaURLValidator
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
-from temba.contacts.models import Contact, ContactField, ContactGroup, ContactImport, ContactURN
+from temba.channels.models import Channel
+from temba.contacts.models import Contact, ContactField, ContactGroup, ContactImport, ContactURN, ExportContactsTask
+from temba.contacts.tasks import export_contacts_by_status_task
 from temba.contacts.views import ContactImportCRUDL
 from temba.msgs.models import Broadcast, Msg
 from temba.orgs.models import Org
@@ -55,22 +63,22 @@ User = get_user_model()
 
 
 class InternalContactView(APIViewMixin, APIView):
+    authentication_classes = [WeniAuthentication]
+    permission_classes = [WeniCanCommunicateInternally]
+
     def post(self, request: Request):
-        params = request.query_params
-        token = params.get("token")
-
-        if token is None:
-            raise NotAuthenticated()
-
-        if token != settings.BILLING_FIXED_ACCESS_TOKEN:
-            raise AuthenticationFailed()
+        auth = get_auth_context(request)
+        project_uuid = auth.project_uuid
 
         serializer = InternalContactSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         contacts_uuids = serializer.validated_data.get("contacts")
 
+        if Contact.objects.filter(uuid__in=contacts_uuids).exclude(org__proj_uuid=project_uuid).exists():
+            return Response({"error": "Contact not found"}, status=status.HTTP_404_NOT_FOUND)
+
         contacts = (
-            Contact.objects.filter(uuid__in=contacts_uuids)
+            Contact.objects.filter(uuid__in=contacts_uuids, org__proj_uuid=project_uuid)
             .select_related("org")
             .only("uuid", "org__proj_uuid", "name")
         )
@@ -91,8 +99,8 @@ class InternalContactView(APIViewMixin, APIView):
 
 
 class InternalContactFieldsEndpoint(APIViewMixin, APIView):
-    authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)]
+    authentication_classes = [OptionalJWTAuthentication, InternalOIDCAuthentication]
+    permission_classes = [(IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)) | HasValidJWT]
 
     def get(self, request, *args, **kwargs):
         query_params = request.query_params
@@ -101,10 +109,12 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
 
         if not project_uuid:
             return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except (Org.DoesNotExist, django_exceptions.ValidationError):
-            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+        org = getattr(request, "org", None)
+        if not org:
+            try:
+                org = Org.objects.get(proj_uuid=project_uuid)
+            except (Org.DoesNotExist, django_exceptions.ValidationError):
+                return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
         contact_fields = ContactField.user_fields.filter(org=org, is_active=True)
 
@@ -116,43 +126,88 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
         return Response({"results": serializer.data})
 
     def post(self, request, *args, **kwargs):
-        project_uuid = request.data.get("project")
-
-        if not project_uuid:
-            return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-            user = User.objects.get(email=request.user.email)
-        except (Org.DoesNotExist, django_exceptions.ValidationError):
-            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        except User.DoesNotExist:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        serializer = ContactFieldWriteSerializer(
-            data=request.data, context={"request": request, "org": org, "user": user}
+        project_uuid = (
+            request.data.get("project_uuid") or request.data.get("project") or getattr(request, "project_uuid", None)
+        )
+        channel_uuid = (
+            request.data.get("channel_uuid") or request.data.get("channel") or getattr(request, "channel_uuid", None)
         )
 
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.validated_data)
+        if project_uuid:
+            self.org = get_object_or_404(Org, field_error_name="project", proj_uuid=project_uuid)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        elif channel_uuid:
+            channel = get_object_or_404(Channel, field_error_name="channel", uuid=channel_uuid)
+            self.org = channel.org
+            if not self.org:
+                return Response(
+                    {"channel": "Channel is not associated with a project"}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+        else:
+            return Response(
+                {"error": "At least either a channel or a project is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        email = self._get_request_email(request)
+        if not email:
+            return Response({"error": "User email not provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = get_object_or_404(User, field_error_name="user", email=email)
+
+        serializer = ContactFieldWriteSerializer(
+            data=request.data,
+            context={"request": request, "user": user, "org": self.org},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(serializer.validated_data)
+
+    def _get_request_email(self, request):
+        payload = getattr(request, "jwt_payload", None)
+        if payload:
+            email = payload.get("email") or payload.get("user_email") or request.data.get("user_email")
+        else:
+            email = request.data.get("user_email") or getattr(request.user, "email", None)
+
+        if email:
+            return email
+
+        internal_email = getattr(settings, "INTERNAL_USER_EMAIL", "")
+        return internal_email or None
 
 
+@method_decorator(transaction.non_atomic_requests, name="dispatch")
 class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
+    """
+    Runs outside ATOMIC_REQUESTS so ContactField rows created in the same request (e.g. segment/orderform
+    fallback) are committed before mailroom's contact_modify reads the DB.
+    """
+
+    authentication_classes = [OptionalJWTAuthentication]
     renderer_classes = [JSONRenderer]
 
     def patch(self, request, *args, **kwargs):
-        validation_response = self.protected_resource(request)  # pragma: no cover
-        if validation_response.status_code != 200:  # pragma: no cover
-            return validation_response
-        serializer = InternalContactFieldsValuesSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.update(instance=None, validated_data=serializer.validated_data)
-            return Response({"message": "Contact fields updated successfully"}, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if not getattr(request, "jwt_payload", None):
+            validation_response = self.protected_resource(request)  # pragma: no cover
+            if validation_response.status_code != 200:  # pragma: no cover
+                return validation_response
+
+        project_uuid = (
+            request.data.get("project_uuid") or request.data.get("project") or getattr(request, "project_uuid", None)
+        )
+        channel_uuid = (
+            request.data.get("channel_uuid") or request.data.get("channel") or getattr(request, "channel_uuid", None)
+        )
+
+        serializer = InternalContactFieldsValuesSerializer(
+            data=request.data, context={"project_uuid": project_uuid, "channel_uuid": channel_uuid}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.update(instance=None, validated_data=serializer.validated_data)
+
+        return Response({"message": "Contact fields updated successfully"}, status=status.HTTP_200_OK)
 
 
 class ContactGroupsService:
@@ -190,14 +245,9 @@ class InternalContactGroupsView(APIViewMixin, APIView):
         """
         Get all contact groups from an organization (org) from the project_uuid.
         """
-        project_uuid = request.query_params.get("project_uuid")
-        if not project_uuid:
-            return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except (Org.DoesNotExist, django_exceptions.ValidationError):
-            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+        org = self.get_org_from_request(request, missing_status=400, missing_error="Project not provided")
+        if isinstance(org, Response):
+            return org
 
         name_filter = request.query_params.get("name")
         order_by = request.query_params.get("order_by") or request.query_params.get("order")
@@ -272,7 +322,74 @@ class InternalContactGroupsView(APIViewMixin, APIView):
         )
 
 
+class ContactsExportByStatusView(APIViewMixin, APIView):
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, IsUserInOrg]
+
+    def post(self, request, *args, **kwargs):
+        broadcast_id = request.data.get("broadcast_id")
+        msg_status = request.data.get("status")
+        org = self.get_org_from_request(
+            request,
+            body_keys=("project_uuid", "project"),
+            missing_status=400,
+            missing_error="Project not provided",
+            not_found_status=status.HTTP_404_NOT_FOUND,
+            not_found_error="Project or Broadcast not found",
+        )
+        if isinstance(org, Response):
+            return org
+
+        # validate broadcast belongs to org
+        try:
+            broadcast = Broadcast.objects.get(id=broadcast_id)
+            if broadcast.org_id != org.id:
+                return Response({"error": "Broadcast not found for project"}, status=status.HTTP_404_NOT_FOUND)
+        except (Org.DoesNotExist, Broadcast.DoesNotExist, django_exceptions.ValidationError):
+            return Response({"error": "Project or Broadcast not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Optionally precompute count for response
+        if msg_status:
+            valid_statuses = [s[0] for s in Msg.STATUS_CHOICES]
+            if msg_status not in valid_statuses:
+                return Response({"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "Status is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        msgs = Msg.objects.filter(broadcast_id=broadcast_id, status=msg_status)
+        contact_count = msgs.values("contact_id").distinct().count()
+
+        # create export record (we'll attach file in the async task)
+        user = User.objects.get(email=request.user.email)
+        export = ExportContactsTask.create(org=org, user=user, group=None, search=None, group_memberships=())
+
+        # schedule background export building and notification
+        on_transaction_commit(lambda: export_contacts_by_status_task.delay(export.pk, broadcast_id, msg_status))
+
+        if not getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+            message = f"We are preparing your export. We will e-mail you at {request.user.email} when it is ready."
+            download_url = None
+        else:
+            # in eager mode, export may be ready immediately
+            export.refresh_from_db()
+            download_url = export.get_download_url()
+            message = f"Export complete, you can find it here: {download_url}"
+
+        return Response(
+            {
+                "export_id": export.id,
+                "download_url": download_url,
+                "count": contact_count,
+                "message": message,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
 class ContactHasOpenTicketView(APIViewMixin, APIView):
+    authentication_classes = [BaseJWTAuthentication]
+    permission_classes = [HasValidJWT]
+
     def get(self, request: Request):
         contact_urn = request.query_params.get("contact_urn")
         if contact_urn is None:
@@ -292,14 +409,21 @@ class ContactsImportUploadView(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated, IsUserInOrg]
 
     def post(self, request, *args, **kwargs):
-        project_uuid = request.data.get("project_uuid")
+        project_uuid = request.data.get("project_uuid") or request.data.get("project")
         uploaded_file = request.FILES.get("file")
         if not project_uuid or not uploaded_file:
             return Response({"error": "Project and file are required."}, status=400)
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except Org.DoesNotExist:
-            return Response({"error": "Project not found."}, status=404)
+
+        org = self.get_org_from_request(
+            request,
+            body_keys=("project_uuid", "project"),
+            missing_status=400,
+            missing_error="Project and file are required.",
+            not_found_status=404,
+            not_found_error="Project not found.",
+        )
+        if isinstance(org, Response):
+            return org
         # Deduplicate uploaded file by UUID/URN and build duplicates XLSX if needed
         try:
             (
@@ -677,18 +801,14 @@ class GroupsContactFieldsView(APIViewMixin, APIView):
 
     def get(self, request: Request):
         params = request.query_params
-        project_uuid = params.get("project_uuid") or params.get("project")
         group_ids_param = params.get("group_ids")
 
-        if not project_uuid:
-            return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
         if not group_ids_param:
             return Response({"error": "group_ids not provided"}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except (Org.DoesNotExist, django_exceptions.ValidationError):
-            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+        org = self.get_org_from_request(request, missing_status=400, missing_error="Project not provided")
+        if isinstance(org, Response):
+            return org
 
         # parse comma-separated list; accept ONLY numeric IDs
         raw_tokens = [t.strip() for t in group_ids_param.split(",") if t.strip()]
@@ -709,3 +829,46 @@ class GroupsContactFieldsView(APIViewMixin, APIView):
 
         results = GroupContactFieldsService.get_fields_with_examples(org, groups_qs)
         return Response({"results": results})
+
+
+class CleanContactsFieldsView(APIViewMixin, APIView):
+    authentication_classes = [RequiredJWTAuthentication]
+    permission_classes = [HasValidJWT]
+
+    def post(self, request: Request):
+        project_uuid = request.data.get("project_uuid") or request.data.get("project")
+        token_project_uuid = getattr(request, "project_uuid", None)
+
+        if not project_uuid:
+            return Response({"error": "project_uuid is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if token_project_uuid and str(token_project_uuid) != str(project_uuid):
+            return Response({"error": "project_uuid does not match token"}, status=status.HTTP_403_FORBIDDEN)
+
+        org = self.get_org_from_request(
+            request,
+            query_keys=(),
+            body_keys=("project_uuid", "project"),
+            missing_status=status.HTTP_400_BAD_REQUEST,
+            missing_error="project_uuid is required",
+            not_found_status=status.HTTP_404_NOT_FOUND,
+            not_found_error="Project not found",
+        )
+        if isinstance(org, Response):
+            return org
+
+        serializer = CleanContactFieldsSerializer(data=request.data, context={"org": org})
+        serializer.is_valid(raise_exception=True)
+
+        cleared_fields_count = CleanContactFieldsService.clear(
+            org,
+            serializer.validated_data["contact"],
+            jwt_payload=getattr(request, "jwt_payload", None),
+        )
+        return Response(
+            {
+                "message": "Contact fields cleaned successfully",
+                "cleared_fields_count": cleared_fields_count,
+            },
+            status=status.HTTP_200_OK,
+        )

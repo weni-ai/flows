@@ -48,7 +48,7 @@ class BillingInternalClientTest(TembaTest):
 
                 # verify params and headers forwarded
                 called_kwargs = mock_get.call_args.kwargs
-                self.assertEqual(called_kwargs["params"], {"project": project})
+                self.assertEqual(called_kwargs["params"], {"project_uuid": project})
                 self.assertEqual(called_kwargs["headers"], self.authenticator.headers)
 
 

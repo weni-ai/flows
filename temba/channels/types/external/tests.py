@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.urls import reverse
 
 from temba.tests import TembaTest
@@ -34,8 +36,8 @@ class ExternalTypeTest(TembaTest):
 
         # fail due to missing number and invalid URL
         response = self.client.post(url, post_data)
-        self.assertFormError(response, "form", "url", "Cannot be a local or private host.")
-        self.assertFormError(response, "form", "number", "This field is required.")
+        self.assertFormError(response, "form", "url", "Can't be a local or private host")
+        self.assertFormError(response, "form", "number", "Required field")
 
         # change scheme to Ext and add valid URL
         ext_url = "http://test.com/send.php?from={{from}}&text={{text}}&to={{to}}"
@@ -44,12 +46,14 @@ class ExternalTypeTest(TembaTest):
 
         # fail due to missing address
         response = self.client.post(url, post_data)
-        self.assertFormError(response, "form", "address", "This field is required.")
+        self.assertFormError(response, "form", "address", "Required field")
 
         # update to valid number
         post_data["scheme"] = "tel"
         post_data["number"] = "12345"
-        response = self.client.post(url, post_data)
+
+        with patch("temba.utils.fields.socket.gethostbyname", return_value="93.184.216.34"):
+            response = self.client.post(url, post_data)
         channel = Channel.objects.get()
 
         self.assertEqual(channel.country, "RW")
@@ -132,7 +136,8 @@ class ExternalTypeTest(TembaTest):
         post_data["max_length"] = 180
         post_data["encoding"] = Channel.ENCODING_SMART
 
-        self.client.post(url, post_data)
+        with patch("temba.utils.fields.socket.gethostbyname", return_value="93.184.216.34"):
+            self.client.post(url, post_data)
         channel = Channel.objects.get(schemes=["ext"])
         self.assertEqual("123456789", channel.address)
         self.assertIsNone(channel.country.code)
@@ -172,7 +177,8 @@ class ExternalTypeTest(TembaTest):
         post_data["encoding"] = Channel.ENCODING_SMART
         post_data["mt_response_check"] = "SENT"
 
-        response = self.client.post(url, post_data)
+        with patch("temba.utils.fields.socket.gethostbyname", return_value="93.184.216.34"):
+            response = self.client.post(url, post_data)
         channel = Channel.objects.filter(org=self.org).exclude(pk=self.channel.pk).first()
 
         self.assertEqual(channel.country, "RW")

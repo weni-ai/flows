@@ -7,9 +7,15 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
 
+from temba.api.auth.jwt import OptionalJWTAuthentication
+from temba.contacts.models import Contact
 from temba.flows.models import Flow
-from temba.msgs.models import Broadcast, BroadcastStatistics
+from temba.msgs.models import Broadcast, BroadcastStatistics, ManagedTriggerGroup
+from temba.msgs.usecases.managed_trigger_group import resolve_or_create_managed_trigger_group
+from temba.orgs.models import Org
 from temba.tests.base import TembaTest
+from temba.tests.mailroom import mock_mailroom
+from temba.triggers.models import Trigger
 
 User = get_user_model()
 
@@ -35,8 +41,12 @@ class TestInternalWhatsappBroadcast(TembaTest):
             }
             response = self.client.post(url, data=body, content_type="application/json")
 
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json(), {"message": "Success"})
+            self.assertEqual(response.status_code, 201)
+            data = response.json()
+            self.assertIn("id", data)
+            self.assertIn("created_on", data)
+            self.assertEqual(data["contacts"][0]["uuid"], str(contact.uuid))
+            self.assertEqual(data["metadata"].get("text"), body["msg"]["text"])
 
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
@@ -166,26 +176,187 @@ class TestInternalWhatsappBroadcast(TembaTest):
 
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
-    def test_trigger_flow_uuid_only_for_template_batch(self):
+    @mock_mailroom
+    def test_trigger_flow_uuid_with_urns_creates_managed_group(self, mocks):
         mock_user = MagicMock(spec=User)
         mock_user.is_authenticated = True
         mock_user.email = "mockuser@example.com"
 
         with patch("rest_framework.request.Request.user", mock_user):
+            flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
             url = "/api/v2/internals/whatsapp_broadcasts"
             body = {
                 "project": self.org.proj_uuid,
-                "queue": "wpp_broadcast_batch",
-                "trigger_flow_uuid": str(uuid.uuid4()),
+                "trigger_flow_uuid": str(flow.uuid),
                 "msg": {"text": "hello"},
-                "urns": ["whatsapp:5561912345678"],
+                "urns": ["whatsapp:5511999999999", "whatsapp:5511888888888"],
             }
             response = self.client.post(url, data=body, content_type="application/json")
-            self.assertEqual(response.status_code, 400)
-            self.assertIn(
-                "trigger_flow_uuid is only allowed when queue is template_batch",
-                response.json()["non_field_errors"][0],
+
+            self.assertEqual(response.status_code, 201)
+            data = response.json()
+            self.assertEqual(data["groups"], [])
+            self.assertIn("trigger_group", data["metadata"])
+            trigger_group = data["metadata"]["trigger_group"]
+            self.assertIn("uuid", trigger_group)
+            self.assertTrue(trigger_group["name"].startswith("Trigger · "))
+
+            association = ManagedTriggerGroup.objects.get(org=self.org, flow=flow)
+            self.assertEqual(str(association.group.uuid), trigger_group["uuid"])
+            self.assertEqual(association.group.contacts.count(), 2)
+            self.assertEqual(
+                Trigger.objects.filter(
+                    org=self.org,
+                    flow=flow,
+                    trigger_type=Trigger.TYPE_CATCH_ALL,
+                    is_archived=False,
+                    groups=association.group,
+                ).count(),
+                1,
             )
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    @mock_mailroom
+    def test_trigger_flow_uuid_most_recent_campaign_wins(self, mocks):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            flow_a = self.create_flow(name="Flow A", flow_type=Flow.TYPE_MESSAGE)
+            flow_b = self.create_flow(name="Flow B", flow_type=Flow.TYPE_MESSAGE)
+            url = "/api/v2/internals/whatsapp_broadcasts"
+            urn = "whatsapp:5511999999999"
+
+            self.client.post(
+                url,
+                data={
+                    "project": self.org.proj_uuid,
+                    "trigger_flow_uuid": str(flow_a.uuid),
+                    "msg": {"text": "hello A"},
+                    "urns": [urn],
+                },
+                content_type="application/json",
+            )
+            response = self.client.post(
+                url,
+                data={
+                    "project": self.org.proj_uuid,
+                    "trigger_flow_uuid": str(flow_b.uuid),
+                    "msg": {"text": "hello B"},
+                    "urns": [urn],
+                },
+                content_type="application/json",
+            )
+            self.assertEqual(response.status_code, 201)
+
+            group_a = ManagedTriggerGroup.objects.get(org=self.org, flow=flow_a).group
+            group_b = ManagedTriggerGroup.objects.get(org=self.org, flow=flow_b).group
+            contact = Contact.from_urn(self.org, urn)
+            self.assertTrue(group_b.contacts.filter(id=contact.id).exists())
+            self.assertFalse(group_a.contacts.filter(id=contact.id).exists())
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_trigger_flow_uuid_groups_only_does_not_create_managed_group(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
+            group = self.create_group("Segment", contacts=[])
+            url = "/api/v2/internals/whatsapp_broadcasts"
+            body = {
+                "project": self.org.proj_uuid,
+                "groups": [str(group.uuid)],
+                "trigger_flow_uuid": str(flow.uuid),
+                "msg": {"text": "hello"},
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+
+            self.assertEqual(response.status_code, 201)
+            data = response.json()
+            self.assertNotIn("trigger_group", data["metadata"])
+            self.assertFalse(ManagedTriggerGroup.objects.filter(org=self.org).exists())
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    @mock_mailroom
+    def test_trigger_flow_uuid_mixed_audience_does_not_copy_group_members(self, mocks):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
+            segment_contact = self.create_contact("Segment", urns=["whatsapp:5511555555555"])
+            segment = self.create_group("Segment", contacts=[segment_contact])
+            url = "/api/v2/internals/whatsapp_broadcasts"
+            body = {
+                "project": self.org.proj_uuid,
+                "groups": [str(segment.uuid)],
+                "urns": ["whatsapp:5511999999999"],
+                "trigger_flow_uuid": str(flow.uuid),
+                "msg": {"text": "hello"},
+            }
+            response = self.client.post(url, data=body, content_type="application/json")
+            self.assertEqual(response.status_code, 201)
+
+            managed = ManagedTriggerGroup.objects.get(org=self.org, flow=flow).group
+            self.assertEqual(managed.contacts.count(), 1)
+            self.assertFalse(managed.contacts.filter(id=segment_contact.id).exists())
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    @mock_mailroom
+    def test_trigger_flow_uuid_group_quota_exceeded(self, mocks):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            self.org.limits = {Org.LIMIT_GROUPS: 0}
+            self.org.save(update_fields=("limits",))
+            flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
+            response = self.client.post(
+                "/api/v2/internals/whatsapp_broadcasts",
+                data={
+                    "project": self.org.proj_uuid,
+                    "trigger_flow_uuid": str(flow.uuid),
+                    "msg": {"text": "hello"},
+                    "urns": ["whatsapp:5511999999999"],
+                },
+                content_type="application/json",
+            )
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("the limit is", str(response.json()))
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    @mock_mailroom
+    def test_trigger_flow_uuid_contact_resolution_error(self, mocks):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
+            resolve_or_create_managed_trigger_group(self.org, self.admin, flow)
+            mocks.error("boom")
+            response = self.client.post(
+                "/api/v2/internals/whatsapp_broadcasts",
+                data={
+                    "project": self.org.proj_uuid,
+                    "trigger_flow_uuid": str(flow.uuid),
+                    "msg": {"text": "hello"},
+                    "urns": ["whatsapp:5511777777777"],
+                },
+                content_type="application/json",
+            )
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("Couldn't resolve or create a contact", str(response.json()))
 
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
@@ -239,8 +410,10 @@ class TestInternalWhatsappBroadcast(TembaTest):
             }
             response = self.client.post(url, data=body, content_type="application/json")
 
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json(), {"message": "Success"})
+            self.assertEqual(response.status_code, 201)
+            data = response.json()
+            self.assertIn("id", data)
+            self.assertEqual(data["metadata"].get("text"), body["msg"]["text"])
 
 
 class TestInternalBroadcastsUploadMedia(TembaTest):
@@ -553,6 +726,246 @@ class TestInternalBroadcastStatistics(TembaTest):
         self.assertIn("success_rate_30_days", body)
 
 
+class TestInternalBroadcastGroupsStats(TembaTest):
+    url = "/api/v2/internals/broadcasts/groups-stats"
+
+    def _disable_auth(self):
+        return patch(
+            "temba.api.v2.internals.broadcasts.views.InternalBroadcastGroupsStatsEndpoint.authentication_classes",
+            [],
+        ), patch(
+            "temba.api.v2.internals.broadcasts.views.InternalBroadcastGroupsStatsEndpoint.permission_classes",
+            [],
+        )
+
+    def test_missing_and_invalid_project(self):
+        # missing project_uuid
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(self.url, data={"groups": []})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "Project UUID not provided"})
+
+        # invalid project_uuid
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(
+                self.url, data={"project_uuid": "00000000-0000-0000-0000-000000000000", "groups": []}
+            )
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {"error": "Project not found"})
+
+    def test_no_groups_or_invalid_groups(self):
+        # no groups provided
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(self.url, data={"project_uuid": str(self.org.proj_uuid)})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "Groups not provided"})
+
+        # invalid groups
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(
+                self.url,
+                data={"project_uuid": str(self.org.proj_uuid), "groups": ["00000000-0000-0000-0000-000000000000"]},
+            )
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json(), {"error": "No valid groups found for this project"})
+
+    def test_create_endpoint_with_overlapping_groups(self):
+        # contacts
+        alice = self.create_contact("Alice", urns=["tel:+111"])
+        bob = self.create_contact("Bob", urns=["tel:+222"])
+        carlos = self.create_contact("Carlos", urns=["tel:+333"])
+
+        # groups with overlap on Bob
+        g1 = self.create_group("G1", contacts=[alice, bob])
+        g2 = self.create_group("G2", contacts=[bob, carlos])
+
+        # ensure counts are populated for deterministic member_count
+        from temba.contacts.models import ContactGroupCount
+
+        ContactGroupCount.populate_for_group(g1)
+        ContactGroupCount.populate_for_group(g2)
+
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(
+                self.url,
+                data={"project_uuid": str(self.org.proj_uuid), "groups": [str(g1.uuid), str(g2.uuid)]},
+            )
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["total_count"], g1.get_member_count() + g2.get_member_count())  # 2 + 2 = 4
+        self.assertEqual(data["duplicates_count"], 1)  # only Bob overlaps
+        self.assertEqual(data["distinct_count"], 3)  # unique across both groups
+
+    def test_create_endpoint_single_group(self):
+        # contacts
+        alice = self.create_contact("Alice", urns=["tel:+111"])
+        bob = self.create_contact("Bob", urns=["tel:+222"])
+        g1 = self.create_group("G1", contacts=[alice, bob])
+
+        from temba.contacts.models import ContactGroupCount
+
+        ContactGroupCount.populate_for_group(g1)
+
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(self.url, data={"project_uuid": str(self.org.proj_uuid), "groups": [str(g1.uuid)]})
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["total_count"], g1.get_member_count())
+        self.assertEqual(data["duplicates_count"], 0)
+        self.assertEqual(data["distinct_count"], g1.get_member_count())
+
+    def test_accepts_comma_separated_group_ids(self):
+        # contacts and groups
+        a = self.create_contact("A", urns=["tel:+1"])
+        b = self.create_contact("B", urns=["tel:+2"])
+        c = self.create_contact("C", urns=["tel:+3"])
+        g1 = self.create_group("G1", contacts=[a, b])
+        g2 = self.create_group("G2", contacts=[b, c])  # overlap on B
+
+        from temba.contacts.models import ContactGroupCount
+
+        ContactGroupCount.populate_for_group(g1)
+        ContactGroupCount.populate_for_group(g2)
+
+        groups_param = f"{g1.id},{g2.id}"
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(self.url, data={"project_uuid": str(self.org.proj_uuid), "group_ids": groups_param})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["total_count"], g1.get_member_count() + g2.get_member_count())
+        self.assertEqual(data["duplicates_count"], 1)
+        self.assertEqual(data["distinct_count"], 3)
+
+    def test_accepts_comma_separated_group_uuids(self):
+        a = self.create_contact("A", urns=["tel:+1"])
+        b = self.create_contact("B", urns=["tel:+2"])
+        c = self.create_contact("C", urns=["tel:+3"])
+        g1 = self.create_group("G1", contacts=[a, b])
+        g2 = self.create_group("G2", contacts=[b, c])
+
+        from temba.contacts.models import ContactGroupCount
+
+        ContactGroupCount.populate_for_group(g1)
+        ContactGroupCount.populate_for_group(g2)
+
+        groups_param = f"{g1.uuid},{g2.uuid}"
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(self.url, data={"project_uuid": str(self.org.proj_uuid), "groups": groups_param})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["total_count"], g1.get_member_count() + g2.get_member_count())
+        self.assertEqual(data["duplicates_count"], 1)
+        self.assertEqual(data["distinct_count"], 3)
+
+    def test_mixed_ids_and_uuids_and_dedupe(self):
+        a = self.create_contact("A", urns=["tel:+1"])
+        b = self.create_contact("B", urns=["tel:+2"])
+        c = self.create_contact("C", urns=["tel:+3"])
+        g1 = self.create_group("G1", contacts=[a, b])
+        g2 = self.create_group("G2", contacts=[b, c])
+
+        from temba.contacts.models import ContactGroupCount
+
+        ContactGroupCount.populate_for_group(g1)
+        ContactGroupCount.populate_for_group(g2)
+
+        with self._disable_auth()[0], self._disable_auth()[1]:
+            resp = self.client.get(
+                self.url,
+                data={
+                    "project_uuid": str(self.org.proj_uuid),
+                    "group_ids": [str(g1.id)],
+                    "groups": [str(g1.uuid), str(g2.uuid)],  # g1 duplicated by id and uuid
+                },
+            )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["total_count"], g1.get_member_count() + g2.get_member_count())
+        self.assertEqual(data["duplicates_count"], 1)
+        self.assertEqual(data["distinct_count"], 3)
+
+
+class TestInternalWhatsappBroadcastJWT(TembaTest):
+    url = "/api/v2/internals/whatsapp_broadcasts"
+
+    @patch("temba.api.auth.jwt.settings")
+    @patch("temba.api.auth.jwt.jwt.decode")
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes",
+        [OptionalJWTAuthentication],
+    )
+    def test_jwt_missing_project_returns_401(self, mock_decode, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = "dummy"
+        mock_decode.return_value = {}  # no project in payload
+        resp = self.client.post(
+            self.url,
+            data={"msg": {"text": "Hi"}, "urns": ["tel:+111"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer token",
+        )
+        self.assertEqual(resp.status_code, 401)
+        self.assertIn("Project not provided", resp.json().get("error", ""))
+
+    @patch("temba.api.auth.jwt.settings")
+    @patch("temba.api.auth.jwt.jwt.decode")
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes",
+        [OptionalJWTAuthentication],
+    )
+    def test_jwt_org_not_found_returns_404(self, mock_decode, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = "dummy"
+        mock_decode.return_value = {"project_uuid": "00000000-0000-0000-0000-000000000000"}
+        resp = self.client.post(
+            self.url,
+            data={"msg": {"text": "Hi"}, "urns": ["tel:+12025550149"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer token",
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertIn("Project not found", resp.json().get("error", ""))
+
+    @patch("temba.api.auth.jwt.settings")
+    @patch("temba.api.auth.jwt.jwt.decode")
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes",
+        [OptionalJWTAuthentication],
+    )
+    def test_jwt_missing_email_returns_401(self, mock_decode, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = "dummy"
+        mock_decode.return_value = {"project_uuid": str(self.org.proj_uuid)}
+        resp = self.client.post(
+            self.url,
+            data={"project": str(self.org.proj_uuid), "msg": {"text": "Hi"}, "urns": ["tel:+12025550149"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer token",
+        )
+        self.assertEqual(resp.status_code, 401)
+        self.assertIn("User email not provided", resp.json().get("error", ""))
+
+    @patch("temba.api.auth.jwt.settings")
+    @patch("temba.api.auth.jwt.jwt.decode")
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes",
+        [OptionalJWTAuthentication],
+    )
+    def test_jwt_success_returns_201(self, mock_decode, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = "dummy"
+        mock_decode.return_value = {"project_uuid": str(self.org.proj_uuid), "email": "user@example.com"}
+
+        resp = self.client.post(
+            self.url,
+            data={"project": str(self.org.proj_uuid), "msg": {"text": "Hi"}, "urns": ["tel:+12025550149"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer token",
+        )
+        self.assertEqual(resp.status_code, 201)
+        data = resp.json()
+        self.assertIn("id", data)
+        self.assertEqual(data["metadata"].get("text"), "Hi")
+
+
 class BroadcastWithStatisticsSerializerTests(TembaTest):
     def test_template_none_without_template_id(self):
         # create a broadcast with recipients but no template_id
@@ -578,3 +991,554 @@ class BroadcastWithStatisticsSerializerTests(TembaTest):
         ser = BroadcastWithStatisticsSerializer(b)
         data = ser.data
         self.assertEqual(data["template"], {"id": t.id, "name": "Welcome"})  # covers return at line 84
+
+
+class TestInternalWhatsappBroadcastIdempotency(TembaTest):
+    url = "/api/v2/internals/whatsapp_broadcasts"
+
+    def setUp(self):
+        super().setUp()
+        from django_redis import get_redis_connection
+
+        self.redis = get_redis_connection()
+        self._cleanup_idempotency_keys()
+
+    def tearDown(self):
+        self._cleanup_idempotency_keys()
+        super().tearDown()
+
+    def _cleanup_idempotency_keys(self):
+        for key in self.redis.scan_iter("idempotency:whatsapp_broadcasts:*"):
+            self.redis.delete(key)
+
+    def _redis_key(self, project_uuid, idem_key):
+        return f"idempotency:whatsapp_broadcasts:{project_uuid}:{idem_key}"
+
+    def _make_body(self, contact, text="Mensagem padrão"):
+        return {
+            "project": str(self.org.proj_uuid),
+            "contacts": [str(contact.uuid)],
+            "msg": {"text": text},
+        }
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_no_header_processes_normally(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+            body = self._make_body(contact)
+
+            response = self.client.post(self.url, data=body, content_type="application/json")
+
+            self.assertEqual(response.status_code, 201)
+
+        existing = list(self.redis.scan_iter("idempotency:whatsapp_broadcasts:*"))
+        self.assertEqual(existing, [], "No idempotency keys should be stored when the header is absent")
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_first_request_caches_response(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        idem_key = "test-key-first-request"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+            body = self._make_body(contact)
+
+            response = self.client.post(
+                self.url,
+                data=body,
+                content_type="application/json",
+                HTTP_IDEMPOTENCY_KEY=idem_key,
+            )
+
+            self.assertEqual(response.status_code, 201)
+
+        redis_key = self._redis_key(self.org.proj_uuid, idem_key)
+        raw = self.redis.get(redis_key)
+        self.assertIsNotNone(raw, "Idempotency entry should be persisted after a successful request")
+
+        from temba.utils import json as temba_json
+
+        cached = temba_json.loads(raw)
+        self.assertEqual(cached["state"], "done")
+        self.assertEqual(cached["status"], 201)
+        self.assertIn("body", cached)
+        self.assertEqual(cached["body"]["id"], response.json()["id"])
+
+        ttl = self.redis.ttl(redis_key)
+        self.assertGreater(ttl, 86000)
+        self.assertLessEqual(ttl, 86400)
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_replay_same_body_returns_cached_response(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        idem_key = "test-key-replay"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+            body = self._make_body(contact)
+
+            initial_count = Broadcast.objects.count()
+
+            first = self.client.post(
+                self.url,
+                data=body,
+                content_type="application/json",
+                HTTP_IDEMPOTENCY_KEY=idem_key,
+            )
+            self.assertEqual(first.status_code, 201)
+            first_data = first.json()
+
+            second = self.client.post(
+                self.url,
+                data=body,
+                content_type="application/json",
+                HTTP_IDEMPOTENCY_KEY=idem_key,
+            )
+            self.assertEqual(second.status_code, 201)
+            second_data = second.json()
+
+            self.assertEqual(first_data, second_data, "Replay must return identical body")
+            self.assertEqual(
+                Broadcast.objects.count(),
+                initial_count + 1,
+                "Broadcast must be created exactly once across the two requests",
+            )
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_replay_different_body_returns_409(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        idem_key = "test-key-conflict"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+
+            first = self.client.post(
+                self.url,
+                data=self._make_body(contact, text="primeira mensagem"),
+                content_type="application/json",
+                HTTP_IDEMPOTENCY_KEY=idem_key,
+            )
+            self.assertEqual(first.status_code, 201)
+
+            second = self.client.post(
+                self.url,
+                data=self._make_body(contact, text="segunda mensagem diferente"),
+                content_type="application/json",
+                HTTP_IDEMPOTENCY_KEY=idem_key,
+            )
+            self.assertEqual(second.status_code, 409)
+            self.assertIn("different body", second.json()["error"])
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_concurrent_inflight_returns_409(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        from temba.utils import json as temba_json
+
+        idem_key = "test-key-inflight"
+        redis_key = self._redis_key(self.org.proj_uuid, idem_key)
+        self.redis.set(
+            redis_key,
+            temba_json.dumps({"state": "inflight", "body_hash": "deadbeef"}),
+            ex=60,
+        )
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+            response = self.client.post(
+                self.url,
+                data=self._make_body(contact),
+                content_type="application/json",
+                HTTP_IDEMPOTENCY_KEY=idem_key,
+            )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("already being processed", response.json()["error"])
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_blank_header_treated_as_missing(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+            body = self._make_body(contact)
+
+            first = self.client.post(
+                self.url,
+                data=body,
+                content_type="application/json",
+                HTTP_IDEMPOTENCY_KEY="   ",
+            )
+            self.assertEqual(first.status_code, 201)
+
+            second = self.client.post(
+                self.url,
+                data=body,
+                content_type="application/json",
+                HTTP_IDEMPOTENCY_KEY="   ",
+            )
+            self.assertEqual(second.status_code, 201, "Blank key must bypass dedupe entirely")
+
+        existing = list(self.redis.scan_iter("idempotency:whatsapp_broadcasts:*"))
+        self.assertEqual(existing, [], "Blank Idempotency-Key must not touch Redis")
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_validation_failure_releases_key(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        idem_key = "test-key-validation-failure"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            invalid_body = {
+                "project": str(self.org.proj_uuid),
+                "msg": {"text": "missing recipients"},
+            }
+            failure = self.client.post(
+                self.url,
+                data=invalid_body,
+                content_type="application/json",
+                HTTP_IDEMPOTENCY_KEY=idem_key,
+            )
+            self.assertEqual(failure.status_code, 400)
+
+            self.assertIsNone(
+                self.redis.get(self._redis_key(self.org.proj_uuid, idem_key)),
+                "Idempotency marker must be released after validation failures",
+            )
+
+            contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+            valid = self.client.post(
+                self.url,
+                data=self._make_body(contact),
+                content_type="application/json",
+                HTTP_IDEMPOTENCY_KEY=idem_key,
+            )
+            self.assertEqual(
+                valid.status_code,
+                201,
+                "Reusing the same key after a validation failure must succeed",
+            )
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_long_header_treated_as_missing(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        oversized_key = "x" * 201
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+            response = self.client.post(
+                self.url,
+                data=self._make_body(contact),
+                content_type="application/json",
+                HTTP_IDEMPOTENCY_KEY=oversized_key,
+            )
+            self.assertEqual(response.status_code, 201)
+
+        existing = list(self.redis.scan_iter("idempotency:whatsapp_broadcasts:*"))
+        self.assertEqual(existing, [], "Oversized Idempotency-Key must not be stored")
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_project_not_found_releases_key(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        idem_key = "test-key-org-not-found"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            body = {
+                "project": str(self.org.uuid),  # org.uuid != org.proj_uuid -> Org.DoesNotExist
+                "msg": {"text": "Test"},
+            }
+            response = self.client.post(
+                self.url,
+                data=body,
+                content_type="application/json",
+                HTTP_IDEMPOTENCY_KEY=idem_key,
+            )
+            self.assertEqual(response.status_code, 404)
+            self.assertEqual(response.json(), {"error": "Project not found"})
+
+        self.assertIsNone(
+            self.redis.get(self._redis_key(self.org.uuid, idem_key)),
+            "Idempotency marker must be released when the project is not found",
+        )
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_missing_email_releases_key(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = None
+
+        idem_key = "test-key-no-email"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+            response = self.client.post(
+                self.url,
+                data=self._make_body(contact),
+                content_type="application/json",
+                HTTP_IDEMPOTENCY_KEY=idem_key,
+            )
+            self.assertEqual(response.status_code, 401)
+            self.assertEqual(response.json(), {"error": "User email not provided"})
+
+        self.assertIsNone(
+            self.redis.get(self._redis_key(self.org.proj_uuid, idem_key)),
+            "Idempotency marker must be released when the user email is missing",
+        )
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_unexpected_exception_releases_key(self):
+        from temba.api.v2.serializers import WhatsappBroadcastWriteSerializer
+
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        idem_key = "test-key-exception"
+
+        with patch("rest_framework.request.Request.user", mock_user), patch.object(
+            WhatsappBroadcastWriteSerializer, "save", side_effect=RuntimeError("simulated downstream failure")
+        ):
+            contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    self.url,
+                    data=self._make_body(contact),
+                    content_type="application/json",
+                    HTTP_IDEMPOTENCY_KEY=idem_key,
+                )
+
+        self.assertIsNone(
+            self.redis.get(self._redis_key(self.org.proj_uuid, idem_key)),
+            "Idempotency marker must be released after an unexpected exception",
+        )
+
+
+class TestIdempotencyHelpers(TembaTest):
+    """Unit tests for the idempotency helper module."""
+
+    def setUp(self):
+        super().setUp()
+        from django_redis import get_redis_connection
+
+        self.redis = get_redis_connection()
+        self._cleanup_idempotency_keys()
+
+    def tearDown(self):
+        self._cleanup_idempotency_keys()
+        super().tearDown()
+
+    def _cleanup_idempotency_keys(self):
+        for key in self.redis.scan_iter("idempotency:whatsapp_broadcasts:*"):
+            self.redis.delete(key)
+
+    def _redis_key(self, project_uuid, idem_key):
+        return f"idempotency:whatsapp_broadcasts:{project_uuid}:{idem_key}"
+
+    def test_extract_idempotency_key_strips_surrounding_whitespace(self):
+        from temba.api.v2.internals.broadcasts.idempotency import extract_idempotency_key
+
+        request = MagicMock()
+        request.headers = {"Idempotency-Key": "  abc-123  "}
+        self.assertEqual(extract_idempotency_key(request), "abc-123")
+
+    def test_extract_idempotency_key_returns_none_when_header_missing(self):
+        from temba.api.v2.internals.broadcasts.idempotency import extract_idempotency_key
+
+        request = MagicMock()
+        request.headers = {}
+        self.assertIsNone(extract_idempotency_key(request))
+
+    def test_compute_body_hash_is_key_order_independent(self):
+        from temba.api.v2.internals.broadcasts.idempotency import compute_body_hash
+
+        request_a = MagicMock()
+        request_a.data = {"a": 1, "b": 2, "nested": {"y": 4, "x": 3}}
+        request_b = MagicMock()
+        request_b.data = {"nested": {"x": 3, "y": 4}, "b": 2, "a": 1}
+
+        self.assertEqual(compute_body_hash(request_a), compute_body_hash(request_b))
+
+    def test_compute_body_hash_falls_back_for_non_serializable_data(self):
+        from temba.api.v2.internals.broadcasts.idempotency import compute_body_hash
+
+        class Unserializable:
+            def __repr__(self):
+                return "Unserializable(payload)"
+
+        request = MagicMock()
+        request.data = Unserializable()
+        result = compute_body_hash(request)
+        self.assertEqual(len(result), 64)  # sha256 hex digest length
+
+    def test_idempotency_lookup_returns_miss_on_first_call(self):
+        from temba.api.v2.internals.broadcasts.idempotency import LOOKUP_MISS, idempotency_lookup
+
+        state, cached = idempotency_lookup("project-x", "fresh-key", "hash1")
+
+        self.assertEqual(state, LOOKUP_MISS)
+        self.assertIsNone(cached)
+        self.assertIsNotNone(self.redis.get(self._redis_key("project-x", "fresh-key")))
+
+    def test_idempotency_lookup_returns_hit_when_done_with_matching_hash(self):
+        from temba.api.v2.internals.broadcasts.idempotency import (
+            LOOKUP_HIT,
+            idempotency_lookup,
+            idempotency_store_success,
+        )
+
+        idempotency_store_success("project-x", "done-key", "hash1", 201, {"id": 7})
+
+        state, cached = idempotency_lookup("project-x", "done-key", "hash1")
+
+        self.assertEqual(state, LOOKUP_HIT)
+        self.assertIsNotNone(cached)
+        self.assertEqual(cached["status"], 201)
+        self.assertEqual(cached["body"], {"id": 7})
+
+    def test_idempotency_lookup_returns_conflict_when_hash_differs(self):
+        from temba.api.v2.internals.broadcasts.idempotency import (
+            LOOKUP_CONFLICT,
+            idempotency_lookup,
+            idempotency_store_success,
+        )
+
+        idempotency_store_success("project-x", "conflict-key", "hash1", 201, {"id": 7})
+
+        state, cached = idempotency_lookup("project-x", "conflict-key", "hash2")
+
+        self.assertEqual(state, LOOKUP_CONFLICT)
+        self.assertIsNone(cached)
+
+    def test_idempotency_lookup_returns_inflight_on_corrupted_json(self):
+        from temba.api.v2.internals.broadcasts.idempotency import LOOKUP_INFLIGHT, idempotency_lookup
+
+        self.redis.set(self._redis_key("project-x", "corrupt-key"), "not-json", ex=60)
+
+        state, cached = idempotency_lookup("project-x", "corrupt-key", "hash1")
+
+        self.assertEqual(state, LOOKUP_INFLIGHT)
+        self.assertIsNone(cached)
+
+    def test_idempotency_lookup_returns_inflight_for_unknown_state(self):
+        from temba.api.v2.internals.broadcasts.idempotency import LOOKUP_INFLIGHT, idempotency_lookup
+        from temba.utils import json as temba_json
+
+        self.redis.set(
+            self._redis_key("project-x", "weird-state-key"),
+            temba_json.dumps({"state": "exploding", "body_hash": "hash1"}),
+            ex=60,
+        )
+
+        state, cached = idempotency_lookup("project-x", "weird-state-key", "hash1")
+
+        self.assertEqual(state, LOOKUP_INFLIGHT)
+        self.assertIsNone(cached)
+
+    def test_idempotency_lookup_handles_race_when_slot_expires(self):
+        """SETNX loses to an existing key, but a GET right after returns None because the
+        key just expired. The reclaim path retries SETNX and wins."""
+        from temba.api.v2.internals.broadcasts.idempotency import LOOKUP_MISS, idempotency_lookup
+
+        redis_mock = MagicMock()
+        redis_mock.set.side_effect = [False, True]  # initial NX fails, reclaim NX wins
+        redis_mock.get.return_value = None
+
+        with patch(
+            "temba.api.v2.internals.broadcasts.idempotency.get_redis_connection",
+            return_value=redis_mock,
+        ):
+            state, cached = idempotency_lookup("project-x", "race-key", "hash1")
+
+        self.assertEqual(state, LOOKUP_MISS)
+        self.assertIsNone(cached)
+
+    def test_idempotency_lookup_returns_inflight_when_double_race_loses(self):
+        """Pathological case: both SETNX attempts fail and GETs return None. We give up
+        and report inflight so the caller returns 409 instead of overwriting blindly."""
+        from temba.api.v2.internals.broadcasts.idempotency import LOOKUP_INFLIGHT, idempotency_lookup
+
+        redis_mock = MagicMock()
+        redis_mock.set.side_effect = [False, False]
+        redis_mock.get.return_value = None
+
+        with patch(
+            "temba.api.v2.internals.broadcasts.idempotency.get_redis_connection",
+            return_value=redis_mock,
+        ):
+            state, cached = idempotency_lookup("project-x", "double-race-key", "hash1")
+
+        self.assertEqual(state, LOOKUP_INFLIGHT)
+        self.assertIsNone(cached)
+
+    def test_idempotency_store_success_persists_payload_with_ttl(self):
+        from temba.api.v2.internals.broadcasts.idempotency import TTL_SECONDS, idempotency_store_success
+        from temba.utils import json as temba_json
+
+        idempotency_store_success("project-x", "store-key", "hash1", 201, {"id": 42, "name": "x"})
+
+        redis_key = self._redis_key("project-x", "store-key")
+        raw = self.redis.get(redis_key)
+        self.assertIsNotNone(raw)
+
+        cached = temba_json.loads(raw)
+        self.assertEqual(cached["state"], "done")
+        self.assertEqual(cached["status"], 201)
+        self.assertEqual(cached["body"], {"id": 42, "name": "x"})
+        self.assertEqual(cached["body_hash"], "hash1")
+
+        ttl = self.redis.ttl(redis_key)
+        self.assertGreater(ttl, TTL_SECONDS - 60)
+        self.assertLessEqual(ttl, TTL_SECONDS)
+
+    def test_idempotency_release_deletes_existing_marker(self):
+        from temba.api.v2.internals.broadcasts.idempotency import idempotency_release
+
+        redis_key = self._redis_key("project-x", "release-key")
+        self.redis.set(redis_key, "marker", ex=60)
+
+        idempotency_release("project-x", "release-key")
+
+        self.assertIsNone(self.redis.get(redis_key))
+
+    def test_idempotency_release_is_a_noop_when_no_marker_exists(self):
+        from temba.api.v2.internals.broadcasts.idempotency import idempotency_release
+
+        # Must not raise even when the key was never set.
+        idempotency_release("project-x", "never-existed")
+        self.assertIsNone(self.redis.get(self._redis_key("project-x", "never-existed")))

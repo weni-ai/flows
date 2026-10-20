@@ -6,13 +6,14 @@ from unittest.mock import call
 
 import iso8601
 import regex
+from botocore.exceptions import ClientError
 
 from temba.archives.models import FileAndHash, jsonlgz_iterate
 from temba.utils import chunk_list, json
 
 
 class MockEventStream:
-    def __init__(self, records: list[dict], max_payload_size: int = 256):
+    def __init__(self, records: list[dict], max_payload_size: int = 256, error: Exception = None):
         # serialize records as a JSONL payload
         buffer = io.BytesIO()
         for record in records:
@@ -23,14 +24,22 @@ class MockEventStream:
         payload_chunks = chunk_list(payload, size=max_payload_size)
 
         self.events = [{"Records": {"Payload": chunk}} for chunk in payload_chunks]
-        self.events.append(
-            {"Stats": {"Details": {"BytesScanned": 123, "BytesProcessed": 234, "BytesReturned": len(payload)}}},
-        )
-        self.events.append({"End": {}})
+
+        # if simulating a mid-stream failure, don't emit the closing events
+        self.error = error
+        if not error:
+            self.events.append(
+                {"Stats": {"Details": {"BytesScanned": 123, "BytesProcessed": 234, "BytesReturned": len(payload)}}},
+            )
+            self.events.append({"End": {}})
 
     def __iter__(self):
         for event in self.events:
             yield event
+
+        # S3 Select raises while the payload is being consumed, so do the same after emitting the events so far
+        if self.error:
+            raise self.error
 
 
 class MockS3Client:
@@ -38,9 +47,13 @@ class MockS3Client:
     A mock of the boto S3 client
     """
 
-    def __init__(self):
+    def __init__(self, max_chars_per_record: int = None):
         self.objects = {}
         self.calls = defaultdict(list)
+
+        # if set, select_object_content simulates the S3 OverMaxRecordSize error when it reaches a record whose
+        # serialized length exceeds this threshold (matching real S3 Select behavior)
+        self.max_chars_per_record = max_chars_per_record
 
     def put_object(self, Bucket: str, Key: str, Body, **kwargs):
         self.calls["put_object"].append(call(Bucket=Bucket, Key=Key, Body=Body, **kwargs))
@@ -75,12 +88,26 @@ class MockS3Client:
         stream = self.objects[(Bucket, Key)]
         stream.seek(0)
         records = []
+        error = None
 
         for record in jsonlgz_iterate(stream):
+            # S3 Select fails when it reaches a record that's too long, regardless of whether it matches
+            if self.max_chars_per_record and len(json.dumps(record)) > self.max_chars_per_record:
+                error = ClientError(
+                    {
+                        "Error": {
+                            "Code": "OverMaxRecordSize",
+                            "Message": "The character number in one record is more than our max threshold",
+                        }
+                    },
+                    "SelectObjectContent",
+                )
+                break
+
             if select_matches(Expression, record):
                 records.append(record)
 
-        return {"Payload": MockEventStream(records)}
+        return {"Payload": MockEventStream(records, error=error)}
 
 
 def jsonlgz_encode(records: list) -> tuple:

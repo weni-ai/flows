@@ -1,4 +1,7 @@
+from uuid import uuid4
+
 from django.core.management import call_command
+from django.db import connection
 from django.utils import timezone
 
 from temba.contacts.models import Contact
@@ -71,6 +74,76 @@ class InspectFlowsTest(TembaTest):
 
         flow3.refresh_from_db()
         self.assertFalse(flow3.has_issues)
+
+    def test_command_filters_by_org(self):
+        flow1 = self.create_flow("Org1 Flow", org=self.org)
+        flow1.has_issues = True
+        flow1.save(update_fields=("has_issues",))
+
+        flow2 = self.create_flow("Org2 Flow", org=self.org2)
+        flow2.has_issues = True
+        flow2.save(update_fields=("has_issues",))
+
+        call_command("inspect_flows", org=str(self.org.id))
+
+        flow1.refresh_from_db()
+        flow2.refresh_from_db()
+        self.assertFalse(flow1.has_issues)
+        self.assertTrue(flow2.has_issues)
+
+    def test_command_filters_by_proj_uuid(self):
+        self.org.proj_uuid = uuid4()
+        self.org.save(update_fields=("proj_uuid",))
+
+        flow1 = self.create_flow("Org1 Flow", org=self.org)
+        flow1.has_issues = True
+        flow1.save(update_fields=("has_issues",))
+
+        call_command("inspect_flows", org=str(self.org.proj_uuid))
+
+        flow1.refresh_from_db()
+        self.assertFalse(flow1.has_issues)
+
+    def test_command_filters_by_flow_uuid(self):
+        flow1 = self.create_flow("No Problems")
+        flow1.has_issues = True
+        flow1.save(update_fields=("has_issues",))
+
+        flow2 = self.create_flow("Also No Problems")
+        flow2.has_issues = True
+        flow2.save(update_fields=("has_issues",))
+
+        call_command("inspect_flows", flow=str(flow1.uuid))
+
+        flow1.refresh_from_db()
+        flow2.refresh_from_db()
+        self.assertFalse(flow1.has_issues)
+        self.assertTrue(flow2.has_issues)
+
+    def test_command_dry_run(self):
+        flow1 = self.create_flow("No Problems")
+        flow1.has_issues = True
+        flow1.save(update_fields=("has_issues",))
+
+        call_command("inspect_flows", flow=str(flow1.uuid), dry_run=True)
+
+        flow1.refresh_from_db()
+        self.assertTrue(flow1.has_issues)
+
+    def test_command_handles_unreadable_flow(self):
+        flow1 = self.create_flow("No Problems")
+        flow1.has_issues = True
+        flow1.save(update_fields=("has_issues",))
+
+        flow2 = self.create_flow("Unreadable")
+        revision_id = flow2.revisions.order_by("revision").last().id
+        with connection.cursor() as cursor:
+            cursor.execute("UPDATE flows_flowrevision SET definition = %s WHERE id = %s", ["", revision_id])
+
+        call_command("inspect_flows")
+
+        flow1.refresh_from_db()
+        self.assertFalse(flow1.has_issues)
 
 
 class RecalcNodeCountsTest(TembaTest):

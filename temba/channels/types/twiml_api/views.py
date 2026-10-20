@@ -28,12 +28,14 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             max_length=14,
             min_length=1,
             label=_("Number"),
-            help_text=_("The phone number without country code or short code you are connecting."),
+            help_text=_("The phone number without the country code or short code you're connecting"),
         )
         url = ExternalURLField(
             max_length=1024,
-            label=_("TwiML REST API Host"),
-            help_text=_("The publicly accessible URL for your TwiML REST API instance ex: https://api.twilio.com"),
+            label=_("TwiML REST API host"),
+            help_text=_(
+                "The publicly accessible URL for your TwiML REST API instance. Example: https://api.twilio.com"
+            ),
         )
         role = forms.ChoiceField(
             choices=ROLES, label=_("Role"), help_text=_("Choose the role that this channel supports")
@@ -41,17 +43,17 @@ class ClaimView(ClaimViewMixin, SmartFormView):
         account_sid = forms.CharField(
             max_length=64,
             required=False,
-            help_text=_("The Account SID to use to authenticate to the TwiML REST API"),
+            help_text=_("The account SID to use to authenticate to the TwiML REST API"),
             widget=forms.TextInput(attrs={"autocomplete": "off"}),
         )
         account_token = forms.CharField(
             max_length=64,
             required=False,
-            help_text=_("The Account Token to use to authenticate to the TwiML REST API"),
+            help_text=_("The account token to use to authenticate to the TwiML REST API"),
             widget=forms.TextInput(attrs={"autocomplete": "off"}),
         )
         max_concurrent_events = forms.IntegerField(
-            min_value=1, required=False, help_text=_("Max active calls at the same time")
+            min_value=1, required=False, help_text=_("Maximum active calls at the same time")
         )
 
     form_class = TwimlApiClaimForm

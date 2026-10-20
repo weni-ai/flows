@@ -20,7 +20,7 @@ from temba.mailroom.client import ContactSpec, MailroomClient, MailroomException
 from temba.mailroom.modifiers import Modifier
 from temba.orgs.models import Org
 from temba.tests.dates import parse_datetime
-from temba.tickets.models import Ticket, TicketEvent, Topic
+from temba.tickets.models import Ticket, Ticketer, TicketEvent, Topic
 from temba.utils import format_number, get_anonymous_user, json
 from temba.utils.cache import incrby_existing
 
@@ -228,6 +228,25 @@ class TestClient(MailroomClient):
                 event_type=TicketEvent.TYPE_TOPIC_CHANGED,
                 topic=topic,
                 created_by_id=user_id,
+            )
+
+        return {"changed_ids": [t.id for t in tickets]}
+
+    @_client_method
+    def ticket_change_ticketer(self, org_id, user_id, ticket_ids, ticketer_id, external_id=None):
+        now = timezone.now()
+        ticketer = Ticketer.objects.get(id=ticketer_id)
+        tickets = Ticket.objects.filter(org_id=org_id, id__in=ticket_ids)
+        # mirror mailroom: when external_id is provided we overwrite it (empty string clears it);
+        # when omitted we preserve the existing external_id so the link to the external system is kept
+        if external_id is None:
+            tickets.update(ticketer=ticketer, modified_on=now, last_activity_on=now)
+        else:
+            tickets.update(
+                ticketer=ticketer,
+                external_id=(external_id or None),
+                modified_on=now,
+                last_activity_on=now,
             )
 
         return {"changed_ids": [t.id for t in tickets]}

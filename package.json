@@ -9,7 +9,7 @@
     ]
   },
   "dependencies": {
-    "@weni/flow-editor": "3.6.3",
+    "@weni/flow-editor": "3.6.5",
     "@nyaruka/temba-components": "0.23.0",
     "colorette": "1.2.2",
     "fa-icons": "0.2.0",
@@ -37,7 +37,7 @@
     "watch": "0.13.0"
   },
   "resolutions": {
-    "minimist": "1.2.5"
+    "minimist": "1.2.8"
   },
   "vaadin": {
     "disableUsageStatistics": true

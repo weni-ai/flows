@@ -8,23 +8,23 @@
     -if flows or triggers or campaigns
       .mb-2
         -blocktrans trimmed with group_name=object.name
-          Sorry, <span class="named">{{group_name}}</span> cannot be deleted yet.
+          You can't delete <span class="named">{{group_name}}</span> yet.
 
       -if triggers
         -url 'triggers.trigger_list' as triggers_url
         -blocktrans trimmed count counter=triggers|length
-          This group is used by an <a href="{{ triggers_url }}">active trigger</a>.
-          In order to delete it, first remove the trigger.
+          This group is used by an <a href="{{ triggers_url }}">active trigger</a>. To delete it, first remove the
+          trigger.
           -plural
-            This group is used by <a href="{{ triggers_url }}">{{counter}} triggers<a>.
-            In order to delete it, first remove the triggers.
+            This group is used by <a href="{{ triggers_url }}">{{counter}} triggers</a>. To delete it, first remove
+            the triggers.
 
       -if flows
         -blocktrans trimmed count counter=flows|length
-          There is an active flow using this group. It cannot be deleted until it is removed from the
+          There's an active flow using this group. It can't be deleted until it's removed from the
 
           -plural
-            There are {{counter}} flows using this group. It cannot be deleted until it is removed from the
+            There are {{counter}} flows using this group. It can't be deleted until it's removed from the
 
         -for flow in flows
           <a href="{%url 'flows.flow_editor' flow.uuid%}">{{flow.name}}</a>{{forloop|oxford}}
@@ -36,10 +36,10 @@
 
       -if campaigns
         -blocktrans trimmed count counter=campaigns|length
-          There is an active campaign using this group. It cannot be deleted until it is removed from the
+          There's an active campaign using this group. It can't be deleted until it's removed from the
 
           -plural
-            There are {{counter}} campaigns using this group. It cannot be deleted until it is removed from the
+            There are {{counter}} campaigns using this group. It can't be deleted until it's removed from the
 
         -for campaign in campaigns
           <a href="{% url 'campaigns.campaign_read' campaign.id %}">{{campaign.name}}</a>{{forloop|oxford}}
@@ -59,11 +59,11 @@
     -else
       -blocktrans trimmed
         .mb-2
-          You are about to delete
+          You're about to delete
           %span.named
             {{object}}.
 
-        No contacts will be deleted but the group itself will be deleted. There is no way to undo this. Are you sure?
+        No contacts will be deleted but the group itself will be deleted. This action can't be undone. Are you sure you want to continue?
 
       .hidden
         %form(method="POST")

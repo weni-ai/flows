@@ -1,20 +1,23 @@
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
 from weni.internal.permissions import CanCommunicateInternally
 
-from django.contrib.auth.models import User
-from django.db.models import Prefetch
+from django.db.models import F, Min, Prefetch
 
+from temba.api.auth.jwt import JWTAuthMixinRequired
 from temba.api.support import InvalidQueryError
-from temba.api.v2.internals.msgs.serializers import InternalMsgReadSerializer
+from temba.api.v2.internals.msgs.serializers import InternalMsgReadSerializer, MsgStreamSerializer
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.views_base import CreatedOnCursorPagination
 from temba.channels.models import Channel
 from temba.contacts.models import URN, Contact, ContactURN
 from temba.msgs.models import Label, Msg, SystemLabel
 from temba.orgs.models import Org
+
+from .services import create_message_db_only
 
 
 class InternalMessagesView(APIViewMixin, APIView):
@@ -119,7 +122,6 @@ class InternalMessagesView(APIViewMixin, APIView):
 
         try:
             org = Org.objects.get(proj_uuid=project_uuid)
-            user, _ = User.objects.get_or_create(email=request.user.email)
         except Org.DoesNotExist:
             return Response({"error": "Project not found"}, status=404)
 
@@ -136,6 +138,103 @@ class InternalMessagesView(APIViewMixin, APIView):
         pagination = self.Pagination()
         pagination.page_size = limit
         page = pagination.paginate_queryset(queryset, request, self)
-        serializer = InternalMsgReadSerializer(page, many=True, context={"org": org, "user": user})
+        serializer = InternalMsgReadSerializer(page, many=True, context={"org": org})
 
         return pagination.get_paginated_response(serializer.data)
+
+
+class MsgStreamView(APIViewMixin, APIView, JWTAuthMixinRequired):
+    def post(self, request, *args, **kwargs):
+        serializer = MsgStreamSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+        project_uuid = data["project_uuid"]
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except Org.DoesNotExist:
+            return Response({"error": "Project not found"}, status=404)
+
+        # pick content field
+        msg_data = data.get("msg") or {}
+        text = data.get("text") or data.get("message") or msg_data.get("text") or ""
+        attachments = data.get("attachments") or msg_data.get("attachments")
+
+        # template can be a string (legacy) or a dict (whatsapp)
+        template = data.get("template") or msg_data.get("template")
+
+        contact_uuid = str(data.get("contact_uuid")) if data.get("contact_uuid") else None
+        urns = data.get("urns") or [None]
+
+        created_ids = []
+        try:
+            for urn in urns:
+                msg = create_message_db_only(
+                    org=org,
+                    direction=data["direction"],
+                    text=text,
+                    contact_uuid=contact_uuid,
+                    urn=urn,
+                    channel_uuid=str(data.get("channel_uuid")) if data.get("channel_uuid") else None,
+                    status=data.get("status"),
+                    created_on=data.get("created_on"),
+                    sent_on=data.get("sent_on"),
+                    attachments=attachments,
+                    visibility=data.get("visibility"),
+                    labels=data.get("labels"),
+                    template=template,
+                    metadata=msg_data,
+                )
+                created_ids.append(msg.id)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=400)
+
+        return Response({"ids": created_ids}, status=201)
+
+
+class FirstContactsPagination(LimitOffsetPagination):
+    default_limit = 500
+    max_limit = 1000
+
+
+class InternalFirstContactsView(JWTAuthMixinRequired, APIViewMixin, APIView):
+    def get(self, request, *args, **kwargs):
+        project_uuid = request.query_params.get("project_uuid")
+
+        if not project_uuid:
+            return Response({"error": "project_uuid is required"}, status=400)
+
+        try:
+            org = Org.objects.get(proj_uuid=project_uuid)
+        except Org.DoesNotExist:
+            return Response({"error": "Project not found"}, status=404)
+
+        channel_uuid = request.query_params.get("channel_uuid")
+        after = request.query_params.get("after")
+        before = request.query_params.get("before")
+
+        if not channel_uuid:
+            return Response({"error": "channel_uuid is required"}, status=400)
+        if not after:
+            return Response({"error": "after is required"}, status=400)
+        if not before:
+            return Response({"error": "before is required"}, status=400)
+
+        queryset = (
+            Msg.objects.filter(
+                org=org,
+                channel__uuid=channel_uuid,
+                created_on__gte=after,
+                created_on__lt=before,
+                direction=Msg.DIRECTION_IN,
+            )
+            .exclude(status__in=[Msg.STATUS_FAILED, Msg.STATUS_ERRORED])
+            .values(contact_urn_identity=F("contact_urn__identity"))
+            .annotate(first_created_on=Min("created_on"))
+            .order_by("contact_urn_identity")
+        )
+
+        paginator = FirstContactsPagination()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+
+        return paginator.get_paginated_response(page)

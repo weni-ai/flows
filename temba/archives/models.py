@@ -7,6 +7,7 @@ from datetime import date, datetime
 from gettext import gettext as _
 from urllib.parse import urlparse
 
+from botocore.exceptions import ClientError
 from dateutil.relativedelta import relativedelta
 
 from django.conf import settings
@@ -184,9 +185,24 @@ class Archive(models.Model):
         """
 
         s3_client = s3.client()
+        bucket, key = self.get_storage_location()
 
-        if where:
-            bucket, key = self.get_storage_location()
+        if not where:
+            s3_obj = s3_client.get_object(Bucket=bucket, Key=key)
+            return jsonlgz_iterate(s3_obj["Body"])
+
+        return self._iter_filtered_records(s3_client, bucket, key, where)
+
+    def _iter_filtered_records(self, s3_client, bucket: str, key: str, where: dict):
+        """
+        Streams records matching the given criteria using S3 Select, falling back to local filtering if a record is
+        too big for S3 Select
+        """
+        # track how many records S3 Select streamed so that, if it fails partway through, we can resume from the same
+        # point when falling back to local filtering (records are streamed in file order using the same criteria)
+        num_yielded = 0
+
+        try:
             response = s3_client.select_object_content(
                 Bucket=bucket,
                 Key=key,
@@ -196,16 +212,34 @@ class Archive(models.Model):
                 OutputSerialization={"JSON": {"RecordDelimiter": "\n"}},
             )
 
-            def generator():
-                for record in EventStreamReader(response["Payload"]):
-                    yield record
+            for record in EventStreamReader(response["Payload"]):
+                num_yielded += 1
+                yield record
+        except ClientError as e:
+            # S3 Select can't read archives that contain a record longer than 1 MB (OverMaxRecordSize), so fall back
+            # to downloading the whole archive and filtering it locally, which has no such limit
+            if e.response.get("Error", {}).get("Code") != "OverMaxRecordSize":
+                raise
 
-            return generator()
+            yield from self._iter_local_records(s3_client, bucket, key, where, skip=num_yielded)
 
-        else:
-            bucket, key = self.get_storage_location()
-            s3_obj = s3_client.get_object(Bucket=bucket, Key=key)
-            return jsonlgz_iterate(s3_obj["Body"])
+    def _iter_local_records(self, s3_client, bucket: str, key: str, where: dict, *, skip: int = 0):
+        """
+        Downloads the whole archive and filters records locally, skipping the first `skip` matching records (those
+        already streamed by S3 Select before it failed)
+        """
+        s3_obj = s3_client.get_object(Bucket=bucket, Key=key)
+        num_skipped = 0
+
+        for record in jsonlgz_iterate(s3_obj["Body"]):
+            if not s3.matches_where(record, where=where):
+                continue
+
+            if num_skipped < skip:
+                num_skipped += 1
+                continue
+
+            yield record
 
     def rewrite(self, transform, delete_old=False):
         s3_client = s3.client()

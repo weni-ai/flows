@@ -19,10 +19,10 @@ class ClaimView(AuthenticatedExternalCallbackClaimView):
             max_length=14,
             min_length=3,
             label=_("Number"),
-            help_text=_("The short code or phone number you are connecting."),
+            help_text=_("The short code or phone number you're connecting"),
         )
         url = ExternalURLField(
-            widget=forms.URLInput(attrs={"placeholder": _("Ex: https://jasmin.gateway.io/send")}),
+            widget=forms.URLInput(attrs={"placeholder": _("Example: https://jasmin.gateway.io/send")}),
             label=_("URL"),
             help_text=_("The URL for the Jasmin server send path"),
         )
@@ -49,7 +49,7 @@ class ClaimView(AuthenticatedExternalCallbackClaimView):
                 return phonenumbers.format_number(cleaned, phonenumbers.PhoneNumberFormat.E164)
             except Exception:  # pragma: needs cover
                 raise forms.ValidationError(
-                    _("Invalid phone number, please include the country code. ex: +250788123123")
+                    _("Invalid phone number. Include the country code. Example: +250788123123")
                 )
 
     form_class = JasminForm

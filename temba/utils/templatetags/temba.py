@@ -200,7 +200,7 @@ def to_json(value):
 
     https://stackoverflow.com/a/14290542
     """
-    if type(value) != str:
+    if not isinstance(value, str):
         raise ValueError(f"Expected str got {type(value)} for to_json")
 
     escaped_output = escapejs(value)
@@ -209,44 +209,43 @@ def to_json(value):
 
 
 @register.simple_tag(takes_context=True)
-def short_datetime(context, dtime):
+def short_datetime(context, dtime, seconds: bool = False):
     if dtime.tzinfo is None:
         dtime = dtime.replace(tzinfo=pytz.utc)
 
-    org_format = "D"
-    tz = pytz.UTC
     org = context["user_org"]
-    if org:
-        org_format = org.date_format
-        tz = org.timezone
+    org_format = org.date_format if org else "D"
+    tz = org.timezone if org else pytz.UTC
 
     dtime = dtime.astimezone(tz)
 
     now = timezone.now()
     twelve_hours_ago = now - timedelta(hours=12)
 
-    if org_format == "D":
-        if dtime > twelve_hours_ago:
-            return f"{dtime.strftime('%H')}:{dtime.strftime('%M')}"
-        elif now.year == dtime.year:
-            return f"{int(_date(dtime, 'd'))} {_date(dtime, 'M')}"
-        else:
-            return f"{int(dtime.strftime('%d'))}/{int(dtime.strftime('%m'))}/{dtime.strftime('%y')}"
-    elif org_format == "Y":
-        if dtime > twelve_hours_ago:
-            return f"{dtime.strftime('%H')}:{dtime.strftime('%M')}"
-        elif now.year == dtime.year:
-            return f"{_date(dtime, 'M')} {int(_date(dtime, 'd'))}"
-        else:
-            return f"{dtime.strftime('%Y')}/{int(dtime.strftime('%m'))}/{int(dtime.strftime('%d'))}"
+    # within last 12 hours, display time
+    if dtime > twelve_hours_ago:
+        if org_format in ("D", "Y"):
+            return dtime.strftime("%H:%M:%S" if seconds else "%H:%M")
 
-    else:
-        if dtime > twelve_hours_ago:
-            return f"{int(dtime.strftime('%I'))}:{dtime.strftime('%M')} {dtime.strftime('%p').lower()}"
-        elif now.year == dtime.year:
-            return f"{_date(dtime, 'M')} {int(_date(dtime, 'd'))}"
-        else:
-            return f"{int(dtime.strftime('%m'))}/{int(dtime.strftime('%d'))}/{dtime.strftime('%y')}"
+        # month-first (12 hour time with am/pm)
+        hour = int(dtime.strftime("%I"))
+        suffix = dtime.strftime("%p").lower()
+        if seconds:
+            return f"{hour}:{dtime.strftime('%M')}:{dtime.strftime('%S')} {suffix}"
+        return f"{hour}:{dtime.strftime('%M')} {suffix}"
+
+    # beyond last 12 hours, display date
+    if now.year == dtime.year:
+        if org_format == "D":
+            return f"{int(_date(dtime, 'd'))} {_date(dtime, 'M')}"
+        return f"{_date(dtime, 'M')} {int(_date(dtime, 'd'))}"
+
+    # different year
+    if org_format == "D":
+        return f"{int(dtime.strftime('%d'))}/{int(dtime.strftime('%m'))}/{dtime.strftime('%y')}"
+    if org_format == "Y":
+        return f"{dtime.strftime('%Y')}/{int(dtime.strftime('%m'))}/{int(dtime.strftime('%d'))}"
+    return f"{int(dtime.strftime('%m'))}/{int(dtime.strftime('%d'))}/{dtime.strftime('%y')}"
 
 
 @register.simple_tag(takes_context=True)

@@ -48,21 +48,24 @@
 
     <!-- Hotjar Tracking -->
     <script>
-    (function (h, o, t, j, a, r) {
-        if ({{ hotjar_id }}) {
-        h.hj =
-          h.hj ||
-          function () {
-            (h.hj.q = h.hj.q || []).push(arguments);
-          };
-        h._hjSettings = { hjid: {{ hotjar_id }}, hjsv: 6 };
-        a = o.getElementsByTagName('head')[0];
-        r = o.createElement('script');
-        r.async = 1;
-        r.src = t + h._hjSettings.hjid + j + h._hjSettings.hjsv;
-        a.appendChild(r);
-      }
-    })(window, document, 'https://static.hotjar.com/c/hotjar-', '.js?sv=');
+    // setTimeout to delay the code execution until the DOM is loaded
+    setTimeout(function() {
+      (function (h, o, t, j, a, r) {
+          if ({{ hotjar_id }}) {
+          h.hj =
+            h.hj ||
+            function () {
+              (h.hj.q = h.hj.q || []).push(arguments);
+            };
+          h._hjSettings = { hjid: {{ hotjar_id }}, hjsv: 6 };
+          a = o.getElementsByTagName('head')[0];
+          r = o.createElement('script');
+          r.async = 1;
+          r.src = t + h._hjSettings.hjid + j + h._hjSettings.hjsv;
+          a.appendChild(r);
+        }
+      })(window, document, 'https://static.hotjar.com/c/hotjar-', '.js?sv=');
+    }, 0);
     </script>
 
     -compress js
@@ -322,7 +325,7 @@
   -trans 'Delete' as title
   %temba-dialog#general-delete-confirmation.hidden{header:"{{title|escapejs}}", primaryButtonName:"{{title|escapejs}}", destructive: "true"}
     .p-6.confirmation-body
-      -trans "Are you sure you want to continue? This cannot be undone."
+      -trans "Are you sure you want to continue? This action can't be undone."
 
   // media associated with any form we are displaying
   -if form

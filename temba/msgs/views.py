@@ -99,7 +99,7 @@ class SendMessageForm(Form):
             step_node = cleaned.get("step_node")
 
             if not step_node and not omnibox:
-                self.add_error("omnibox", _("At least one recipient is required."))
+                self.add_error("omnibox", _("At least one recipient is required"))
 
         return cleaned
 
@@ -211,7 +211,7 @@ class InboxView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
                     id="export-messages",
                     title=_("Download"),
                     href=self.derive_export_url(),
-                    modax=_("Download Messages"),
+                    modax=_("Download messages"),
                 )
             )
         return links
@@ -257,10 +257,10 @@ class BroadcastCRUDL(SmartCRUDL):
     model = Broadcast
 
     class ScheduleRead(SpaMixin, FormaxMixin, OrgObjPermsMixin, SmartReadView):
-        title = _("Schedule Message")
+        title = _("Schedule message")
 
         def derive_title(self):
-            return _("Scheduled Message")
+            return _("Scheduled message")
 
         def get_context_data(self, **kwargs):
             context = super().get_context_data(**kwargs)
@@ -312,7 +312,7 @@ class BroadcastCRUDL(SmartCRUDL):
 
     class ScheduleList(InboxView):
         refresh = 30000
-        title = _("Scheduled Messages")
+        title = _("Scheduled messages")
         fields = ("contacts", "msgs", "sent", "status")
         search_fields = ("text__icontains", "contacts__urns__path__icontains")
         template_name = "msgs/broadcast_schedule_list.haml"
@@ -322,7 +322,7 @@ class BroadcastCRUDL(SmartCRUDL):
             return super().get_queryset(**kwargs).select_related("org", "schedule")
 
     class Send(OrgPermsMixin, ModalMixin, SmartFormView):
-        title = _("Send Message")
+        title = _("Send message")
         form_class = SendMessageForm
         fields = ("omnibox", "text", "schedule", "step_node")
         success_url = "@msgs.msg_inbox"
@@ -330,8 +330,7 @@ class BroadcastCRUDL(SmartCRUDL):
 
         blockers = {
             "no_send_channel": _(
-                'To get started you need to <a href="%(link)s">add a channel</a> to your workspace which will allow '
-                "you to send messages to your contacts."
+                'To get started, <a href="%(link)s">add a channel</a> to your workspace to allow you to send messages to your contacts.'
             ),
         }
 
@@ -449,9 +448,11 @@ class BroadcastCRUDL(SmartCRUDL):
 
 
 class TestMessageForm(forms.Form):
-    channel = TembaChoiceField(Channel.objects.filter(id__lt=0), help_text=_("Which channel will deliver the message"))
+    channel = TembaChoiceField(
+        Channel.objects.filter(id__lt=0), help_text=_("The channel that will deliver the message")
+    )
     urn = forms.CharField(max_length=14, help_text=_("The URN of the contact delivering this message"))
-    text = forms.CharField(max_length=160, widget=forms.Textarea, help_text=_("The message that is being delivered"))
+    text = forms.CharField(max_length=160, widget=forms.Textarea, help_text=_("The message being delivered"))
 
     def __init__(self, *args, **kwargs):  # pragma: needs cover
         org = kwargs["org"]
@@ -473,13 +474,13 @@ class ExportForm(Form):
     start_date = forms.DateField(
         required=False,
         help_text=_("Leave blank for the oldest message"),
-        widget=InputWidget(attrs={"datepicker": True, "hide_label": True, "placeholder": _("Start Date")}),
+        widget=InputWidget(attrs={"datepicker": True, "hide_label": True, "placeholder": _("Start date")}),
     )
 
     end_date = forms.DateField(
         required=False,
         help_text=_("Leave blank for the latest message"),
-        widget=InputWidget(attrs={"datepicker": True, "hide_label": True, "placeholder": _("End Date")}),
+        widget=InputWidget(attrs={"datepicker": True, "hide_label": True, "placeholder": _("End date")}),
     )
 
     groups = forms.ModelMultipleChoiceField(
@@ -487,7 +488,7 @@ class ExportForm(Form):
         required=False,
         label=_("Groups"),
         widget=SelectMultipleWidget(
-            attrs={"widget_only": True, "placeholder": _("Optional: Choose groups to show in your export")}
+            attrs={"widget_only": True, "placeholder": _("Optional: choose groups to show in your export")}
         ),
     )
 
@@ -499,7 +500,7 @@ class ExportForm(Form):
 
         self.fields["groups"].queryset = ContactGroup.user_groups.filter(org=self.user.get_org(), is_active=True)
         self.fields["groups"].help_text = _(
-            "Export only messages from these contact groups. " "(Leave blank to export all messages)."
+            "Export only messages from these contact groups. Leave blank to export all messages."
         )
 
     def clean(self):
@@ -508,7 +509,7 @@ class ExportForm(Form):
         end_date = cleaned_data.get("end_date")
 
         if start_date and start_date > date.today():  # pragma: needs cover
-            raise forms.ValidationError(_("Start date can't be in the future."))
+            raise forms.ValidationError(_("Start date can't be in the future"))
 
         if end_date and start_date and end_date < start_date:  # pragma: needs cover
             raise forms.ValidationError(_("End date can't be before start date"))
@@ -648,8 +649,8 @@ class MsgCRUDL(SmartCRUDL):
                 messages.info(
                     self.request,
                     _(
-                        "There is already an export in progress, started by %s. You must wait "
-                        "for that export to complete before starting another." % existing.created_by.username
+                        "An export is already in progress, started by %s. Wait for it to complete before starting another."
+                        % existing.created_by.username
                     ),
                 )
 
@@ -670,7 +671,7 @@ class MsgCRUDL(SmartCRUDL):
                 if not getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):  # pragma: needs cover
                     messages.info(
                         self.request,
-                        _("We are preparing your export. We will e-mail you at %s when " "it is ready.")
+                        _("Your export is in progress. We'll email you at %s when it's ready.")
                         % self.request.user.username,
                     )
 
@@ -678,8 +679,7 @@ class MsgCRUDL(SmartCRUDL):
                     dl_url = reverse("assets.download", kwargs=dict(type="message_export", pk=export.pk))
                     messages.info(
                         self.request,
-                        _("Export complete, you can find it here: %s (production users " "will get an email)")
-                        % dl_url,
+                        _("Export complete. You can find it here: %s (production users will get an email)") % dl_url,
                     )
 
             messages.success(self.request, self.derive_success_message())
@@ -709,7 +709,7 @@ class MsgCRUDL(SmartCRUDL):
             return qs.prefetch_related("labels").select_related("contact")
 
     class Flow(InboxView):
-        title = _("Flow Messages")
+        title = _("Flow messages")
         template_name = "msgs/message_box.haml"
         system_label = SystemLabel.TYPE_FLOWS
         bulk_actions = ("label",)
@@ -731,7 +731,7 @@ class MsgCRUDL(SmartCRUDL):
             return qs.prefetch_related("labels").select_related("contact")
 
     class Outbox(InboxView):
-        title = _("Outbox Messages")
+        title = _("Outbox messages")
         template_name = "msgs/msg_outbox.haml"
         system_label = SystemLabel.TYPE_OUTBOX
         bulk_actions = ()
@@ -758,7 +758,7 @@ class MsgCRUDL(SmartCRUDL):
             return super().get_queryset(**kwargs).select_related("contact")
 
     class Sent(InboxView):
-        title = _("Sent Messages")
+        title = _("Sent messages")
         template_name = "msgs/msg_sent.haml"
         system_label = SystemLabel.TYPE_SENT
         bulk_actions = ()
@@ -770,7 +770,7 @@ class MsgCRUDL(SmartCRUDL):
             return super().get_queryset(**kwargs).select_related("contact")
 
     class Failed(InboxView):
-        title = _("Failed Outgoing Messages")
+        title = _("Failed outgoing messages")
         template_name = "msgs/msg_failed.haml"
         success_message = ""
         system_label = SystemLabel.TYPE_FAILED
@@ -799,18 +799,18 @@ class MsgCRUDL(SmartCRUDL):
                     links.append(
                         dict(
                             id="update-label",
-                            title=_("Edit Folder"),
+                            title=_("Edit folder"),
                             href=reverse("msgs.label_update", args=[label.pk]),
-                            modax=_("Edit Folder"),
+                            modax=_("Edit folder"),
                         )
                     )
                 else:
                     links.append(
                         dict(
                             id="update-label",
-                            title=_("Edit Label"),
+                            title=_("Edit label"),
                             href=reverse("msgs.label_update", args=[label.pk]),
-                            modax=_("Edit Label"),
+                            modax=_("Edit label"),
                         )
                     )
 
@@ -820,13 +820,13 @@ class MsgCRUDL(SmartCRUDL):
                         id="export-messages",
                         title=_("Download"),
                         href=self.derive_export_url(),
-                        modax=_("Download Messages"),
+                        modax=_("Download messages"),
                     )
                 )
 
             if self.has_org_perm("msgs.broadcast_send"):
                 links.append(
-                    dict(title=_("Send All"), style="btn-primary", href="#", js_class="filter-send-all-send-button")
+                    dict(title=_("Send all"), style="btn-primary", href="#", js_class="filter-send-all-send-button")
                 )
 
             links.append(
@@ -843,9 +843,9 @@ class MsgCRUDL(SmartCRUDL):
                     links.append(
                         dict(
                             id="delete-folder",
-                            title=_("Delete Folder"),
+                            title=_("Delete folder"),
                             href=reverse("msgs.label_delete_folder", args=[label.id]),
-                            modax=_("Delete Folder"),
+                            modax=_("Delete folder"),
                         )
                     )
             else:
@@ -853,9 +853,9 @@ class MsgCRUDL(SmartCRUDL):
                     links.append(
                         dict(
                             id="delete-label",
-                            title=_("Delete Label"),
+                            title=_("Delete label"),
                             href=reverse("msgs.label_delete", args=[label.uuid]),
-                            modax=_("Delete Label"),
+                            modax=_("Delete label"),
                         )
                     )
 
@@ -890,8 +890,8 @@ class BaseLabelForm(forms.ModelForm):
         if count >= self.org.get_limit(Org.LIMIT_LABELS):
             raise forms.ValidationError(
                 _(
-                    "This workspace has %d labels and the limit is %s. You must delete existing ones before you can "
-                    "create new ones." % (count, self.org.get_limit(Org.LIMIT_LABELS))
+                    "This workspace has %d labels and the limit is %s. Delete existing ones before creating new ones."
+                    % (count, self.org.get_limit(Org.LIMIT_LABELS))
                 )
             )
 
@@ -910,7 +910,7 @@ class LabelForm(BaseLabelForm):
         required=False,
         label=_("Folder"),
         widget=SelectWidget(attrs={"placeholder": _("Select folder")}),
-        help_text=_("Optional folder which can be used to group related labels."),
+        help_text=_("Optional folder which can be used to group related labels"),
     )
 
     messages = forms.CharField(required=False, widget=forms.HiddenInput)
@@ -1006,7 +1006,7 @@ class LabelCRUDL(SmartCRUDL):
             return FolderForm if self.get_object().is_folder() else LabelForm
 
         def derive_title(self):
-            return _("Update Folder") if self.get_object().is_folder() else _("Update Label")
+            return _("Update folder") if self.get_object().is_folder() else _("Update label")
 
         def derive_fields(self):
             return ("name",) if self.get_object().is_folder() else ("name", "folder")
@@ -1017,13 +1017,13 @@ class LabelCRUDL(SmartCRUDL):
     class Delete(DependencyDeleteModal):
         cancel_url = "@msgs.msg_inbox"
         success_url = "@msgs.msg_inbox"
-        success_message = _("Your label has been deleted.")
+        success_message = _("Your label has been deleted")
 
     class DeleteFolder(ModalMixin, OrgObjPermsMixin, SmartDeleteView):
         success_url = "@msgs.msg_inbox"
         redirect_url = "@msgs.msg_inbox"
         cancel_url = "@msgs.msg_inbox"
-        success_message = _("Your label folder has been deleted.")
+        success_message = _("Your label folder has been deleted")
         fields = ("uuid",)
         submit_button_name = _("Delete")
 

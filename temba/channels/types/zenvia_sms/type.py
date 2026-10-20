@@ -57,7 +57,7 @@ class ZenviaSMSType(ChannelType):
 
         if resp.status_code != 200:
             raise ValidationError(
-                _("Unable to register webhook subscriptions: %(resp)s"), params={"resp": resp.content}
+                _("Couldn't register webhook subscriptions: %(resp)s"), params={"resp": resp.content}
             )
 
         return resp.json()["id"]
@@ -86,7 +86,7 @@ class ZenviaSMSType(ChannelType):
                 errored = True
 
         if errored:
-            raise ValidationError(_("Unable to remove webhook subscriptions: %(resp)s"), params={"resp": resp.content})
+            raise ValidationError(_("Couldn't remove webhook subscriptions: %(resp)s"), params={"resp": resp.content})
 
     def activate(self, channel):
         domain = channel.org.get_brand_domain()

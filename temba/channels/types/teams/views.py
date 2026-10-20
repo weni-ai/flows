@@ -10,11 +10,11 @@ from ...views import ClaimViewMixin
 
 class ClaimView(ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
-        bot_name = forms.CharField(required=True, help_text=_("The name of bot"))
-        bot_id = forms.CharField(required=True, help_text=_("The ID of bot"))
-        app_id = forms.CharField(required=True, help_text=_("The App ID"))
+        bot_name = forms.CharField(required=True, help_text=_("The name of the bot"))
+        bot_id = forms.CharField(required=True, help_text=_("The bot ID"))
+        app_id = forms.CharField(required=True, help_text=_("The app ID"))
         app_password = forms.CharField(required=True, help_text=_("The application password"))
-        tenant_id = forms.CharField(required=True, help_text=_("The Tenant ID"))
+        tenant_id = forms.CharField(required=True, help_text=_("The tenant ID"))
 
         def clean(self):
             try:
@@ -39,9 +39,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
 
             except Exception:
                 raise forms.ValidationError(
-                    _(
-                        "Unable to complete login for your Microsoft Teams bot, please check information about your APP."
-                    )
+                    _("Couldn't complete login for your Microsoft Teams bot. Check your app information.")
                 )
 
             return self.cleaned_data

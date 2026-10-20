@@ -2,12 +2,12 @@
 -load smartmin i18n
 
 -block login-title
-  -trans "Confirm Access"
+  -trans "Confirm access"
       
 -block login-content
 
   -blocktrans trimmed
-    To access this page please confirm your current password.
+    To access this page, confirm your current password.
 
   %form(method="POST")
     -csrf_token

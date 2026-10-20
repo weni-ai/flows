@@ -19,7 +19,7 @@ class OmieType(ExternalServiceType, ExternalServiceTypeInterface):
     slug = "omie"
     icon = "icon-power-cord"
 
-    connect_blurb = _("omie external service")
+    connect_blurb = _("Omie external service")
 
     def is_available_to(self, user):
         return True

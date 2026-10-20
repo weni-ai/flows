@@ -17,6 +17,8 @@ from django.db import connection
 from django.db.models import Value as DbValue
 from django.db.models.functions import Concat, Substr
 from django.db.utils import IntegrityError
+from django.http import Http404
+from django.test import RequestFactory
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -25,7 +27,8 @@ from temba.airtime.models import AirtimeTransfer
 from temba.campaigns.models import Campaign, CampaignEvent, EventFire
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
 from temba.contacts.search import SearchException, SearchResults, search_contacts
-from temba.contacts.views import ContactListView
+from temba.contacts.views import ContactCRUDL, ContactGroupCRUDL, ContactGroupForm, ContactListView
+from temba.conversion_events.models import CTWA, CtwaReferralSource
 from temba.flows.models import Flow, FlowSession, FlowStart
 from temba.ivr.models import IVRCall
 from temba.locations.models import AdminBoundary
@@ -61,7 +64,7 @@ from .models import (
     ExportContactsTask,
 )
 from .tasks import check_elasticsearch_lag, squash_contactgroupcounts
-from .templatetags.contacts import contact_field, history_class, history_icon
+from .templatetags.contacts import contact_field, history_class, history_icon, urn_scheme_label
 
 
 class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
@@ -657,6 +660,32 @@ class ContactCRUDLTest(CRUDLTestMixin, TembaTest):
         # that has been queued to mailroom
         self.assertEqual("start_flow", mr_mocks.queued_batch_tasks[-1]["type"])
 
+    def test_derive_group_without_org_raises_404(self):
+        view = ContactCRUDL.List()
+        request = RequestFactory().get("/contact/")
+        request.user = self.user
+        view.request = request
+        view.system_group = ContactGroup.TYPE_ACTIVE
+
+        with patch.object(type(self.user), "get_org", return_value=None):
+            with self.assertRaises(Http404):
+                view.derive_group()
+
+    def test_derive_group_recreates_missing_system_groups(self):
+        view = ContactCRUDL.List()
+        request = RequestFactory().get("/contact/")
+        request.user = self.user
+        view.request = request
+        view.system_group = ContactGroup.TYPE_ACTIVE
+
+        self.org.all_groups(manager="system_groups").all().delete()
+
+        group = view.derive_group()
+
+        self.assertEqual(group.group_type, ContactGroup.TYPE_ACTIVE)
+        self.assertEqual(group.org, self.org)
+        self.assertTrue(self.org.all_groups(manager="system_groups").exists())
+
 
 class ContactGroupTest(TembaTest):
     def setUp(self):
@@ -732,6 +761,47 @@ class ContactGroupTest(TembaTest):
         # can't update query again while it is in this state
         with self.assertRaises(ValueError):
             group.update_query("age = 18")
+
+    @mock_mailroom
+    def test_whatsapp_contacts_without_phone(self, mr_mocks):
+        query = ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY
+        outdated = 'whatsapp_bsuid != "" AND whatsapp_phone = "" AND tel = ""'
+        mr_mocks.parse_query(query, cleaned=query)
+
+        # there's nothing to ensure while the org doesn't have the group
+        self.assertIsNone(ContactGroup.get_whatsapp_contacts_without_phone(self.org))
+        self.assertIsNone(ContactGroup.ensure_whatsapp_contacts_without_phone_query(self.org, self.admin))
+
+        group = ContactGroup.create_whatsapp_contacts_without_phone(self.org, self.admin)
+
+        self.assertEqual(ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME, group.name)
+        self.assertEqual(query, group.query)
+
+        # creating it again returns the existing group instead of a duplicate
+        self.assertEqual(group, ContactGroup.create_whatsapp_contacts_without_phone(self.org, self.admin))
+        self.assertEqual(1, ContactGroup.user_groups.filter(org=self.org, name=group.name).count())
+
+        # an outdated query is updated and the group re-evaluated
+        group.query = outdated
+        group.status = ContactGroup.STATUS_READY
+        group.save(update_fields=("query", "status"))
+
+        self.assertEqual(group, ContactGroup.ensure_whatsapp_contacts_without_phone_query(self.org, self.admin))
+
+        group.refresh_from_db()
+        self.assertEqual(query, group.query)
+        self.assertEqual(ContactGroup.STATUS_INITIALIZING, group.status)
+
+        # but is left alone while the group is still evaluating
+        group.query = outdated
+        group.status = ContactGroup.STATUS_EVALUATING
+        group.save(update_fields=("query", "status"))
+
+        self.assertEqual(group, ContactGroup.ensure_whatsapp_contacts_without_phone_query(self.org, self.admin))
+
+        group.refresh_from_db()
+        self.assertEqual(outdated, group.query)
+        self.assertEqual(ContactGroup.STATUS_EVALUATING, group.status)
 
     def test_get_or_create(self):
         group = ContactGroup.get_or_create(self.org, self.user, " first ")
@@ -930,7 +1000,7 @@ class ContactGroupTest(TembaTest):
         second_trigger.groups.add(group)
 
         response = self.client.get(delete_url, dict(), HTTP_X_PJAX=True)
-        self.assertContains(response, 'This group is used by <a href="/trigger/">2 triggers<a>')
+        self.assertContains(response, 'This group is used by <a href="/trigger/">2 triggers</a>')
 
         response = self.client.post(delete_url, dict())
         self.assertEqual(302, response.status_code)
@@ -973,13 +1043,13 @@ class ContactGroupTest(TembaTest):
         a_campaign = Campaign.objects.first()
 
         response = self.client.get(delete_url, dict(), HTTP_X_PJAX=True)
-        self.assertContains(response, "There is an active campaign using this group.")
+        self.assertContains(response, "an active campaign using this group.")
 
         # archive the campaign
         self.client.post(reverse("campaigns.campaign_archive", args=(a_campaign.pk,)))
 
         response = self.client.get(delete_url, dict(), HTTP_X_PJAX=True)
-        self.assertContains(response, "Are you sure?")
+        self.assertContains(response, "Are you sure you want to continue?")
 
         response = self.client.post(delete_url, dict(), HTTP_X_PJAX=True)
         self.assertContains(response, "document.location.href = '/contact/';")
@@ -1031,7 +1101,7 @@ class ContactGroupTest(TembaTest):
 
         # users are notified that a group cannot be deleted
         response = self.client.get(delete_url, dict(), HTTP_X_PJAX=True)
-        self.assertContains(response, "There is an active campaign using this group")
+        self.assertContains(response, "an active campaign using this group")
 
         # can't delete if it is a dependency
         response = self.client.post(delete_url, dict())
@@ -1183,9 +1253,73 @@ class ContactGroupCRUDLTest(TembaTest, CRUDLTestMixin):
             response,
             "form",
             "name",
-            "This org has 10 groups and the limit is 10. "
-            "You must delete existing ones before you can create new ones.",
+            "This org has 10 groups and the limit is 10. Delete existing ones before creating new ones.",
         )
+
+    @mock_mailroom
+    def test_create_whatsapp_contacts_without_phone(self, mr_mocks):
+        url = reverse("contacts.contactgroup_create")
+        field = ContactGroupForm.WHATSAPP_WITHOUT_PHONE_FIELD
+
+        self.login(self.admin)
+
+        # the checkbox is offered while the org doesn't have the group
+        response = self.client.get(url)
+        self.assertIn(field, response.context["form"].fields)
+
+        # checking it creates the smart group with its fixed name and query, without needing a name
+        mr_mocks.parse_query(
+            ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY,
+            cleaned=ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY,
+        )
+        response = self.client.post(url, {"name": "", field: "on"})
+        self.assertNoFormErrors(response)
+
+        group = ContactGroup.get_whatsapp_contacts_without_phone(self.org)
+        self.assertIsNotNone(group)
+        self.assertEqual(ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME, group.name)
+        self.assertEqual('whatsapp_bsuid != "" AND whatsapp_phone = ""', group.query)
+        self.assertEqual(ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY, group.query)
+
+        # and is no longer offered once the group exists
+        response = self.client.get(url)
+        self.assertNotIn(field, response.context["form"].fields)
+
+        # so posting the flag again creates a regular group instead of a duplicate
+        response = self.client.post(url, {"name": "Others", field: "on"})
+        self.assertNoFormErrors(response)
+        ContactGroup.user_groups.get(org=self.org, name="Others")
+        self.assertEqual(
+            1,
+            ContactGroup.user_groups.filter(
+                org=self.org, name=ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME, is_active=True
+            ).count(),
+        )
+
+        # opening Create Group refreshes an outdated query that still required tel = ""
+        old_query = 'whatsapp_bsuid != "" AND whatsapp_phone = "" AND tel = ""'
+        group.query = old_query
+        group.status = ContactGroup.STATUS_READY
+        group.save(update_fields=("query", "status"))
+
+        mr_mocks.parse_query(
+            ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY,
+            cleaned=ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY,
+        )
+        response = self.client.get(url)
+        self.assertNotIn(field, response.context["form"].fields)
+
+        group.refresh_from_db()
+        self.assertEqual('whatsapp_bsuid != "" AND whatsapp_phone = ""', group.query)
+        self.assertEqual(ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_QUERY, group.query)
+
+    def test_create_whatsapp_contacts_without_phone_needs_org(self):
+        view = ContactGroupCRUDL.Create()
+        view.request = RequestFactory().get(reverse("contacts.contactgroup_create"))
+        view.request.user = self.non_org_user
+
+        self.assertFalse(view.offer_whatsapp_without_phone_group())
+        self.assertNotIn(ContactGroupForm.WHATSAPP_WITHOUT_PHONE_FIELD, view.derive_fields())
 
     def test_create_disallow_duplicates(self):
         self.login(self.admin)
@@ -1253,7 +1387,7 @@ class ContactGroupCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # dependent on id
         response = self.client.post(url, dict(name="Frank", query="id = 123"))
-        self.assertFormError(response, "form", "query", 'You cannot create a smart group based on "id" or "group".')
+        self.assertFormError(response, "form", "query", 'You can\'t create a smart group based on "id" or "group"')
 
         response = self.client.post(url, dict(name="Frank", query='twitter = "hola"'))
 
@@ -1268,7 +1402,7 @@ class ContactGroupCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # and check we can't change the query while that is the case
         response = self.client.post(url, dict(name="Frank", query='twitter = "hello"'))
-        self.assertFormError(response, "form", "query", "You cannot update the query of a group that is evaluating.")
+        self.assertFormError(response, "form", "query", "You can't update the query of a group that is evaluating")
 
         # but can change the name
         response = self.client.post(url, dict(name="Frank2", query='twitter = "hola"'))
@@ -1395,30 +1529,131 @@ class ContactTest(TembaTest):
 
         # try creating a contact with a number that belongs to another contact
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__tel__0="+250781111111")
+            reverse("contacts.contact_create"),
+            {"name": "Ben Haggerty", "urn__whatsapp__0": "+250781111111"},
         )
-        self.assertFormError(response, "form", "urn__tel__0", "Used by another contact")
+        self.assertFormError(response, "form", "urn__whatsapp__0", "Used by another contact")
 
         # now repost with a unique phone number
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__tel__0="+250 783-835665")
+            reverse("contacts.contact_create"),
+            {"name": "Ben Haggerty", "urn__whatsapp__0": "+250 783-835665"},
         )
         self.assertNoFormErrors(response)
 
         # repost with the phone number of an orphaned URN
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__tel__0="+250788888888")
+            reverse("contacts.contact_create"),
+            {"name": "Ben Orphan", "urn__whatsapp__0": "+250788888888"},
         )
         self.assertNoFormErrors(response)
 
-        # check that the orphaned URN has been associated with the contact
-        self.assertEqual("Ben Haggerty", Contact.from_urn(self.org, "tel:+250788888888").name)
+        # check that the orphaned tel URN has been associated with the contact
+        self.assertEqual("Ben Orphan", Contact.from_urn(self.org, "tel:+250788888888").name)
 
         # check we display error for invalid input
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__tel__0="=")
+            reverse("contacts.contact_create"),
+            {"name": "Ben Haggerty", "urn__whatsapp__0": "="},
         )
-        self.assertFormError(response, "form", "urn__tel__0", "Invalid input")
+        self.assertFormError(response, "form", "urn__whatsapp__0", "Invalid format")
+
+        # reject creation with an empty/whitespace-only name
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            {"name": "   ", "urn__whatsapp__0": "+250788777777"},
+        )
+        self.assertFormError(response, "form", "name", "Contact name can't be empty")
+
+        # reject creation with a name longer than the configured maximum
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            {"name": "x" * 101, "urn__whatsapp__0": "+250788777777"},
+        )
+        self.assertFormError(response, "form", "name", "Contact name can't exceed 100 characters")
+
+        # reject phones that pass phonenumbers (4-digit Niue national + 3-digit country code)
+        # but fall under the 8-digit minimum, exercising validate_contact_phone in the form
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            {"name": "Niue Phone", "urn__whatsapp__0": "+6831234"},
+        )
+        self.assertFormError(response, "form", "urn__whatsapp__0", "Phone number must have at least 8 digits")
+
+        # reject creation with no name at all (empty input)
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            {"name": "", "urn__whatsapp__0": "+250788777777"},
+        )
+        self.assertFormError(response, "form", "name", "This field is required.")
+
+        # strip leading + from WhatsApp and pair a tel URN (Mailroom rejects whatsapp:+...)
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            {"name": "Fernando Luiz", "urn__whatsapp__0": "+5545991163316"},
+        )
+        self.assertNoFormErrors(response)
+        fernando = Contact.objects.get(name="Fernando Luiz")
+        self.assertEqual(
+            set(fernando.urns.values_list("identity", flat=True)),
+            {"whatsapp:5545991163316", "tel:+5545991163316"},
+        )
+        self.assertEqual(
+            mr_mocks.calls["contact_create"][-1].args[2].urns,
+            ["whatsapp:5545991163316", "tel:+5545991163316"],
+        )
+
+        # non-phone whatsapp URNs use the single-URN save path
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            {"name": "BSUID Contact", "urn__whatsapp__0": "BR.35029025746744354"},
+        )
+        self.assertNoFormErrors(response)
+        bsuid_contact = Contact.objects.get(name="BSUID Contact")
+        self.assertEqual(
+            list(bsuid_contact.urns.values_list("identity", flat=True)),
+            ["whatsapp:BR.35029025746744354"],
+        )
+
+        # reject creation when no URN field is filled in (no way to reach the contact)
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            {"name": "No Phone", "urn__whatsapp__0": ""},
+        )
+        self.assertFormError(response, "form", None, "At least one WhatsApp number or connection is required")
+
+    @mock_mailroom
+    def test_create_with_mailroom_error(self, mr_mocks):
+        mr_mocks.error("Error creating contact")
+
+        self.login(self.admin)
+
+        response = self.client.post(
+            reverse("contacts.contact_create"),
+            {"name": "Fernando Luiz", "urn__whatsapp__0": "+5545991163316"},
+        )
+
+        self.assertFormError(response, "form", None, "An error occurred creating your contact. Try again later.")
+
+    @mock_mailroom
+    def test_contact_update_name_validation(self, mr_mocks):
+        self.login(self.admin)
+
+        update_url = reverse("contacts.contact_update", args=[self.joe.id])
+
+        # reject update with empty/whitespace-only name
+        response = self.client.post(
+            update_url,
+            data=dict(name="   ", urn__tel__0="+250781111111", groups=[]),
+        )
+        self.assertFormError(response, "form", "name", "Contact name can't be empty")
+
+        # reject update with name longer than max length
+        response = self.client.post(
+            update_url,
+            data=dict(name="y" * 101, urn__tel__0="+250781111111", groups=[]),
+        )
+        self.assertFormError(response, "form", "name", "Contact name can't exceed 100 characters")
 
     @patch("temba.mailroom.client.MailroomClient.contact_modify")
     def test_block_and_stop(self, mock_contact_modify):
@@ -1850,7 +2085,7 @@ class ContactTest(TembaTest):
                 omnibox_request(query="", version="2"),
             )
 
-        with self.assertNumQueries(19):
+        with self.assertNumQueries(20):
             mock_search_contacts.side_effect = [
                 SearchResults(query="", total=2, contact_ids=[self.billy.id, self.frank.id]),
                 SearchResults(query="", total=2, contact_ids=[self.voldemort.id, self.frank.id]),
@@ -2199,7 +2434,7 @@ class ContactTest(TembaTest):
             for path, expected in kwargs.items():
                 self.assertPathValue(item, path, expected, f"item {index}")
 
-        assertHistoryEvent(history, 0, "call_started", status="E", status_display="Errored (No Answer)")
+        assertHistoryEvent(history, 0, "call_started", status="E", status_display="Error (No answer)")
         assertHistoryEvent(history, 1, "channel_event", channel_event_type="new_conversation")
         assertHistoryEvent(history, 2, "channel_event", channel_event_type="mo_miss")
         assertHistoryEvent(history, 3, "channel_event", channel_event_type="mt_miss")
@@ -2274,7 +2509,7 @@ class ContactTest(TembaTest):
         # now we'll see the message that just came in first, followed by the call event
         history = response.context["events"]
         assertHistoryEvent(history, 0, "msg_received", msg__text="Newer message")
-        assertHistoryEvent(history, 1, "call_started", status="E", status_display="Errored (No Answer)")
+        assertHistoryEvent(history, 1, "call_started", status="E", status_display="Error (No answer)")
 
         recent_start = datetime_to_timestamp(timezone.now() - timedelta(days=1))
         response = self.fetch_protected(url + "?limit=100&after=%s" % recent_start, self.admin)
@@ -2483,6 +2718,22 @@ class ContactTest(TembaTest):
         self.assertEqual(history_icon(item), '<span class="material-symbols-outlined fill">storefront</span>')
         self.assertEqual(history_class(item), "msg detail-event")
 
+    def test_urn_scheme_label(self):
+        whatsapp_phone = ContactURN(scheme=URN.WHATSAPP_SCHEME, path="5511987654321")
+        self.assertEqual(urn_scheme_label(whatsapp_phone), "whatsapp")
+
+        whatsapp_bsuid = ContactURN(scheme=URN.WHATSAPP_SCHEME, path="BR.35029025746744354")
+        self.assertEqual(urn_scheme_label(whatsapp_bsuid), "BSUID")
+
+        whatsapp_parent_bsuid = ContactURN(scheme=URN.WHATSAPP_SCHEME, path="US.ENT.11815799212886844830")
+        self.assertEqual(urn_scheme_label(whatsapp_parent_bsuid), "BSUID")
+
+        email = ContactURN(scheme=URN.EMAIL_SCHEME, path="joe@nyaruka.com")
+        self.assertEqual(urn_scheme_label(email), "Email")
+
+        tel = ContactURN(scheme=URN.TEL_SCHEME, path="+5511987654321")
+        self.assertEqual(urn_scheme_label(tel), "tel")
+
     def test_get_scheduled_messages(self):
         self.just_joe = self.create_group("Just Joe", [self.joe])
 
@@ -2526,13 +2777,13 @@ class ContactTest(TembaTest):
         # we have a field to add new urns
         response = self.fetch_protected(update_url, self.admin)
         self.assertEqual(self.joe, response.context["object"])
-        self.assertContains(response, "Add Connection")
+        self.assertContains(response, "Add connection")
 
         # no field to add new urns for anon org
         with AnonymousOrg(self.org):
             response = self.fetch_protected(update_url, self.admin)
             self.assertEqual(self.joe, response.context["object"])
-            self.assertNotContains(response, "Add Connection")
+            self.assertNotContains(response, "Add connection")
 
     @mock_mailroom
     def test_read(self, mr_mocks):
@@ -2580,6 +2831,8 @@ class ContactTest(TembaTest):
         # visit a contact detail page as a manager within the organization
         response = self.fetch_protected(read_url, self.admin)
         self.assertEqual(self.joe, response.context["object"])
+        self.assertIsNone(response.context["latest_ctwa_event"])
+        self.assertNotContains(response, 'id="contact-ctwa"')
 
         with patch("temba.orgs.models.Org.get_schemes") as mock_get_schemes:
             mock_get_schemes.return_value = []
@@ -2689,6 +2942,34 @@ class ContactTest(TembaTest):
             reverse("contacts.contact_read", args=[self.other_org_contact.uuid]), self.superuser
         )
         self.assertEqual(response.status_code, 200)
+
+    def test_read_latest_ctwa_event(self):
+        read_url = reverse("contacts.contact_read", args=[self.joe.uuid])
+        response = self.fetch_protected(read_url, self.admin)
+        self.assertIsNone(response.context["latest_ctwa_event"])
+        self.assertNotContains(response, 'id="contact-ctwa"')
+
+        source, _ = CtwaReferralSource.get_or_create_for_org(
+            self.org,
+            "120226305854810726",
+            CtwaReferralSource.SOURCE_TYPE_AD,
+            headline="Carrossel Tênis Running 30% OFF",
+            source_url="https://fb.me/2aBcDeFgHiJ",
+        )
+        CTWA.objects.create(
+            referral_source=source,
+            ctwa_clid="clid-joe",
+            channel_uuid=self.channel.uuid,
+            waba="waba-test",
+            contact_urn=self.joe.get_urn(URN.TEL_SCHEME).identity,
+            timestamp=timezone.now(),
+        )
+
+        response = self.fetch_protected(read_url, self.admin)
+        self.assertEqual(response.context["latest_ctwa_event"].ctwa_clid, "clid-joe")
+        self.assertContains(response, "Carrossel Tênis Running 30% OFF")
+        self.assertContains(response, "120226305854810726")
+        self.assertContains(response, "clid-joe")
 
     def test_read_with_customer_support(self):
         self.customer_support.is_staff = True
@@ -3222,7 +3503,7 @@ class ContactTest(TembaTest):
 
         response = self.client.post(
             reverse("contacts.contact_update", args=[self.joe.id]),
-            dict(name="Joey", new_scheme="whatsapp", new_path="5582988990000"),
+            dict(name="Joey", new_scheme="whatsapp", new_path="+5582988990000"),
         )
 
         self.assertEqual(response.status_code, 200)
@@ -3257,9 +3538,7 @@ class ContactTest(TembaTest):
             dict(language="fra", name="Muller Awesome", urn__tel__0="+250781111111", urn__twitter__1="blow80"),
         )
 
-        self.assertFormError(
-            response, "form", None, "An error occurred updating your contact. Please try again later."
-        )
+        self.assertFormError(response, "form", None, "An error occurred updating your contact. Try again later.")
 
     def test_contact_read_with_contactfields(self):
         self.login(self.admin)
@@ -3805,9 +4084,11 @@ class ContactFieldTest(TembaTest):
         self.assertEqual(contact_field(self.joe, "Not there"), "--")
 
     def test_make_key(self):
-        self.assertEqual("first_name", ContactField.make_key("First Name"))
+        self.assertEqual("first_name", ContactField.make_key("First name"))
         self.assertEqual("second_name", ContactField.make_key("Second   Name  "))
         self.assertEqual("caf", ContactField.make_key("café"))
+        self.assertEqual("first_name", ContactField.make_key("First_Name"))
+        self.assertEqual("first_name", ContactField.make_key("First-Name"))
         self.assertEqual(
             "323_ffsn_slfs_ksflskfs_fk_anfaddgas",
             ContactField.make_key("  ^%$# %$$ $##323 ffsn slfs ksflskfs!!!! fk$%%%$$$anfaDDGAS ))))))))) "),
@@ -3830,8 +4111,14 @@ class ContactFieldTest(TembaTest):
     def test_is_valid_label(self):
         self.assertTrue(ContactField.is_valid_label("Age"))
         self.assertTrue(ContactField.is_valid_label("Age Now 2"))
-        self.assertFalse(ContactField.is_valid_label("Age_Now"))  # can't have punctuation
+        self.assertTrue(ContactField.is_valid_label("Age_Now"))
+        self.assertTrue(ContactField.is_valid_label("first_name"))
+        self.assertTrue(ContactField.is_valid_label("Age_Now-2 test"))
+        self.assertTrue(ContactField.is_valid_label("a_b-c d"))
         self.assertFalse(ContactField.is_valid_label("âge"))  # a-z only
+        self.assertFalse(ContactField.is_valid_label("Age!"))  # can't have punctuation
+        self.assertFalse(ContactField.is_valid_label("field@name"))  # no special chars
+        self.assertFalse(ContactField.is_valid_label(""))  # empty
 
     @mock_mailroom
     def test_contact_export(self, mr_mocks):
@@ -3885,7 +4172,7 @@ class ContactFieldTest(TembaTest):
         blocking_export = ExportContactsTask.create(self.org, self.admin)
 
         response = self.client.post(export_url, {}, follow=True)
-        self.assertContains(response, "already an export in progress")
+        self.assertContains(response, "An export is already in progress")
 
         # ok, mark that one as finished and try again
         blocking_export.update_status(ExportContactsTask.STATUS_COMPLETE)
@@ -4641,6 +4928,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.age = ContactField.get_or_create(self.org, self.admin, "age", "Age", value_type="N", show_in_table=True)
         self.gender = ContactField.get_or_create(self.org, self.admin, "gender", "Gender", value_type="T")
         self.state = ContactField.get_or_create(self.org, self.admin, "state", "State", value_type="S")
+        self.nick_name = ContactField.get_or_create(self.org, self.admin, "nick_name", "Nick Name", value_type="T")
 
         self.deleted = ContactField.get_or_create(self.org, self.admin, "foo", "Foo")
         self.deleted.is_active = False
@@ -4672,21 +4960,38 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertCreateSubmit(
             create_url,
             {"label": "???", "value_type": "T", "show_in_table": True},
-            form_errors={"label": "Can only contain letters, numbers and hypens."},
+            form_errors={"label": "Can only contain letters, numbers, hyphens and underscores"},
         )
 
         # try to submit with something that would be an invalid key
         self.assertCreateSubmit(
             create_url,
             {"label": "UUID", "value_type": "T", "show_in_table": True},
-            form_errors={"label": "Can't be a reserved word."},
+            form_errors={"label": "Can't be a reserved word"},
         )
 
         # try to submit with name of existing field
         self.assertCreateSubmit(
             create_url,
             {"label": "AGE", "value_type": "N", "show_in_table": True},
-            form_errors={"label": "Must be unique."},
+            form_errors={"label": "Must be unique"},
+        )
+
+        # try to submit with underscore label that conflicts with existing key
+        self.assertCreateSubmit(
+            create_url,
+            {"label": "age_in_years", "value_type": "N", "show_in_table": True},
+            new_obj_query=ContactField.user_fields.filter(
+                org=self.org, label="age_in_years", value_type="N", show_in_table=True
+            ),
+            success_status=200,
+        )
+
+        # try to submit with a different label that generates a conflicting key
+        self.assertCreateSubmit(
+            create_url,
+            {"label": "age-in-years", "value_type": "N", "show_in_table": True},
+            form_errors={"label": "A field with the same generated key already exists"},
         )
 
         # submit with valid data
@@ -4716,7 +5021,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
             self.assertCreateSubmit(
                 create_url,
                 {"label": "Sheep", "value_type": "T", "show_in_table": True},
-                form_errors={"__all__": "Cannot create a new field as limit is 2."},
+                form_errors={"__all__": "Can't create a new field as the limit is 2"},
             )
 
     def test_update(self):
@@ -4746,7 +5051,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertUpdateSubmit(
             update_url,
             {"label": "???", "value_type": "N", "show_in_table": True},
-            form_errors={"label": "Can only contain letters, numbers and hypens."},
+            form_errors={"label": "Can only contain letters, numbers, hyphens and underscores"},
             object_unchanged=self.age,
         )
 
@@ -4754,9 +5059,25 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertUpdateSubmit(
             update_url,
             {"label": "GENDER", "value_type": "N", "show_in_table": True},
-            form_errors={"label": "Must be unique."},
+            form_errors={"label": "Must be unique"},
             object_unchanged=self.age,
         )
+
+        # try to submit with a label that generates a key conflicting with another field's key
+        self.assertUpdateSubmit(
+            update_url,
+            {"label": "nick_name", "value_type": "N", "show_in_table": True},
+            form_errors={"label": "A field with the same generated key already exists"},
+            object_unchanged=self.age,
+        )
+
+        # update with underscore label should work when key doesn't conflict
+        self.assertUpdateSubmit(
+            update_url, {"label": "age_value", "value_type": "N", "show_in_table": True}, success_status=200
+        )
+
+        self.age.refresh_from_db()
+        self.assertEqual("age_value", self.age.label)
 
         # submit with different name and type
         self.assertUpdateSubmit(
@@ -4781,22 +5102,25 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         list_url = reverse("contacts.contactfield_list")
 
         response = self.assertListFetch(
-            list_url, allow_viewers=False, allow_editors=True, context_objects=[self.age, self.gender, self.state]
+            list_url,
+            allow_viewers=False,
+            allow_editors=True,
+            context_objects=[self.age, self.gender, self.nick_name, self.state],
         )
-        self.assertEqual(3, response.context["total_count"])
+        self.assertEqual(4, response.context["total_count"])
         self.assertEqual(250, response.context["total_limit"])
-        self.assertNotContains(response, "You have reached the limit")
-        self.assertNotContains(response, "You are approaching the limit")
+        self.assertNotContains(response, "reached the limit")
+        self.assertNotContains(response, "approaching the limit")
 
         with override_settings(ORG_LIMIT_DEFAULTS={"fields": 10}):
             response = self.requestView(list_url, self.admin)
 
-            self.assertContains(response, "You are approaching the limit")
+            self.assertContains(response, "approaching the limit")
 
         with override_settings(ORG_LIMIT_DEFAULTS={"fields": 3}):
             response = self.requestView(list_url, self.admin)
 
-            self.assertContains(response, "You have reached the limit")
+            self.assertContains(response, "reached the limit")
 
     @mock_mailroom
     def test_usages(self, mr_mocks):
@@ -4866,8 +5190,8 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.assertDeleteFetch(delete_gender_url, allow_editors=True)
         self.assertEqual({}, response.context["soft_dependents"])
         self.assertEqual({}, response.context["hard_dependents"])
-        self.assertContains(response, "You are about to delete")
-        self.assertContains(response, "There is no way to undo this. Are you sure?")
+        self.assertContains(response, "You're about to delete")
+        self.assertContains(response, "This action can't be undone. Are you sure you want to continue?")
 
         self.assertDeleteSubmit(delete_gender_url, object_deactivated=self.gender, success_status=200)
 
@@ -4877,7 +5201,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertEqual({}, response.context["hard_dependents"])
         self.assertContains(response, "is used by the following items but can still be deleted:")
         self.assertContains(response, "Amazing Flow")
-        self.assertContains(response, "There is no way to undo this. Are you sure?")
+        self.assertContains(response, "This action can't be undone. Are you sure you want to continue?")
 
         self.assertDeleteSubmit(delete_joined_url, object_deactivated=joined_on, success_status=200)
 
@@ -4893,7 +5217,7 @@ class ContactFieldCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.assertDeleteFetch(delete_age_url, allow_editors=True)
         self.assertEqual({"flow"}, set(response.context["soft_dependents"].keys()))
         self.assertEqual({"group"}, set(response.context["hard_dependents"].keys()))
-        self.assertContains(response, "can't be deleted as it is still used by the following items:")
+        self.assertContains(response, "can't be deleted as it's still used by the following items:")
         self.assertContains(response, "Amazing Group")
         self.assertNotContains(response, "Delete")
 
@@ -4911,8 +5235,67 @@ class URNTest(TembaTest):
         self.assertFalse(URN.validate(URN.from_discord("not-a-discord-id")))
 
     def test_whatsapp_urn(self):
+        # phone-based numeric URNs
         self.assertTrue(URN.validate("whatsapp:12065551212"))
         self.assertFalse(URN.validate("whatsapp:+12065551212"))
+
+        # BSUID format: 2-letter country code + dot + optional ENT segment + alphanumeric id
+        self.assertTrue(URN.validate("whatsapp:BR.35029025746744354"))
+        self.assertTrue(URN.validate("whatsapp:IN.35029025746744354"))
+        self.assertTrue(URN.validate("whatsapp:US.12345678901234567"))
+        self.assertTrue(URN.validate("whatsapp:BR.abc123"))
+        self.assertTrue(URN.validate("whatsapp:US.ENT.11815799212886844830"))
+
+        # invalid BSUID formats
+        self.assertFalse(URN.validate("whatsapp:BR35029025746744354"))
+        self.assertFalse(URN.validate("whatsapp:BRA.35029025746744354"))
+        self.assertFalse(URN.validate("whatsapp:br.35029025746744354"))
+        self.assertFalse(URN.validate("whatsapp:.35029025746744354"))
+        self.assertFalse(URN.validate("whatsapp:BR."))
+        self.assertFalse(URN.validate("whatsapp:US.ENT."))
+
+        # normalize preserves BSUID and strips + from WhatsApp phone paths
+        self.assertEqual(URN.normalize("whatsapp:BR.35029025746744354"), "whatsapp:BR.35029025746744354")
+        self.assertEqual(URN.normalize("whatsapp:12065551212"), "whatsapp:12065551212")
+        self.assertEqual(URN.normalize("whatsapp:+12065551212", "US"), "whatsapp:12065551212")
+        self.assertEqual(URN.normalize("whatsapp:86982810225", "BR"), "whatsapp:86982810225")
+        self.assertEqual(URN.normalize("tel:86982810225", "BR"), "tel:+86982810225")
+
+        # format returns BSUID path as-is (no phone formatting)
+        self.assertEqual(URN.format("whatsapp:BR.35029025746744354"), "BR.35029025746744354")
+        self.assertEqual(URN.format("whatsapp:US.ENT.11815799212886844830"), "US.ENT.11815799212886844830")
+
+        self.assertTrue(URN.is_whatsapp_bsuid_path("BR.35029025746744354"))
+        self.assertTrue(URN.is_whatsapp_bsuid_path("US.ENT.11815799212886844830"))
+        self.assertFalse(URN.is_whatsapp_bsuid_path("5511987654321"))
+
+    def test_phone_scheme_inference(self):
+        self.assertFalse(URN.looks_like_phone(12065551212))
+        self.assertTrue(URN.is_phone_based_path("11987654321"))
+        self.assertFalse(URN.is_phone_based_path("BR.35029025746744354"))
+        self.assertFalse(URN.is_phone_based_path("US.ENT.11815799212886844830"))
+        self.assertEqual(
+            URN.paired_phone_urns("86982810225", "BR"),
+            ["whatsapp:86982810225", "tel:+86982810225"],
+        )
+        self.assertEqual(
+            URN.paired_phone_urns("+5545991163316", "BR"),
+            ["whatsapp:5545991163316", "tel:+5545991163316"],
+        )
+        self.assertTrue(URN.looks_like_phone("+12065551212", "US"))
+        self.assertTrue(URN.looks_like_phone("0788 123 123", "RW"))
+        self.assertFalse(URN.looks_like_phone("tel:+12065551212", "US"))
+        self.assertFalse(URN.looks_like_phone("twitter:jean"))
+        self.assertFalse(URN.looks_like_phone("BR.35029025746744354"))
+        self.assertFalse(URN.looks_like_phone("12345", "RW"))
+
+        self.assertEqual(URN.ensure_scheme("+12065551212", "US"), "whatsapp:12065551212")
+        self.assertEqual(URN.ensure_scheme("tel:+12065551212", "US"), "tel:+12065551212")
+        self.assertEqual(URN.ensure_scheme("whatsapp:+12065551212", "US"), "whatsapp:+12065551212")
+        self.assertEqual(URN.ensure_scheme("twitter:jean", "US"), "twitter:jean")
+        self.assertRaises(ValueError, URN.ensure_scheme, "12345", "RW")
+
+        self.assertEqual(URN.from_whatsapp("12065551212"), "whatsapp:12065551212")
 
     def test_freshchat_urn(self):
         self.assertTrue(
@@ -5378,7 +5761,7 @@ class ESIntegrationTest(TembaNonAtomicTest):
 class ContactImportTest(TembaTest):
     def test_parse_errors(self):
         # try to open an import that is completely empty
-        with self.assertRaisesRegexp(ValidationError, "Import file appears to be empty."):
+        with self.assertRaisesRegexp(ValidationError, "Import file appears to be empty"):
             ContactImport.try_to_parse(self.org, io.BytesIO(b""), "foo.csv")
 
         def try_to_parse(name):
@@ -5388,28 +5771,99 @@ class ContactImportTest(TembaTest):
 
         # try to open an import that exceeds the record limit
         with patch("temba.contacts.models.ContactImport.MAX_RECORDS", 2):
-            with self.assertRaisesRegexp(ValidationError, r"Import files can contain a maximum of 2 records\."):
+            with self.assertRaisesRegexp(ValidationError, r"Import files can contain a maximum of 2 records"):
                 try_to_parse("simple.xlsx")
 
         bad_files = [
-            ("empty.csv", "Import file doesn't contain any records."),
-            ("empty_header.xls", "Import file contains an empty header."),
-            ("duplicate_urn.xlsx", "Import file contains duplicated contact URN 'tel:+250788382382'."),
+            ("empty.csv", "Import file doesn't contain any records"),
+            ("empty_header.xls", "Import file contains an empty header"),
+            ("duplicate_urn.xlsx", "Import file contains duplicated contact URN 'tel:+250788382382'"),
             (
                 "duplicate_uuid.xlsx",
-                "Import file contains duplicated contact UUID 'f519ca1f-8513-49ba-8896-22bf0420dec7'.",
+                "Import file contains duplicated contact UUID 'f519ca1f-8513-49ba-8896-22bf0420dec7'",
             ),
-            ("invalid_scheme.xlsx", "Header 'URN:XXX' is not a valid URN type."),
-            ("invalid_field_key.xlsx", "Header 'Field: #$^%' is not a valid field name."),
-            ("reserved_field_key.xlsx", "Header 'Field:id' is not a valid field name."),
-            ("no_urn_or_uuid.xlsx", "Import files must contain either UUID or a URN header."),
-            ("uuid_only.csv", "Import files must contain columns besides UUID."),
+            ("invalid_scheme.xlsx", "Header 'URN:XXX' isn't a valid URN type"),
+            ("invalid_field_key.xlsx", "Header 'Field: #$^%' isn't a valid field name"),
+            ("reserved_field_key.xlsx", "Header 'Field:id' isn't a valid field name"),
+            ("no_urn_or_uuid.xlsx", "Import files must contain either UUID or a URN header"),
+            ("uuid_only.csv", "Import files must contain columns besides UUID"),
         ]
 
         for imp_file, imp_error in bad_files:
             with self.assertRaises(ValidationError, msg=f"expected error in {imp_file}") as e:
                 try_to_parse(imp_file)
             self.assertEqual(imp_error, e.exception.messages[0], f"error mismatch for {imp_file}")
+
+    def test_parse_rejects_oversized_name(self):
+        # CSV with a name column whose value exceeds the configured max length
+        long_name = "x" * 101
+        csv_content = ("URN:Tel,name\n" f"+250788111111,{long_name}\n").encode("utf-8")
+
+        with self.assertRaises(ValidationError) as cm:
+            ContactImport.try_to_parse(self.org, io.BytesIO(csv_content), "import.csv")
+
+        self.assertIn(
+            "Import file contains a contact name longer than 100 characters at row 2",
+            cm.exception.messages,
+        )
+
+    def test_parse_allows_blank_name(self):
+        # blank name values mean "leave unchanged" so they should not fail
+        csv_content = ("URN:Tel,name\n" "+250788111111,\n").encode("utf-8")
+
+        mappings, num_records = ContactImport.try_to_parse(self.org, io.BytesIO(csv_content), "import.csv")
+
+        self.assertEqual(1, num_records)
+        self.assertEqual(
+            [
+                {"header": "URN:Tel", "mapping": {"type": "scheme", "scheme": "tel"}},
+                {"header": "name", "mapping": {"type": "attribute", "name": "name"}},
+            ],
+            mappings,
+        )
+
+    def test_parse_maps_phone_columns_to_whatsapp(self):
+        csv_content = "Phone,name\n+250788111111,Jean\n".encode("utf-8")
+
+        mappings, num_records = ContactImport.try_to_parse(self.org, io.BytesIO(csv_content), "import.csv")
+
+        self.assertEqual(1, num_records)
+        self.assertEqual(
+            [
+                {"header": "Phone", "mapping": {"type": "scheme", "scheme": "whatsapp"}},
+                {"header": "name", "mapping": {"type": "attribute", "name": "name"}},
+            ],
+            mappings,
+        )
+
+    def test_row_to_spec_uses_whatsapp_for_phone_columns(self):
+        imp = ContactImport(
+            org=self.org,
+            created_by=self.admin,
+            mappings=[
+                {"header": "Phone", "mapping": {"type": "scheme", "scheme": "whatsapp"}},
+                {"header": "name", "mapping": {"type": "attribute", "name": "name"}},
+            ],
+        )
+
+        spec = imp._row_to_spec(["0788 111 111", "Jean"])
+
+        self.assertEqual(["whatsapp:250788111111"], spec["urns"])
+        self.assertEqual("Jean", spec["name"])
+
+    def test_row_to_spec_preserves_explicit_tel_mapping(self):
+        imp = ContactImport(
+            org=self.org,
+            created_by=self.admin,
+            mappings=[
+                {"header": "URN:Tel", "mapping": {"type": "scheme", "scheme": "tel"}},
+                {"header": "name", "mapping": {"type": "attribute", "name": "name"}},
+            ],
+        )
+
+        spec = imp._row_to_spec(["0788 111 111", "Jean"])
+
+        self.assertEqual(["tel:+250788111111"], spec["urns"])
 
     def test_extract_mappings(self):
         # try simple import in different formats
@@ -5884,7 +6338,7 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # try uploading an empty CSV file
         response = self.client.post(create_url, {"file": upload("media/test_imports/empty.csv")})
-        self.assertFormError(response, "form", "file", "Import file doesn't contain any records.")
+        self.assertFormError(response, "form", "file", "Import file doesn't contain any records")
 
         # try uploading a valid XLSX file
         response = self.client.post(create_url, {"file": upload("media/test_imports/simple.xlsx")})
@@ -5933,24 +6387,24 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # try creating new group but not providing a name
         response = self.client.post(preview_url, {"add_to_group": True, "group_mode": "N", "new_group_name": "  "})
-        self.assertFormError(response, "form", "new_group_name", "Required.")
+        self.assertFormError(response, "form", "new_group_name", "Required")
 
         # try creating new group but providing an invalid name
         response = self.client.post(preview_url, {"add_to_group": True, "group_mode": "N", "new_group_name": "????"})
-        self.assertFormError(response, "form", "new_group_name", "Invalid group name.")
+        self.assertFormError(response, "form", "new_group_name", "Invalid group name")
 
         # try creating new group but providing a name of an existing group
         response = self.client.post(
             preview_url, {"add_to_group": True, "group_mode": "N", "new_group_name": "testERs"}
         )
-        self.assertFormError(response, "form", "new_group_name", "Already exists.")
+        self.assertFormError(response, "form", "new_group_name", "Already exists")
 
         # try creating new group when we've already reached our group limit
         with override_settings(ORG_LIMIT_DEFAULTS={"groups": 2}):
             response = self.client.post(
                 preview_url, {"add_to_group": True, "group_mode": "N", "new_group_name": "Import"}
             )
-            self.assertFormError(response, "form", "__all__", "This workspace has reached the limit of 2 groups.")
+            self.assertFormError(response, "form", "__all__", "This workspace has reached the limit of 2 groups")
 
         # finally create new group...
         response = self.client.post(preview_url, {"add_to_group": True, "group_mode": "N", "new_group_name": "Import"})
@@ -5979,7 +6433,7 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # try submitting without group
         response = self.client.post(preview_url, {"add_to_group": True, "group_mode": "E", "existing_group": ""})
-        self.assertFormError(response, "form", "existing_group", "Required.")
+        self.assertFormError(response, "form", "existing_group", "Required")
 
         # finally try with actual group...
         response = self.client.post(
@@ -6029,7 +6483,7 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
             },
         )
         self.assertEqual(1, len(response.context["form"].errors))
-        self.assertFormError(response, "form", "__all__", "Field name for 'Field:Sheep' matches an existing field.")
+        self.assertFormError(response, "form", "__all__", "Field name for 'Field:Sheep' matches an existing field")
 
         # if including a new fields, can't repeat names
         response = self.client.post(
@@ -6045,7 +6499,7 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
             },
         )
         self.assertEqual(1, len(response.context["form"].errors))
-        self.assertFormError(response, "form", "__all__", "Field name 'goats' is repeated.")
+        self.assertFormError(response, "form", "__all__", "Field name 'goats' is repeated")
 
         # if including a new field, name can't be invalid
         response = self.client.post(
@@ -6061,9 +6515,7 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
             },
         )
         self.assertEqual(1, len(response.context["form"].errors))
-        self.assertFormError(
-            response, "form", "__all__", "Field name for 'Field:Sheep' is invalid or a reserved word."
-        )
+        self.assertFormError(response, "form", "__all__", "Field name for 'Field:Sheep' is invalid or a reserved word")
 
         # or empty
         response = self.client.post(
@@ -6079,7 +6531,7 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
             },
         )
         self.assertEqual(1, len(response.context["form"].errors))
-        self.assertFormError(response, "form", "__all__", "Field name for 'Field:Sheep' can't be empty.")
+        self.assertFormError(response, "form", "__all__", "Field name for 'Field:Sheep' can't be empty")
 
         # unless you're ignoring it
         response = self.client.post(
@@ -6122,3 +6574,211 @@ class ContactImportCRUDLTest(TembaTest, CRUDLTestMixin):
         read_url = reverse("contacts.contactimport_read", args=[imp.id])
 
         self.assertReadFetch(read_url, allow_viewers=True, allow_editors=True, context_object=imp)
+
+
+class ExportContactsByStatusNoGroupTest(TembaTest):
+    def test_task_success_without_group_memberships(self):
+        from temba.contacts.models import ExportContactsTask
+        from temba.contacts.tasks import export_contacts_by_status_task
+        from temba.msgs.models import Msg
+        from unittest.mock import Mock, patch
+
+        c1 = self.create_contact("NoGroup", urns=["tel:+12025550003"])
+        bcast = self.create_broadcast(self.admin, "ping", contacts=[c1])
+        bcast.msgs.update(status=Msg.STATUS_DELIVERED)
+
+        export = ExportContactsTask.create(self.org, self.admin, group=None, search=None, group_memberships=())
+
+        with patch("temba.contacts.tasks.get_asset_store") as mock_get_store, self.mockReadOnly():
+            mock_store = Mock()
+            mock_store.save.return_value = None
+            mock_get_store.return_value = mock_store
+
+            export_contacts_by_status_task(export.id, bcast.id, Msg.STATUS_DELIVERED)
+
+        export.refresh_from_db()
+        self.assertEqual(ExportContactsTask.STATUS_COMPLETE, export.status)
+
+
+class ExportContactsTaskFunctionTest(TembaTest):
+    def test_export_contacts_task_calls_perform(self):
+        from temba.contacts.models import ExportContactsTask
+        from temba.contacts.tasks import export_contacts_task
+        from unittest.mock import patch
+
+        export = ExportContactsTask.create(self.org, self.admin, group=None, search=None, group_memberships=())
+        with patch.object(ExportContactsTask, "perform") as mock_perform:
+            export_contacts_task(export.id)
+            mock_perform.assert_called_once()
+
+
+class ExportContactsByStatusTaskTest(TembaTest):
+    def _make_broadcast_with_contacts(self):
+        main = self.create_contact("Main", urns=["tel:+12025550000"])
+        c1 = self.create_contact("Alice", urns=["tel:+12025550001"])
+        c2 = self.create_contact("Bob", urns=["tel:+12025550002"])
+        bcast = self.create_broadcast(self.admin, "hi", contacts=[main, c1, c2])
+        # mark only c1 and c2 as delivered to match status filter
+        bcast.msgs.filter(contact_id__in=[c1.id, c2.id]).update(status=Msg.STATUS_DELIVERED)
+        return bcast, [c1, c2]
+
+    def test_task_success_creates_asset_and_notifies(self):
+        from temba.contacts.models import ExportContactsTask
+        from temba.contacts.tasks import export_contacts_by_status_task
+        from temba.notifications.models import Notification
+        from unittest.mock import Mock
+
+        bcast, delivered = self._make_broadcast_with_contacts()
+
+        # include group memberships to cover that branch in writer
+        group = self.create_group("Members", contacts=[delivered[0]])
+        export = ExportContactsTask.create(self.org, self.admin, group=None, search=None, group_memberships=(group,))
+
+        with patch("temba.contacts.tasks.get_asset_store") as mock_get_store, patch.object(
+            Notification, "export_finished"
+        ) as mock_notify, self.mockReadOnly():
+            mock_store = Mock()
+            mock_store.save.return_value = None
+            mock_get_store.return_value = mock_store
+
+            export_contacts_by_status_task(export.id, bcast.id, Msg.STATUS_DELIVERED)
+
+        export.refresh_from_db()
+        self.assertEqual(ExportContactsTask.STATUS_COMPLETE, export.status)
+        mock_notify.assert_called_once_with(export)
+
+        # download URL should resolve from asset store
+        url = export.get_download_url()
+        self.assertTrue(url and isinstance(url, str))
+
+    def test_task_handles_missing_export(self):
+        from temba.contacts.tasks import export_contacts_by_status_task
+
+        # should no-op without raising
+        export_contacts_by_status_task(999999, 1, Msg.STATUS_DELIVERED)
+
+    def test_task_failure_sets_failed_status(self):
+        from temba.contacts.models import ExportContactsTask
+        from temba.contacts.tasks import export_contacts_by_status_task
+        from unittest.mock import Mock
+
+        bcast, _ = self._make_broadcast_with_contacts()
+        export = ExportContactsTask.create(self.org, self.admin, group=None, search=None, group_memberships=())
+
+        # force failure on asset save
+        with patch("temba.contacts.tasks.get_asset_store") as mock_get_store, self.mockReadOnly():
+            mock_store = Mock()
+            mock_store.save.side_effect = RuntimeError("boom")
+            mock_get_store.return_value = mock_store
+
+            export_contacts_by_status_task(export.id, bcast.id, Msg.STATUS_DELIVERED)
+
+        export.refresh_from_db()
+        self.assertEqual(ExportContactsTask.STATUS_FAILED, export.status)
+
+
+class ContactNameValidatorTest(TembaTest):
+    """
+    Tests for the centralized contact name validator used at every entry point that
+    accepts a contact name (public API, internal API, UI form, file import).
+    """
+
+    def test_clean_contact_name_accepts_none(self):
+        from temba.contacts.validators import clean_contact_name
+
+        self.assertIsNone(clean_contact_name(None))
+
+    def test_clean_contact_name_trims_whitespace(self):
+        from temba.contacts.validators import clean_contact_name
+
+        self.assertEqual("Joe Blow", clean_contact_name("  Joe Blow  "))
+
+    def test_clean_contact_name_rejects_empty_string(self):
+        from temba.contacts.validators import clean_contact_name
+
+        with self.assertRaises(ValidationError) as cm:
+            clean_contact_name("")
+        self.assertIn("Contact name can't be empty", cm.exception.messages)
+
+    def test_clean_contact_name_rejects_whitespace_only(self):
+        from temba.contacts.validators import clean_contact_name
+
+        with self.assertRaises(ValidationError) as cm:
+            clean_contact_name("   ")
+        self.assertIn("Contact name can't be empty", cm.exception.messages)
+
+    def test_clean_contact_name_accepts_max_length(self):
+        from temba.contacts.validators import CONTACT_NAME_MAX_LEN, clean_contact_name
+
+        name = "x" * CONTACT_NAME_MAX_LEN
+        self.assertEqual(name, clean_contact_name(name))
+
+    def test_clean_contact_name_rejects_too_long(self):
+        from temba.contacts.validators import CONTACT_NAME_MAX_LEN, clean_contact_name
+
+        with self.assertRaises(ValidationError) as cm:
+            clean_contact_name("x" * (CONTACT_NAME_MAX_LEN + 1))
+        self.assertIn(f"Contact name can't exceed {CONTACT_NAME_MAX_LEN} characters", cm.exception.messages)
+
+    def test_clean_contact_name_rejects_non_string(self):
+        from temba.contacts.validators import clean_contact_name
+
+        with self.assertRaises(ValidationError):
+            clean_contact_name(123)
+
+
+class ContactPhoneValidatorTest(TembaTest):
+    """
+    Tests for the centralized contact phone validator used at every entry point that
+    accepts a phone (public API, internal API, UI form, file import).
+    """
+
+    def test_validate_contact_phone_accepts_none(self):
+        from temba.contacts.validators import validate_contact_phone
+
+        self.assertIsNone(validate_contact_phone(None))
+
+    def test_validate_contact_phone_accepts_min_digits(self):
+        from temba.contacts.validators import CONTACT_PHONE_MIN_DIGITS, validate_contact_phone
+
+        digits = "5" * CONTACT_PHONE_MIN_DIGITS
+        self.assertEqual(digits, validate_contact_phone(digits))
+
+    def test_validate_contact_phone_accepts_max_digits(self):
+        from temba.contacts.validators import CONTACT_PHONE_MAX_DIGITS, validate_contact_phone
+
+        number = "+" + ("5" * CONTACT_PHONE_MAX_DIGITS)
+        self.assertEqual(number, validate_contact_phone(number))
+
+    def test_validate_contact_phone_ignores_plus_and_formatting(self):
+        from temba.contacts.validators import validate_contact_phone
+
+        # 13 digits, comfortably between 8 and 15
+        formatted = "+55 (11) 99999-9999"
+        self.assertEqual(formatted, validate_contact_phone(formatted))
+
+    def test_validate_contact_phone_rejects_too_short(self):
+        from temba.contacts.validators import CONTACT_PHONE_MIN_DIGITS, validate_contact_phone
+
+        with self.assertRaises(ValidationError) as cm:
+            validate_contact_phone("+" + ("5" * (CONTACT_PHONE_MIN_DIGITS - 1)))
+        self.assertIn(f"Phone number must have at least {CONTACT_PHONE_MIN_DIGITS} digits", cm.exception.messages)
+
+    def test_validate_contact_phone_rejects_too_long(self):
+        from temba.contacts.validators import CONTACT_PHONE_MAX_DIGITS, validate_contact_phone
+
+        with self.assertRaises(ValidationError) as cm:
+            validate_contact_phone("+" + ("5" * (CONTACT_PHONE_MAX_DIGITS + 1)))
+        self.assertIn(f"Phone number can't exceed {CONTACT_PHONE_MAX_DIGITS} digits", cm.exception.messages)
+
+    def test_validate_contact_phone_rejects_non_string(self):
+        from temba.contacts.validators import validate_contact_phone
+
+        with self.assertRaises(ValidationError):
+            validate_contact_phone(5511999999999)
+
+    def test_validate_contact_phone_rejects_no_digits(self):
+        from temba.contacts.validators import validate_contact_phone
+
+        with self.assertRaises(ValidationError):
+            validate_contact_phone("not a phone")

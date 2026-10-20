@@ -19,8 +19,7 @@ class ChikkaType(ChannelType):
     name = "Chikka"
 
     claim_blurb = _(
-        "If you are based in the Phillipines, you can integrate with Chikka to send and receive "
-        "messages on your short code."
+        "If you're based in the Philippines, you can integrate with Chikka to send and receive messages on your short code."
     )
     claim_view = ClaimView
 
@@ -29,17 +28,16 @@ class ChikkaType(ChannelType):
     attachment_support = False
 
     configuration_blurb = _(
-        "To finish configuring your Chikka connection you need to set the following URLs in your "
-        "Chikka account API settings."
+        "To finish configuring your Chikka connection, you'll need to set the following URLs in your Chikka account API settings."
     )
 
     configuration_urls = (
         dict(
-            label=_("Notification Receiver URL"),
+            label=_("Notification receiver URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.ck' channel.uuid %}",
         ),
         dict(
-            label=_("Message Receiver URL"),
+            label=_("Message receiver URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.ck' channel.uuid %}",
         ),
     )

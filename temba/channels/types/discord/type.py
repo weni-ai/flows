@@ -21,10 +21,7 @@ class DiscordType(ChannelType):
     show_config_page = False
 
     claim_blurb = _(
-        "Add a %(link)s bot to send messages to Discord users for free. "
-        "Your users will need a Discord account and a compatible device to send/recieve messages. "
-        "This channel type is only available if your instance has been "
-        "configured with the Discord proxy application, available %(proxy_link)s."
+        "Add a %(link)s bot to send messages to Discord users for free. Your users will need a Discord account and a compatible device to send and receive messages. This channel type is only available if your instance has been configured with the Discord proxy application, available %(proxy_link)s."
         % {
             "link": '<a href="https://discord.com/">Discord</a>',
             "proxy_link": '<a href="https://github.com/releaseplatform/RapidPro-Discord-Proxy">here</a>',

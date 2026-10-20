@@ -12,13 +12,13 @@ from ...views import ClaimViewMixin
 class ClaimView(ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
         channel_id = forms.CharField(
-            label=_("Channel ID"), required=True, help_text=_("The Channel ID of the LINE channel for the Bot")
+            label=_("Channel ID"), required=True, help_text=_("The channel ID of the LINE channel for the bot")
         )
-        name = forms.CharField(label=_("Name"), required=True, help_text=_("The Name of the Bot"))
+        name = forms.CharField(label=_("Name"), required=True, help_text=_("The name of the bot"))
         access_token = forms.CharField(
-            label=_("Access Token"), required=True, help_text=_("The Access Token of the LINE Bot")
+            label=_("Access token"), required=True, help_text=_("The access token of the LINE bot")
         )
-        secret = forms.CharField(label=_("Secret"), required=True, help_text=_("The Secret of the LINE Bot"))
+        secret = forms.CharField(label=_("Secret"), required=True, help_text=_("The secret of the LINE bot"))
 
         def clean(self):
             access_token = self.cleaned_data.get("access_token")

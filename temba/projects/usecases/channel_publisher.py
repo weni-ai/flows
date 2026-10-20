@@ -1,0 +1,18 @@
+from temba.channels.models import Channel
+from temba.event_driven.publisher.rabbitmq_publisher import RabbitmqPublisher
+
+
+def publish_channel_event(channel: Channel, action: str):
+    rabbitmq_publisher = RabbitmqPublisher()
+
+    rabbitmq_publisher.send_message(
+        body=dict(
+            action=action,
+            uuid=str(channel.uuid),
+            project_uuid=str(channel.org.proj_uuid),
+            channel_type=channel.channel_type,
+            is_live_desk_copilot=bool((channel.config or {}).get("is_live_desk_copilot")),
+        ),
+        exchange="channel-events.topic",
+        routing_key="wwc-create",
+    )

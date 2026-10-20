@@ -15,7 +15,9 @@ from .type import TeamsType
 logger = logging.getLogger(__name__)
 
 
-@shared_task(track_started=True, name="refresh_teams_tokens")
+@shared_task(
+    track_started=True, name="refresh_teams_tokens", autoretry_for=(Exception,), max_retries=3, retry_backoff=True
+)
 def refresh_teams_tokens():
     r = get_redis_connection()
     if r.get("refresh_teams_tokens"):  # pragma: no cover
@@ -24,7 +26,10 @@ def refresh_teams_tokens():
         # iterate across each of our teams channels and get a new token
         for channel in Channel.objects.filter(is_active=True, channel_type="TM").order_by("id"):
             try:
-                url = "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token"
+                if channel.config.get("version") == "v2":
+                    url = f"https://login.microsoftonline.com/{channel.config[TeamsType.CONFIG_TEAMS_TENANT_ID]}/oauth2/v2.0/token"
+                else:
+                    url = "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token"
 
                 request_body = {
                     "client_id": channel.config[TeamsType.CONFIG_TEAMS_APPLICATION_ID],

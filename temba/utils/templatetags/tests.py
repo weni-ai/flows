@@ -14,7 +14,7 @@ class TembaTagLibraryTest(TembaTest):
         self.assertEqual("Flows", verbose_name_plural(flow))
         self.assertEqual("Groups", verbose_name_plural(group))
         self.assertEqual("Campaigns", verbose_name_plural(Campaign()))
-        self.assertEqual("Campaign Events", verbose_name_plural(CampaignEvent()))
+        self.assertEqual("Campaign events", verbose_name_plural(CampaignEvent()))
 
     def test_object_url(self):
         flow = self.create_flow()

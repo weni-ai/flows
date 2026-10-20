@@ -6,12 +6,12 @@
 {% trans "Someone has requested that the password for this email address be reset." %}
 
 {% blocktrans trimmed with email=user.username  %}
-Clicking on the following link will allow you to reset the password for the account {{ email }}:
+Click the following link to reset the password for the account {{ email }}:
 {% endblocktrans %}
 
 {{ branding.link }}{{ path }}
 
-{% trans "If you did not request this, don't worry, this email has only been sent to you and your account remains secure." %}
+{% trans "If you didn't request this, don't worry. This email was only sent to you and your account remains secure." %}
 
-{% trans "Thank you. Please do not reply to this email." %}
+{% trans "Thank you. Don't reply to this email." %}
 {% endblock body %}

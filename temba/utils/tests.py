@@ -13,6 +13,7 @@ import intercom.errors
 import pytz
 from django_redis import get_redis_connection
 from openpyxl import load_workbook
+from redis.exceptions import LockNotOwnedError
 from smartmin.tests import SmartminTest
 
 from django.conf import settings
@@ -325,8 +326,9 @@ class TemplateTagTest(TembaTest):
 
             # date without timezone
             test_date = datetime.datetime.now()
-            modified_now = test_date.replace(hour=17, minute=5)
+            modified_now = test_date.replace(hour=17, minute=5, second=30)
             self.assertEqual("19:05", short_datetime(context, modified_now))
+            self.assertEqual("19:05:30", short_datetime(context, modified_now, seconds=True))
 
             # given the time as now, should display as 24 hour time
             now = timezone.now()
@@ -351,8 +353,9 @@ class TemplateTagTest(TembaTest):
 
             # given the time as now, should display "Hour:Minutes AM|PM" eg. "5:05 pm"
             now = timezone.now()
-            modified_now = now.replace(hour=17, minute=5)
+            modified_now = now.replace(hour=17, minute=5, second=30)
             self.assertEqual("7:05 pm", short_datetime(context, modified_now))
+            self.assertEqual("7:05:30 pm", short_datetime(context, modified_now, seconds=True))
 
             # given the time beyond 12 hours ago within the same month, should display "MonthName DayOfMonth" eg. "Jan 2"
             test_date = now.replace(day=2)
@@ -717,6 +720,25 @@ class CeleryTest(TembaTest):
         self.assertEqual(mock_redis_lock.call_count, 0)
         self.assertEqual(task_calls, ["1-11-12", "2-21-22", "3-31-32"])
 
+    @patch("redis.client.StrictRedis.lock")
+    @patch("redis.client.StrictRedis.get")
+    def test_nonoverlapping_task_lock_expired_on_release(self, mock_redis_get, mock_redis_lock):
+        mock_redis_get.return_value = None
+        task_calls = []
+
+        mock_lock = MagicMock()
+        mock_lock.__enter__ = MagicMock(return_value=mock_lock)
+        mock_lock.__exit__ = MagicMock(side_effect=LockNotOwnedError("Cannot release a lock that's no longer owned"))
+        mock_redis_lock.return_value = mock_lock
+
+        @nonoverlapping_task()
+        def test_task(foo, bar):
+            task_calls.append("called")
+
+        test_task(1, 2)
+
+        self.assertEqual(task_calls, ["called"])
+
 
 class ModelsTest(TembaTest):
     def test_require_update_fields(self):
@@ -890,7 +912,7 @@ class MiddlewareTest(TembaTest):
 
         # can be overridden in Django settings
         with override_settings(DEFAULT_LANGUAGE="es"):
-            assert_text("Cree visualmente aplicaciones móviles")
+            assert_text("Crea visualmente aplicaciones móviles")
 
         # if we have an authenticated user, their setting takes priority
         self.login(self.admin)
@@ -1752,14 +1774,14 @@ class RedactTest(TestCase):
 class TestValidators(TestCase):
     def test_validate_external_url(self):
         cases = (
-            dict(url="ftp://google.com", error="Must use HTTP or HTTPS."),
-            dict(url="http://localhost/foo", error="Cannot be a local or private host."),
-            dict(url="http://localhost:80/foo", error="Cannot be a local or private host."),
-            dict(url="http://127.0.00.1/foo", error="Cannot be a local or private host."),  # loop back
-            dict(url="http://192.168.0.0/foo", error="Cannot be a local or private host."),  # private
-            dict(url="http://255.255.255.255", error="Cannot be a local or private host."),  # multicast
-            dict(url="http://169.254.169.254/latest", error="Cannot be a local or private host."),  # link local
-            dict(url="http://::1:80/foo", error="Unable to resolve host."),  # no ipv6 addresses for now
+            dict(url="ftp://google.com", error="Must use HTTP or HTTPS"),
+            dict(url="http://localhost/foo", error="Can't be a local or private host"),
+            dict(url="http://localhost:80/foo", error="Can't be a local or private host"),
+            dict(url="http://127.0.00.1/foo", error="Can't be a local or private host"),  # loop back
+            dict(url="http://192.168.0.0/foo", error="Can't be a local or private host"),  # private
+            dict(url="http://255.255.255.255", error="Can't be a local or private host"),  # multicast
+            dict(url="http://169.254.169.254/latest", error="Can't be a local or private host"),  # link local
+            dict(url="http://::1:80/foo", error="Couldn't resolve host"),  # no ipv6 addresses for now
             dict(url="http://google.com/foo", error=None),
             dict(url="http://google.com:8000/foo", error=None),
             dict(url="HTTP://google.com:8000/foo", error=None),

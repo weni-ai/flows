@@ -15,6 +15,11 @@ from temba.channels.models import Channel
 from temba.contacts.models import URN, Contact, ContactURN
 from temba.request_logs.models import HTTPLog
 from temba.templates.models import Template, TemplateButton, TemplateHeader, TemplateTranslation
+from temba.templates.parameter_format import (
+    extract_parameter_names_from_components,
+    has_placeholders,
+    normalize_parameter_format,
+)
 from temba.utils import chunk_list
 from temba.wpp_products.models import Catalog, Product
 
@@ -123,12 +128,25 @@ def update_template_status(value, template):
         return True
 
 
+def update_template_category(value, template_id):
+    """Updates a template's category based on a completed category change webhook."""
+    previous_category = value.get("previous_category")
+    if not previous_category:
+        return
+
+    new_category = value.get("new_category")
+    template_object = Template.objects.get(id=template_id)
+    template_object.category = new_category
+    template_object.modified_on = timezone.now()
+    template_object.save(update_fields=["category", "modified_on"])
+
+
 def process_event(field, value, template):
     if field == "message_template_status_update":
         update_template_status(value, template)
 
     elif field == "template_category_update":
-        pass
+        update_template_category(value, template)
 
     elif field == "message_template_quality_update":
         pass
@@ -137,6 +155,7 @@ def process_event(field, value, template):
 def update_template_sync(template_id, webhook):
     allowed_event_types = [
         "message_template_status_update",
+        "template_category_update",
     ]
 
     for entry in webhook["entry"]:
@@ -176,7 +195,7 @@ def update_local_templates(channel, templates_data, unique=False):
             if "text" not in component:
                 continue
 
-            if component["type"] in ["HEADER", "FOOTER"] and _calculate_variable_count(component["text"]):
+            if component["type"] in ["HEADER", "FOOTER"] and has_placeholders(component.get("text")):
                 all_supported = False
 
             # collect component texts
@@ -191,7 +210,11 @@ def update_local_templates(channel, templates_data, unique=False):
             continue
 
         content = "\n\n".join(content_parts)
-        variable_count = _calculate_variable_count(content)
+        parameter_format = normalize_parameter_format(template.get("parameter_format"))
+        parameter_names = (
+            extract_parameter_names_from_components(template.get("components")) if parameter_format == "named" else []
+        )
+        variable_count = len(parameter_names) if parameter_format == "named" else _calculate_variable_count(content)
 
         language, country = LANGUAGE_MAPPING.get(template["language"], (None, None))
 
@@ -214,6 +237,8 @@ def update_local_templates(channel, templates_data, unique=False):
             category=template["category"],
             body=body_text,
             footer=footer_text,
+            parameter_format=parameter_format,
+            parameter_names=parameter_names,
         )
 
         for component in template["components"]:

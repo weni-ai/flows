@@ -29,8 +29,7 @@ from .client import Client, ClientError
 
 class ConnectView(BaseConnectView):
     form_blurb = _(
-        "Enter your Zendesk subdomain. You will be redirected to Zendesk where you need to grant access to this "
-        "application."
+        "Enter your Zendesk subdomain. You'll be redirected to Zendesk, where you'll need to grant access to this application."
     )
 
     class Form(BaseConnectView.Form):
@@ -40,14 +39,17 @@ class ConnectView(BaseConnectView):
             from .type import ZendeskType
 
             org = self.request.user.get_org()
-            data = self.cleaned_data["subdomain"]
+            # Zendesk subdomains are case-insensitive on Zendesk's side but our lookups against
+            # the Ticketer JSON config are case-sensitive, so we normalize on input to avoid
+            # case-mismatch bugs at the channel-account validation step.
+            data = self.cleaned_data["subdomain"].strip().lower()
 
-            if not re.match(r"^[\w\-]+", data):
-                raise forms.ValidationError(_("Not a valid subdomain name."))
+            if not re.match(r"^[\w\-]+$", data):
+                raise forms.ValidationError(_("Not a valid subdomain name"))
 
             for_domain = org.ticketers.filter(is_active=True, ticketer_type=ZendeskType.slug, config__subdomain=data)
             if for_domain.exists():
-                raise forms.ValidationError(_("There is already a ticketing service configured for this subdomain."))
+                raise forms.ValidationError(_("A ticketing service configured for this subdomain already exists"))
 
             return data
 
@@ -89,14 +91,16 @@ class ConnectView(BaseConnectView):
         from .type import ZendeskType
 
         code = request.GET["code"]
-        subdomain = request.GET["state"]
+        # state is round-tripped through Zendesk; normalize to keep the stored config
+        # consistent with what Zendesk itself will POST back to the admin UI later.
+        subdomain = request.GET["state"].strip().lower()
         client = Client(subdomain)
         try:
             access_token = client.get_oauth_token(
                 settings.ZENDESK_CLIENT_ID, settings.ZENDESK_CLIENT_SECRET, code, self.get_absolute_url()
             )
         except ClientError:
-            messages.error(request, _("Unable to request OAuth token."))
+            messages.error(request, _("Couldn't request OAuth token"))
             return super(ConnectView, self).get(request, *args, **kwargs)
 
         config = {
@@ -180,7 +184,9 @@ class AdminUIView(SmartFormView):
 
     class Form(forms.Form):
         def __init__(self, **kwargs):
-            self.subdomain = kwargs.pop("subdomain")
+            # subdomain comes from Zendesk's POST; normalize so secret lookups against the
+            # ticketer config (which is now stored lowercase) match regardless of casing.
+            self.subdomain = (kwargs.pop("subdomain") or "").strip().lower()
             super().__init__(**kwargs)
 
         name = forms.CharField(
@@ -210,7 +216,7 @@ class AdminUIView(SmartFormView):
                 ticketer_type=ZendeskType.slug, config__subdomain=self.subdomain, config__secret=data, is_active=True
             )
             if not ticketers.exists():
-                raise forms.ValidationError(_("Secret is incorrect."))
+                raise forms.ValidationError(_("Secret is incorrect"))
 
             return data
 
@@ -274,7 +280,7 @@ class AdminUIView(SmartFormView):
     def form_valid(self, form):
         from .type import ZendeskType
 
-        subdomain = form.cleaned_data["subdomain"]
+        subdomain = (form.cleaned_data["subdomain"] or "").strip().lower()
         secret = form.cleaned_data["secret"]
 
         ticketer = Ticketer.objects.get(

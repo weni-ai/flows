@@ -11,7 +11,7 @@ from temba.utils.uuid import uuid4
 
 class ConnectView(BaseConnectView):
     class Form(BaseConnectView.Form):
-        project_auth = forms.CharField(label=_("Project Auth"), help_text=_("Project Auth"))
+        project_auth = forms.CharField(label=_("Project auth"), help_text=_("Project auth"))
         sector_uuid = forms.CharField(label=_("Sector UUID"), help_text=_("Sector UUID"))
 
         def clean(self):
@@ -29,8 +29,12 @@ class ConnectView(BaseConnectView):
 
             if existing:
                 if existing.org_id == self.request.user.get_org().id:
-                    raise ValidationError(_("A Weni Chats ticketer for this sector already exists in this workspace."))
-                raise ValidationError(_("A Weni Chats ticketer for this sector already exists in another workspace."))
+                    raise ValidationError(
+                        _("A Weni Chats ticketing service for this sector already exists in this workspace")
+                    )
+                raise ValidationError(
+                    _("A Weni Chats ticketing service for this sector already exists in another workspace")
+                )
 
     def form_valid(self, form):
         from .type import WeniChatsType
@@ -47,7 +51,7 @@ class ConnectView(BaseConnectView):
         if sectors_response.status_code != 200:
             raise Exception(
                 _(
-                    "This ticketer integration with Weni Chats couldn't be created, check if all fields is correct and try again."
+                    "This ticketing service integration with Weni Chats couldn't be created. Check that all fields are correct and try again."
                 )
             )
 
@@ -59,7 +63,9 @@ class ConnectView(BaseConnectView):
 
         if not current_sector:
             raise Exception(
-                _("This ticketer integration with Weni Chats couldn't be created, the defined sector not exists.")
+                _(
+                    "This ticketing service integration with Weni Chats couldn't be created. The specified sector doesn't exist."
+                )
             )
 
         config = {

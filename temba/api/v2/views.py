@@ -1,5 +1,8 @@
 import itertools
+import os
+from datetime import timedelta
 from enum import Enum
+from types import SimpleNamespace
 
 from rest_framework import generics, status, views
 from rest_framework.pagination import CursorPagination
@@ -8,14 +11,18 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from smartmin.views import SmartFormView, SmartTemplateView
+from weni_commons.kong import api_gateway_expose
+from weni_datalake_sdk.clients.redshift.events import get_events as dl_get_events
 
 from django import forms
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 
@@ -28,6 +35,7 @@ from temba.api.v2.views_base import (
     ContactsTemplateCursorPagination,
     CreatedOnCursorPagination,
     DateJoinedCursorPagination,
+    DefaultLimitOffsetPagination,
     DeleteAPIMixin,
     ListAPIMixin,
     ModifiedOnCursorPagination,
@@ -538,7 +546,7 @@ class BoundariesEndpoint(ListAPIMixin, BaseAPIView):
     pagination_class = Pagination
 
     def derive_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
         if not org.country:
             return AdminBoundary.objects.none()
 
@@ -606,9 +614,9 @@ class BroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
 
     A `POST` allows you to create and send new broadcasts, with the following JSON data:
 
-      * **text** - the text of the message to send (string, limited to 640 characters)
-      * **urns** - the URNs of contacts to send to (array of up to 100 strings, optional)
-      * **contacts** - the UUIDs of contacts to send to (array of up to 100 strings, optional)
+      * **text** - the text of the message to send (string, limited to 1500 characters)
+      * **urns** - the URNs of contacts to send to (array of up to 1000 strings, optional)
+      * **contacts** - the UUIDs of contacts to send to (array of up to 1000 strings, optional)
       * **groups** - the UUIDs of contact groups to send to (array of up to 100 strings, optional)
 
     Example:
@@ -640,7 +648,7 @@ class BroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     throttle_scope = "v2.broadcasts"
 
     def filter_queryset(self, queryset):
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         queryset = queryset.filter(broadcast_type=Broadcast.BROADCAST_TYPE_DEFAULT)
 
@@ -699,6 +707,7 @@ class BroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
         }
 
 
+@method_decorator(transaction.non_atomic_requests, name="dispatch")
 class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     """
     This endpoint allows you to send new whatsapp message broadcasts and list existing broadcasts in your account.
@@ -732,10 +741,10 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "groups": [],
                     "created_on": "2013-03-02T17:28:12.123456Z".
                     "metadata": {
-                        "text": "Essa é uma mensagem de teste para @contact.name",
+                        "text": "This is a test message for @contact.name",
                         "header": {
                             "type": "text",
-                            "text": "Oi @contact.name"
+                            "text": "Hello @contact.name"
                         }
                     },
                 },
@@ -745,9 +754,10 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
 
     A `POST` allows you to create and send new broadcasts, with the following JSON data:
 
-      * **urns** - the URNs of contacts to send to (array of up to 100 strings, optional)
-      * **contacts** - the UUIDs of contacts to send to (array of up to 100 strings, optional)
+      * **urns** - the URNs of contacts to send to (array of up to 1000 strings, optional)
+      * **contacts** - the UUIDs of contacts to send to (array of up to 1000 strings, optional)
       * **groups** - the UUIDs of contact groups to send to (array of up to 100 strings, optional)
+      * **trigger_flow_uuid** - the UUID of the messaging or voice flow to start when a recipient replies (string, optional)
       * **msg** - the template, text and attachments that will be send to contacts
 
 
@@ -759,11 +769,13 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
         {
             "urns": ["tel:+250788123123", "tel:+250788123124"],
             "contacts": ["09d23a05-47fe-11e4-bfe9-b8f6b119e9ab"],
+            "trigger_flow_uuid": "f14e4ff0-724d-43fe-a953-1d16aefd1c00",
             "msg": {
                 "text": "This is a test message for @contact.name",
                 "template":{
                     "uuid":"c3e129a2-5802-4248-a5f0-620566ef4345",
-                    "variables": ["@contact.name"]
+                    "variables": ["@contact.name"],
+                    "locale": "pt-BR"
                 }
                 "attachments": ["image/png:https://example.com/image.png"]
                 "header": {
@@ -783,7 +795,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                         ]
                     }
                 ],
-                "interaction_type": "flow_msg | cta_url | location | order_details",
+                "interaction_type": "flow_msg | cta_url | location | order_details | carousel | request_contact_info",
                 "flow_message": {
                     "flow_id": "1234567890",
                     "flow_data": {
@@ -812,6 +824,25 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "url": "https://weni.ai",
                     "display_text": "Go to Weni"
                 },
+                "carousel": [
+                    {
+                        "body": "Card body text",
+                        "buttons": [
+                            {
+                                "sub_type": "quick_reply",
+                                "parameters": {"id": "item-1", "title": "Option 1"}
+                            },
+                            {
+                                "sub_type": "url",
+                                "parameters": {"display_text": "Visit", "url": "https://example.com"}
+                            }
+                        ]
+                    }
+                ],
+                "direct_send": True,
+                "ttl_seconds": 3600,
+                "ig_comment_id": "30065218",
+                "ig_response_type": "comment | dm_comment",
                 "order_details": {
                     "reference_id": "unique-reference-id-123",
                     "payment_settings": {
@@ -867,6 +898,29 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                             "value": 500
                         }
                     }
+                },
+                "catalog_message": {
+                    "carousel": true,
+                    "products": [
+                        {
+                            "product": "Example Product Name",
+                            "product_retailer_ids": [
+                                "01#store01",
+                                "02#store02"
+                            ],
+                            "product_retailer_info": [
+                                {
+                                    "name": "Product Variant A",
+                                    "price": "29.90",
+                                    "retailer_id": "1001#store01",
+                                    "seller_id": "1",
+                                    "description": "Description for variant A",
+                                    "image": "https://example.com/product-a.jpg",
+                                    "product_url": "https://example.com/product-a"
+                                }
+                            ]
+                        }
+                    ]
                 }
             }
         }
@@ -883,7 +937,8 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                 "text": "This is a test message for @contact.name",
                 "template":{
                     "uuid":"c3e129a2-5802-4248-a5f0-620566ef4345",
-                    "variables": ["@contact.name"]
+                    "variables": ["@contact.name"],
+                    "locale": "pt-BR"
                 }
                 "attachments": ["image/png:https://example.com/image.png"]
                 "header": {
@@ -903,7 +958,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                         ]
                     }
                 ],
-                "interaction_type": "flow_msg | cta_url | location | order_details",
+                "interaction_type": "flow_msg | cta_url | location | order_details | carousel | request_contact_info",
                 "flow_message": {
                     "flow_id": "1234567890",
                     "flow_data": {
@@ -932,6 +987,25 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "url": "https://weni.ai",
                     "display_text": "Go to Weni"
                 },
+                "carousel": [
+                    {
+                        "body": "Card body text",
+                        "buttons": [
+                            {
+                                "sub_type": "quick_reply",
+                                "parameters": {"id": "item-1", "title": "Option 1"}
+                            },
+                            {
+                                "sub_type": "url",
+                                "parameters": {"display_text": "Visit", "url": "https://example.com"}
+                            }
+                        ]
+                    }
+                ],
+                "direct_send": True,
+                "ttl_seconds": 3600,
+                "ig_comment_id": "30065218",
+                "ig_response_type": "comment | dm_comment",
                 "order_details": {
                     "reference_id": "unique-reference-id-123",
                     "payment_settings": {
@@ -987,6 +1061,29 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                             "value": 500
                         }
                     }
+                },
+                "catalog_message": {
+                    "carousel": true,
+                    "products": [
+                        {
+                            "product": "Example Product Name",
+                            "product_retailer_ids": [
+                                "01#store01",
+                                "02#store02"
+                            ],
+                            "product_retailer_info": [
+                                {
+                                    "name": "Product Variant A",
+                                    "price": "29.90",
+                                    "retailer_id": "1001#store01",
+                                    "seller_id": "1",
+                                    "description": "Description for variant A",
+                                    "image": "https://example.com/product-a.jpg",
+                                    "product_url": "https://example.com/product-a"
+                                }
+                            ]
+                        }
+                    ]
                 }
             }
         }
@@ -996,11 +1093,13 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     model = Broadcast
     serializer_class = WhatsappBroadcastReadSerializer
     write_serializer_class = WhatsappBroadcastWriteSerializer
+    # Mailroom must see the managed group committed before contact_modify (ATOMIC_REQUESTS would hide it).
+    write_with_transaction = False
     pagination_class = CreatedOnCursorPagination
     throttle_scope = "v2.broadcasts"
 
     def filter_queryset(self, queryset):
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         queryset = queryset.filter(broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP)
 
@@ -1059,6 +1158,11 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                 {"name": "contacts", "required": False, "help": "The UUIDs of contacts you want to send to"},
                 {"name": "groups", "required": False, "help": "The UUIDs of contact groups you want to send to"},
                 {
+                    "name": "trigger_flow_uuid",
+                    "required": False,
+                    "help": "The UUID of the messaging or voice flow to start when a recipient replies",
+                },
+                {
                     "name": "msg",
                     "required": True,
                     "help": "The template, text and attachments that will be sent to contact",
@@ -1077,6 +1181,11 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                                     "name": "variables",
                                     "required": False,
                                     "help": "The variables to be used in the template body",
+                                },
+                                {
+                                    "name": "locale",
+                                    "required": False,
+                                    "help": "The locale of the template (e.g., pt-BR, en-US)",
                                 },
                             ],
                         },
@@ -1332,12 +1441,12 @@ class CampaignEventsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAP
     pagination_class = CreatedOnCursorPagination
 
     def derive_queryset(self):
-        return self.model.objects.filter(campaign__org=self.request.user.get_org(), is_active=True)
+        return self.model.objects.filter(campaign__org=self.get_org(), is_active=True)
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
         queryset = queryset.filter(is_active=True)
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         # filter by UUID (optional)
         uuid = params.get("uuid")
@@ -1429,6 +1538,7 @@ class CampaignEventsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAP
         }
 
 
+@api_gateway_expose(alias="channels")
 class ChannelsEndpoint(ListAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list channels in your account.
@@ -1565,7 +1675,7 @@ class ChannelEventsEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         # filter by id (optional)
         call_id = self.get_int_param("id")
@@ -1742,7 +1852,7 @@ class ClassifiersEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         queryset = queryset.filter(org=org, is_active=True)
 
@@ -1780,6 +1890,7 @@ class ClassifiersEndpoint(ListAPIMixin, BaseAPIView):
         }
 
 
+@api_gateway_expose(alias="contacts")
 class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list, create, update and delete contacts in your account.
@@ -1921,7 +2032,7 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         deleted_only = str_to_bool(params.get("deleted"))
         queryset = queryset.filter(is_active=(not deleted_only))
@@ -1979,7 +2090,7 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
         So that we only fetch active contact fields once for all contacts
         """
         context = super().get_serializer_context()
-        context["contact_fields"] = ContactField.user_fields.active_for_org(org=self.request.user.get_org())
+        context["contact_fields"] = ContactField.user_fields.active_for_org(org=self.get_org())
         return context
 
     def get_object(self):
@@ -1987,7 +2098,7 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
 
         # don't blow up if posted a URN that doesn't exist - we'll let the serializer create a new contact
         if self.request.method == "POST" and "urns__identity" in self.lookup_values:
-            org = self.request.user.get_org()
+            org = self.get_org()
             urn = self.lookup_values.get("urns__identity")
 
             contact = queryset.first()
@@ -2144,7 +2255,7 @@ class ContactsLeanEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         deleted_only = str_to_bool(params.get("deleted"))
         queryset = queryset.filter(is_active=(not deleted_only))
@@ -2347,11 +2458,11 @@ class ContactsTemplatesEndpoint(ListAPIMixin, BaseAPIView):
     pagination_class = ContactsTemplateCursorPagination
 
     def get_queryset(self):
-        return self.model.objects.filter(org=self.request.user.get_org(), is_active=True)
+        return self.model.objects.filter(org=self.get_org(), is_active=True)
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         contact = params.get("contact")
         if contact:
@@ -2468,11 +2579,11 @@ class ContactsTemplatesEndpointNew(ListAPIMixin, BaseAPIView):
     pagination_class = ContactsTemplateCursorPagination
 
     def get_queryset(self):
-        return self.model.objects.filter(org=self.request.user.get_org(), is_active=True)
+        return self.model.objects.filter(org=self.get_org(), is_active=True)
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         contact = params.get("contact")
         if contact:
@@ -2548,9 +2659,15 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
      * **modified_on** - when this contact was last modified (datetime).
      * **last_seen_on** - when this contact last communicated with us (datetime).
 
+    **Filters:**
+
+     * **template** (required) - filter by the template **name** (string). UUID is not supported. ex: `template=template_test`
+     * **before** (optional) - only return contacts whose last message was sent before this date. ex: `before=2024-01-01`
+     * **after** (optional) - only return contacts whose last message was sent after this date. ex: `after=2023-01-01`
+
     Example:
 
-        GET /api/v2/filter_templates.json
+        GET /api/v2/filter_templates.json?template=template_test
 
     Response containing the contacts for your organization:
 
@@ -2586,7 +2703,7 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
 
     def get(self, request, *args, **kwargs):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         serializer = FilterTemplateSerializer(data=params)
         serializer.is_valid(raise_exception=True)
@@ -2612,6 +2729,9 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
                     contact.id,
                     contact.uuid,
                     contact.name,
+                    contact_urn.scheme,
+                    contact_urn.path,
+                    contact_urn.display,
                     msg.metadata::json->'templating'->'template'->>'uuid',
                     msg.metadata::json->'templating'->'template'->>'name',
                     msg.text,
@@ -2622,6 +2742,13 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
                 FROM public.msgs_msg as msg
                 JOIN public.contacts_contact as contact
                     on msg.contact_id = contact.id
+                LEFT JOIN LATERAL (
+                    SELECT cu.scheme, cu.path, cu.display
+                    FROM public.contacts_contacturn as cu
+                    WHERE cu.contact_id = contact.id AND cu.org_id = contact.org_id
+                    ORDER BY cu.priority DESC, cu.id ASC
+                    LIMIT 1
+                ) as contact_urn on true
                 WHERE
                     msg.metadata::json->'templating'->'template'->>'name' = %s
                     AND msg.org_id = %s"""
@@ -2644,25 +2771,32 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
             cursor.execute(sql, [template, org.id, int(page_size), int(offset)])
 
             results = cursor.fetchall()
-            messages = list(
-                map(
-                    lambda message: {
+            messages = []
+            for message in results:
+                urn = None
+                if message[3]:
+                    if org.is_anon:
+                        urn = f"{message[3]}:{ContactURN.ANON_MASK}"
+                    else:
+                        urn = str(URN.from_parts(message[3], message[4], display=message[5]))
+
+                messages.append(
+                    {
                         "id": message[0],
                         "uuid": message[1],
                         "name": message[2],
+                        "contact_urn": urn,
                         "template": {
-                            "uuid": message[3],
-                            "name": message[4],
-                            "text": message[5],
-                            "created_on": message[6],
-                            "sent_on": message[7],
-                            "direction": message[8],
-                            "status": message[9],
+                            "uuid": message[6],
+                            "name": message[7],
+                            "text": message[8],
+                            "created_on": message[9],
+                            "sent_on": message[10],
+                            "direction": message[11],
+                            "status": message[12],
                         },
-                    },
-                    results,
+                    }
                 )
-            )
 
         response_data = {
             "results": messages,
@@ -2680,18 +2814,18 @@ class FilterTemplatesEndpoint(ListAPIMixin, BaseAPIView):
             "params": [
                 {
                     "name": "template",
-                    "required": False,
-                    "help": "Only return contacts for this template, ex: template=template_test",
+                    "required": True,
+                    "help": "The template name to filter by. Must be the template name, not UUID. ex: template=template_test",
                 },
                 {
                     "name": "before",
                     "required": False,
-                    "help": "Only return contacts for this template before the date, ex: before=2024-01-01",
+                    "help": "Only return contacts whose last message was sent before this date. ex: before=2024-01-01",
                 },
                 {
                     "name": "after",
                     "required": False,
-                    "help": "Only return contacts for this template after the data, ex: after=2023-01-01",
+                    "help": "Only return contacts whose last message was sent after this date. ex: after=2023-01-01",
                 },
             ],
         }
@@ -2748,6 +2882,10 @@ class FilterTemplatesEndpointNew(ListAPIMixin, BaseAPIView):
     model = Msg
     serializer_class = FilterTemplateSerializerNew
     pagination_class = ContactsTemplateCursorPagination
+
+    def get_queryset(self):
+        # make sure serializer can access contact details efficiently
+        return super().get_queryset().select_related("contact", "contact_urn")
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
@@ -2848,7 +2986,7 @@ class DefinitionsEndpoint(BaseAPIView):
         all = 2
 
     def get(self, request, *args, **kwargs):
-        org = request.user.get_org()
+        org = self.get_org()
         params = request.query_params
 
         if "flow_uuid" in params or "campaign_uuid" in params:  # deprecated
@@ -2997,7 +3135,7 @@ class FieldsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     lookup_params = {"key": "key"}
 
     def derive_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
         return self.model.user_fields.filter(org=org, is_active=True)
 
     def filter_queryset(self, queryset):
@@ -3198,7 +3336,7 @@ class FlowsLabelsEndpoint(ListAPIMixin, BaseAPIView):
     pagination_class = NameCursorPagination
 
     def filter_queryset(self, queryset):
-        org = self.request.user.get_org()
+        org = self.get_org()
         return org.flow_labels.all()
 
     @classmethod
@@ -3691,7 +3829,7 @@ class MediaEndpoint(BaseAPIView):
     permission = "msgs.msg_api"
 
     def post(self, request, format=None, *args, **kwargs):
-        org = self.request.user.get_org()
+        org = self.get_org()
         media_file = request.data.get("media_file", None)
         extension = request.data.get("extension", None)
 
@@ -3773,6 +3911,10 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
         at all incoming messages.
         """
 
+        page_size = 100
+        page_size_query_param = "limit"
+        max_page_size = 1000
+
         def get_ordering(self, request, queryset, view=None):
             if request.query_params.get("folder", "").lower() == "incoming":
                 return "-modified_on", "-id"
@@ -3796,7 +3938,7 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
     }
 
     def derive_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
         folder = self.request.query_params.get("folder")
 
         if folder:
@@ -3812,7 +3954,7 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         # filter by id (optional)
         msg_id = self.get_int_param("id")
@@ -3823,6 +3965,12 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
         broadcast_id = params.get("broadcast")
         if broadcast_id:
             queryset = queryset.filter(broadcast_id=broadcast_id)
+
+        # filter by contact URN (optional)
+        urn = params.get("urn")
+        if urn:
+            normalized_urn = self.normalize_urn(urn)
+            queryset = queryset.filter(contact__urns__identity=normalized_urn)
 
         # filter by contact (optional)
         contact_uuid = params.get("contact")
@@ -3872,6 +4020,11 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
                     "name": "contact",
                     "required": False,
                     "help": "A contact UUID to filter by, ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                },
+                {
+                    "name": "urn",
+                    "required": False,
+                    "help": "A contact URN to filter by, ex: tel:+12065551212",
                 },
                 {
                     "name": "folder",
@@ -4087,7 +4240,7 @@ class ResthookSubscribersEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, B
     lookup_params = {"id": "id"}
 
     def get_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
         return self.model.objects.filter(resthook__org=org, is_active=True)
 
     def filter_queryset(self, queryset):
@@ -4328,7 +4481,7 @@ class RunsEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         # filter by flow (optional)
         flow_uuid = params.get("flow")
@@ -4472,7 +4625,7 @@ class FlowStartsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
      * **urns** - the URNs you want to start in this flow (array of up to 100 strings, optional)
      * **restart_participants** - whether to restart participants already in this flow (optional, defaults to true)
      * **exclude_active** - whether to exclude contacts currently in other flow (optional, defaults to false)
-     * **params** - a dictionary of extra parameters to pass to the flow start (accessible via @trigger.params in your flow)
+     * **params** - a dictionary of extra parameters to pass to the flow start (accessible via @trigger.params in your flow, string values limited to 4096 characters)
 
     Example:
 
@@ -4664,13 +4817,19 @@ class TemplatesEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         active_translations = Prefetch(
-            "translations", queryset=TemplateTranslation.objects.filter(is_active=True), to_attr="active_translations"
+            "translations",
+            queryset=TemplateTranslation.objects.filter(is_active=True, channel__is_active=True),
+            to_attr="active_translations",
         )
 
-        queryset = org.templates.filter(translations__is_active=True).distinct().prefetch_related(active_translations)
+        queryset = (
+            org.templates.filter(translations__is_active=True, translations__channel__is_active=True)
+            .distinct()
+            .prefetch_related(active_translations)
+        )
 
         status = params.get("status", "A")
         queryset = queryset.filter(translations__status=status).distinct()
@@ -4748,7 +4907,7 @@ class TicketersEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         queryset = queryset.filter(org=org, is_active=True)
 
@@ -4756,6 +4915,10 @@ class TicketersEndpoint(ListAPIMixin, BaseAPIView):
         uuid = params.get("uuid")
         if uuid:
             queryset = queryset.filter(uuid=uuid)
+
+        sector_uuid = params.get("sector_uuid")
+        if sector_uuid:
+            queryset = queryset.filter(config__sector_uuid=sector_uuid)
 
         return self.filter_before_after(queryset, "created_on")
 
@@ -4825,7 +4988,7 @@ class ExternalServicesEndpoint(ListAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         queryset = queryset.filter(org=org, is_active=True)
         # filter by uuid (optional)
@@ -4877,6 +5040,7 @@ class TicketsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
      * **topic** - the topic of the ticket (object).
      * **body** - the body of the ticket (string).
      * **opened_on** - when this ticket was opened (datetime).
+     * **modified_on** - when this ticket was last modified (datetime), filterable as `before` and `after`.
 
     Example:
 
@@ -4907,7 +5071,7 @@ class TicketsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         queryset = queryset.filter(org=org)
 
@@ -4936,7 +5100,7 @@ class TicketsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
             "assignee",
         )
 
-        return queryset
+        return self.filter_before_after(queryset, "modified_on")
 
     @classmethod
     def get_read_explorer(cls):
@@ -4950,6 +5114,16 @@ class TicketsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "name": "contact",
                     "required": False,
                     "help": "A contact UUID to filter by, ex: 09d23a05-47fe-11e4-bfe9-b8f6b119e9ab",
+                },
+                {
+                    "name": "before",
+                    "required": False,
+                    "help": "Only return tickets modified before this date, ex: 2015-01-28T18:00:00.000",
+                },
+                {
+                    "name": "after",
+                    "required": False,
+                    "help": "Only return tickets modified after this date, ex: 2015-01-28T18:00:00.000",
                 },
             ],
         }
@@ -4966,11 +5140,18 @@ class TicketActionsEndpoint(BulkWriteAPIMixin, BaseAPIView):
 
         * _assign_ - Assign the tickets to the given user
         * _note_ - Add the given note to the tickets
+        * _change_topic_ - Move the tickets to the given topic
+        * _change_ticketer_ - Move the tickets to the given ticketer
         * _close_ - Close the tickets
         * _reopen_ - Re-open the tickets
 
     * **assignee** - the email of a user (string, optional)
     * **note** - the note to add to the tickets (string, optional)
+    * **topic** - the UUID of a topic (string, optional)
+    * **ticketer** - the UUID of a ticketer (string, optional)
+    * **external_id** - the identifier issued by the new ticketer's external system for the tickets being moved
+      (string, optional). Only meaningful for the `change_ticketer` action. When omitted, the existing
+      `external_id` is preserved so the link to the external system is not silently lost.
 
     Example:
 
@@ -5000,6 +5181,13 @@ class TicketActionsEndpoint(BulkWriteAPIMixin, BaseAPIView):
                 {"name": "action", "required": True, "help": "One of the following strings: " + ", ".join(actions)},
                 {"name": "assignee", "required": False, "help": "The email address of a user"},
                 {"name": "note", "required": False, "help": "The note text"},
+                {"name": "topic", "required": False, "help": "The UUID of a topic"},
+                {"name": "ticketer", "required": False, "help": "The UUID of a ticketer"},
+                {
+                    "name": "external_id",
+                    "required": False,
+                    "help": "The identifier issued by the new ticketer's external system (only for change_ticketer)",
+                },
             ],
         }
 
@@ -5096,7 +5284,7 @@ class UsersEndpoint(ListAPIMixin, BaseAPIView):
     pagination_class = DateJoinedCursorPagination
 
     def derive_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
 
         # limit to roles if specified
         roles = self.request.query_params.getlist("role")
@@ -5112,7 +5300,7 @@ class UsersEndpoint(ListAPIMixin, BaseAPIView):
         context = super().get_serializer_context()
 
         # build a map of users to roles so that serializing multiple users only uses on query per role
-        org = self.request.user.get_org()
+        org = self.get_org()
         user_roles = {}
         for role in OrgRole:
             for user in role.get_users(org):
@@ -5162,7 +5350,7 @@ class WorkspaceEndpoint(BaseAPIView):
     permission = "orgs.org_api"
 
     def get(self, request, *args, **kwargs):
-        org = request.user.get_org()
+        org = self.get_org()
         serializer = WorkspaceReadSerializer(org)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -5242,7 +5430,7 @@ class ProductsEndpoint(ListAPIMixin, BaseAPIView):
     pagination_class = CreatedOnCursorPagination
 
     def get_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
         catalog = org.catalogs.exclude(is_active=False).first()
         return Product.objects.filter(catalog=catalog)
 
@@ -5314,7 +5502,7 @@ class WhatsappFlowsEndpoint(ListAPIMixin, BaseAPIView):
     pagination_class = CreatedOnCursorPagination
 
     def get_queryset(self):
-        org = self.request.user.get_org()
+        org = self.get_org()
         return WhatsappFlow.objects.filter(org=org, is_active=True)
 
     def filter_queryset(self, queryset):
@@ -5352,7 +5540,12 @@ class EventsEndpoint(BaseAPIView):
         try:
             from temba.api.v2.services.events import fetch_events_for_org
 
-            processed_events = fetch_events_for_org(request.user, **serializer.validated_data)
+            org = self.get_org()
+            user = request.user or SimpleNamespace()
+            if not hasattr(user, "get_org") or not user.get_org():
+                user = SimpleNamespace(get_org=lambda: org)
+
+            processed_events = fetch_events_for_org(user, **serializer.validated_data)
 
             return Response(processed_events)
         except Exception as e:
@@ -5382,6 +5575,67 @@ class EventsEndpoint(BaseAPIView):
                 {"name": "value", "required": False, "help": "A value to filter by"},
                 {"name": "metadata", "required": False, "help": "A metadata to filter by"},
                 {"name": "event_name", "required": False, "help": "An event_name to filter by"},
+                {"name": "silver", "required": False, "help": "If true, also include data from silver"},
+                {"name": "table", "required": False, "help": "Required when silver=true; silver table name"},
+                {"name": "limit", "required": False, "help": "The number of events to return, default is 100"},
+                {"name": "offset", "required": False, "help": "The offset to return, default is 0"},
+            ],
+        }
+
+
+class EventsV2Endpoint(BaseAPIView):
+    permission = "orgs.org_api"
+
+    def get(self, request, *args, **kwargs):
+        serializer = EventFilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        pagination = DefaultLimitOffsetPagination()
+        limit = pagination.get_limit(request)
+        offset = pagination.get_offset(request)
+        filters = dict(serializer.validated_data)
+        if limit is not None:
+            filters["limit"] = limit
+        if offset is not None:
+            filters["offset"] = offset
+
+        try:
+            from temba.api.v2.services.events import fetch_events_for_org
+
+            processed_events = fetch_events_for_org(request.user, **filters)
+
+            return Response(processed_events)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @classmethod
+    def get_read_explorer(cls):
+        return {
+            "method": "GET",
+            "title": "List Datalake Events (v2)",
+            "url": reverse("api.v2.events_v2"),
+            "slug": "events-list-v2",
+            "params": [
+                {
+                    "name": "date_start",
+                    "required": True,
+                    "help": "The start date for the filter, ex: 2025-06-03T00:00:00Z",
+                },
+                {
+                    "name": "date_end",
+                    "required": True,
+                    "help": "The end date for the filter, ex: 2025-06-20T23:59:59Z",
+                },
+                {"name": "key", "required": False, "help": "A key to filter by"},
+                {"name": "contact_urn", "required": False, "help": "A contact URN to filter by"},
+                {"name": "value_type", "required": False, "help": "A value_type to filter by"},
+                {"name": "value", "required": False, "help": "A value to filter by"},
+                {"name": "metadata", "required": False, "help": "A metadata to filter by"},
+                {"name": "event_name", "required": False, "help": "An event_name to filter by"},
+                {"name": "silver", "required": False, "help": "If true, also include data from silver"},
+                {"name": "table", "required": False, "help": "Required when silver=true; silver table name"},
+                {"name": "limit", "required": False, "help": "The number of events to return, default is 10"},
+                {"name": "offset", "required": False, "help": "The offset to return, default is 0"},
             ],
         }
 
@@ -5396,7 +5650,12 @@ class EventsGroupByCountEndpoint(BaseAPIView):
         try:
             from temba.api.v2.services.events import fetch_event_counts_for_org
 
-            processed_events = fetch_event_counts_for_org(request.user, **serializer.validated_data)
+            org = self.get_org()
+            user = request.user or SimpleNamespace()
+            if not hasattr(user, "get_org") or not user.get_org():
+                user = SimpleNamespace(get_org=lambda: org)
+
+            processed_events = fetch_event_counts_for_org(user, **serializer.validated_data)
 
             return Response(processed_events)
         except Exception as e:
@@ -5427,5 +5686,52 @@ class EventsGroupByCountEndpoint(BaseAPIView):
                 {"name": "metadata", "required": False, "help": "A metadata to filter by"},
                 {"name": "event_name", "required": False, "help": "An event_name to filter by"},
                 {"name": "group_by", "required": False, "help": "A group_by to filter by, default is value"},
+                {"name": "silver", "required": False, "help": "If true, also include data from silver"},
+                {"name": "table", "required": False, "help": "Required when silver=true; silver table name"},
             ],
         }
+
+
+class EventsHealthCheckEndpoint(views.APIView):
+    """
+    Health check endpoint for get_events functionality.
+    Tests if the fetch_events_for_org service is working correctly.
+    Uses a project_id from environment variable EVENTS_HEALTH_CHECK_PROJECT_UUID.
+    Returns 200 if healthy, 503 if there's an error.
+    """
+
+    permission_classes = []  # No authentication required for health checks
+
+    def get(self, request, *args, **kwargs):
+        try:
+            # Get project_id from environment variable (assumed to be valid UUID string)
+            project_id = os.environ.get("EVENTS_HEALTH_CHECK_PROJECT_UUID")
+
+            # Prepare minimal test parameters (last 24 hours, limit 1 for quick check)
+            date_end = timezone.now()
+            date_start = date_end - timedelta(hours=24)
+
+            # Format dates as UTC ISO strings with Z suffix
+            date_start_str = date_start.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            date_end_str = date_end.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+            # Check if events are available for this project
+            dl_get_events(
+                project=project_id,
+                date_start=date_start_str,
+                date_end=date_end_str,
+                limit=1,
+            )
+
+            # If we got here without exception, the service is working
+            return Response(
+                {"status": "healthy", "message": "get_events service is operational"},
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            # Return 503 if there's any error
+            return Response(
+                {"status": "error", "message": str(e)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )

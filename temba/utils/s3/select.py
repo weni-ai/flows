@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import iso8601
+
 LOOKUPS = {"gt": ">", "gte": ">=", "lte": "<=", "lt": "<", "in": "IN"}
 
 
@@ -54,3 +56,50 @@ def _compile_value(val) -> str:
     if isinstance(val, (list, tuple)):
         return f"({', '.join([_compile_value(v) for v in val])})"
     return str(val)
+
+
+def matches_where(record: dict, *, where: dict = None) -> bool:
+    """
+    Client-side equivalent of compile_select, used as a fallback to filter records locally when S3 Select can't be
+    used (e.g. an archive contains a record which exceeds the OverMaxRecordSize limit)
+    """
+    if not where:
+        return True
+
+    for field, val in where.items():
+        if field == "__raw__":
+            raise ValueError("can't evaluate a raw S3 select expression locally")
+        if not _condition_matches(record, field, val):
+            return False
+
+    return True
+
+
+def _condition_matches(record: dict, field: str, val) -> bool:
+    op = "="
+    field_parts = field.split("__")
+    if field_parts[-1] in LOOKUPS:
+        op = LOOKUPS[field_parts[-1]]
+        field_parts = field_parts[:-1]
+
+    actual = record
+    for part in field_parts:
+        if not isinstance(actual, dict) or part not in actual:
+            actual = None
+            break
+        actual = actual[part]
+
+    # a missing field never matches any condition (consistent with S3 Select's handling of MISSING values)
+    if actual is None:
+        return False
+
+    # record datetimes are stored as ISO strings, so parse before comparing
+    if isinstance(val, datetime) and isinstance(actual, str):
+        actual = iso8601.parse_date(actual)
+
+    if op == "=":
+        return actual == val
+    if op == "IN":
+        return actual in val
+
+    return {">": actual > val, ">=": actual >= val, "<": actual < val, "<=": actual <= val}[op]

@@ -50,17 +50,17 @@ class HTTPLog(models.Model):
     # possible log type choices and descriptive names
     LOG_TYPE_CHOICES = (
         (WEBHOOK_CALLED, "Webhook Called"),
-        (INTENTS_SYNCED, _("Intents Synced")),
-        (CLASSIFIER_CALLED, _("Classifier Called")),
-        (TICKETER_CALLED, _("Ticketing Service Called")),
-        (AIRTIME_TRANSFERRED, _("Airtime Transferred")),
-        (WHATSAPP_TEMPLATES_SYNCED, _("WhatsApp Templates Synced")),
-        (WHATSAPP_TOKENS_SYNCED, _("WhatsApp Tokens Synced")),
-        (WHATSAPP_CONTACTS_REFRESHED, _("WhatsApp Contacts Refreshed")),
-        (WHATSAPP_CHECK_HEALTH, _("WhatsApp Health Check")),
-        (WHATSAPP_CATALOGS_SYNCED, _("WhatsApp Catalogs Synced")),
-        (WHATSAPP_PRODUCTS_SYNCED, _("WhatsApp Products Synced")),
-        (TEAMS_TOKENS_SYNCED, _("Teams Tokens Synced")),
+        (INTENTS_SYNCED, _("Intents synced")),
+        (CLASSIFIER_CALLED, _("Classifier called")),
+        (TICKETER_CALLED, _("Ticketing service called")),
+        (AIRTIME_TRANSFERRED, _("Airtime transferred")),
+        (WHATSAPP_TEMPLATES_SYNCED, _("WhatsApp templates synced")),
+        (WHATSAPP_TOKENS_SYNCED, _("WhatsApp tokens synced")),
+        (WHATSAPP_CONTACTS_REFRESHED, _("WhatsApp contacts refreshed")),
+        (WHATSAPP_CHECK_HEALTH, _("WhatsApp health check")),
+        (WHATSAPP_CATALOGS_SYNCED, _("WhatsApp catalogs synced")),
+        (WHATSAPP_PRODUCTS_SYNCED, _("WhatsApp products synced")),
+        (TEAMS_TOKENS_SYNCED, _("Teams tokens synced")),
     )
 
     org = models.ForeignKey(Org, related_name="http_logs", on_delete=models.PROTECT)

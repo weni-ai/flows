@@ -1,4 +1,4 @@
-from amqp.channel import Channel  # pragma: no cover
+from weni.eda.channels import Channel  # pragma: no cover
 
 from .consumers.ticketer_consumer import TicketConsumer  # pragma: no cover
 

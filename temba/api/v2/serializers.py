@@ -11,6 +11,7 @@ from rest_framework import serializers
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from temba import mailroom
 from temba.api.models import Resthook, ResthookSubscriber, WebHookEvent
@@ -19,6 +20,7 @@ from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
 from temba.classifiers.models import Classifier
 from temba.contacts.models import Contact, ContactField, ContactGroup
+from temba.contacts.validators import clean_contact_name
 from temba.externals.models import ExternalService
 from temba.flows.models import Flow, FlowLabel, FlowRun, FlowStart
 from temba.globals.models import Global
@@ -26,8 +28,15 @@ from temba.locations.models import AdminBoundary
 from temba.mailroom import modifiers
 from temba.mailroom.client import MailroomException
 from temba.msgs.models import Broadcast, Label, Msg
+from temba.msgs.usecases.managed_trigger_group import (
+    ContactResolutionError,
+    GroupQuotaExceeded,
+    prepare_trigger_group_for_broadcast,
+)
+from temba.msgs.usecases.named_template_broadcast import NamedTemplateBroadcastError, prepare_named_broadcast
 from temba.orgs.models import Org, OrgRole
 from temba.templates.models import Template, TemplateTranslation
+from temba.templates.parameter_format import is_named_format
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.triggers.usecases import create_catchall_trigger
 from temba.utils import extract_constants, json, on_transaction_commit
@@ -63,7 +72,7 @@ def _normalize_extra(extra, count):
         return INVALID_EXTRA_KEY_CHARS.sub("_", key)[:255]
 
     if isinstance(extra, str):
-        return extra[:640], count + 1
+        return extra[: settings.FLOW_START_PARAM_VALUE_SIZE], count + 1
 
     elif isinstance(extra, numbers.Number) or isinstance(extra, bool):
         return extra, count + 1
@@ -212,8 +221,10 @@ class BroadcastReadSerializer(ReadSerializer):
 
 class BroadcastWriteSerializer(WriteSerializer):
     text = fields.TranslatableField(required=True, max_length=Msg.MAX_TEXT_LEN)
-    urns = fields.URNListField(required=False)
-    contacts = fields.ContactField(many=True, required=False)
+    # Recipient lists allow up to 1000 items to support bulk sends without
+    # forcing clients to paginate small batches.
+    urns = fields.URNListField(required=False, max_items=1000)
+    contacts = fields.ContactField(many=True, required=False, max_items=1000)
     groups = fields.ContactGroupField(many=True, required=False)
     ticket = fields.TicketField(required=False)
 
@@ -281,8 +292,13 @@ class WhatsappBroadcastReadSerializer(ReadSerializer):
 
 
 class WhatsappBroadcastWriteSerializer(WriteSerializer):
-    urns = fields.URNListField(required=False)
-    contacts = fields.ContactField(many=True, required=False)
+    MAX_RECIPIENTS_PER_BROADCAST = 1000
+    MAX_VARIABLES_PER_RECIPIENT = 100
+
+    # WhatsApp broadcasts allow larger recipient lists than the default API limit
+    # to support bulk sends without forcing clients to paginate small batches.
+    urns = fields.URNListField(required=False, max_items=MAX_RECIPIENTS_PER_BROADCAST)
+    contacts = fields.ContactField(many=True, required=False, max_items=MAX_RECIPIENTS_PER_BROADCAST)
     groups = fields.ContactGroupField(many=True, required=False)
     msg = serializers.DictField(required=True)
     channel = serializers.UUIDField(required=False)
@@ -290,25 +306,85 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
     name = serializers.CharField(required=False)
     template_id = serializers.IntegerField(required=False)
     trigger_flow_uuid = serializers.UUIDField(required=False)
+    recipients = serializers.ListField(
+        required=False, child=serializers.DictField(), max_length=MAX_RECIPIENTS_PER_BROADCAST
+    )
 
     def validate_msg(self, value):
-        if not (value.get("text") or value.get("attachments") or value.get("template") or value.get("action_type")):
-            raise serializers.ValidationError("Must provide either text, attachments, template or action_type")
+        if not (
+            value.get("text")
+            or value.get("attachments")
+            or value.get("template")
+            or value.get("action_type")
+            or value.get("carousel")
+        ):
+            raise serializers.ValidationError(
+                "Must provide either text, attachments, template, action_type or carousel"
+            )
+        if "direct_send" in value and not isinstance(value["direct_send"], bool):
+            raise serializers.ValidationError("direct_send must be a boolean")
+        if "ttl_seconds" in value:
+            if not isinstance(value["ttl_seconds"], int):
+                raise serializers.ValidationError("ttl_seconds must be an integer")
+            if value["ttl_seconds"] < 0:
+                raise serializers.ValidationError("ttl_seconds must be a non-negative integer")
+        if "direct_send_template_name" in value and not isinstance(value["direct_send_template_name"], str):
+            raise serializers.ValidationError("direct_send_template_name must be a string")
+        if "ig_comment_id" in value and not isinstance(value["ig_comment_id"], str):
+            raise serializers.ValidationError("ig_comment_id must be a string")
+        if "ig_response_type" in value and value["ig_response_type"] not in ("comment", "dm_comment"):
+            raise serializers.ValidationError("ig_response_type must be either comment or dm_comment")
+        if value.get("ig_comment_id") and not value.get("ig_response_type"):
+            raise serializers.ValidationError("ig_response_type is required when ig_comment_id is provided")
+        if value.get("ig_response_type") and not value.get("ig_comment_id"):
+            raise serializers.ValidationError("ig_comment_id is required when ig_response_type is provided")
         return value
 
+    def _validate_recipients(self, data):
+        recipients = data.get("recipients") or []
+        if not recipients:
+            return []
+
+        country_code = self.context["org"].default_country_code
+        seen = set()
+        normalized = []
+        for index, recipient in enumerate(recipients):
+            if not isinstance(recipient, dict):
+                raise serializers.ValidationError("recipients must contain objects")
+            if "urn" not in recipient:
+                raise serializers.ValidationError("recipients[].urn is required")
+            if not isinstance(recipient["urn"], str):
+                raise serializers.ValidationError("Not a valid string.")
+            urn = fields.validate_urn(recipient["urn"], country_code=country_code)
+            if urn in seen:
+                raise serializers.ValidationError(f"Recipient {urn} is repeated")
+            seen.add(urn)
+            variables = recipient.get("variables") or {}
+            if variables is None:
+                variables = {}
+            if not isinstance(variables, dict):
+                raise serializers.ValidationError("recipients[].variables must be an object")
+            if len(variables) > self.MAX_VARIABLES_PER_RECIPIENT:
+                raise serializers.ValidationError(
+                    f"This field can only contain up to {self.MAX_VARIABLES_PER_RECIPIENT} items."
+                )
+            normalized.append({"urn": urn, "variables": {str(key): value for key, value in variables.items()}})
+        return normalized
+
     def validate(self, data):
-        if not (data.get("urns") or data.get("contacts") or data.get("groups")):
+        if not (data.get("urns") or data.get("contacts") or data.get("groups") or data.get("recipients")):
             raise serializers.ValidationError("Must provide either urns, contacts or groups")
 
         channel_data = data.get("channel", None)
+        channel = None
         if channel_data:
             try:
                 channel = Channel.objects.get(uuid=channel_data)
                 data["channel"] = channel
-                if channel.channel_type != "WAC":
-                    raise serializers.ValidationError("Channel must be a WhatsApp Cloud channel")
             except Channel.DoesNotExist:
                 raise serializers.ValidationError("Channel not found")
+
+        data["recipients"] = self._validate_recipients(data)
 
         template_data = data.get("msg", {}).get("template", None)
         if template_data is not None:
@@ -336,12 +412,8 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
                 if data.get("contacts"):
                     raise serializers.ValidationError("Contacts are not allowed for template_batch queue")
 
-        # If a flow UUID is provided it is only valid for template_batch queue
+        # Resolve and validate trigger flow if provided. trigger_flow_uuid is independent of queue.
         trigger_flow_uuid = data.get("trigger_flow_uuid")
-        if trigger_flow_uuid and data.get("queue") != "template_batch":
-            raise serializers.ValidationError("trigger_flow_uuid is only allowed when queue is template_batch")
-
-        # Resolve and validate trigger flow if provided
         if trigger_flow_uuid:
             org = self.context.get("org")
             try:
@@ -369,16 +441,60 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         if name and not channel_data:
             raise serializers.ValidationError("Channel is required to use template name")
 
+        positional_variables = template_data.get("variables", [])
+        named_variables = template_data.get("named_variables")
+        if positional_variables and named_variables:
+            raise serializers.ValidationError("named_variables and variables cannot be used together")
+
         try:
             template = self._get_template(uuid=uuid, name=name, org=self.context.get("org"))
             template_id = template.id
+            parameter_format = template.parameter_format or "positional"
+
+            if is_named_format(parameter_format) and positional_variables:
+                raise serializers.ValidationError(
+                    f"Template {template.uuid} expects named parameters, not the positional variables list"
+                )
+            if not is_named_format(parameter_format) and named_variables:
+                raise serializers.ValidationError(
+                    f"Template {template.uuid} expects positional variables, not named parameters"
+                )
+
+            named_resolution = None
+            extra_urns = list(data.get("urns") or [])
+            if is_named_format(parameter_format):
+                channel = data.get("channel")
+                try:
+                    named_resolution = prepare_named_broadcast(
+                        self.context.get("org"),
+                        template,
+                        channel if isinstance(channel, Channel) else None,
+                        data.get("recipients") or [],
+                        named_variables,
+                        extra_urns=extra_urns,
+                    )
+                except NamedTemplateBroadcastError as exc:
+                    raise serializers.ValidationError(str(exc))
 
             data["msg"]["template"] = {
                 "name": template.name,
                 "uuid": str(template.uuid),
-                "variables": template_data.get("variables", []),
+                "variables": positional_variables if not is_named_format(parameter_format) else [],
                 "locale": template_data.get("locale", None),
+                "is_carousel": template_data.get("is_carousel", False),
+                "carousel": template_data.get("carousel", []),
             }
+            if is_named_format(parameter_format):
+                data["msg"]["template"]["named_variables"] = named_variables or {}
+                data["msg"]["template"]["parameter_format"] = parameter_format
+            if named_resolution and (data.get("recipients") or extra_urns):
+                data["msg"]["template"]["recipient_variables"] = named_resolution["recipient_variables"]
+                data["named_parameters"] = {
+                    "accepted_count": named_resolution["accepted_count"],
+                    "rejected_count": named_resolution["rejected_count"],
+                    "rejected": named_resolution["rejected"],
+                }
+                data["resolved_urns"] = named_resolution["accepted_urns"]
             data["msg"]["template_id"] = template_id
 
         except Template.DoesNotExist:
@@ -397,16 +513,47 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         """
         Create a new whatsapp broadcast to send out
         """
+        org = self.context["org"]
+        user = self.context["user"]
+        trigger_flow = self.validated_data.get("trigger_flow")
+        urns = self.validated_data.get("urns") or []
+        contacts = self.validated_data.get("contacts") or []
+        groups = self.validated_data.get("groups") or []
+        msg = dict(self.validated_data.get("msg") or {})
+
+        resolved_urns = self.validated_data.get("resolved_urns")
+        if resolved_urns is not None:
+            urns = resolved_urns
+            named_parameters = self.validated_data.get("named_parameters")
+            if named_parameters:
+                msg["named_parameters"] = named_parameters
+                template_meta = dict(msg.get("template") or {})
+                template_meta["parameter_format"] = template_meta.get("parameter_format", "named")
+                msg["template"] = template_meta
+
+        # Ad-hoc recipients (urns/contacts) are covered by a platform-managed group + Catch All.
+        if trigger_flow and (urns or contacts):
+            try:
+                managed_group = prepare_trigger_group_for_broadcast(org, user, trigger_flow, urns, contacts)
+            except GroupQuotaExceeded as e:
+                raise serializers.ValidationError(str(e))
+            except ContactResolutionError as e:
+                raise serializers.ValidationError(str(e))
+            except MailroomException:
+                raise serializers.ValidationError(
+                    "Contact group membership couldn't be updated due to a technical issue"
+                )
+            msg["trigger_group"] = {"uuid": str(managed_group.uuid), "name": managed_group.name}
 
         # create the broadcast
         broadcast = Broadcast.create(
-            self.context["org"],
-            self.context["user"],
-            groups=self.validated_data.get("groups", []),
-            contacts=self.validated_data.get("contacts", []),
-            urns=self.validated_data.get("urns", []),
+            org,
+            user,
+            groups=groups,
+            contacts=contacts,
+            urns=urns,
             template_state=Broadcast.TEMPLATE_STATE_UNEVALUATED,
-            msg=self.validated_data.get("msg", {}),
+            msg=msg,
             channel=self.validated_data.get("channel", None),
             broadcast_type=Broadcast.BROADCAST_TYPE_WHATSAPP,
             queue=self.validated_data.get("queue", None),
@@ -414,14 +561,9 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             template_id=self.validated_data.get("template_id", None),
             is_bulk_send=True if self.validated_data.get("queue") == "template_batch" else False,
         )
-        # create optional catch-all trigger (uncaught message) for provided flow and groups
-        trigger_flow = self.validated_data.get("trigger_flow")
-        if trigger_flow and self.validated_data.get("queue") == "template_batch":
-            groups = self.validated_data.get("groups", [])
-            if groups:
-                create_catchall_trigger(
-                    org=self.context["org"], user=self.context["user"], flow=trigger_flow, groups=groups
-                )
+        # Caller-supplied groups keep today's Catch All behavior, independent of the managed group.
+        if trigger_flow and groups:
+            create_catchall_trigger(org=org, user=user, flow=trigger_flow, groups=groups)
 
         # send it
         on_transaction_commit(lambda: broadcast.send_async())
@@ -753,7 +895,9 @@ class ContactReadSerializer(ReadSerializer):
 
 
 class ContactWriteSerializer(WriteSerializer):
-    name = serializers.CharField(required=False, max_length=64, allow_null=True)
+    # length and emptiness are enforced by validate_name via clean_contact_name; allow_blank/trim_whitespace
+    # are flipped here so DRF passes the raw value (including whitespace-only strings) to validate_name
+    name = serializers.CharField(required=False, allow_null=True, allow_blank=True, trim_whitespace=False)
     language = serializers.CharField(required=False, min_length=3, max_length=3, allow_null=True)
     urns = fields.URNListField(required=False)
     groups = fields.ContactGroupField(many=True, required=False, allow_dynamic=False)
@@ -761,6 +905,12 @@ class ContactWriteSerializer(WriteSerializer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def validate_name(self, value):
+        try:
+            return clean_contact_name(value)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.messages)
 
     def validate_language(self, value):
         if value and not pycountry.languages.get(alpha_3=value):
@@ -938,15 +1088,24 @@ class ContactFieldWriteSerializer(WriteSerializer):
         max_length=ContactField.MAX_LABEL_LEN,
         validators=[UniqueForOrgValidator(ContactField.user_fields.filter(is_active=True), ignore_case=True)],
     )
+    channel_uuid = serializers.UUIDField(required=False)
+    project_uuid = serializers.UUIDField(required=False)
     value_type = serializers.ChoiceField(required=True, choices=list(VALUE_TYPES.keys()))
 
     def validate_label(self, value):
         if not ContactField.is_valid_label(value):
-            raise serializers.ValidationError("Can only contain letters, numbers and hypens.")
+            raise serializers.ValidationError("Can only contain letters, numbers, hyphens and underscores.")
 
         key = ContactField.make_key(value)
         if not ContactField.is_valid_key(key):
             raise serializers.ValidationError('Generated key "%s" is invalid or a reserved name.' % key)
+
+        org = self.context["org"]
+        conflicting_fields = ContactField.user_fields.active_for_org(org=org).filter(key=key)
+        if self.instance:
+            conflicting_fields = conflicting_fields.exclude(id=self.instance.id)
+        if conflicting_fields.exists():
+            raise serializers.ValidationError('Generated key "%s" conflicts with an existing contact field.' % key)
 
         return value
 
@@ -954,10 +1113,10 @@ class ContactFieldWriteSerializer(WriteSerializer):
         return self.VALUE_TYPES[value]
 
     def validate(self, data):
-        org = self.context["org"]
-        org_active_fields_limit = org.get_limit(Org.LIMIT_FIELDS)
+        self.org = self.context["org"]
 
-        field_count = ContactField.user_fields.count_active_for_org(org=org)
+        org_active_fields_limit = self.org.get_limit(Org.LIMIT_FIELDS)
+        field_count = ContactField.user_fields.count_active_for_org(org=self.org)
         if not self.instance and field_count >= org_active_fields_limit:
             raise serializers.ValidationError(
                 "This org has %s contact fields and the limit is %s. "
@@ -968,6 +1127,7 @@ class ContactFieldWriteSerializer(WriteSerializer):
         return data
 
     def save(self):
+        user = self.context["user"]
         label = self.validated_data.get("label")
         value_type = self.validated_data.get("value_type")
 
@@ -976,7 +1136,7 @@ class ContactFieldWriteSerializer(WriteSerializer):
         else:
             key = ContactField.make_key(label)
 
-        return ContactField.get_or_create(self.context["org"], self.context["user"], key, label, value_type=value_type)
+        return ContactField.get_or_create(self.org, user, key, label, value_type=value_type)
 
 
 class ContactGroupReadSerializer(ReadSerializer):
@@ -1244,10 +1404,39 @@ class FilterTemplateSerializer(ReadSerializer):
 
 class FilterTemplateSerializerNew(ReadSerializer):
     template = serializers.CharField(required=True)
+    contact_uuid = serializers.SerializerMethodField()
+    contact_urn = serializers.SerializerMethodField()
+
+    def get_contact_uuid(self, obj):
+        return str(obj.contact.uuid) if getattr(obj, "contact_id", None) else None
+
+    def get_contact_urn(self, obj):
+        # Prefer the URN used on the message itself (historical & most accurate)
+        msg_urn = getattr(obj, "contact_urn", None)
+        if msg_urn:
+            return str(msg_urn.api_urn())
+
+        # Fallback to the contact's current highest priority URN
+        contact = getattr(obj, "contact", None)
+        if not contact:
+            return None
+
+        urn = contact.get_urn()
+        return str(urn.api_urn()) if urn else None
 
     class Meta:
         model = Msg
-        fields = ("uuid", "contact_id", "template", "text", "created_on", "sent_on", "status")
+        fields = (
+            "uuid",
+            "contact_id",
+            "contact_uuid",
+            "contact_urn",
+            "template",
+            "text",
+            "created_on",
+            "sent_on",
+            "status",
+        )
 
 
 class FlowReadSerializer(ReadSerializer):
@@ -1807,7 +1996,7 @@ class TemplateReadSerializer(ReadSerializer):
     def get_translations(self, obj):
         translations = []
         for translation in (
-            TemplateTranslation.objects.filter(template=obj, is_active=True)
+            TemplateTranslation.objects.filter(template=obj, is_active=True, channel__is_active=True)
             .order_by("language")
             .select_related("channel")
         ):
@@ -1819,6 +2008,7 @@ class TemplateReadSerializer(ReadSerializer):
                     "variable_count": translation.variable_count,
                     "status": translation.get_status_display(),
                     "channel": {"uuid": translation.channel.uuid, "name": translation.channel.name},
+                    "parameter_names": translation.parameter_names or [],
                 }
             )
 
@@ -1826,7 +2016,7 @@ class TemplateReadSerializer(ReadSerializer):
 
     class Meta:
         model = Template
-        fields = ("uuid", "name", "translations", "created_on", "modified_on")
+        fields = ("uuid", "name", "parameter_format", "translations", "created_on", "modified_on")
 
 
 class TicketerReadSerializer(ReadSerializer):
@@ -1876,14 +2066,24 @@ class TicketBulkActionSerializer(WriteSerializer):
     ACTION_ASSIGN = "assign"
     ACTION_ADD_NOTE = "add_note"
     ACTION_CHANGE_TOPIC = "change_topic"
+    ACTION_CHANGE_TICKETER = "change_ticketer"
     ACTION_CLOSE = "close"
     ACTION_REOPEN = "reopen"
-    ACTION_CHOICES = (ACTION_ASSIGN, ACTION_ADD_NOTE, ACTION_CHANGE_TOPIC, ACTION_CLOSE, ACTION_REOPEN)
+    ACTION_CHOICES = (
+        ACTION_ASSIGN,
+        ACTION_ADD_NOTE,
+        ACTION_CHANGE_TOPIC,
+        ACTION_CHANGE_TICKETER,
+        ACTION_CLOSE,
+        ACTION_REOPEN,
+    )
 
     tickets = fields.TicketField(many=True)
     action = serializers.ChoiceField(required=True, choices=ACTION_CHOICES)
     assignee = fields.UserField(required=False, allow_null=True, assignable_only=True)
     topic = fields.TopicField(required=False)
+    ticketer = fields.TicketerField(required=False)
+    external_id = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=255)
     note = serializers.CharField(required=False, max_length=Ticket.MAX_NOTE_LEN)
 
     def validate(self, data):
@@ -1895,6 +2095,8 @@ class TicketBulkActionSerializer(WriteSerializer):
             raise serializers.ValidationError('For action "%s" you must specify the note' % action)
         elif action == self.ACTION_CHANGE_TOPIC and not data.get("topic"):
             raise serializers.ValidationError('For action "%s" you must specify the topic' % action)
+        elif action == self.ACTION_CHANGE_TICKETER and not data.get("ticketer"):
+            raise serializers.ValidationError('For action "%s" you must specify the ticketer' % action)
 
         return data
 
@@ -1906,6 +2108,8 @@ class TicketBulkActionSerializer(WriteSerializer):
         assignee = self.validated_data.get("assignee")
         note = self.validated_data.get("note")
         topic = self.validated_data.get("topic")
+        ticketer = self.validated_data.get("ticketer")
+        external_id = self.validated_data.get("external_id")
 
         if action == self.ACTION_ASSIGN:
             Ticket.bulk_assign(org, user, tickets, assignee=assignee, note=note)
@@ -1913,6 +2117,8 @@ class TicketBulkActionSerializer(WriteSerializer):
             Ticket.bulk_add_note(org, user, tickets, note=note)
         elif action == self.ACTION_CHANGE_TOPIC:
             Ticket.bulk_change_topic(org, user, tickets, topic=topic)
+        elif action == self.ACTION_CHANGE_TICKETER:
+            Ticket.bulk_change_ticketer(org, user, tickets, ticketer=ticketer, external_id=external_id)
         elif action == self.ACTION_CLOSE:
             Ticket.bulk_close(org, user, tickets)
         elif action == self.ACTION_REOPEN:
@@ -1971,6 +2177,7 @@ class UserReadSerializer(ReadSerializer):
         OrgRole.VIEWER: "viewer",
         OrgRole.AGENT: "agent",
         OrgRole.SURVEYOR: "surveyor",
+        OrgRole.MARKETING: "marketing",
     }
 
     role = serializers.SerializerMethodField()
@@ -2089,3 +2296,11 @@ class EventFilterSerializer(serializers.Serializer):
     metadata_key = serializers.CharField(required=False)
     metadata_value = serializers.CharField(required=False)
     group_by = serializers.CharField(required=False)
+    silver = serializers.BooleanField(required=False, default=False)
+    table = serializers.CharField(required=False)
+
+    def validate(self, attrs):
+        # If silver is true, table is mandatory
+        if attrs.get("silver") and not attrs.get("table"):
+            raise serializers.ValidationError({"table": ["This field is required when silver=true."]})
+        return attrs

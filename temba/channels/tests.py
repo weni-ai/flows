@@ -140,10 +140,10 @@ class ChannelTest(TembaTest):
         self.login(self.admin)
 
         channel_types = (
-            ("JN", Channel.DEFAULT_ROLE, None, "Channel Log"),
-            ("T", Channel.ROLE_CALL, None, "Call Log"),
-            ("T", Channel.ROLE_SEND + Channel.ROLE_CALL, None, "Channel Log"),
-            ("EX", Channel.ROLE_RECEIVE, ["tel"], "Channel Log"),
+            ("JN", Channel.DEFAULT_ROLE, None, "Channel log"),
+            ("T", Channel.ROLE_CALL, None, "Call log"),
+            ("T", Channel.ROLE_SEND + Channel.ROLE_CALL, None, "Channel log"),
+            ("EX", Channel.ROLE_RECEIVE, ["tel"], "Channel log"),
         )
 
         for channel_type, channel_role, channel_schemes, link_text in channel_types:
@@ -188,12 +188,12 @@ class ChannelTest(TembaTest):
         # should now have the option to disable
         self.login(self.admin)
         response = self.client.get(reverse("channels.channel_read", args=[self.tel_channel.uuid]))
-        self.assertContains(response, "Disable Voice Calling")
+        self.assertContains(response, "Disable voice calling")
 
         # try adding a caller for an invalid channel
         response = self.client.post("%s?channel=20000" % reverse("channels.channel_create_caller"))
         self.assertEqual(200, response.status_code)
-        self.assertFormError(response, "form", "channel", "A caller cannot be added for that number")
+        self.assertFormError(response, "form", "channel", "A caller can't be added for that number")
 
         # disable our twilio connection
         with patch("temba.channels.types.twilio.TwilioType.deactivate"):
@@ -203,7 +203,7 @@ class ChannelTest(TembaTest):
 
         # we should lose our caller
         response = self.client.get(reverse("channels.channel_read", args=[self.tel_channel.uuid]))
-        self.assertNotContains(response, "Disable Voice Calling")
+        self.assertNotContains(response, "Disable voice calling")
 
         # now try and add it back without a twilio connection
         response = self.client.post(reverse("channels.channel_create_caller"), post_data)
@@ -216,9 +216,9 @@ class ChannelTest(TembaTest):
         )
 
     def test_get_channel_type_name(self):
-        self.assertEqual(self.tel_channel.get_channel_type_name(), "Android Phone")
-        self.assertEqual(self.twitter_channel.get_channel_type_name(), "Twitter Channel")
-        self.assertEqual(self.unclaimed_channel.get_channel_type_name(), "Vonage Channel")
+        self.assertEqual(self.tel_channel.get_channel_type_name(), "Android phone")
+        self.assertEqual(self.twitter_channel.get_channel_type_name(), "Twitter channel")
+        self.assertEqual(self.unclaimed_channel.get_channel_type_name(), "Vonage channel")
 
     def test_get_address_display(self):
         self.assertEqual("+250 785 551 212", self.tel_channel.get_address_display())
@@ -370,6 +370,57 @@ class ChannelTest(TembaTest):
         self.assertEqual(1, channel2.triggers.filter(is_active=True).count())
 
     @mock_mailroom
+    def test_release_deactivates_template_translations(self, mr_mocks):
+        from temba.templates.models import TemplateTranslation
+
+        channel = self.create_channel("WA", "WhatsApp", "1234", config={"fb_namespace": "ns"})
+        other_channel = self.create_channel("WA", "WhatsApp 2", "5678", config={"fb_namespace": "ns"})
+
+        translation = TemplateTranslation.get_or_create(
+            channel,
+            "hello",
+            "eng",
+            "US",
+            "Hi {{1}}",
+            1,
+            TemplateTranslation.STATUS_APPROVED,
+            "ext-1",
+            "ns",
+            "UTILITY",
+        )
+        other_translation = TemplateTranslation.get_or_create(
+            other_channel,
+            "hello",
+            "fra",
+            "FR",
+            "Bonjour {{1}}",
+            1,
+            TemplateTranslation.STATUS_APPROVED,
+            "ext-2",
+            "ns",
+            "UTILITY",
+        )
+        template = translation.template
+
+        channel.release(self.admin)
+
+        translation.refresh_from_db()
+        other_translation.refresh_from_db()
+        template.refresh_from_db()
+
+        self.assertFalse(translation.is_active)
+        self.assertTrue(other_translation.is_active)
+        self.assertTrue(template.is_active)
+
+        other_channel.release(self.admin)
+
+        other_translation.refresh_from_db()
+        template.refresh_from_db()
+
+        self.assertFalse(other_translation.is_active)
+        self.assertFalse(template.is_active)
+
+    @mock_mailroom
     def test_release_android(self, mr_mocks):
         android = self.claim_new_android()
         self.assertEqual("FCM111", android.config.get(Channel.CONFIG_FCM_ID))
@@ -395,6 +446,27 @@ class ChannelTest(TembaTest):
 
         # bulk sender was also released
         self.assertFalse(vonage.is_active)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    @patch("temba.msgs.tasks.fail_channel_outgoing_messages")
+    def test_release_enqueues_async_fail(self, mock_task):
+        # create a temporary channel and a pending message
+        temp_channel = Channel.create(
+            self.org,
+            self.user,
+            "RW",
+            "A",
+            name="Temp",
+            address="+250788000999",
+            config={Channel.CONFIG_FCM_ID: "x"},
+        )
+
+        contact = self.create_contact("Foo", phone="+250788000999")
+        self.create_outgoing_msg(contact, "hi", channel=temp_channel, status=Msg.STATUS_PENDING)
+
+        temp_channel.release(self.admin)
+
+        mock_task.delay.assert_called_once_with(temp_channel.id)
 
     def test_list(self):
         # de-activate existing channels
@@ -442,7 +514,7 @@ class ChannelTest(TembaTest):
         self.tel_channel.save()
         response = self.client.get(reverse("channels.channel_list"))
         self.assertContains(response, "Unknown")
-        self.assertContains(response, "Android Phone")
+        self.assertContains(response, "Android phone")
 
     def test_channel_status(self):
         # visit page as a viewer
@@ -621,7 +693,7 @@ class ChannelTest(TembaTest):
         self.assertTrue(len(response.context["latest_sync_events"]) <= 5)
 
         response = self.fetch_protected(reverse("channels.channel_read", args=[self.tel_channel.uuid]), self.admin)
-        self.assertNotContains(response, "Enable Voice")
+        self.assertNotContains(response, "Enable voice calling")
 
         # Add twilio credentials to make sure we can add calling for our android channel
         self.org.config.update({Org.CONFIG_TWILIO_SID: "SID", Org.CONFIG_TWILIO_TOKEN: "TOKEN"})
@@ -629,7 +701,7 @@ class ChannelTest(TembaTest):
 
         response = self.fetch_protected(reverse("channels.channel_read", args=[self.tel_channel.uuid]), self.admin)
         self.assertTrue(self.org.is_connected_to_twilio())
-        self.assertContains(response, "Enable Voice")
+        self.assertContains(response, "Enable voice calling")
 
         two_hours_ago = timezone.now() - timedelta(hours=2)
 
@@ -1502,7 +1574,7 @@ class ChannelCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # fetch delete modal
         response = self.assertDeleteFetch(delete_url, allow_editors=True)
-        self.assertContains(response, "You are about to delete")
+        self.assertContains(response, "You're about to delete")
 
         # submit to delete it
         response = self.assertDeleteSubmit(delete_url, object_deactivated=self.ex_channel, success_status=200)
@@ -1538,7 +1610,7 @@ class ChannelCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # fetch delete modal
         response = self.assertDeleteFetch(delete_url, allow_editors=True)
-        self.assertContains(response, "Disable Bulk Sending")
+        self.assertContains(response, "Disable bulk sending")
 
         # try when delegate is a caller instead
         vonage.role = "C"
@@ -1546,11 +1618,30 @@ class ChannelCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # fetch delete modal
         response = self.assertDeleteFetch(delete_url, allow_editors=True)
-        self.assertContains(response, "Disable Voice Calling")
+        self.assertContains(response, "Disable voice calling")
 
         # submit to delete it - should be redirected to the Android channel page
         response = self.assertDeleteSubmit(delete_url, object_deactivated=vonage, success_status=200)
         self.assertEqual(f"/channels/channel/read/{android.uuid}/", response["Temba-Success"])
+
+    def test_update_and_delete_hidden_copilot_channel(self):
+        copilot_channel = self.create_channel(
+            "WWC",
+            "Weni Web Chat - Copilot",
+            "copilot-address",
+            config={"is_live_desk_copilot": True},
+        )
+
+        update_url = reverse("channels.channel_update", args=[copilot_channel.id])
+        delete_url = reverse("channels.channel_delete", args=[copilot_channel.uuid])
+
+        self.login(self.admin)
+
+        response = self.client.get(update_url)
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.get(delete_url)
+        self.assertEqual(response.status_code, 404)
 
 
 class ChannelEventCRUDLTest(TembaTest):
@@ -1564,8 +1655,8 @@ class ChannelEventCRUDLTest(TembaTest):
         response = self.fetch_protected(list_url, self.user)
 
         self.assertEqual(response.context["object_list"].count(), 2)
-        self.assertContains(response, "Missed Incoming Call")
-        self.assertContains(response, "Incoming Call (600 seconds)")
+        self.assertContains(response, "Missed incoming call")
+        self.assertContains(response, "Incoming call (600 seconds)")
 
 
 class SyncEventTest(SmartminTest):

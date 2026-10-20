@@ -205,7 +205,7 @@ class UserTest(TembaTest):
 
         # enter invalid OTP
         response = self.client.post(verify_url, {"otp": "nope"})
-        self.assertFormError(response, "form", "otp", "Incorrect OTP. Please try again.")
+        self.assertFormError(response, "form", "otp", "Incorrect OTP. Try again.")
 
         # enter valid OTP
         with patch("pyotp.TOTP.verify", return_value=True):
@@ -225,7 +225,7 @@ class UserTest(TembaTest):
 
         # enter invalid backup token
         response = self.client.post(backup_url, {"token": "nope"})
-        self.assertFormError(response, "form", "token", "Invalid backup token. Please try again.")
+        self.assertFormError(response, "form", "token", "Invalid backup token. Try again.")
 
         # enter valid backup token
         response = self.client.post(backup_url, {"token": self.admin.backup_tokens.first()})
@@ -354,7 +354,7 @@ class UserTest(TembaTest):
 
         header = {"HTTP_TEMBA_SPA": 1}
         response = self.client.get(tokens_url, **header)
-        self.assertContains(response, "Regenerate Tokens")
+        self.assertContains(response, "Regenerate tokens")
         self.assertNotContains(response, "gear-container")
 
     def test_two_factor_views(self):
@@ -380,8 +380,8 @@ class UserTest(TembaTest):
 
         # try to submit with invalid OTP and password
         response = self.client.post(enable_url, {"otp": "nope", "password": "wrong"})
-        self.assertFormError(response, "form", "otp", "OTP incorrect. Please try again.")
-        self.assertFormError(response, "form", "password", "Password incorrect.")
+        self.assertFormError(response, "form", "otp", "OTP incorrect. Try again.")
+        self.assertFormError(response, "form", "password", "Password incorrect")
 
         # submit with valid OTP and password
         with patch("pyotp.TOTP.verify", return_value=True):
@@ -395,14 +395,14 @@ class UserTest(TembaTest):
 
         # view backup tokens page
         response = self.client.get(tokens_url)
-        self.assertContains(response, "Regenerate Tokens")
+        self.assertContains(response, "Regenerate tokens")
         self.assertContains(response, disable_url)
 
         tokens = [t.token for t in response.context["backup_tokens"]]
 
         # posting to that page regenerates tokens
         response = self.client.post(tokens_url)
-        self.assertContains(response, "Two-factor authentication backup tokens changed.")
+        self.assertContains(response, "Two-factor authentication backup tokens changed")
         self.assertNotEqual(tokens, [t.token for t in response.context["backup_tokens"]])
 
         # view form to disable 2FA
@@ -415,7 +415,7 @@ class UserTest(TembaTest):
 
         # try to submit with invalid password
         response = self.client.post(disable_url, {"password": "wrong"})
-        self.assertFormError(response, "form", "password", "Password incorrect.")
+        self.assertFormError(response, "form", "password", "Password incorrect")
 
         # submit with valid password
         response = self.client.post(disable_url, {"password": "Administrator"})
@@ -472,7 +472,7 @@ class UserTest(TembaTest):
 
         # try to submit with incorrect password
         response = self.client.post(confirm_url, {"password": "nope"})
-        self.assertFormError(response, "form", "password", "Password incorrect.")
+        self.assertFormError(response, "form", "password", "Password incorrect")
 
         # submit with real password
         response = self.client.post(confirm_url, {"password": "Administrator"})
@@ -497,7 +497,7 @@ class UserTest(TembaTest):
 
         # try to submit with incorrect password
         response = self.client.post(confirm_url, {"password": "nope"})
-        self.assertFormError(response, "form", "password", "Password incorrect.")
+        self.assertFormError(response, "form", "password", "Password incorrect")
 
         # 2 more times..
         self.client.post(confirm_url, {"password": "nope"})
@@ -512,7 +512,7 @@ class UserTest(TembaTest):
 
         # can once again submit incorrect passwords
         response = self.client.post(confirm_url, {"password": "nope"})
-        self.assertFormError(response, "form", "password", "Password incorrect.")
+        self.assertFormError(response, "form", "password", "Password incorrect")
 
         # and also correct ones
         response = self.client.post(confirm_url, {"password": "Administrator"})
@@ -1066,7 +1066,6 @@ class OrgTest(TembaTest):
     def test_country_view(self):
         self.setUpLocations()
 
-        home_url = reverse("orgs.org_home")
         country_url = reverse("orgs.org_country")
 
         rwanda = AdminBoundary.objects.get(name="Rwanda")
@@ -1086,15 +1085,6 @@ class OrgTest(TembaTest):
         self.org.refresh_from_db()
         self.assertEqual("Rwanda", str(self.org.country))
         self.assertEqual("RW", self.org.default_country_code)
-
-        response = self.client.get(home_url)
-        self.assertContains(response, "Rwanda")
-
-        # if location support is disabled in the branding, don't display country formax
-        current_branding = settings.BRANDING["rapidpro.io"]
-        with override_settings(BRANDING={"rapidpro.io": {**current_branding, "location_support": False}}):
-            response = self.client.get(home_url)
-            self.assertNotContains(response, "Rwanda")
 
     def test_default_country(self):
         # if country boundary is set and name is valid country, that has priority
@@ -1159,7 +1149,7 @@ class OrgTest(TembaTest):
 
         email_args = mock_send_temba_email.call_args[0]  # all positional args
 
-        self.assertEqual(email_args[0], "RapidPro Invitation")
+        self.assertEqual(email_args[0], "RapidPro invitation")
         self.assertIn(f"https://app.rapidpro.io/org/join/{invitation.secret}/", email_args[1])
         self.assertNotIn("{{", email_args[1])
         self.assertIn(f"https://app.rapidpro.io/org/join/{invitation.secret}/", email_args[2])
@@ -1175,7 +1165,7 @@ class OrgTest(TembaTest):
         token_obj = RecoveryToken.objects.filter(user=user).first()
 
         email_args = mock_send_temba_email.call_args[0]  # all positional args
-        self.assertEqual(email_args[0], "Password Recovery Request")
+        self.assertEqual(email_args[0], "Password recovery request")
         self.assertIn(f"app.rapidpro.io/users/user/recover/{token_obj.token}/", email_args[1])
         self.assertNotIn("{{", email_args[1])
         self.assertIn(f"app.rapidpro.io/users/user/recover/{token_obj.token}/", email_args[2])
@@ -1232,7 +1222,9 @@ class OrgTest(TembaTest):
         self.org.refresh_from_db()
         self.assertTrue(self.org.is_flagged)
 
-        expected_message = "Sorry, your workspace is currently flagged. To re-enable starting flows and sending messages, please contact support."
+        expected_message = (
+            "Your workspace is currently flagged. To re-enable starting flows and sending messages, contact Support."
+        )
 
         # while we are flagged, we can't send broadcasts
         response = self.client.get(reverse("msgs.broadcast_send"))
@@ -1253,7 +1245,9 @@ class OrgTest(TembaTest):
         self.org.is_suspended = True
         self.org.save(update_fields=("is_suspended",))
 
-        expected_message = "Sorry, your workspace is currently suspended. To re-enable starting flows and sending messages, please contact support."
+        expected_message = (
+            "Your workspace is currently suspended. To re-enable starting flows and sending messages, contact Support."
+        )
 
         response = self.client.get(reverse("msgs.broadcast_send"))
         self.assertContains(response, expected_message)
@@ -1292,7 +1286,7 @@ class OrgTest(TembaTest):
         self.login(self.admin)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "If you use the RapidPro Surveyor application to run flows offline")
+        self.assertContains(response, "If you use the RapidPro Surveyor app to run flows offline")
 
         Org.objects.create(
             name="Another Org",
@@ -1305,7 +1299,7 @@ class OrgTest(TembaTest):
 
         response = self.client.post(url, dict(surveyor_password="nyaruka"))
         self.org.refresh_from_db()
-        self.assertContains(response, "This password is not valid. Choose a new password and try again.")
+        self.assertContains(response, "This password isn&#x27;t valid. Choose a new password and try again.")
         self.assertIsNone(self.org.surveyor_password)
 
         # now try again, but with a unique password
@@ -1382,7 +1376,14 @@ class OrgTest(TembaTest):
         self.assertEqual(response.status_code, 200)
 
         self.assertEqual(
-            [("A", "Administrator"), ("E", "Editor"), ("V", "Viewer"), ("T", "Agent"), ("S", "Surveyor")],
+            [
+                ("A", "Administrator"),
+                ("E", "Editor"),
+                ("V", "Viewer"),
+                ("T", "Agent"),
+                ("S", "Surveyor"),
+                ("M", "Marketing"),
+            ],
             response.context["form"].fields["invite_role"].choices,
         )
 
@@ -1445,7 +1446,7 @@ class OrgTest(TembaTest):
                 "invite_role": "A",
             },
         )
-        self.assertFormError(response, "form", "invite_emails", "One of the emails you entered is invalid.")
+        self.assertFormError(response, "form", "invite_emails", "One of the emails you entered is invalid")
 
         # try again with valid email
         response = self.client.post(
@@ -1536,7 +1537,7 @@ class OrgTest(TembaTest):
                 "invite_role": "V",
             },
         )
-        self.assertFormError(response, "form", "__all__", "A workspace must have at least one administrator.")
+        self.assertFormError(response, "form", "__all__", "A workspace must have at least one administrator")
 
         # try to downgrade ourselves to an editor
         response = self.client.post(
@@ -1550,7 +1551,7 @@ class OrgTest(TembaTest):
                 "invite_role": "V",
             },
         )
-        self.assertFormError(response, "form", "__all__", "A workspace must have at least one administrator.")
+        self.assertFormError(response, "form", "__all__", "A workspace must have at least one administrator")
 
         # finally upgrade agent to admin, downgrade editor to surveyor, remove ourselves entirely and remove last invite
         last_invite = Invitation.objects.last()
@@ -1612,7 +1613,10 @@ class OrgTest(TembaTest):
         )
 
         self.assertFormError(
-            response, "form", "invite_emails", "One of the emails you entered has an existing user on the workspace."
+            response,
+            "form",
+            "invite_emails",
+            "One of the emails you entered belongs to an existing user on the workspace",
         )
 
         # do not allow multiple invite on the same email
@@ -1630,7 +1634,10 @@ class OrgTest(TembaTest):
         )
 
         self.assertFormError(
-            response, "form", "invite_emails", "One of the emails you entered has an existing user on the workspace."
+            response,
+            "form",
+            "invite_emails",
+            "One of the emails you entered belongs to an existing user on the workspace",
         )
 
         # no error for inactive invite
@@ -1647,7 +1654,7 @@ class OrgTest(TembaTest):
             },
         )
 
-        self.assertFormError(response, "form", "invite_emails", "One of the emails you entered is duplicated.")
+        self.assertFormError(response, "form", "invite_emails", "One of the emails you entered is duplicated")
 
         # no error for inactive invite
         response = self.client.post(
@@ -1688,7 +1695,7 @@ class OrgTest(TembaTest):
         editor_invitation.send()
         email_args = mock_send_temba_email.call_args[0]  # all positional args
 
-        self.assertEqual(email_args[0], "RapidPro Invitation")
+        self.assertEqual(email_args[0], "RapidPro invitation")
         self.assertIn("https://app.rapidpro.io/org/join/%s/" % editor_invitation.secret, email_args[1])
         self.assertNotIn("{{", email_args[1])
         self.assertIn("https://app.rapidpro.io/org/join/%s/" % editor_invitation.secret, email_args[2])
@@ -1895,9 +1902,7 @@ class OrgTest(TembaTest):
         # try creating a surveyor account with a bogus password
         post_data = dict(surveyor_password="badpassword")
         response = self.client.post(url, post_data)
-        self.assertContains(
-            response, "Invalid surveyor password, please check with your project leader and try again."
-        )
+        self.assertContains(response, "Invalid surveyor password. Check with your project leader and try again.")
 
         # put a space in the org name to test URL encoding and set a surveyor password
         self.org.name = "Temba Org"
@@ -2107,7 +2112,7 @@ class OrgTest(TembaTest):
                     response,
                     "form",
                     "__all__",
-                    "The Twilio account SID and Token seem invalid. " "Please check them again and retry.",
+                    "The Twilio account SID and token seem invalid. Check them and try again.",
                 )
 
             self.client.post(connect_url, post_data)
@@ -2144,7 +2149,7 @@ class OrgTest(TembaTest):
                     # post without a sid or token, should get a form validation error
                     response = self.client.post(twilio_account_url, dict(disconnect="false"), follow=True)
                     self.assertEqual(
-                        '[{"message": "You must enter your Twilio Account SID", "code": ""}]',
+                        '[{"message": "Enter your Twilio account SID", "code": ""}]',
                         response.context["form"].errors["__all__"].as_json(),
                     )
 
@@ -2216,46 +2221,7 @@ class OrgTest(TembaTest):
 
         self.assertTrue(self.org.has_airtime_transfers())
 
-    def test_prometheus(self):
-        # visit as viewer, no prometheus section
-        self.login(self.user)
-        org_home_url = reverse("orgs.org_home")
-        response = self.client.get(org_home_url)
-
-        self.assertNotContains(response, "Prometheus")
-
-        # admin can see it though
-        self.login(self.admin)
-
-        response = self.client.get(org_home_url)
-        self.assertContains(response, "Prometheus")
-        self.assertContains(response, "Enable Prometheus")
-
-        # enable it
-        prometheus_url = reverse("orgs.org_prometheus")
-        response = self.client.post(prometheus_url, {}, follow=True)
-        self.assertContains(response, "Disable Prometheus")
-
-        # make sure our API token exists
-        prometheus_group = Group.objects.get(name="Prometheus")
-        self.assertTrue(APIToken.objects.filter(org=self.org, role=prometheus_group, is_active=True))
-
-        # other admin sees it enabled too
-        self.other_admin = self.create_user("Other Administrator")
-        self.org.administrators.add(self.other_admin)
-        self.login(self.other_admin)
-
-        response = self.client.get(org_home_url)
-        self.assertContains(response, "Prometheus")
-        self.assertContains(response, "Disable Prometheus")
-
-        # now disable it
-        response = self.client.post(prometheus_url, {}, follow=True)
-        self.assertFalse(APIToken.objects.filter(org=self.org, role=prometheus_group, is_active=True))
-        self.assertContains(response, "Enable Prometheus")
-
     def test_resthooks(self):
-        home_url = reverse("orgs.org_home")
         resthook_url = reverse("orgs.org_resthooks")
 
         # no hitting this page without auth
@@ -2269,9 +2235,6 @@ class OrgTest(TembaTest):
 
         # shouldn't have any resthooks listed yet
         self.assertFalse(response.context["current_resthooks"])
-
-        response = self.client.get(home_url)
-        self.assertContains(response, "You have <b>no flow events</b> configured.")
 
         # try to create one with name that's too long
         response = self.client.post(resthook_url, {"new_slug": "x" * 100})
@@ -2293,10 +2256,6 @@ class OrgTest(TembaTest):
             [{"field": f"resthook_{mother_reg.id}", "resthook": mother_reg}],
             list(response.context["current_resthooks"]),
         )
-
-        # and summarized on org home page
-        response = self.client.get(home_url)
-        self.assertContains(response, "You have <b>1 flow event</b> configured.")
 
         # let's try to create a repeat, should fail due to duplicate slug
         response = self.client.post(resthook_url, {"new_slug": "Mother-Registration"})
@@ -2335,21 +2294,21 @@ class OrgTest(TembaTest):
 
         response = self.client.post(config_url, dict(disconnect="false"), follow=True)
         self.assertEqual(
-            '[{"message": "You must enter a from email", "code": ""}]',
+            '[{"message": "Enter a from email", "code": ""}]',
             response.context["form"].errors["__all__"].as_json(),
         )
         self.assertEqual(len(mail.outbox), 0)
 
         response = self.client.post(config_url, {"from_email": "foobar.com", "disconnect": "false"}, follow=True)
         self.assertEqual(
-            '[{"message": "Please enter a valid email address", "code": ""}]',
+            '[{"message": "Enter a valid email address", "code": ""}]',
             response.context["form"].errors["__all__"].as_json(),
         )
         self.assertEqual(len(mail.outbox), 0)
 
         response = self.client.post(config_url, {"from_email": "foo@bar.com", "disconnect": "false"}, follow=True)
         self.assertEqual(
-            '[{"message": "You must enter the SMTP host", "code": ""}]',
+            '[{"message": "Enter the SMTP host", "code": ""}]',
             response.context["form"].errors["__all__"].as_json(),
         )
         self.assertEqual(len(mail.outbox), 0)
@@ -2360,7 +2319,7 @@ class OrgTest(TembaTest):
             follow=True,
         )
         self.assertEqual(
-            '[{"message": "You must enter the SMTP username", "code": ""}]',
+            '[{"message": "Enter the SMTP username", "code": ""}]',
             response.context["form"].errors["__all__"].as_json(),
         )
         self.assertEqual(len(mail.outbox), 0)
@@ -2376,7 +2335,7 @@ class OrgTest(TembaTest):
             follow=True,
         )
         self.assertEqual(
-            '[{"message": "You must enter the SMTP password", "code": ""}]',
+            '[{"message": "Enter the SMTP password", "code": ""}]',
             response.context["form"].errors["__all__"].as_json(),
         )
         self.assertEqual(len(mail.outbox), 0)
@@ -2393,7 +2352,7 @@ class OrgTest(TembaTest):
             follow=True,
         )
         self.assertEqual(
-            '[{"message": "You must enter the SMTP port", "code": ""}]',
+            '[{"message": "Enter the SMTP port", "code": ""}]',
             response.context["form"].errors["__all__"].as_json(),
         )
         self.assertEqual(len(mail.outbox), 0)
@@ -2413,7 +2372,7 @@ class OrgTest(TembaTest):
                 follow=True,
             )
             self.assertEqual(
-                '[{"message": "Failed to send email with STMP server configuration with error \'SMTP Error\'", "code": ""}]',
+                '[{"message": "Couldn\'t send email with SMTP server configuration. Error: \'SMTP Error\'", "code": ""}]',
                 response.context["form"].errors["__all__"].as_json(),
             )
             self.assertEqual(len(mail.outbox), 0)
@@ -2432,7 +2391,7 @@ class OrgTest(TembaTest):
                 follow=True,
             )
             self.assertEqual(
-                '[{"message": "Failed to send email with STMP server configuration", "code": ""}]',
+                '[{"message": "Couldn\'t send email with SMTP server configuration", "code": ""}]',
                 response.context["form"].errors["__all__"].as_json(),
             )
             self.assertEqual(len(mail.outbox), 0)
@@ -2518,7 +2477,7 @@ class OrgTest(TembaTest):
 
         # should have error for blank password
         self.assertEqual(
-            '[{"message": "You must enter the SMTP password", "code": ""}]',
+            '[{"message": "Enter the SMTP password", "code": ""}]',
             response.context["form"].errors["__all__"].as_json(),
         )
 
@@ -2582,6 +2541,40 @@ class OrgTest(TembaTest):
             },
         )
 
+    def test_home_hides_preview_channels(self):
+        self.login(self.admin)
+
+        preview_channel = self.create_channel(
+            "WWC",
+            "Weni Web Chat - Preview",
+            "preview-channel",
+            org=self.org,
+            config={"preview": True},
+        )
+
+        response = self.client.get(reverse("orgs.org_home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.channel.name)
+        self.assertNotContains(response, preview_channel.name)
+
+    def test_home_hides_copilot_channels(self):
+        self.login(self.admin)
+
+        copilot_channel = self.create_channel(
+            "WWC",
+            "Weni Web Chat - Copilot",
+            "copilot-channel",
+            org=self.org,
+            config={"is_live_desk_copilot": True},
+        )
+
+        response = self.client.get(reverse("orgs.org_home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.channel.name)
+        self.assertNotContains(response, copilot_channel.name)
+
     @patch("temba.channels.types.vonage.client.VonageClient.check_credentials")
     def test_connect_vonage(self, mock_check_credentials):
         self.login(self.admin)
@@ -2614,7 +2607,7 @@ class OrgTest(TembaTest):
 
         # post without API token, should get validation error
         response = self.client.post(account_url, {"disconnect": "false"})
-        self.assertFormError(response, "form", "__all__", "You must enter your account API Key")
+        self.assertFormError(response, "form", "__all__", "Enter your account API key")
 
         # vonage config should remain the same
         self.org.refresh_from_db()
@@ -2661,9 +2654,7 @@ class OrgTest(TembaTest):
                 401, "Could not verify your access level for that URL." "\nYou have to login with proper credentials"
             )
             response = self.client.post(connect_url, dict(auth_id="auth-id", auth_token="auth-token"))
-            self.assertContains(
-                response, "Your Plivo auth ID and auth token seem invalid. Please check them again and retry."
-            )
+            self.assertContains(response, "Your Plivo auth ID and auth token seem invalid. Check them and try again.")
             self.assertFalse(Channel.CONFIG_PLIVO_AUTH_ID in self.client.session)
             self.assertFalse(Channel.CONFIG_PLIVO_AUTH_TOKEN in self.client.session)
 
@@ -2792,7 +2783,7 @@ class OrgTest(TembaTest):
         session.save()
 
         response = self.client.get(reverse("orgs.org_home"))
-        self.assertNotContains(response, "Manage Workspaces")
+        self.assertNotContains(response, "Manage workspaces")
 
         # attempting to manage orgs should redirect
         response = self.client.get(reverse("orgs.org_sub_orgs"))
@@ -2824,7 +2815,7 @@ class OrgTest(TembaTest):
         # now we can manage our orgs
         response = self.client.get(reverse("orgs.org_sub_orgs"))
         self.assertEqual(200, response.status_code)
-        self.assertContains(response, "Workspaces")
+        self.assertContains(response, "Manage workspaces")
 
         # and add topups
         self.assertContains(response, reverse("orgs.org_transfer_credits"))
@@ -2860,7 +2851,7 @@ class OrgTest(TembaTest):
         # try to transfer more than we have
         post_data = dict(from_org=self.org.id, to_org=sub_org.id, amount=1500)
         response = self.client.post(reverse("orgs.org_transfer_credits"), post_data)
-        self.assertContains(response, "Pick a different workspace to transfer from")
+        self.assertContains(response, "Select a different workspace to transfer from")
 
         # now transfer some credits
         post_data = dict(from_org=self.org.id, to_org=sub_org.id, amount=600)
@@ -2872,7 +2863,7 @@ class OrgTest(TembaTest):
 
         headers = {"HTTP_TEMBA_SPA": 1}
         response = self.client.get("%s?org=%d" % (reverse("orgs.org_manage_accounts_sub_org"), sub_org.id), **headers)
-        self.assertContains(response, "Edit Workspace")
+        self.assertContains(response, "Edit workspace")
 
         # edit our sub org's details
         response = self.client.post(
@@ -3079,7 +3070,7 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.client.get(reverse("orgs.org_workspace"))
 
         # make sure we have the appropriate number of sections
-        self.assertContains(response, "Transfer Credits")
+        self.assertContains(response, "Transfer credits")
 
         # should have an extra menu option for our child (and section header)
         self.assertMenu(f"{reverse('orgs.org_menu')}settings/", 16)
@@ -3227,7 +3218,7 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
                 "password": "password",
             },
         )
-        self.assertFormError(response, "form", None, "Login already exists, please do not include password.")
+        self.assertFormError(response, "form", None, "Login already exists. Don't include a password.")
 
         # try to create a new user with empty password
         response = self.client.post(
@@ -3242,7 +3233,7 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
                 "password": "",
             },
         )
-        self.assertFormError(response, "form", None, "Password required for new login.")
+        self.assertFormError(response, "form", None, "Password required for new login")
 
         # try to create a new user with invalid password
         response = self.client.post(
@@ -3474,7 +3465,7 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
         post_data = dict(email="bill@msn.com", current_password="HelloWorld1")
         response = self.client.post(reverse("orgs.user_edit"), post_data)
         self.assertEqual(200, response.status_code)
-        self.assertFormError(response, "form", "email", "Sorry, that email address is already taken.")
+        self.assertFormError(response, "form", "email", "That email address is already being used")
 
         post_data = dict(
             email="myal@wr.org",
@@ -3531,7 +3522,7 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.requestView(choose_url, self.non_org_user)
         self.assertLoginRedirect(response)
         response = self.client.get("/users/login/")
-        self.assertContains(response, "No organizations for this account, please contact your administrator.")
+        self.assertContains(response, "No organizations found for this account. Contact your administrator.")
 
         # unless they are Customer Support
         Group.objects.get(name="Customer Support").user_set.add(self.non_org_user)
@@ -3896,12 +3887,12 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # create a new contact
         response = self.client.post(
-            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__tel__0="0788123123")
+            reverse("contacts.contact_create"), data=dict(name="Ben Haggerty", urn__whatsapp__0="0788123123")
         )
         self.assertNoFormErrors(response)
 
         # make sure that contact's created on is our cs rep
-        contact = Contact.objects.get(urns__path="+250788123123", org=self.org)
+        contact = Contact.objects.get(name="Ben Haggerty", org=self.org)
         self.assertEqual(self.csrep, contact.created_by)
 
         # make sure we can manage topups as well
@@ -3936,7 +3927,7 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # check summary on home page
         response = self.requestView(home_url, self.admin)
-        self.assertContains(response, "Your workspace is configured to use a single language.")
+        self.assertContains(response, "Your workspace is configured to use a single language")
 
         self.assertUpdateFetch(
             langs_url,
@@ -3966,7 +3957,7 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # summary now includes this
         response = self.requestView(home_url, self.admin)
-        self.assertContains(response, "The default flow language is <b>French</b>.")
+        self.assertContains(response, "The default flow language is <b>French</b>")
         self.assertNotContains(response, "Translations are provided in")
 
         # and now give it additional languages
@@ -3982,7 +3973,7 @@ class OrgCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertEqual(["fra", "hat", "hau"], self.org.flow_languages)
 
         response = self.requestView(home_url, self.admin)
-        self.assertContains(response, "The default flow language is <b>French</b>.")
+        self.assertContains(response, "The default flow language is <b>French</b>")
         self.assertContains(response, "Translations are provided in")
         self.assertContains(response, "<b>Hausa</b>")
 
@@ -4077,7 +4068,7 @@ class BulkExportTest(TembaTest):
         post_data = dict(import_file=open("%s/test_flows/too_old.json" % settings.MEDIA_ROOT, "rb"))
         response = self.client.post(reverse("orgs.org_import"), post_data)
         self.assertFormError(
-            response, "form", "import_file", "This file is no longer valid. Please export a new version and try again."
+            response, "form", "import_file", "This file is no longer valid. Export a new version and try again."
         )
 
         # try a file which can be migrated forwards
@@ -4095,7 +4086,7 @@ class BulkExportTest(TembaTest):
             validate.side_effect = Exception("Unexpected Error")
             post_data = dict(import_file=open("%s/test_flows/new_mother.json" % settings.MEDIA_ROOT, "rb"))
             response = self.client.post(reverse("orgs.org_import"), post_data)
-            self.assertFormError(response, "form", "import_file", "Sorry, your import file is invalid.")
+            self.assertFormError(response, "form", "import_file", "Your import file is invalid")
 
             # trigger import failed, new flows that were added should get rolled back
             self.assertIsNone(Flow.objects.filter(org=self.org, name="New Mother").first())
@@ -4104,12 +4095,12 @@ class BulkExportTest(TembaTest):
         junk_binary_data = io.BytesIO(b"\x00!\x00b\xee\x9dh^\x01\x00\x00\x04\x00\x02[Content_Types].xml \xa2\x04\x02(")
         post_data = dict(import_file=junk_binary_data)
         response = self.client.post(reverse("orgs.org_import"), post_data)
-        self.assertFormError(response, "form", "import_file", "This file is not a valid flow definition file.")
+        self.assertFormError(response, "form", "import_file", "This file isn't a valid flow definition file")
 
         junk_json_data = io.BytesIO(b'{"key": "data')
         post_data = dict(import_file=junk_json_data)
         response = self.client.post(reverse("orgs.org_import"), post_data)
-        self.assertFormError(response, "form", "import_file", "This file is not a valid flow definition file.")
+        self.assertFormError(response, "form", "import_file", "This file isn't a valid flow definition file")
 
     def test_import_campaign_with_translations(self):
         self.import_file("campaign_import_with_translations")
@@ -4693,7 +4684,7 @@ class CreditAlertTest(TembaTest):
         sent_email = mail.outbox[0]
         self.assertEqual(1, len(sent_email.to))
         self.assertIn("RapidPro workspace for Temba", sent_email.body)
-        self.assertIn("expiring credits in less than one month.", sent_email.body)
+        self.assertIn("credits expiring in less than one month.", sent_email.body)
 
         # check topup expiration, it should no create a new one, because last one is still active
         check_topup_expiration_task()
@@ -4775,7 +4766,7 @@ class CreditAlertTest(TembaTest):
                 sent_email = mail.outbox[0]
                 self.assertEqual(len(sent_email.to), 1)
                 self.assertIn("RapidPro workspace for Temba", sent_email.body)
-                self.assertIn("is out of credit.", sent_email.body)
+                self.assertIn("has no credits left.", sent_email.body)
 
                 # no new alert if one is sent and no new email
                 CreditAlert.check_org_credits()
@@ -4877,7 +4868,7 @@ class StripeCreditsTest(TembaTest):
         # assert we sent our confirmation emai
         self.assertEqual(1, len(mail.outbox))
         email = mail.outbox[0]
-        self.assertEqual("RapidPro Receipt", email.subject)
+        self.assertEqual("RapidPro receipt", email.subject)
         self.assertIn("Rudolph", email.body)
         self.assertIn("Visa", email.body)
         self.assertIn("$20", email.body)
@@ -4917,7 +4908,7 @@ class StripeCreditsTest(TembaTest):
         # assert we sent our confirmation emai
         self.assertEqual(1, len(mail.outbox))
         email = mail.outbox[0]
-        self.assertEqual("RapidPro Receipt", email.subject)
+        self.assertEqual("RapidPro receipt", email.subject)
         self.assertIn("bitcoin", email.body)
         self.assertIn("abcde", email.body)
         self.assertIn("$20", email.body)
@@ -5012,7 +5003,7 @@ class StripeCreditsTest(TembaTest):
         # assert we sent our confirmation email
         self.assertEqual(1, len(mail.outbox))
         email = mail.outbox[0]
-        self.assertEqual("RapidPro Receipt", email.subject)
+        self.assertEqual("RapidPro receipt", email.subject)
         self.assertIn("Rudolph", email.body)
         self.assertIn("Visa", email.body)
         self.assertIn("$20", email.body)
@@ -5023,9 +5014,7 @@ class StripeCreditsTest(TembaTest):
             self.org.add_credits("2000", "stripe-token", self.admin)
             self.fail("should have thrown")
         except ValidationError as e:
-            self.assertEqual(
-                "Sorry, your card was declined, please contact your provider or try another card.", e.message
-            )
+            self.assertEqual("Your card was declined. Contact your provider or try another card.", e.message)
 
         # do it again with a different user, should create a new stripe customer
         self.org.add_credits("2000", "stripe-token", self.admin2)
@@ -5080,6 +5069,134 @@ class OrgActivityTest(TembaTest):
         self.assertEqual(1, activity.plan_active_contact_count)
 
 
+class UniqueContactCountTest(TembaTest):
+    @patch("temba.orgs.tasks.Elasticsearch")
+    def test_update_unique_contact_counts_task(self, mock_es_class):
+        """Test the update_unique_contact_counts task creates records from ES data."""
+        from temba.orgs.models import UniqueContactCount
+        from temba.orgs.tasks import update_unique_contact_counts
+
+        # Setup mock ES client
+        mock_es_instance = mock_es_class.return_value
+        mock_es_instance.count.return_value = {"count": 42}
+
+        # Run the task for a specific date
+        update_unique_contact_counts(target_date="2026-01-15")
+
+        # Verify ES was queried for each active org
+        self.assertTrue(mock_es_instance.count.called)
+
+        # Verify records were created
+        count_record = UniqueContactCount.objects.filter(org=self.org, day="2026-01-15").first()
+        self.assertIsNotNone(count_record)
+        self.assertEqual(count_record.count, 42)
+
+    @patch("temba.orgs.tasks.Elasticsearch")
+    def test_update_unique_contact_counts_defaults_to_yesterday(self, mock_es_class):
+        """Test that without target_date, the task fetches yesterday's data."""
+        from temba.orgs.models import UniqueContactCount
+        from temba.orgs.tasks import update_unique_contact_counts
+
+        mock_es_instance = mock_es_class.return_value
+        mock_es_instance.count.return_value = {"count": 10}
+
+        # Run the task without target_date
+        update_unique_contact_counts()
+
+        # Should create record for yesterday
+        yesterday = (timezone.now() - timedelta(days=1)).date()
+        count_record = UniqueContactCount.objects.filter(org=self.org, day=yesterday).first()
+        self.assertIsNotNone(count_record)
+
+    @patch("temba.orgs.tasks.Elasticsearch")
+    def test_update_unique_contact_counts_updates_existing(self, mock_es_class):
+        """Test that running the task again updates existing records."""
+        from temba.orgs.models import UniqueContactCount
+        from temba.orgs.tasks import update_unique_contact_counts
+
+        # Create existing record
+        UniqueContactCount.objects.create(org=self.org, day="2026-01-15", count=5)
+
+        mock_es_instance = mock_es_class.return_value
+        mock_es_instance.count.return_value = {"count": 99}
+
+        # Run the task
+        update_unique_contact_counts(target_date="2026-01-15")
+
+        # Verify record was updated (not duplicated)
+        count_records = UniqueContactCount.objects.filter(org=self.org, day="2026-01-15")
+        self.assertEqual(count_records.count(), 1)
+        self.assertEqual(count_records.first().count, 99)
+
+    @patch("temba.orgs.tasks.settings")
+    def test_update_unique_contact_counts_skips_if_no_es_url(self, mock_settings):
+        """Test that task does nothing if ELASTICSEARCH_URL is not configured."""
+        from temba.orgs.models import UniqueContactCount
+        from temba.orgs.tasks import update_unique_contact_counts
+
+        mock_settings.ELASTICSEARCH_URL = None
+
+        # Run the task
+        update_unique_contact_counts(target_date="2026-01-15")
+
+        # No records should be created
+        self.assertEqual(UniqueContactCount.objects.count(), 0)
+
+    @patch("sentry_sdk.capture_exception")
+    @patch("time.sleep")
+    @patch("temba.orgs.tasks.Elasticsearch")
+    def test_update_unique_contact_counts_retries_and_reports_to_sentry(self, mock_es_class, mock_sleep, mock_capture):
+        """Test that ES errors trigger retries and report to Sentry after exhausting retries."""
+        from temba.orgs.models import UniqueContactCount
+        from temba.orgs.tasks import ORG_MAX_RETRIES, update_unique_contact_counts
+
+        mock_es_instance = mock_es_class.return_value
+
+        # First org fails all retries, second org succeeds
+        # Need ORG_MAX_RETRIES failures for org1, then 1 success for org2
+        side_effects = [Exception("ES error")] * ORG_MAX_RETRIES + [{"count": 50}]
+        mock_es_instance.count.side_effect = side_effects
+
+        # Run the task (should continue after error and report to Sentry)
+        update_unique_contact_counts(target_date="2026-01-15")
+
+        # Sentry should have been called for the failed org
+        self.assertTrue(mock_capture.called)
+
+        # At least one record should be created (for org2)
+        records = UniqueContactCount.objects.filter(day="2026-01-15")
+        self.assertEqual(records.count(), 1)
+
+    @patch("time.sleep")
+    @patch("temba.orgs.tasks.Elasticsearch")
+    def test_update_unique_contact_counts_retries_on_transient_error(self, mock_es_class, mock_sleep):
+        """Test that transient errors are retried and succeed."""
+        from temba.orgs.models import UniqueContactCount
+        from temba.orgs.tasks import update_unique_contact_counts
+
+        mock_es_instance = mock_es_class.return_value
+
+        # First call fails, second succeeds (within retry limit)
+        mock_es_instance.count.side_effect = [
+            Exception("Transient error"),
+            {"count": 42},
+            {"count": 50},  # for org2
+        ]
+
+        update_unique_contact_counts(target_date="2026-01-15")
+
+        # Both orgs should have records
+        records = UniqueContactCount.objects.filter(day="2026-01-15")
+        self.assertEqual(records.count(), 2)
+
+    def test_unique_contact_count_model_str(self):
+        """Test the string representation of UniqueContactCount."""
+        from temba.orgs.models import UniqueContactCount
+
+        count = UniqueContactCount.objects.create(org=self.org, day="2026-01-15", count=100)
+        self.assertEqual(str(count), f"{self.org.name} - 2026-01-15: 100")
+
+
 class BackupTokenTest(TembaTest):
     def test_model(self):
         admin_tokens = BackupToken.generate_for_user(self.admin)
@@ -5118,7 +5235,9 @@ class UserCRUDLTestCase(TestCase):
 
         self.assertFalse(form.is_valid())
         self.assertIn("email", form.errors)
-        expected_error = "You have exceeded the maximum number of attempts, please try again in {settings.USER_RECOVER_TIME_INTERVAL} hours!"
+        expected_error = (
+            "You've exceeded the maximum number of attempts. Try again in {settings.USER_RECOVER_TIME_INTERVAL} hours."
+        )
         self.assertEqual(form.errors["email"][0], expected_error)
 
     @patch("django.core.cache.cache.get_or_set")

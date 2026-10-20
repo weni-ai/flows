@@ -17,8 +17,8 @@
           %form#login-form(method="post" action="{% url 'users.user_login' %}?next={% url 'orgs.org_join_accept' secret %}")
             %fieldset
               .control-group
-                %temba-textinput#id_username(type="text" name="username" maxlenght="150" label="{% trans 'Email Address' %}" value="{{email}}" disabled)
+                %temba-textinput#id_username(type="text" name="username" maxlenght="150" label="{% trans 'Email address' %}" value="{{email}}" disabled)
               .control-group
-                %temba-textinput#id_password(type="password" name="password" label="{% trans 'Password' %}" placeholder="{% trans 'Your password, at least eight letters please' %}" password)
+                %temba-textinput#id_password(type="password" name="password" label="{% trans 'Password' %}" placeholder="{% trans 'Your password (should be at least eight characters)' %}" password)
             -csrf_token
             %input.button-primary{type:"submit", value:"Login"}

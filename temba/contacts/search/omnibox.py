@@ -77,7 +77,7 @@ def omnibox_mixed_search(org, query, types):
     """
     query_terms = query.split(" ") if query else None
     search_types = types or (SEARCH_ALL_GROUPS, SEARCH_CONTACTS, SEARCH_URNS)
-    per_type_limit = 25
+    per_type_limit = 50
     results = []
 
     if SEARCH_ALL_GROUPS in search_types or SEARCH_STATIC_GROUPS in search_types:
@@ -88,7 +88,12 @@ def omnibox_mixed_search(org, query, types):
             groups = groups.filter(query=None)
 
         if query:
-            groups = term_search(groups, ("name__icontains",), query_terms)
+            # try full query matching first
+            groups = groups.filter(name__icontains=query)
+
+            # if no matches, try partial matching
+            if groups.count() == 0:
+                groups = term_search(groups, ("name__icontains",), query_terms)
 
         results += list(groups.order_by(Upper("name"))[:per_type_limit])
 

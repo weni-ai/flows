@@ -198,7 +198,7 @@ class LuisTypeTest(TembaTest):
                 "slot": "staging",
             },
         )
-        self.assertFormError(response, "form", "__all__", "App has not yet been published to staging slot.")
+        self.assertFormError(response, "form", "__all__", "App hasn't been published to staging slot yet")
 
         # simulate wrong prediction credentials
         mock_predict.side_effect = RequestException(

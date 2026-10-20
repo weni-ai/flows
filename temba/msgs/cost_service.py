@@ -25,7 +25,7 @@ class BillingInternalClient(BaseInternalClient):
     def get_pricing(self, project=None):
         params = {}
         if project:
-            params["project"] = project
+            params["project_uuid"] = project
         response = requests.get(
             self.get_url("/api/v1/meta-pricing/"), headers=self.authenticator.headers, params=params, timeout=10
         )

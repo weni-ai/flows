@@ -1,3 +1,487 @@
+3.101.0
+----------
+* feat: add internal ticketer list GET and item GET/PUT/DELETE on the existing ticketer endpoints
+
+3.100.2
+----------
+* feat: JWT public key to env variable
+
+3.100.1
+----------
+* feat: Remove channel type validation in whatsapp broadcast API again
+
+3.100.0
+----------
+* feat: named WhatsApp template parameters — record parameter format/names, accept named broadcast values, resolve per recipient
+* fix: Translate global form labels and cancel buttons
+
+3.99.0
+----------
+* feat: add validation for Instagram comment ID and response type in WhatsappBroadcastWriteSerializer
+
+3.98.0
+----------
+* feat: Create a hidden WWC Copilot channel when projects are created via EDA with is_live_desk_copilot=True
+
+3.97.1
+----------
+* feat: Remove channel type validation in whatsapp broadcast API
+
+3.97.0
+----------
+* feat: add WA Conversation Handovers app
+
+3.96.0
+----------
+* feat: Full localization review of the project for the officially supported languages: EN (source), ES, PT and RO.
+
+3.95.0
+----------
+* feat: add speckit
+* feat: add broadcast flows trigger group
+
+3.94.2
+----------
+* fix: normalizing whatsapp urn on create
+
+3.94.1
+----------
+* feat: increase flow start params string limit from 640 to 4096
+* fix: add break-all to CTWA contact fields to prevent overflow
+
+3.94.0
+----------
+* feat: add search functionality to ListCtwaReferralSource API
+* feat: collapse legacy CTWA referral sources into single canonical row per org
+* feat: add date formatting utility for Datalake events
+
+3.93.1
+----------
+* feat: refactored api gateway implementation
+
+3.93.0
+----------
+* feat: integrate CTWA events into contact detail view
+* feat: Add CTWA referral sources internal API endpoint
+* feat: enhance CtwaReferralSource model with org field and backfill functionality
+* feat: implement Courier fixed access token authentication and add conversation_started event type
+
+3.92.0
+----------
+* feat: add CtwaReferralSource model and enhance CTWA with new fields
+
+3.91.0
+----------
+* feat: add URN support in multiple languages and update contact templates
+* chore: remove structured logging from EDA consumers
+* feat: Add whatsapp contacts without numbers dynamic group
+
+3.90.3
+----------
+* Avoid get template translations from a inactive channel
+* Handle lock not owned error in nonoverlapping tasks
+
+3.90.2
+----------
+* fix: guard broadcast statistics sent/delivered counters against out-of-order DLRs
+
+3.90.1
+----------
+* fix: sanitize unpaired Unicode surrogates in WhatsApp Flow assets sync
+
+3.90.0
+----------
+* feat: add whatsapp bsuid urn validation
+
+3.89.0
+----------
+* fix: Migrate project consumer to AmazonMQ
+
+3.88.1
+----------
+* fix: adding missing dynamodb ambiente variables
+
+3.88.0
+----------
+* feat: first api gateway implementation
+
+3.87.2
+----------
+* feat: change header for import contacts spreadsheet to URN:whatsapp default
+
+3.87.1
+----------
+* feat: create commando to inspect flows by org or flow ids
+
+3.87.0
+----------
+* feat: implement template category update functionality in WhatsApp tasks
+
+3.86.1
+----------
+* Add classifier, flow, global, and ticket permissions to Marketing group
+* Endpoint to update waba in WAC
+
+3.86.0
+----------
+* feat: add marketing_opt_in field to contact updates
+* feat: add request_contact_info to interaction_type in the WhatsappBroadcastsEndpoint documentation
+
+3.85.0
+----------
+* fix: map project INACTIVE status to is_suspended instead of is_active to prevent contacts module failures
+* feat: revert whatsapp and tel urns normalization for old stable state
+* feat: allow none topic on open ticket if is not wenichats
+
+3.84.0
+----------
+* feat: add ChannelMarketingTags functionality
+
+3.83.2
+----------
+* feat: enhance squash flowpathcount
+
+3.83.1
+----------
+* feat: extend InternalChannelView with billing dual auth and additive fields
+
+3.83.0
+----------
+* feat: default bare phone URNs to whatsapp on API, import and contact create form
+
+3.82.0
+----------
+* feat: add internal endpoint for ticketer creation
+
+3.81.1
+----------
+* fix: fall back to local filtering when exporting flow results from archives with records that exceed the S3 Select limit (OverMaxRecordSize)
+* feat: add queue porpuse in get departments
+
+3.81.0
+----------
+* feat: add generic ticketer type
+
+3.80.1
+----------
+* fix: adjust Instagram page access token pagination check and improve token refresh validation message
+
+3.80.0
+----------
+* feat: improve endpoint to search contacts in elastic excluding the 9th digit
+
+3.79.0
+----------
+* feat: enable carousel in catalog messages for WhatsApp broadcasts
+
+3.78.0
+----------
+* feat: validate contact name length (1-100 characters) and validate phone number length (8-15 digits, ignoring "+")
+
+3.77.1
+----------
+* feat: add date filter in tickets endpoint
+* feat: add vtex_account to auto-create contact fields
+
+3.77.0
+----------
+* Fix error on change_ticketer
+* feat: enhance WhatsApp URN validation and formatting
+
+3.76.1
+----------
+* feat(serializers): add validation for direct_send_template_name
+
+3.76.0
+----------
+* feat: Add session field to auto-create contact fields
+
+3.75.1
+----------
+* fix: Restructure FastAPI initialization and improve module imports
+
+3.75.0
+----------
+* feat: Add FastAPI server configuration to Docker start script
+* feat: FastAPI endpoint for WhatsApp broadcasts
+
+3.74.0
+----------
+* feat: Avoid subdomain error in Zendesk integration
+* feat: Update filter_templates endpoint documentation
+* feat: Add JWT authentication on internal first contacts endpoint
+
+3.73.0
+----------
+* Add sector_uuid filter in ticketer.json API
+* Add change_ticketer action in TicketActions endpoint
+
+3.72.0
+----------
+* feat: Implement Idempotency-Key support for WhatsApp broadcasts endpoint
+
+3.71.2
+----------
+* feat: Add email field to fallback auto-creation in contact updates
+
+3.71.1
+----------
+* Increase batch lenght in WhatsAppbroadcast API
+
+3.71.0
+----------
+* Allow use underscore in label contact field name
+* Update weni-rp-apps version to 2.10.9
+* Add token deactivation in user permission deletion
+
+3.70.4
+----------
+* feat: Add consumer action to update project type (is_multy_agents | True or False)
+* feat: Update project creation consumer to set org config is_multi_agents | True or False from inline_agent_switch field from body event
+
+3.70.3
+----------
+* feat: Add overpass to missing user_email in InternalContactFieldsEndpoint
+
+3.70.2
+----------
+* fix: Update contact field resolution to skip inactive fields and auto-create new active fields
+
+3.70.1
+----------
+* feat: Add voice_mode key on preview channel creation
+
+3.70.0
+----------
+* refactor: remove billing stream publication method
+* feat: Endpoint to clear contacts fields
+* feat: Create WWC channel after project creation
+
+3.65.1
+----------
+* fix: Add WWC in WhatsappBroadcast write serializer
+
+3.65.0
+----------
+* feat: add catalog message structure to WhatsappBroadcastsEndpoint
+* feat: add validation for direct_send and ttl_seconds in WhatsappBroadcastWriteSerializer
+* feat: implement fallback logic for auto-creating contact fields during updates
+
+3.64.0
+----------
+* feat: Adding internal endpoint that returns the first incoming message per distinct contact URN for a given channel and time range
+* feat: Adding timezone on Org (Project) update via EDA
+
+3.63.0
+----------
+* feat: Adding attribute validation for JWT users
+
+3.62.0
+----------
+* feat: Adding optional jwt auth on v2 endpoints
+
+3.61.0
+----------
+* feat: s3 bucket proxy to more than 1 bucket
+* feat: Update CI to avoid error
+* fix(tests): Update error messages in ChannelElevenLabsApiKeyViewTest
+
+3.60.0
+----------
+* fix: Propagates language to Flows on project creation via EDA
+
+3.59.0
+----------
+* feat: Add ElevenLabs API key endpoint
+
+3.58.1
+----------
+* feat: Update refresh teams token schedule time to 30 minutes
+
+3.58.0
+----------
+* feat: s3 proxy endpoint
+* fix: changing log level warning for pika-eda lib
+
+3.57.3
+----------
+* fix: amazon mq publisher
+
+3.57.2
+----------
+* feat: create health check events endpoint
+
+3.57.1
+----------
+* fix: poetry lock
+
+3.57.0
+----------
+* feat: Add support for carousel messages in WhatsApp broadcasts and update validation to include carousel in required fields
+* feat: amazon-mq-publisher
+
+3.56.0
+----------
+* feat: creating view to count all messages and unique contact messages
+
+3.55.0
+----------
+* feat: new events endpoint with pagination
+* feat: Add limit in messages.json endpoint
+
+3.54.1
+----------
+* feat: Avoid null contact_urn in filter_template endpoint
+
+3.54.0
+----------
+* feat: implementing parallel test running to decrease pipeline slow runtime
+
+3.53.1
+----------
+* feat: Add contact_uuid and contact_urn in filter_template endpoint
+
+3.53.0
+----------
+* feat: Endpoint to save msg without pass to mailroom
+
+3.52.0
+----------
+* feat: msg count endpoint
+* feat: changing whatsapp broadcast internal response
+
+3.51.0
+----------
+* feat: Add is_carousel and carousel fields to WhatsappBroadcastWriteSerializer and update corresponding tests
+
+3.50.1
+----------
+* update: coverage-version
+
+3.50.0
+----------
+* feat: updating python and poetry
+* update: weni-rp-apps-2.10.8
+
+3.49.1
+----------
+* feat: Delay Hotjar tracking script execution until DOM is fully loaded
+* feat: smtp server config
+
+3.49.0
+----------
+* Add Marketing role and permissions to Org model and related functions
+
+3.48.0
+----------
+* Add project event consumer
+* Update OpenTicketSerializer to make conversation_started_on field optional
+
+3.47.4
+----------
+* Feat/adding seconds on history logs
+* Feat/refactor is org
+
+3.47.3
+----------
+* Update @weni/flow-editor dependency to version 3.6.5
+
+3.47.2
+----------
+* Add is_mutable in Flow Import API
+
+3.47.1
+----------
+* Fix read status trigger
+* Update events.json API doc
+
+3.47.0
+----------
+* Changing log error to see if the getbyhostname will still fail on tests
+* Feature/adding jwt auth to 3 endpoints 
+
+3.46.1
+----------
+* Adjust Broadcast Statistics trigger count
+* Add v2 option in refresh teams token
+
+3.46.0
+----------
+* Implementing optional jwt auth on 2 endpoints
+* Endpoint and validation to avoid contact duplication in contacts count
+
+3.45.2
+----------
+* Fix: package-lock.json issue
+
+3.45.1
+----------
+* Fix: floweditor lock file issue
+
+3.45.0
+----------
+* Add locale field to WhatsApp broadcast template documentation
+* Change FlowPathCount squash to avoid distinct on query
+* Update @weni/flow-editor dependency to version 3.6.4
+* Add language field to project update consumer
+* Refactor OrgCRUDL view to remove unused sections
+
+3.44.1
+----------
+* Add jwt auth in internal whatsapp broadcast endpoint
+* Endpoint to download contacts according msgs status
+
+3.44.0
+----------
+* Add Freshchat ticketer integration
+
+3.43.3
+----------
+* Add migration to optimize broadcast statistics trigger
+
+3.43.2
+----------
+* Update weni-rp-apps version to 2.10.7
+
+3.43.1
+----------
+* Remove unnecessary validation on twilio flex 2 claim
+
+3.43.0
+----------
+* Add twilioflex2 ticketer type and respective claim view
+
+3.42.1
+----------
+* Add task to update msgs async on channel release
+* Add silver in events API
+* Add ClaimView to E2 channel
+* Improve build
+
+3.42.0
+----------
+* Increase per-type search limit to 50 and enhance group query matching logic in omnibox search
+* Rename project parameter to project_uuid in get_pricing method
+
+3.41.7
+----------
+* Update weni-rp-apps version to 2.10.6
+* Add URN filter in messages endpoint
+* Adjust internal endpoint to update name field correctly
+
+3.41.6
+----------
+* Update Poetry version on Dockerfile to 1.8.5
+
+3.41.5
+----------
+* Update weni-rp-apps version to 2.10.5
+* Fix date error in events endpoint
+* Improve Flow Category squash
+* Return only queues active
+* Endpoint to import flow internally
+* Add project_language endpoint
+
 3.41.4
 ----------
 * Update floweditor to 3.6.3

@@ -140,6 +140,45 @@ class TeamsTypeTest(TembaTest):
             self.assertEqual("abc345", channel.config[Channel.CONFIG_AUTH_TOKEN])
             self.assertEqual("abc098", channel2.config[Channel.CONFIG_AUTH_TOKEN])
 
+    def test_refresh_tokens_uses_tenant_endpoint_for_v2(self):
+        Channel.objects.all().delete()
+
+        channel = self.create_channel(
+            "TM",
+            "Teams v2: 1234",
+            "1234",
+            config={
+                Channel.CONFIG_AUTH_TOKEN: "oldtoken123",
+                TeamsType.CONFIG_TEAMS_APPLICATION_ID: "app-1234",
+                TeamsType.CONFIG_TEAMS_BOT_ID: "1234",
+                TeamsType.CONFIG_TEAMS_TENANT_ID: "tenant-4123",
+                TeamsType.CONFIG_TEAMS_APPLICATION_PASSWORD: "secret-1234",
+                TeamsType.CONFIG_TEAMS_BOT_NAME: "test_bot_v2",
+                "version": "v2",
+            },
+        )
+
+        with patch("requests.post") as mock_post:
+            mock_post.return_value = MockResponse(200, '{"access_token": "newtoken456"}')
+
+            refresh_teams_tokens()
+
+            expected_url = "https://login.microsoftonline.com/tenant-4123/oauth2/v2.0/token"
+            expected_data = {
+                "client_id": "app-1234",
+                "grant_type": "client_credentials",
+                "scope": "https://api.botframework.com/.default",
+                "client_secret": "secret-1234",
+            }
+            mock_post.assert_called_with(
+                expected_url,
+                data=expected_data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+
+        channel.refresh_from_db()
+        self.assertEqual("newtoken456", channel.config[Channel.CONFIG_AUTH_TOKEN])
+
     def test_exception_handling(self):
         form_data = {
             "bot_name": "my_bot",

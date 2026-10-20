@@ -62,12 +62,12 @@
   
   #dow_container
     %h4
-      -trans "Day of Week"
+      -trans "Day of week"
     #dow
 
   #hod_container
     %h4
-      -trans "Time of Day"
+      -trans "Time of day"
     #hod
 
 -if hod and dow
@@ -75,12 +75,12 @@
     var pie_points = [
       {% if active %}{ name: '{{ _("Active")|escapejs }}', y: {{active}}, color: '#2387CA'},{%endif%}
       { name: '{{ _("Completed")|escapejs }}', y: {{completed}}, drilldown: null, color: '#8FC93A'},
-      { name: '{{ _("Interrupted, Expired and Failed")|escapejs }}', y: {{interrupted|add:expired|add:failed}}, drilldown: 'incomplete', color: '#CCC'},
+      { name: '{{ _("Interrupted, expired and failed")|escapejs }}', y: {{interrupted|add:expired|add:failed}}, drilldown: 'incomplete', color: '#CCC'},
     ];
 
     var pie_drill = {
       series: [{
-        name: '{{ _("Interrupted, Expired and Failed")|escapejs }}',
+        name: '{{ _("Interrupted, expired and failed")|escapejs }}',
         id: 'incomplete',
         innerSize: '50%',
         data:[

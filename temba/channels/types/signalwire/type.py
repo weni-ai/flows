@@ -69,7 +69,7 @@ class SignalWireType(ChannelType):
     name = "SignalWire"
     icon = "icon-signalwire"
 
-    claim_blurb = _("Easily add a two way number you have with %(link)s using their APIs.") % {
+    claim_blurb = _("Easily add a two-way number you have with %(link)s using their APIs.") % {
         "link": '<a href="http://www.signalwire.com/">SignalWire</a>'
     }
     claim_view = SignalWireClaimView
@@ -87,7 +87,7 @@ class SignalWireType(ChannelType):
         dict(
             label=_("Inbound URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.sw' channel.uuid 'receive' %}",
-            description=_("This endpoint will be called by SignalWire when new messages are received to your number."),
+            description=_("This endpoint will be called by SignalWire when new messages are received at your number."),
         ),
     )
 

@@ -23,6 +23,7 @@ from temba.assets.models import register_asset_store
 from temba.channels.models import Channel, ChannelEvent, ChannelLog
 from temba.contacts.models import URN, Contact, ContactGroup, ContactGroupCount, ContactURN
 from temba.msgs.cost_service import get_template_price_and_currency_from_api
+from temba.msgs.services import count_unique_contacts_in_groups
 from temba.orgs.models import DependencyMixin, Org, TopUp
 from temba.schedules.models import Schedule
 from temba.utils import chunk_list, on_transaction_commit
@@ -221,12 +222,15 @@ class Broadcast(models.Model):
 
             if groups:
                 group_ids = [g.id if hasattr(g, "id") else g for g in groups]
-                contact_count = (
-                    ContactGroupCount.objects.filter(group_id__in=group_ids).aggregate(total=models.Sum("count"))[
-                        "total"
-                    ]
-                    or 0
-                )
+                # For multiple groups, count unique contacts across all groups to avoid double counting
+                if len(group_ids) > 1:
+                    contact_count = count_unique_contacts_in_groups(group_ids)
+                else:
+                    # For a single group, use the existing aggregated count
+                    contact_count = (
+                        ContactGroupCount.objects.filter(group_id__in=group_ids).aggregate(total=Sum("count"))["total"]
+                        or 0
+                    )
                 BroadcastStatistics.objects.create(
                     broadcast=broadcast,
                     org=org,
@@ -1554,3 +1558,22 @@ class MessageExportAssetStore(BaseExportAssetStore):
     directory = "message_exports"
     permission = "msgs.msg_export"
     extensions = ("xlsx",)
+
+
+class ManagedTriggerGroup(models.Model):
+    """
+    Stable association between a flow and the platform-managed static group used as
+    Catch All scope for WhatsApp broadcasts that carry trigger_flow_uuid with urns/contacts.
+    """
+
+    org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="managed_trigger_groups")
+    flow = models.OneToOneField("flows.Flow", on_delete=models.CASCADE, related_name="managed_trigger_group")
+    group = models.OneToOneField(ContactGroup, on_delete=models.CASCADE, related_name="managed_trigger_group_link")
+    created_on = models.DateTimeField(default=timezone.now)
+    modified_on = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [models.Index(fields=["org"], name="msgs_mtg_org_idx")]
+
+    def __str__(self):  # pragma: no cover
+        return f"ManagedTriggerGroup[flow={self.flow_id} group={self.group_id}]"

@@ -1,11 +1,14 @@
+import regex
 from rest_framework import relations, serializers
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
 
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel
 from temba.contacts.models import URN, Contact, ContactField as ContactFieldModel, ContactGroup, ContactURN
+from temba.contacts.validators import validate_contact_phone
 from temba.flows.models import Flow
 from temba.msgs.models import Label, Msg
 from temba.tickets.models import Ticket, Ticketer, Topic
@@ -35,14 +38,51 @@ def validate_translations(value, base_language, max_length):
             raise serializers.ValidationError("Ensure translations have no more than %d characters." % max_length)
 
 
+def _invalid_urn_validation_error(value):
+    value = str(value).strip()
+    path = value
+    scheme = None
+    if ":" in value:
+        try:
+            scheme, path, _, _ = URN.to_parts(value)
+        except ValueError:
+            scheme, path = value.split(":", 1)
+
+    if scheme == URN.WHATSAPP_SCHEME and not URN.is_phone_based_path(path):
+        return serializers.ValidationError("Invalid WhatsApp identifier: %s." % value)
+    if URN.is_whatsapp_bsuid_path(path) or regex.match(r"^[A-Z]{2}\.", value, regex.V0):
+        return serializers.ValidationError(
+            "Invalid URN: %s. WhatsApp BSUID identifiers must include the whatsapp: scheme." % value
+        )
+    return serializers.ValidationError("Invalid URN: %s. Ensure phone numbers contain country codes." % value)
+
+
 def validate_urn(value, strict=True, country_code=None):
+    original_value = value
     try:
+        value = URN.ensure_scheme(value, country_code=country_code)
         normalized = URN.normalize(value, country_code=country_code)
 
         if strict and not URN.validate(normalized, country_code=country_code):
             raise ValueError()
     except ValueError:
-        raise serializers.ValidationError("Invalid URN: %s. Ensure phone numbers contain country codes." % value)
+        raise _invalid_urn_validation_error(original_value)
+
+    # enforce strict 8-15 digit length on phone-based URNs (does not affect other schemes).
+    # URN.normalize already guarantees the result is parseable, so URN.to_parts is safe here.
+    if strict:
+        scheme, path, _, _ = URN.to_parts(normalized)
+        if scheme == URN.TEL_SCHEME:
+            try:
+                validate_contact_phone(path)
+            except DjangoValidationError as e:
+                raise serializers.ValidationError(str(e.messages[0]))
+        elif scheme == URN.WHATSAPP_SCHEME and path.isdigit():
+            try:
+                validate_contact_phone(f"+{path}")
+            except DjangoValidationError as e:
+                raise serializers.ValidationError(str(e.messages[0]))
+
     return normalized
 
 
@@ -80,11 +120,16 @@ class TranslatableField(serializers.Field):
 
 class LimitedListField(serializers.ListField):
     """
-    A list field which can be only be written to with a limited number of items
+    A list field which can be only be written to with a limited number of items.
+    The maximum number of items can be customized per-field via the `max_items` kwarg.
     """
 
+    def __init__(self, *args, max_items=DEFAULT_MAX_LIST_ITEMS, **kwargs):
+        self.max_items = max_items
+        super().__init__(*args, **kwargs)
+
     def to_internal_value(self, data):
-        validate_size(data, DEFAULT_MAX_LIST_ITEMS)
+        validate_size(data, self.max_items)
 
         return super().to_internal_value(data)
 
@@ -110,8 +155,11 @@ class URNField(serializers.CharField):
             return str(obj)
 
     def to_internal_value(self, data):
+        if not isinstance(data, str):
+            raise serializers.ValidationError("Not a valid string.")
+
         country_code = self.context["org"].default_country_code
-        return validate_urn(str(data), country_code=country_code)
+        return validate_urn(data, country_code=country_code)
 
 
 class URNListField(LimitedListField):
@@ -130,20 +178,27 @@ class TembaModelField(serializers.RelatedField):
     require_exists = True
 
     class LimitedSizeList(serializers.ManyRelatedField):
+        def __init__(self, *args, max_items=DEFAULT_MAX_LIST_ITEMS, **kwargs):
+            self.max_items = max_items
+            super().__init__(*args, **kwargs)
+
         def run_validation(self, data=serializers.empty):
-            validate_size(data, DEFAULT_MAX_LIST_ITEMS)
+            validate_size(data, self.max_items)
 
             return super().run_validation(data)
 
     @classmethod
     def many_init(cls, *args, **kwargs):
         """
-        Overridden to provide a custom ManyRelated which limits number of items
+        Overridden to provide a custom ManyRelated which limits number of items.
+        The per-field `max_items` kwarg overrides the default size limit.
         """
+        max_items = kwargs.pop("max_items", DEFAULT_MAX_LIST_ITEMS)
         list_kwargs = {"child_relation": cls(*args, **kwargs)}
         for key in kwargs.keys():
             if key in relations.MANY_RELATION_KWARGS:
                 list_kwargs[key] = kwargs[key]
+        list_kwargs["max_items"] = max_items
         return TembaModelField.LimitedSizeList(**list_kwargs)
 
     def get_queryset(self):

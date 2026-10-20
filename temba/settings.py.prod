@@ -1,6 +1,7 @@
 import environ
 import re
 import sentry_sdk
+from corsheaders.defaults import default_headers
 from sentry_sdk.integrations.django import DjangoIntegration
 
 from django.utils.translation import ugettext_lazy as _  # noqa
@@ -194,6 +195,8 @@ S3_NETWORK_RETRY_COUNT = env.int("S3_NETWORK_RETRY_COUNT", default=5)
 
 COURIER_S3_ENDPOINT = env("COURIER_S3_ENDPOINT")
 
+S3_MEDIA_BUCKETS = env.list("S3_MEDIA_BUCKETS", default=[])
+
 # CELERY
 # ------------------------------------------------------------------------------
 CELERY_TIMEZONE = env("CELERY_TIMEZONE", default="UTC")
@@ -272,6 +275,7 @@ LOGGING = {
         "rapidpro": {"level": "WARNING", "handlers": ["elasticapm"], "propagate": False},
         "elasticapm.errors": {"level": "ERROR", "handlers": ["console"], "propagate": False},
         "pycountry": {"level": "ERROR", "handlers": ["console"], "propagate": False},
+        "pika": {"level": "CRITICAL", "handlers": ["console"], "propagate": False},
         "django.security.DisallowedHost": {"handlers": ["null"], "propagate": False},
         # OIDC
         "mozilla_django_oidc": {"level": "DEBUG", "handlers": ["console"], "propagate": False},
@@ -430,9 +434,7 @@ OLD_DESIGN_EXCLUDED_CHANNELS_CODES = env.list("OLD_DESIGN_EXCLUDED_CHANNELS_CODE
 # ------------------------------------------------------------------------------------------
 DISABLE_OIDC = env.bool("DISABLE_OIDC", default=False)
 if DISABLE_OIDC:
-    REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"].remove(
-        "mozilla_django_oidc.contrib.drf.OIDCAuthentication"
-    )
+    REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"].remove("mozilla_django_oidc.contrib.drf.OIDCAuthentication")
 
     installed_apps_list = list(INSTALLED_APPS)
     installed_apps_list.remove("mozilla_django_oidc")
@@ -451,7 +453,7 @@ if DISABLE_OIDC:
 CONNECT_BASE_URL = env("CONNECT_BASE_URL", default="https://api.dev.cloud.weni.ai")
 
 # ----------------------------------------------------------------------------------------
-# Option to enable redirect all routes (except api), to redirect view 
+# Option to enable redirect all routes (except api), to redirect view
 # ----------------------------------------------------------------------------------------
 WENI_REDIRECT_DEPRECATED_DOMAIN = env.bool("WENI_REDIRECT_DEPRECATED_DOMAIN", default=False)
 if WENI_REDIRECT_DEPRECATED_DOMAIN:
@@ -461,6 +463,7 @@ if WENI_REDIRECT_DEPRECATED_DOMAIN:
 # Cors Configuration
 CORS_ORIGIN_ALLOW_ALL = env.bool("CORS_ORIGIN_ALLOW_ALL", default=False)
 CORS_ORIGIN_WHITELIST = env.tuple("CORS_ORIGIN_WHITELIST", default=())
+CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key")
 
 
 # Fixed token with super user access
@@ -480,21 +483,6 @@ DISABLED_CHANNELS_INTEGRATIONS = env.list("DISABLED_CHANNELS_INTEGRATIONS", defa
 CONTACT_IMPORT_MAX_RECORDS = env.int("CONTACT_IMPORT_MAX_RECORDS", default=25_000)
 CONTACT_IMPORT_BATCH_SIZE = env.int("CONTACT_IMPORT_BATCH_SIZE", default=100)
 
-
-# Event Driven Architecture configurations
-
-USE_EDA = env.bool("USE_EDA", default=False)
-
-if USE_EDA:
-    EDA_CONNECTION_BACKEND = "temba.event_driven.backends.PyAMQPConnectionBackend"
-    EDA_CONSUMERS_HANDLE = "temba.event_driven.handle.handle_consumers"
-
-    EDA_BROKER_HOST = env("EDA_BROKER_HOST", default="localhost")
-    EDA_VIRTUAL_HOST = env("EDA_VIRTUAL_HOST", default="/")
-    EDA_BROKER_PORT = env.int("EDA_BROKER_PORT", default=5672)
-    EDA_BROKER_USER = env("EDA_BROKER_USER", default="guest")
-    EDA_BROKER_PASSWORD = env("EDA_BROKER_PASSWORD", default="guest")
-    EDA_WAIT_TIME_RETRY = env.int("EDA_WAIT_TIME_RETRY", default=5)
 
 BOTHUB_SYNC_INTENTS_URL = env("BOTHUB_SYNC_INTENTS_URL", default="https://nlp.bothub.it/info/")
 
@@ -523,4 +511,6 @@ MUTABLE_EDITOR_DOMAINS = env.tuple("MUTABLE_EDITOR_DOMAINS", default=("@inspiria
 LAMBDA_ALLOWED_ROLES = env.list("LAMBDA_ALLOWED_ROLES", default=[])
 
 # Lambda permitted urls
-LAMBDA_VALIDATION_URL = env.list("LAMBDA_VALIDATION_URL", default=["https://sts.amazonaws.com/?Action=GetCallerIdentity&"])
+LAMBDA_VALIDATION_URL = env.list(
+    "LAMBDA_VALIDATION_URL", default=["https://sts.amazonaws.com/?Action=GetCallerIdentity&"]
+)

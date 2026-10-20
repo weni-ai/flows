@@ -1,16 +1,127 @@
 from django.db import models
 
+from temba.orgs.models import Org
+
+from .urns import whatsapp_urn_variants
+
+
+class CtwaReferralSource(models.Model):
+    """
+    Campaign/source data from the Meta referral object on CTWA click events.
+    """
+
+    SOURCE_TYPE_AD = "ad"
+    SOURCE_TYPE_POST = "post"
+    SOURCE_TYPE_CHOICES = (
+        (SOURCE_TYPE_AD, "Ad"),
+        (SOURCE_TYPE_POST, "Post"),
+    )
+    LEGACY_SOURCE_ID = "legacy"
+
+    org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="ctwa_referral_sources")
+    source_id = models.CharField(max_length=64)
+    source_type = models.CharField(max_length=16, choices=SOURCE_TYPE_CHOICES)
+    source_url = models.TextField(null=True, blank=True)
+    headline = models.TextField(null=True, blank=True)
+    body = models.TextField(null=True, blank=True)
+    first_seen_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "ctwa_referral_sources"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["org", "source_id", "source_type"],
+                name="uq_ctwa_referral_source",
+            ),
+            models.CheckConstraint(
+                check=models.Q(source_type__in=["ad", "post"]),
+                name="chk_ctwa_referral_source_type",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["source_id"], name="idx_ctwa_ref_src_source_id"),
+            models.Index(fields=["-last_seen_at"], name="idx_ctwa_ref_src_last_seen"),
+            models.Index(fields=["org", "-last_seen_at"], name="idx_ctwa_ref_src_org_last_seen"),
+        ]
+
+    def __str__(self):
+        return f"CTWA Referral Source - {self.source_type}:{self.source_id}"
+
+    @classmethod
+    def get_or_create_for_org(cls, org, source_id, source_type, **defaults):
+        if org is None:
+            raise ValueError("org is required to create a CtwaReferralSource")
+        return cls.objects.get_or_create(
+            org=org,
+            source_id=source_id,
+            source_type=source_type,
+            defaults=defaults,
+        )
+
+
+class CTWAManager(models.Manager):
+    def latest_for_urns(self, *, channel_uuids, contact_urns):
+        return (
+            self.select_related("referral_source")
+            .filter(channel_uuid__in=channel_uuids, contact_urn__in=contact_urns)
+            .order_by("-timestamp")
+            .first()
+        )
+
+    def latest_for_contact(self, contact):
+        channel_uuids = list(contact.org.channels.filter(is_active=True).values_list("uuid", flat=True))
+        contact_urns = [variant for urn in contact.get_urns() for variant in whatsapp_urn_variants(urn.identity)]
+        if not channel_uuids or not contact_urns:
+            return None
+        return self.latest_for_urns(channel_uuids=channel_uuids, contact_urns=contact_urns)
+
 
 class CTWA(models.Model):
     """
-    Table to store Click to WhatsApp data for lookup
+    Click/conversation event with operational context for CTWA conversion lookup.
     """
 
-    ctwa_clid = models.CharField(max_length=255, db_index=True, unique=True, help_text="Click to WhatsApp Click ID")
-    channel_uuid = models.UUIDField(db_index=True, help_text="Channel UUID")
-    waba = models.CharField(max_length=255, help_text="WhatsApp Business Account ID")
+    objects = CTWAManager()
+
+    ctwa_clid = models.CharField(
+        max_length=512,
+        null=True,
+        blank=True,
+        unique=True,
+        help_text="Click to WhatsApp Click ID",
+    )
     contact_urn = models.CharField(max_length=255, help_text="Contact URN")
-    timestamp = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(help_text="Event timestamp from the webhook")
+    channel_uuid = models.UUIDField(help_text="Channel UUID")
+    waba = models.CharField(max_length=255, help_text="WhatsApp Business Account ID")
+    phone_number_id = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="Phone number ID from webhook metadata",
+    )
+    referral_source = models.ForeignKey(
+        CtwaReferralSource,
+        on_delete=models.PROTECT,
+        related_name="conversion_events",
+        db_column="referral_source_id",
+    )
+    message_id = models.CharField(max_length=255, null=True, blank=True, help_text="WhatsApp message ID (wamid)")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["channel_uuid", "contact_urn", "-timestamp"],
+                name="idx_conv_ev_ctwa_lookup",
+            ),
+            models.Index(fields=["referral_source"], name="idx_conv_ev_ctwa_ref"),
+            models.Index(fields=["waba", "-timestamp"], name="idx_conv_ev_ctwa_waba"),
+        ]
 
     def __str__(self):
-        return f"CTWA Data - CLID: {self.ctwa_clid}, Channel: {self.channel_uuid}"
+        clid = self.ctwa_clid or "no-clid"
+        return f"CTWA Data - CLID: {clid}, Channel: {self.channel_uuid}"

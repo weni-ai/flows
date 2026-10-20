@@ -831,7 +831,7 @@ class MsgTest(TembaTest):
         old_modified_on = blocking_export.modified_on
 
         response = self.client.post(reverse("msgs.msg_export") + "?l=I", {"export_all": 1}, follow=True)
-        self.assertContains(response, "already an export in progress")
+        self.assertContains(response, "An export is already in progress")
 
         # perform the export manually, assert how many queries
         with self.mockReadOnly():
@@ -2039,7 +2039,7 @@ class BroadcastCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.client.post(
             send_url, {"text": "Broken", "omnibox": omnibox_serialize(self.org, [], [], json_encode=True)}
         )
-        self.assertFormError(response, "form", "omnibox", "At least one recipient is required.")
+        self.assertFormError(response, "form", "omnibox", "At least one recipient is required")
 
         # try to submit with an invalid URN
         response = self.client.post(
@@ -2049,14 +2049,14 @@ class BroadcastCRUDLTest(TembaTest, CRUDLTestMixin):
                 "omnibox": omnibox_serialize(self.org, [], [], raw_urns=["tel:$$$$$$"], json_encode=True),
             },
         )
-        self.assertFormError(response, "form", "omnibox", "'tel:$$$$$$' is not a valid URN.")
+        self.assertFormError(response, "form", "omnibox", "'tel:$$$$$$' isn't a valid URN")
 
         # if we release our send channel we also can't start send
         self.channel.release(self.admin)
 
         response = self.requestView(send_url, self.admin)
         self.assertContains(
-            response, 'To get started you need to <a href="/channels/channel/claim/">add a channel</a>'
+            response, 'To get started, <a href="/channels/channel/claim/">add a channel</a> to your workspace'
         )
         self.assertNotContains(response, "Send")
 
@@ -2456,8 +2456,7 @@ class LabelCRUDLTest(TembaTest, CRUDLTestMixin):
                 response,
                 "form",
                 "name",
-                "This workspace has 2 labels and the limit is 2. "
-                "You must delete existing ones before you can create new ones.",
+                "This workspace has 2 labels and the limit is 2. Delete existing ones before creating new ones.",
             )
 
     def test_delete(self):
@@ -2467,7 +2466,7 @@ class LabelCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # fetch delete modal
         response = self.assertDeleteFetch(delete_url, allow_editors=True)
-        self.assertContains(response, "You are about to delete")
+        self.assertContains(response, "You're about to delete")
 
         # submit to delete it
         response = self.assertDeleteSubmit(delete_url, object_deactivated=label, success_status=200)
@@ -2501,7 +2500,7 @@ class LabelCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # fetch delete modal - which will tell us we can't delete this as it is not empty
         response = self.assertDeleteFetch(delete_url, allow_editors=True)
-        self.assertContains(response, "cannot be deleted as it still contains labels")
+        self.assertContains(response, "be deleted as it still contains labels")
 
         # remove label...
         label1.release(self.admin)
@@ -2518,7 +2517,7 @@ class LabelCRUDLTest(TembaTest, CRUDLTestMixin):
         Label.get_or_create(self.org, self.user, "Spam", folder=folder)
 
         response = self.assertDeleteSubmit(delete_url, object_unchanged=folder, success_status=200)
-        self.assertContains(response, "cannot be deleted as it still contains labels")
+        self.assertContains(response, "be deleted as it still contains labels")
 
     def test_list(self):
         folder = Label.get_or_create_folder(self.org, self.user, "Folder")
@@ -2877,6 +2876,149 @@ class BroadcastStatisticsTest(TembaTest):
         self.assertEqual(rate, 0)
 
 
+class BroadcastStatisticsTriggerTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.joe = self.create_contact("Joe Blow", phone="123")
+        self.group = self.create_group("Group", contacts=[self.joe])
+        ContactGroupCount.populate_for_group(self.group)
+
+        with patch(
+            "temba.msgs.models.get_template_price_and_currency_from_api", return_value=(Decimal("0.50"), "USD")
+        ):
+            self.broadcast = Broadcast.create(
+                self.org,
+                self.user,
+                "Trigger test",
+                groups=[self.group],
+                is_bulk_send=True,
+            )
+
+        self.stats = BroadcastStatistics.objects.get(broadcast=self.broadcast)
+        self.stats.refresh_from_db()
+
+    def _create_broadcast_msg(self, status=Msg.STATUS_QUEUED):
+        return self._create_msg(
+            self.joe,
+            "hello",
+            Msg.DIRECTION_OUT,
+            self.channel,
+            Msg.TYPE_INBOX,
+            (),
+            status,
+            None,
+            None,
+            broadcast=self.broadcast,
+        )
+
+    def _advance(self, msg, new_status):
+        msg.status = new_status
+        update_fields = ["status"]
+        if new_status in (Msg.STATUS_WIRED, Msg.STATUS_SENT, Msg.STATUS_DELIVERED):
+            if not msg.sent_on:
+                msg.sent_on = timezone.now()
+            update_fields.append("sent_on")
+        msg.save(update_fields=update_fields)
+        self.stats.refresh_from_db()
+
+    def _assert_stats(self, *, processed=0, sent=0, delivered=0, read=0, failed=0):
+        self.assertEqual(self.stats.processed, processed)
+        self.assertEqual(self.stats.sent, sent)
+        self.assertEqual(self.stats.delivered, delivered)
+        self.assertEqual(self.stats.read, read)
+        self.assertEqual(self.stats.failed, failed)
+
+    def test_normal_status_progression(self):
+        msg = self._create_broadcast_msg()
+
+        self._advance(msg, Msg.STATUS_WIRED)
+        self._assert_stats(processed=1)
+
+        self._advance(msg, Msg.STATUS_SENT)
+        self._assert_stats(processed=1, sent=1)
+
+        self._advance(msg, Msg.STATUS_DELIVERED)
+        self._assert_stats(processed=1, sent=1, delivered=1)
+
+        self._advance(msg, Msg.STATUS_READ)
+        self._assert_stats(processed=1, sent=1, delivered=1, read=1)
+
+    def test_out_of_order_delivered_sent_delivered_does_not_double_count(self):
+        """Regression: W -> D -> S -> D must stay at 1/1/1 (not 2/2)."""
+        msg = self._create_broadcast_msg()
+
+        self._advance(msg, Msg.STATUS_WIRED)
+        self._advance(msg, Msg.STATUS_DELIVERED)
+        self._advance(msg, Msg.STATUS_SENT)
+        self._advance(msg, Msg.STATUS_DELIVERED)
+
+        self._assert_stats(processed=1, sent=1, delivered=1)
+        msg.refresh_from_db()
+        self.assertEqual(msg.status, Msg.STATUS_DELIVERED)
+
+    def test_status_regression_to_sent_is_ignored(self):
+        msg = self._create_broadcast_msg()
+
+        self._advance(msg, Msg.STATUS_WIRED)
+        self._advance(msg, Msg.STATUS_SENT)
+        self._advance(msg, Msg.STATUS_DELIVERED)
+        self._advance(msg, Msg.STATUS_SENT)
+
+        self._assert_stats(processed=1, sent=1, delivered=1)
+        msg.refresh_from_db()
+        self.assertEqual(msg.status, Msg.STATUS_DELIVERED)
+
+    def test_skip_path_q_to_delivered(self):
+        msg = self._create_broadcast_msg()
+
+        self._advance(msg, Msg.STATUS_DELIVERED)
+
+        self._assert_stats(processed=1, sent=1, delivered=1)
+
+    def test_skip_path_q_to_read(self):
+        msg = self._create_broadcast_msg()
+
+        self._advance(msg, Msg.STATUS_READ)
+
+        self._assert_stats(processed=1, sent=1, delivered=1, read=1)
+
+    def test_read_not_double_counted_on_repeated_updates_to_v(self):
+        msg = self._create_broadcast_msg()
+
+        self._advance(msg, Msg.STATUS_WIRED)
+        self._advance(msg, Msg.STATUS_SENT)
+        self._advance(msg, Msg.STATUS_DELIVERED)
+        self._advance(msg, Msg.STATUS_READ)
+        self._advance(msg, Msg.STATUS_READ)
+
+        self._assert_stats(processed=1, sent=1, delivered=1, read=1)
+
+    def test_cost_incremented_once_on_first_sent(self):
+        msg = self._create_broadcast_msg()
+
+        self._advance(msg, Msg.STATUS_WIRED)
+        self._advance(msg, Msg.STATUS_SENT)
+        self.stats.refresh_from_db()
+        self.assertEqual(self.stats.cost, Decimal("0.50"))
+
+        self._advance(msg, Msg.STATUS_DELIVERED)
+        self._advance(msg, Msg.STATUS_SENT)
+        self.stats.refresh_from_db()
+        self.assertEqual(self.stats.cost, Decimal("0.50"))
+
+    def test_multiple_messages_aggregate_correctly(self):
+        msg_a = self._create_broadcast_msg()
+        msg_b = self._create_broadcast_msg()
+
+        for msg in (msg_a, msg_b):
+            self._advance(msg, Msg.STATUS_WIRED)
+            self._advance(msg, Msg.STATUS_DELIVERED)
+            self._advance(msg, Msg.STATUS_SENT)
+            self._advance(msg, Msg.STATUS_DELIVERED)
+
+        self._assert_stats(processed=2, sent=2, delivered=2)
+
+
 class BroadcastCreateWithGroupsTest(TembaTest):
     def setUp(self):
         super().setUp()
@@ -2931,3 +3073,108 @@ class BroadcastCreateWithGroupsTest(TembaTest):
         self.assertEqual(stats.template_price, Decimal("0.10"))
         self.assertEqual(stats.currency, "USD")
         self.assertEqual(stats.cost, Decimal("0"))
+
+    def test_create_bulk_with_overlapping_groups_uses_dedup_count(self):
+        # Overlap Bob between A and C
+        group_c = self.create_group("Group C", contacts=[self.bob, self.carlos])
+        ContactGroupCount.populate_for_group(group_c)
+
+        with self._mock_pricing(price=0.77, currency="EUR"):
+            broadcast = Broadcast.create(
+                self.org,
+                self.user,
+                "Hello overlap",
+                groups=[self.group_a, group_c],
+                is_bulk_send=True,
+            )
+
+        # group_a has 2, group_c has 2, overlap is 1 (Bob), unique total should be 3
+        stats = BroadcastStatistics.objects.filter(broadcast=broadcast, org=self.org).first()
+        self.assertIsNotNone(stats)
+        self.assertEqual(stats.contact_count, 3)
+
+    def test_create_bulk_with_single_group_uses_group_count(self):
+        with self._mock_pricing(price=0.33, currency="GBP"):
+            broadcast = Broadcast.create(
+                self.org,
+                self.user,
+                "Single group",
+                groups=[self.group_a],
+                is_bulk_send=True,
+            )
+
+        stats = BroadcastStatistics.objects.filter(broadcast=broadcast, org=self.org).first()
+        self.assertIsNotNone(stats)
+        self.assertEqual(stats.contact_count, self.group_a.get_member_count())
+
+
+class MsgsServicesCountsTest(TembaTest):
+    def test_count_unique_and_duplicates_empty(self):
+        from temba.msgs.services import count_unique_contacts_in_groups, count_duplicate_contacts_across_groups
+
+        self.assertEqual(count_unique_contacts_in_groups([]), 0)
+        self.assertEqual(count_duplicate_contacts_across_groups([]), 0)
+
+    def test_unique_and_duplicates_with_overlap(self):
+        from temba.msgs.services import count_unique_contacts_in_groups, count_duplicate_contacts_across_groups
+
+        a = self.create_contact("A", phone="111")
+        b = self.create_contact("B", phone="222")
+        c = self.create_contact("C", phone="333")
+
+        g1 = self.create_group("G1", contacts=[a, b])
+        g2 = self.create_group("G2", contacts=[b, c])
+
+        # unique across both is 3, duplicates is 1 (B)
+        self.assertEqual(count_unique_contacts_in_groups([g1.id, g2.id]), 3)
+        self.assertEqual(count_duplicate_contacts_across_groups([g1.id, g2.id]), 1)
+
+    def test_unique_single_group_equals_member_count(self):
+        from temba.msgs.services import count_unique_contacts_in_groups, count_duplicate_contacts_across_groups
+        from temba.contacts.models import ContactGroupCount
+
+        a = self.create_contact("A", phone="111")
+        b = self.create_contact("B", phone="222")
+        g1 = self.create_group("G", contacts=[a, b])
+
+        ContactGroupCount.populate_for_group(g1)
+
+        # unique equals member count; duplicates 0
+        self.assertEqual(count_unique_contacts_in_groups([g1.id]), g1.get_member_count())
+        self.assertEqual(count_duplicate_contacts_across_groups([g1.id]), 0)
+
+
+class MsgTasksTest(TembaTest):
+    def test_fail_channel_outgoing_messages_task(self):
+        contact = self.create_contact("Bob", phone="+250700000001")
+
+        # messages on default channel
+        m_q = self.create_outgoing_msg(contact, "Q", channel=self.channel, status=Msg.STATUS_QUEUED)
+        m_p = self.create_outgoing_msg(contact, "P", channel=self.channel, status=Msg.STATUS_PENDING)
+        m_e = self.create_outgoing_msg(contact, "E", channel=self.channel, status=Msg.STATUS_ERRORED)
+        m_s = self.create_outgoing_msg(contact, "S", channel=self.channel, status=Msg.STATUS_SENT)
+        m_in = self.create_incoming_msg(contact, "in", channel=self.channel)
+
+        # message on other channel should remain unchanged
+        from temba.channels.models import Channel
+
+        other = Channel.create(
+            self.org,
+            self.user,
+            "RW",
+            "A",
+            name="Other",
+            address="+250111111111",
+            config={Channel.CONFIG_FCM_ID: "999"},
+        )
+        m_other = self.create_outgoing_msg(contact, "Other", channel=other, status=Msg.STATUS_PENDING)
+
+        from temba.msgs.tasks import fail_channel_outgoing_messages
+
+        fail_channel_outgoing_messages(self.channel.id)
+
+        for mid in (m_q.id, m_p.id, m_e.id):
+            self.assertEqual(Msg.objects.get(id=mid).status, Msg.STATUS_FAILED)
+        self.assertEqual(Msg.objects.get(id=m_s.id).status, Msg.STATUS_SENT)
+        self.assertEqual(Msg.objects.get(id=m_in.id).status, Msg.STATUS_HANDLED)
+        self.assertEqual(Msg.objects.get(id=m_other.id).status, Msg.STATUS_PENDING)

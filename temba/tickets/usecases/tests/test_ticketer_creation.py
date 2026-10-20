@@ -122,3 +122,42 @@ class TicketerCreationTestCase(TembaTest):
         for queue in queues:
             queue_uuid = queue.get("uuid")
             ticketer.queues.get(queue_uuid=queue_uuid)
+
+    def test_create_ticketer_updates_existing_queue_purpose(self):
+        ticketer_uuid = str(uuid.uuid4())
+        initial_queues = [
+            {
+                "uuid": "1d8176f2-c852-4d92-8521-9dbad81ae531",
+                "name": "Queue 1",
+                "queue_purpose": "Initial purpose",
+            }
+        ]
+
+        create_ticketer(
+            uuid=ticketer_uuid,
+            project_auth=self.project_auth,
+            name=self.name,
+            project_uuid=self.project_uuid,
+            user_email=self.user_email,
+            queues=initial_queues,
+        )
+
+        updated_queues = [
+            {
+                "uuid": "1d8176f2-c852-4d92-8521-9dbad81ae531",
+                "name": "Queue 1",
+                "queue_purpose": "Updated purpose",
+            }
+        ]
+
+        create_ticketer(
+            uuid=ticketer_uuid,
+            project_auth=self.project_auth,
+            name=self.name,
+            project_uuid=self.project_uuid,
+            user_email=self.user_email,
+            queues=updated_queues,
+        )
+
+        queue = TicketerQueue.objects.get(queue_uuid=initial_queues[0]["uuid"])
+        self.assertEqual(queue.queue_purpose, "Updated purpose")
