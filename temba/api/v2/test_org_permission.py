@@ -1,7 +1,7 @@
 import uuid
 from types import SimpleNamespace
 
-from temba.api.v2.permissions import IsUserInOrg
+from temba.api.v2.permissions import IsAdminOrEditorInOrg, IsUserInOrg
 from temba.tests.base import TembaTest
 
 
@@ -60,3 +60,44 @@ class IsUserInOrgPermissionTests(TembaTest):
     def test_get_user_for_membership_check_returns_none_when_request_user_missing(self):
         request = SimpleNamespace(user=None)
         self.assertIsNone(self.permission._get_user_for_membership_check(request))
+
+
+class IsAdminOrEditorInOrgPermissionTests(TembaTest):
+    def setUp(self):
+        super().setUp()
+        self.permission = IsAdminOrEditorInOrg()
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save(update_fields=("proj_uuid",))
+
+    def _request(self, user, project_uuid="default"):
+        query_params = {}
+        if project_uuid == "default":
+            query_params["project_uuid"] = str(self.org.proj_uuid)
+        elif project_uuid is not None:
+            query_params["project_uuid"] = project_uuid
+        return SimpleNamespace(query_params=query_params, data={}, user=user)
+
+    def test_allows_administrator(self):
+        request = self._request(self.admin)
+        self.assertTrue(self.permission.has_permission(request, view=object()))
+        self.assertEqual(request.project_uuid, str(self.org.proj_uuid))
+        self.assertEqual(request.org.id, self.org.id)
+
+    def test_allows_editor(self):
+        request = self._request(self.editor)
+        self.assertTrue(self.permission.has_permission(request, view=object()))
+        self.assertEqual(request.project_uuid, str(self.org.proj_uuid))
+        self.assertEqual(request.org.id, self.org.id)
+
+    def test_denies_viewer_agent_and_non_member(self):
+        for user in (self.user, self.agent, self.non_org_user):
+            request = self._request(user)
+            self.assertFalse(self.permission.has_permission(request, view=object()))
+
+    def test_missing_project_is_left_to_the_view(self):
+        request = self._request(self.user, project_uuid=None)
+        self.assertTrue(self.permission.has_permission(request, view=object()))
+
+    def test_unknown_project_is_left_to_the_view(self):
+        request = self._request(self.admin, project_uuid="00000000-0000-0000-0000-000000000000")
+        self.assertTrue(self.permission.has_permission(request, view=object()))

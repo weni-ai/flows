@@ -1,6 +1,8 @@
+import uuid
 from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
+from rest_framework.test import APIClient
 
 from django.test import TestCase
 from django.urls import reverse
@@ -148,6 +150,25 @@ class TestS3MediaProxyView(TembaTest):
 class TestS3MediaProxyEndpoint(TembaTest):
     """Integration tests for the S3 Media Proxy endpoint."""
 
+    def setUp(self):
+        super().setUp()
+        self.org.proj_uuid = uuid.uuid4()
+        self.org.save(update_fields=("proj_uuid",))
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin)
+
+    def _download_url(self, object_key):
+        return reverse("internals.media_download", kwargs={"object_key": object_key})
+
+    def _get(self, object_key, *, project_uuid="default", client=None):
+        client = client or self.client
+        params = {}
+        if project_uuid == "default":
+            params["project_uuid"] = str(self.org.proj_uuid)
+        elif project_uuid is not None:
+            params["project_uuid"] = project_uuid
+        return client.get(self._download_url(object_key), params)
+
     @patch("temba.api.v2.internals.media.views.s3")
     @patch("temba.api.v2.internals.media.views.settings")
     def test_get_redirect_success(self, mock_settings, mock_s3):
@@ -160,8 +181,7 @@ class TestS3MediaProxyEndpoint(TembaTest):
         mock_client.generate_presigned_url.return_value = presigned_url
         mock_s3.client.return_value = mock_client
 
-        url = reverse("internals.media_download", kwargs={"object_key": "media/image.jpg"})
-        response = self.client.get(url)
+        response = self._get("media/image.jpg")
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, presigned_url)
@@ -180,8 +200,7 @@ class TestS3MediaProxyEndpoint(TembaTest):
         mock_client.generate_presigned_url.return_value = presigned_url
         mock_s3.client.return_value = mock_client
 
-        url = reverse("internals.media_download", kwargs={"object_key": "attachments/file.pdf"})
-        response = self.client.get(url)
+        response = self._get("attachments/file.pdf")
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, presigned_url)
@@ -202,8 +221,7 @@ class TestS3MediaProxyEndpoint(TembaTest):
         mock_client.head_object.side_effect = not_found
         mock_s3.client.return_value = mock_client
 
-        url = reverse("internals.media_download", kwargs={"object_key": "media/missing.jpg"})
-        response = self.client.get(url)
+        response = self._get("media/missing.jpg")
 
         self.assertEqual(response.status_code, 404)
         self.assertIn("error", response.json())
@@ -214,8 +232,7 @@ class TestS3MediaProxyEndpoint(TembaTest):
         mock_settings.AWS_STORAGE_BUCKET_NAME = None
         mock_settings.S3_MEDIA_BUCKETS = []
 
-        url = reverse("internals.media_download", kwargs={"object_key": "media/file.jpg"})
-        response = self.client.get(url)
+        response = self._get("media/file.jpg")
 
         self.assertEqual(response.status_code, 404)
         self.assertIn("error", response.json())
@@ -226,8 +243,7 @@ class TestS3MediaProxyEndpoint(TembaTest):
         mock_settings.S3_MEDIA_BUCKETS = []
 
         long_key = "a" * 2000
-        url = reverse("internals.media_download", kwargs={"object_key": long_key})
-        response = self.client.get(url)
+        response = self._get(long_key)
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["error"], "Access denied")
@@ -236,11 +252,61 @@ class TestS3MediaProxyEndpoint(TembaTest):
     def test_get_unexpected_error_returns_500(self, mock_validate):
         mock_validate.side_effect = RuntimeError("unexpected failure")
 
-        url = reverse("internals.media_download", kwargs={"object_key": "media/file.jpg"})
-        response = self.client.get(url)
+        response = self._get("media/file.jpg")
 
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.json()["error"], "Internal server error")
+
+    def test_get_unauthenticated_returns_401(self):
+        client = APIClient()
+        response = self._get("media/image.jpg", client=client)
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_get_user_not_in_org_returns_403(self):
+        client = APIClient()
+        client.force_authenticate(user=self.non_org_user)
+        response = self._get("media/image.jpg", client=client)
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_viewer_returns_403(self):
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+        response = self._get("media/image.jpg", client=client)
+
+        self.assertEqual(response.status_code, 403)
+
+    @patch("temba.api.v2.internals.media.views.s3")
+    @patch("temba.api.v2.internals.media.views.settings")
+    def test_get_editor_redirect_success(self, mock_settings, mock_s3):
+        mock_settings.AWS_STORAGE_BUCKET_NAME = "test-bucket"
+        mock_settings.S3_MEDIA_BUCKETS = []
+
+        mock_client = MagicMock()
+        mock_client.head_object.return_value = {}
+        presigned_url = "https://test-bucket.s3.amazonaws.com/presigned?signature=editor"
+        mock_client.generate_presigned_url.return_value = presigned_url
+        mock_s3.client.return_value = mock_client
+
+        client = APIClient()
+        client.force_authenticate(user=self.editor)
+        response = self._get("media/image.jpg", client=client)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, presigned_url)
+
+    def test_get_missing_project_returns_400(self):
+        response = self._get("media/file.jpg", project_uuid=None)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Project UUID not provided")
+
+    def test_get_unknown_project_returns_404(self):
+        response = self._get("media/file.jpg", project_uuid="00000000-0000-0000-0000-000000000000")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["error"], "Project not found")
 
 
 class TestPresignedUrlExpiration(TestCase):

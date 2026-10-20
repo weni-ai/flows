@@ -3,7 +3,7 @@ from rest_framework.permissions import BasePermission
 from django.contrib.auth import get_user_model
 from django.core import exceptions as django_exceptions
 
-from temba.orgs.models import Org
+from temba.orgs.models import Org, OrgRole
 
 
 class IsUserInOrg(BasePermission):
@@ -23,6 +23,9 @@ class IsUserInOrg(BasePermission):
 
     PROJECT_UUID_QUERY_KEYS = ("project_uuid", "project")
     PROJECT_UUID_BODY_KEYS = ("project_uuid", "project")
+
+    # None means any explicit org role. Subclasses set a tuple of OrgRole.
+    allowed_roles = None
 
     def _get_project_uuid(self, request, view):
         # already set by auth layer or earlier middleware
@@ -82,13 +85,28 @@ class IsUserInOrg(BasePermission):
         if not user:
             return False
 
-        if not org.has_user(user):
+        if not self._user_is_allowed(org, user):
             return False
 
         # attach for downstream view reuse
         setattr(request, "org", org)
         setattr(request, "project_uuid", str(org.proj_uuid))
         return True
+
+    def _user_is_allowed(self, org, user) -> bool:
+        if not self.allowed_roles:
+            return org.has_user(user)
+        return org.get_users(roles=list(self.allowed_roles)).filter(id=user.id).exists()
+
+
+class IsAdminOrEditorInOrg(IsUserInOrg):
+    """
+    Same project resolution as IsUserInOrg, but only Administrator and Editor
+    (contributor) roles may proceed. Role is read from the org membership, not
+    from staff status.
+    """
+
+    allowed_roles = (OrgRole.ADMINISTRATOR, OrgRole.EDITOR)
 
 
 class HasValidJWT(BasePermission):
