@@ -1,3 +1,7 @@
+3.101.0
+----------
+* feat: add internal ticketer list GET and item GET/PUT/DELETE on the existing ticketer endpoints
+
 3.100.2
 ----------
 * feat: JWT public key to env variable

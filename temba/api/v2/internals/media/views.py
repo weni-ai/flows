@@ -12,14 +12,17 @@ import logging
 
 from botocore.exceptions import ClientError
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from weni.internal.authenticators import InternalOIDCAuthentication
 
 from django.conf import settings
 from django.http import HttpResponseRedirect
 
 from temba.api.v2.internals.views import APIViewMixin
+from temba.api.v2.permissions import IsAdminOrEditorInOrg
 from temba.utils import s3
 
 from .exceptions import (
@@ -42,29 +45,48 @@ class S3MediaProxyView(APIViewMixin, APIView):
     """
     Endpoint that serves as a redirect proxy for private S3 files.
 
+    Authentication is a Keycloak access token (InternalOIDCAuthentication). The
+    token user must be an administrator or editor of the Flows project identified
+    by project_uuid (or project) in the query string. IsAdminOrEditorInOrg only
+    denies users without that role; missing and unknown projects are resolved
+    here so the response stays 400 / 404.
+
     This view:
-    1. Receives an object_key that identifies a file in S3
-    2. Validates the object_key format
-    3. Searches for the file across all configured S3 buckets
-    4. Generates a pre-signed URL with short expiration (5 minutes)
-    5. Returns HTTP 302 redirect to the pre-signed URL
+    1. Authenticates the Keycloak bearer token and checks the admin or editor role
+    2. Receives an object_key that identifies a file in S3
+    3. Validates the object_key format
+    4. Searches for the file across all configured S3 buckets
+    5. Generates a pre-signed URL with short expiration (5 minutes)
+    6. Returns HTTP 302 redirect to the pre-signed URL
 
     Buckets are resolved from settings in this order:
     - S3_MEDIA_BUCKETS (additional buckets list, checked first)
     - AWS_STORAGE_BUCKET_NAME (primary bucket, checked last as fallback)
 
-    URL: GET /api/v2/internals/media/download/<object_key>/
+    URL: GET /api/v2/internals/media/download/<object_key>/?project_uuid=<uuid>
 
     Example:
         If the file path in S3 is "media/image.jpg", the request would be:
-        GET /api/v2/internals/media/download/media/image.jpg
+        GET /api/v2/internals/media/download/media/image.jpg?project_uuid=<uuid>
+        Authorization: Bearer <keycloak access token>
     """
 
-    authentication_classes = []
-    permission_classes = []
+    authentication_classes = [InternalOIDCAuthentication]
+    permission_classes = [IsAuthenticated, IsAdminOrEditorInOrg]
     renderer_classes = [JSONRenderer]
 
     def get(self, request, object_key: str, *args, **kwargs):
+        org = self.get_org_from_request(
+            request,
+            missing_status=400,
+            missing_error="Project UUID not provided",
+            not_found_error="Project not found",
+        )
+        if isinstance(org, Response):
+            return org
+
+        project_uuid = getattr(request, "project_uuid", None)
+
         try:
             self._validate_object_key(object_key)
 
@@ -75,19 +97,19 @@ class S3MediaProxyView(APIViewMixin, APIView):
             return HttpResponseRedirect(presigned_url)
 
         except MediaFileNotFoundException as e:
-            logger.warning(f"Media file not found: {object_key} - {str(e)}")
+            logger.warning(f"Media file not found: {object_key} project_uuid={project_uuid} - {str(e)}")
             return Response(
                 {"error": "File not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
         except MediaAccessDeniedException as e:
-            logger.warning(f"Media access denied: {object_key} - {str(e)}")
+            logger.warning(f"Media access denied: {object_key} project_uuid={project_uuid} - {str(e)}")
             return Response(
                 {"error": "Access denied"},
                 status=status.HTTP_403_FORBIDDEN,
             )
         except Exception:
-            logger.exception(f"Error generating presigned URL for file: {object_key}")
+            logger.exception(f"Error generating presigned URL for file: {object_key} project_uuid={project_uuid}")
             return Response(
                 {"error": "Internal server error"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
