@@ -120,7 +120,7 @@ class TestSMSTagLibrary(TembaTest):
         )
         rendered = template.render(Context())
 
-        self.assertIn("data-featherlight", rendered)
+        self.assertIn("data-featherlight-type='html'", rendered)
         self.assertEqual(1, rendered.count("response-content-disposition=attachment"))
 
         download_href = re.search(r"href='([^']*)'[^>]*class='attachment-download", rendered).group(1)
