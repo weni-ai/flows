@@ -1,3 +1,9 @@
+3.102.0
+----------
+* feat: add oidc auth to media proxy endpoint and permission class to only allow admin, editors and
+human agents to get s3 files.
+* feat: implement custom ordering and pagination for flows.json endpoint
+
 3.101.0
 ----------
 * feat: add internal ticketer list GET and item GET/PUT/DELETE on the existing ticketer endpoints
