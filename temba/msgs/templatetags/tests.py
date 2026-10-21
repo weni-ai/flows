@@ -1,3 +1,4 @@
+import re
 from urllib.parse import parse_qs, urlparse
 
 from django.template import Context, Template
@@ -93,8 +94,8 @@ class TestSMSTagLibrary(TembaTest):
 
         context = Context(attachment_button("image/jpeg:https://example.com/test.jpg"))
         template = Template("""{% load sms %}{% attachment_button 'image/jpeg:https://example.com/test.jpg' %}""")
-        self.assertIn("openMediaModal", template.render(context))
-        self.assertIn("href='https://example.com/test.jpg'", template.render(context))
+        self.assertIn("data-featherlight", template.render(context))
+        self.assertIn('src="https://example.com/test.jpg"', template.render(context))
 
     @override_settings(**S3_SIGNING_SETTINGS)
     def test_attachment_button_presigns_s3_urls(self):
@@ -111,3 +112,16 @@ class TestSMSTagLibrary(TembaTest):
 
         self.assertEqual("/media/voice.ogg", download_url.path)
         self.assertEqual(["attachment"], parse_qs(download_url.query)["response-content-disposition"])
+
+    @override_settings(**S3_SIGNING_SETTINGS)
+    def test_attachment_button_download_uses_download_url(self):
+        template = Template(
+            """{% load sms %}{% attachment_button 'image/jpeg:https://media-bucket.s3.amazonaws.com/media/photo.jpg' %}"""
+        )
+        rendered = template.render(Context())
+
+        self.assertIn("data-featherlight", rendered)
+        self.assertEqual(1, rendered.count("response-content-disposition=attachment"))
+
+        download_href = re.search(r"href='([^']*)'[^>]*class='attachment-download", rendered).group(1)
+        self.assertIn("response-content-disposition=attachment", download_href)
