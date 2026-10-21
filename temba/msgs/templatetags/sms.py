@@ -1,7 +1,10 @@
+from urllib.parse import urlparse
+
 from django import template
 from django.utils.safestring import mark_safe
 
 from temba.channels.models import ChannelEvent
+from temba.utils.s3 import presign_url
 
 register = template.Library()
 
@@ -108,7 +111,7 @@ def attachment_button(attachment: str) -> dict:
     content_type, delim, url = attachment.partition(":")
 
     # some OGG/OGA attachments may have wrong content type
-    if content_type == "application/octet-stream" and (url.endswith(".ogg") or url.endswith(".oga")):
+    if content_type == "application/octet-stream" and urlparse(url).path.endswith((".ogg", ".oga")):
         content_type = "audio/ogg"
 
     # parse the MIME content type
@@ -129,14 +132,18 @@ def attachment_button(attachment: str) -> dict:
             "lat": lat,
             "lng": lng,
         }
+        download_url = None
     else:
         preview = (sub_type or category).upper()  # preview the sub type if it exists or category
+        download_url = presign_url(url, response_content_disposition="attachment")
+        url = presign_url(url)
 
     return {
         "content_type": content_type,
         "category": category,
         "preview": preview,
         "url": url,
+        "download_url": download_url,
         "is_playable": content_type in PLAYABLE_CONTENT_TYPES,
     }
 

@@ -63,6 +63,7 @@ from temba.orgs.models import Org
 from temba.templates.models import Template, TemplateTranslation
 from temba.tests import AnonymousOrg, TembaTest, matchers, mock_mailroom
 from temba.tests.engine import MockSessionWriter
+from temba.tests.s3 import S3_SIGNING_SETTINGS
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.tickets.types.mailgun import MailgunType
 from temba.tickets.types.zendesk import ZendeskType
@@ -5167,6 +5168,34 @@ class APITest(APIJSONMixin, TembaTest):
                 }
             },
         )
+
+    @override_settings(**S3_SIGNING_SETTINGS)
+    def test_messages_presigns_s3_attachments(self):
+        self.login(self.admin)
+        msg = self.create_incoming_msg(
+            self.joe,
+            "Photo",
+            attachments=[
+                "image/jpeg:https://media-bucket.s3.amazonaws.com/media/photo.jpg",
+                "image/jpeg:https://example.com/test.jpg",
+                "geo:-35.998287,26.478109",
+            ],
+        )
+
+        response = self.fetchJSON(reverse("api.v2.messages"), f"id={msg.id}")
+        result = response.json()["results"][0]
+
+        signed_url_prefix = "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg?"
+        self.assertTrue(result["attachments"][0]["url"].startswith(signed_url_prefix))
+        self.assertIn("X-Amz-Signature=", result["attachments"][0]["url"])
+        self.assertEqual(
+            [
+                {"content_type": "image/jpeg", "url": "https://example.com/test.jpg"},
+                {"content_type": "geo", "url": "-35.998287,26.478109"},
+            ],
+            result["attachments"][1:],
+        )
+        self.assertTrue(result["media"].startswith(f"image/jpeg:{signed_url_prefix}"))
 
     def test_message_actions(self):
         url = reverse("api.v2.message_actions")
