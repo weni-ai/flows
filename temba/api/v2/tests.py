@@ -4184,6 +4184,53 @@ class APITest(APIJSONMixin, TembaTest):
         response = self.fetchJSON(url, "after=%s" % format_datetime(color.modified_on))
         self.assertResultsByUUID(response, [archived, color])
 
+        # order by name
+        response = self.fetchJSON(url, "order_by=name")
+        self.assertResultsByUUID(response, [color, archived, survey])
+
+        response = self.fetchJSON(url, "order_by=-name")
+        self.assertResultsByUUID(response, [survey, archived, color])
+
+        # order by created_on
+        response = self.fetchJSON(url, "order_by=created_on")
+        self.assertResultsByUUID(response, [survey, color, archived])
+
+        response = self.fetchJSON(url, "order_by=-created_on")
+        self.assertResultsByUUID(response, [archived, color, survey])
+
+        # invalid order_by
+        response = self.fetchJSON(url, "order_by=uuid")
+        self.assertResponseError(
+            response, None, "Invalid value for order_by, must be one of: name, -name, created_on, -created_on"
+        )
+
+        # cursor pagination with limit keeps the ordering across pages
+        response = self.fetchJSON(url, "order_by=name&limit=2")
+        resp_json = response.json()
+        self.assertResultsByUUID(response, [color, archived])
+        self.assertNotIn("count", resp_json)
+        self.assertIn("cursor=", resp_json["next"])
+
+        response = self.fetchJSON(resp_json["next"], raw_url=True)
+        self.assertResultsByUUID(response, [survey])
+        self.assertIsNone(response.json()["next"])
+
+        # limit/offset pagination when offset is provided
+        response = self.fetchJSON(url, "order_by=name&limit=1&offset=1")
+        resp_json = response.json()
+        self.assertResultsByUUID(response, [archived])
+        self.assertEqual(resp_json["count"], 3)
+        self.assertIn("offset=2", resp_json["next"])
+        self.assertIn("order_by=name", resp_json["next"])
+
+        response = self.fetchJSON(resp_json["next"], raw_url=True)
+        self.assertResultsByUUID(response, [survey])
+        self.assertIsNone(response.json()["next"])
+
+        response = self.fetchJSON(url, "offset=0")
+        self.assertResultsByUUID(response, [archived, color, survey])
+        self.assertEqual(response.json()["count"], 3)
+
         # inactive flows are never returned
         archived.is_active = False
         archived.save()
