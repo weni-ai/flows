@@ -92,6 +92,9 @@ class ResolveOrgAndUserInternalWhatsappTests(TembaTest):
         ), patch(
             "temba.api.v2.internals.broadcasts.context.User.objects.get",
             return_value=self.admin,
-        ):
+        ), self.assertLogs(
+            "temba.api.v2.internals.broadcasts.context", level="DEBUG"
+        ) as logs:
             user = _get_or_create_user(self.admin.email)
         self.assertEqual(user.email, self.admin.email)
+        self.assertTrue(any("Race condition on get_or_create" in message for message in logs.output))

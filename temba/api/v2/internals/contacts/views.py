@@ -546,7 +546,7 @@ class ContactsImportConfirmView(APIViewMixin, APIView):
         if not import_id:
             return Response({"error": "import_id is required in URL."}, status=400)
         try:
-            contact_import = ContactImport.objects.get(id=import_id)
+            contact_import = ContactImport.objects.select_related("org").get(id=import_id)
         except ContactImport.DoesNotExist:
             return Response({"error": "Import not found."}, status=404)
 
@@ -554,11 +554,8 @@ class ContactsImportConfirmView(APIViewMixin, APIView):
         if not (user and user.is_authenticated and contact_import.org.has_user(user)):
             return Response({"error": "Forbidden."}, status=403)
 
-        # ensure the requester is the same user who confirmed the import
-        if not (getattr(request, "user", None) and request.user.is_authenticated):
-            return Response({"error": "Forbidden."}, status=403)
         confirmer_id = contact_import.modified_by_id
-        if not confirmer_id or request.user.id != confirmer_id:
+        if not confirmer_id or user.id != confirmer_id:
             return Response({"error": "Forbidden."}, status=403)
 
         info = contact_import.get_info()

@@ -2,6 +2,8 @@
 Shared resolve logic for WhatsApp broadcast internal endpoints (Django sync + FastAPI bridge).
 """
 
+import logging
+
 from weni.internal.permissions import CanCommunicateInternally
 
 from django.contrib.auth import get_user_model
@@ -10,6 +12,7 @@ from django.db import IntegrityError, transaction
 from temba.orgs.models import Org
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class ProjectMismatch(ValueError):
@@ -29,6 +32,7 @@ def _get_or_create_user(email):
             user, _ = User.objects.get_or_create(email=email)
             return user
     except IntegrityError:
+        logger.debug("Race condition on get_or_create for email=%s, falling back to get", email)
         return User.objects.get(email=email)
 
 
