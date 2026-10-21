@@ -8,6 +8,7 @@ action methods on the class at request time.
 
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
+from weni.internal.models import TicketerQueue
 from weni.internal.permissions import CanCommunicateInternally
 from weni.orgs_api.views import OrgViewSet
 from weni.ticketer_queues.serializers import TicketerQueueSerializer
@@ -17,7 +18,6 @@ from django.shortcuts import get_object_or_404
 
 from temba.orgs.models import Org
 from temba.tickets.models import Ticketer
-from weni.internal.models import TicketerQueue
 
 
 def _is_trusted_internal(request, view) -> bool:

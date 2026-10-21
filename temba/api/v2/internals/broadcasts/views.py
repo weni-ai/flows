@@ -23,7 +23,6 @@ from temba.api.v2.views_base import DefaultLimitOffsetPagination
 from temba.contacts.models import ContactGroup
 from temba.msgs.models import Broadcast, BroadcastStatistics
 from temba.msgs.services import count_duplicate_contacts_across_groups, count_unique_contacts_in_groups
-from temba.orgs.models import Org
 
 from .idempotency import (
     LOOKUP_CONFLICT,
