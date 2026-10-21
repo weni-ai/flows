@@ -299,22 +299,19 @@ class InternalContactGroupsView(APIViewMixin, APIView):
         else:
             return Response({"error": "Status is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        org = getattr(request, "org", None)
-        if org is None:
-            org = self.get_org_from_request(
-                request, missing_status=400, missing_error="Project not provided", not_found_error="Project not found"
-            )
-            if isinstance(org, Response):
-                return org
-
         try:
             broadcast = Broadcast.objects.get(id=broadcast_id)
-            if broadcast.org_id != org.id:
-                return Response({"error": "Project or Broadcast not found"}, status=status.HTTP_404_NOT_FOUND)
-            user = User.objects.get(email=request.user.email)
-        except (Org.DoesNotExist, django_exceptions.ValidationError, Broadcast.DoesNotExist):
+        except Broadcast.DoesNotExist:
             return Response({"error": "Project or Broadcast not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        org = getattr(request, "org", None)
+        if org is None:
+            org = broadcast.org
+        elif broadcast.org_id != org.id:
+            return Response({"error": "Project or Broadcast not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            user = User.objects.get(email=request.user.email)
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 

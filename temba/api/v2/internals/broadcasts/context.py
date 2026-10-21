@@ -5,6 +5,7 @@ Shared resolve logic for WhatsApp broadcast internal endpoints (Django sync + Fa
 from weni.internal.permissions import CanCommunicateInternally
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 
 from temba.orgs.models import Org
 
@@ -20,6 +21,15 @@ def _is_trusted_internal(drf_request) -> bool:
     if not user or not getattr(user, "is_authenticated", False):
         return False
     return CanCommunicateInternally().has_permission(drf_request, view=None) is True
+
+
+def _get_or_create_user(email):
+    try:
+        with transaction.atomic():
+            user, _ = User.objects.get_or_create(email=email)
+            return user
+    except IntegrityError:
+        return User.objects.get(email=email)
 
 
 def resolve_org_and_user_internal_whatsapp(*, drf_request, data):
@@ -62,11 +72,11 @@ def resolve_org_and_user_internal_whatsapp(*, drf_request, data):
     body_email = data.get("user_email")
 
     if trusted and body_email:
-        user, _ = User.objects.get_or_create(email=body_email)
+        user = _get_or_create_user(body_email)
     elif jwt_email:
-        user, _ = User.objects.get_or_create(email=jwt_email)
+        user = _get_or_create_user(jwt_email)
     elif request_user and getattr(request_user, "is_authenticated", False) and getattr(request_user, "email", None):
-        user, _ = User.objects.get_or_create(email=request_user.email)
+        user = _get_or_create_user(request_user.email)
     else:
         raise ValueError("User email not provided")
 

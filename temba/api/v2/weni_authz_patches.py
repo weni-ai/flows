@@ -14,6 +14,8 @@ from weni.orgs_api.views import OrgViewSet
 from weni.ticketer_queues.serializers import TicketerQueueSerializer
 from weni.ticketer_queues.views import TicketerQueuesEndpoint
 
+from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 
 from temba.orgs.models import Org
@@ -39,33 +41,30 @@ def _org_for_privileged_action(view, request, uuid):
 
 def _patched_is_suspended(self, request, uuid=None):
     org = _org_for_privileged_action(self, request, uuid)
-    org.is_suspended = bool(request.data.get("is_suspended"))
-    org.save()
-    from django.http import JsonResponse
-
+    with transaction.atomic():
+        org.is_suspended = bool(request.data.get("is_suspended"))
+        org.save()
     return JsonResponse(dict(is_suspended=org.is_suspended))
 
 
 def _patched_suspend_flag(self, request, uuid=None):
-    from django.http import JsonResponse
-
     from weni.orgs_api.serializers import FlagOrgSerializer
 
     org = _org_for_privileged_action(self, request, uuid)
 
     if request.method == "DELETE":
-        if org.config.get("date_billing_expired"):
-            org.config.pop("date_billing_expired")
-        if org.config.get("date_org_will_suspend"):
-            org.config.pop("date_org_will_suspend")
-        org.save()
+        with transaction.atomic():
+            org.config.pop("date_billing_expired", None)
+            org.config.pop("date_org_will_suspend", None)
+            org.save()
         return JsonResponse(data=dict(success=True), status=200)
 
     serializer = FlagOrgSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    for flag_name, date in serializer.data.items():
-        org.config[flag_name] = date
-    org.save()
+    with transaction.atomic():
+        for flag_name, date in serializer.data.items():
+            org.config[flag_name] = date
+        org.save()
     return JsonResponse(data=serializer.data, status=200)
 
 
