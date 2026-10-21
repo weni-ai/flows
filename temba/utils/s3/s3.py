@@ -11,12 +11,7 @@ from django.core.files.storage import DefaultStorage
 
 from temba.utils import json
 
-
-class PrivateFileStorage(DefaultStorage):
-    default_acl = "private"
-
-
-private_file_storage = PrivateFileStorage()
+private_file_storage = DefaultStorage()
 
 _s3_client = None
 

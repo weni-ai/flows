@@ -78,7 +78,8 @@ STORAGE_ROOT_DIR = "test_orgs" if TESTING else "orgs"
 # -----------------------------------------------------------------------------------
 AWS_ACCESS_KEY_ID = "aws_access_key_id"
 AWS_SECRET_ACCESS_KEY = "aws_secret_access_key"
-AWS_DEFAULT_ACL = "private"
+# buckets with ACLs disabled reject uploads that send any x-amz-acl header
+AWS_DEFAULT_ACL = None
 AWS_S3_REGION_NAME = None
 
 AWS_STORAGE_BUCKET_NAME = "dl-temba-io"
