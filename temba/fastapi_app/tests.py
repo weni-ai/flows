@@ -99,14 +99,27 @@ class TestPostInternalWhatsappBroadcast(TembaTest):
         self.assertEqual(ctx.exception.status_code, 401)
         self.assertEqual(ctx.exception.detail, {"error": "User email not provided"})
 
+    def test_body_user_email_without_identity_is_rejected(self):
+        with self.assertRaises(HTTPException) as ctx:
+            post_internal_whatsapp_broadcast(
+                body={
+                    "project": str(self.org.proj_uuid),
+                    "user_email": "admin@a.com",
+                    "urns": ["whatsapp:5561912345678"],
+                    "msg": {"text": "Hi"},
+                },
+                jwt_payload={},
+            )
+
+        self.assertEqual(ctx.exception.status_code, 401)
+
     def test_serializer_error_returns_400(self):
         resp = post_internal_whatsapp_broadcast(
             body={
                 "project": str(self.org.proj_uuid),
-                "user_email": "user@example.com",
                 "msg": {"text": "Hi"},
             },
-            jwt_payload={},
+            jwt_payload={"email": "user@example.com"},
         )
         status_code, _ = _parse(resp)
         self.assertEqual(status_code, 400)
@@ -116,11 +129,10 @@ class TestPostInternalWhatsappBroadcast(TembaTest):
         resp = post_internal_whatsapp_broadcast(
             body={
                 "project": str(self.org.proj_uuid),
-                "user_email": "user@example.com",
                 "contacts": [str(contact.uuid)],
                 "msg": {"text": "Hello @contact.name"},
             },
-            jwt_payload={},
+            jwt_payload={"email": "user@example.com"},
         )
 
         status_code, data = _parse(resp)
@@ -146,6 +158,22 @@ class TestPostInternalWhatsappBroadcast(TembaTest):
         status_code, data = _parse(resp)
         self.assertEqual(status_code, 201)
         self.assertEqual(data["contacts"][0]["uuid"], str(contact.uuid))
+
+    def test_jwt_project_and_body_project_mismatch_returns_403(self):
+        with self.assertRaises(HTTPException) as ctx:
+            post_internal_whatsapp_broadcast(
+                body={
+                    "project": str(uuid.uuid4()),
+                    "contacts": [],
+                    "msg": {"text": "Hi"},
+                },
+                jwt_payload={
+                    "project_uuid": str(self.org.proj_uuid),
+                    "email": "user-from-jwt@example.com",
+                },
+            )
+
+        self.assertEqual(ctx.exception.status_code, 403)
 
 
 class TestVerifyJwt(TembaTest):

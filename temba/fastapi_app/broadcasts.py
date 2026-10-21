@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
-from temba.api.v2.internals.broadcasts.context import resolve_org_and_user_internal_whatsapp
+from temba.api.v2.internals.broadcasts.context import ProjectMismatch, resolve_org_and_user_internal_whatsapp
 from temba.api.v2.serializers import WhatsappBroadcastReadSerializer, WhatsappBroadcastWriteSerializer
 from temba.fastapi_app.auth import verify_jwt
 
@@ -44,6 +44,8 @@ def post_internal_whatsapp_broadcast(
 
     try:
         org, user = resolve_org_and_user_internal_whatsapp(drf_request=drf_request, data=dict(body))
+    except ProjectMismatch as e:
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail={"error": str(e)})
     except ValueError as e:
         msg = str(e)
         status_code = (

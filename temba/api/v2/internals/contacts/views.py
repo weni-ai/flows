@@ -110,6 +110,8 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
         if not project_uuid:
             return Response({"error": "Project not provided"}, status=status.HTTP_400_BAD_REQUEST)
         org = getattr(request, "org", None)
+        if org is not None and str(org.proj_uuid) != str(project_uuid):
+            return Response({"error": "Project mismatch"}, status=status.HTTP_403_FORBIDDEN)
         if not org:
             try:
                 org = Org.objects.get(proj_uuid=project_uuid)
@@ -133,7 +135,12 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
             request.data.get("channel_uuid") or request.data.get("channel") or getattr(request, "channel_uuid", None)
         )
 
-        if project_uuid:
+        attached_org = getattr(request, "org", None)
+        if attached_org is not None:
+            if project_uuid and str(project_uuid) != str(attached_org.proj_uuid):
+                return Response({"error": "Project mismatch"}, status=status.HTTP_403_FORBIDDEN)
+            self.org = attached_org
+        elif project_uuid:
             self.org = get_object_or_404(Org, field_error_name="project", proj_uuid=project_uuid)
 
         elif channel_uuid:
@@ -165,14 +172,18 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
         return Response(serializer.validated_data)
 
     def _get_request_email(self, request):
-        payload = getattr(request, "jwt_payload", None)
-        if payload:
-            email = payload.get("email") or payload.get("user_email") or request.data.get("user_email")
-        else:
-            email = request.data.get("user_email") or getattr(request.user, "email", None)
+        payload = getattr(request, "jwt_payload", None) or {}
+        jwt_email = payload.get("email") or payload.get("user_email")
+        if jwt_email:
+            return jwt_email
 
-        if email:
-            return email
+        trusted = CanCommunicateInternally().has_permission(request, self) is True
+        if trusted and request.data.get("user_email"):
+            return request.data.get("user_email")
+
+        user = getattr(request, "user", None)
+        if user and getattr(user, "is_authenticated", False) and getattr(user, "email", None):
+            return user.email
 
         internal_email = getattr(settings, "INTERNAL_USER_EMAIL", "")
         return internal_email or None
@@ -288,9 +299,18 @@ class InternalContactGroupsView(APIViewMixin, APIView):
         else:
             return Response({"error": "Status is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Get org and user
+        org = getattr(request, "org", None)
+        if org is None:
+            org = self.get_org_from_request(
+                request, missing_status=400, missing_error="Project not provided", not_found_error="Project not found"
+            )
+            if isinstance(org, Response):
+                return org
+
         try:
-            org = Broadcast.objects.get(id=broadcast_id).org
+            broadcast = Broadcast.objects.get(id=broadcast_id)
+            if broadcast.org_id != org.id:
+                return Response({"error": "Project or Broadcast not found"}, status=status.HTTP_404_NOT_FOUND)
             user = User.objects.get(email=request.user.email)
         except (Org.DoesNotExist, django_exceptions.ValidationError, Broadcast.DoesNotExist):
             return Response({"error": "Project or Broadcast not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -533,6 +553,10 @@ class ContactsImportConfirmView(APIViewMixin, APIView):
         except ContactImport.DoesNotExist:
             return Response({"error": "Import not found."}, status=404)
 
+        user = getattr(request, "user", None)
+        if not (user and user.is_authenticated and contact_import.org.has_user(user)):
+            return Response({"error": "Forbidden."}, status=403)
+
         # ensure the requester is the same user who confirmed the import
         if not (getattr(request, "user", None) and request.user.is_authenticated):
             return Response({"error": "Forbidden."}, status=403)
@@ -565,8 +589,22 @@ class ContactsImportConfirmView(APIViewMixin, APIView):
             return Response({"error": "Project is required."}, status=400)
         if not import_id:
             return Response({"error": "import_id is required in URL."}, status=400)
+        org = getattr(request, "org", None)
+        if org is None:
+            org = self.get_org_from_request(
+                request,
+                body_keys=("project_uuid", "project"),
+                missing_status=400,
+                missing_error="Project is required.",
+                not_found_status=404,
+                not_found_error="Project not found.",
+            )
+            if isinstance(org, Response):
+                return org
+        elif str(org.proj_uuid) != str(project_uuid):
+            return Response({"error": "Project mismatch"}, status=403)
         try:
-            contact_import = ContactImport.objects.get(id=import_id)
+            contact_import = ContactImport.objects.get(id=import_id, org=org)
         except ContactImport.DoesNotExist:
             return Response({"error": "Import not found."}, status=404)
         # Simulate the form of the Preview of the CRUDL

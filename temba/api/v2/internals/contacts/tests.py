@@ -1493,8 +1493,8 @@ class InternalContactFieldsEndpointTest(TembaTest):
     @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_user_not_found(self):
         mock_user = MagicMock(spec=User)
-        mock_user.is_authenticated = False
-        mock_user.email = "mockuser@example.com"
+        mock_user.is_authenticated = True
+        mock_user.email = "unknown-user-not-in-db@example.com"
 
         with patch("rest_framework.request.Request.user", mock_user):
 

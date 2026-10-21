@@ -85,6 +85,17 @@ class TestFlowImportView(TembaTest):
         self.assertEqual(resp.status_code, 400)
 
     @patch("temba.api.v2.internals.flows.views.FlowImportView.authentication_classes", [SessionAuthentication])
+    def test_import_rejects_query_body_project_mismatch(self):
+        self.client.force_login(self.user)
+        body = {"project_uuid": str(uuid4()), "definition": {"flows": []}}
+        resp = self.client.post(
+            f"{self.url}?project_uuid={self.org.proj_uuid}",
+            data=body,
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    @patch("temba.api.v2.internals.flows.views.FlowImportView.authentication_classes", [SessionAuthentication])
     @patch("temba.api.v2.internals.flows.views.FlowImportView.permission_classes", [])
     @mock_mailroom()
     def test_import_flows_has_issues_flag(self, mr_mocks):

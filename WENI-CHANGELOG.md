@@ -7,6 +7,7 @@ human agents to get s3 files.
 3.101.0
 ----------
 * feat: add internal ticketer list GET and item GET/PUT/DELETE on the existing ticketer endpoints
+* fix: security — close fail-open org membership, empty fixed tokens, mixin auth bypass, and cross-tenant internals (SEC-01, 03, 04, 06, 07, 09, 10, 11)
 
 3.100.2
 ----------
