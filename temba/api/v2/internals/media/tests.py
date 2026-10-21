@@ -160,14 +160,24 @@ class TestS3MediaProxyEndpoint(TembaTest):
     def _download_url(self, object_key):
         return reverse("internals.media_download", kwargs={"object_key": object_key})
 
-    def _get(self, object_key, *, project_uuid="default", client=None):
+    def _get(self, object_key, *, project_uuid="default", client=None, **extra_params):
         client = client or self.client
-        params = {}
+        params = dict(extra_params)
         if project_uuid == "default":
             params["project_uuid"] = str(self.org.proj_uuid)
         elif project_uuid is not None:
             params["project_uuid"] = project_uuid
         return client.get(self._download_url(object_key), params)
+
+    def _mock_found(self, mock_settings, mock_s3, presigned_url):
+        mock_settings.AWS_STORAGE_BUCKET_NAME = "test-bucket"
+        mock_settings.S3_MEDIA_BUCKETS = []
+
+        mock_client = MagicMock()
+        mock_client.head_object.return_value = {}
+        mock_client.generate_presigned_url.return_value = presigned_url
+        mock_s3.client.return_value = mock_client
+        return mock_client
 
     @patch("temba.api.v2.internals.media.views.s3")
     @patch("temba.api.v2.internals.media.views.settings")
@@ -292,6 +302,66 @@ class TestS3MediaProxyEndpoint(TembaTest):
         client = APIClient()
         client.force_authenticate(user=self.editor)
         response = self._get("media/image.jpg", client=client)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, presigned_url)
+
+    @patch("temba.api.v2.internals.media.views.s3")
+    @patch("temba.api.v2.internals.media.views.settings")
+    def test_get_agent_redirect_success(self, mock_settings, mock_s3):
+        presigned_url = "https://test-bucket.s3.amazonaws.com/presigned?signature=agent"
+        self._mock_found(mock_settings, mock_s3, presigned_url)
+
+        client = APIClient()
+        client.force_authenticate(user=self.agent)
+        response = self._get("media/image.jpg", client=client)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, presigned_url)
+
+    def test_get_surveyor_returns_403(self):
+        client = APIClient()
+        client.force_authenticate(user=self.surveyor)
+        response = self._get("media/image.jpg", client=client)
+
+        self.assertEqual(response.status_code, 403)
+
+    @patch("temba.api.v2.internals.media.views.s3")
+    @patch("temba.api.v2.internals.media.views.settings")
+    def test_get_json_response_returns_url(self, mock_settings, mock_s3):
+        presigned_url = "https://test-bucket.s3.amazonaws.com/presigned?signature=json"
+        self._mock_found(mock_settings, mock_s3, presigned_url)
+
+        response = self._get("media/image.jpg", response="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"url": presigned_url})
+        self.assertEqual(response["Cache-Control"], "no-store")
+
+    @patch("temba.api.v2.internals.media.views.s3")
+    @patch("temba.api.v2.internals.media.views.settings")
+    def test_get_json_response_not_found_returns_404(self, mock_settings, mock_s3):
+        mock_settings.AWS_STORAGE_BUCKET_NAME = "test-bucket"
+        mock_settings.S3_MEDIA_BUCKETS = []
+
+        mock_client = MagicMock()
+        mock_client.head_object.side_effect = ClientError(
+            {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject"
+        )
+        mock_s3.client.return_value = mock_client
+
+        response = self._get("media/missing.jpg", response="json")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"error": "File not found"})
+
+    @patch("temba.api.v2.internals.media.views.s3")
+    @patch("temba.api.v2.internals.media.views.settings")
+    def test_get_unknown_response_value_still_redirects(self, mock_settings, mock_s3):
+        presigned_url = "https://test-bucket.s3.amazonaws.com/presigned?signature=foo"
+        self._mock_found(mock_settings, mock_s3, presigned_url)
+
+        response = self._get("media/image.jpg", response="foo")
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, presigned_url)

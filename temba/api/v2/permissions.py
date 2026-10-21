@@ -99,14 +99,14 @@ class IsUserInOrg(BasePermission):
         return org.get_users(roles=list(self.allowed_roles)).filter(id=user.id).exists()
 
 
-class IsAdminOrEditorInOrg(IsUserInOrg):
+class IsAdminEditorOrAgentInOrg(IsUserInOrg):
     """
-    Same project resolution as IsUserInOrg, but only Administrator and Editor
-    (contributor) roles may proceed. Role is read from the org membership, not
-    from staff status.
+    Same project resolution as IsUserInOrg, but only Administrator, Editor
+    (contributor) and Agent (human service / chat user) roles may proceed. Role
+    is read from the org membership, not from staff status.
     """
 
-    allowed_roles = (OrgRole.ADMINISTRATOR, OrgRole.EDITOR)
+    allowed_roles = (OrgRole.ADMINISTRATOR, OrgRole.EDITOR, OrgRole.AGENT)
 
 
 class HasValidJWT(BasePermission):

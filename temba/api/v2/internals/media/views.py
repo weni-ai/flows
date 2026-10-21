@@ -22,7 +22,7 @@ from django.conf import settings
 from django.http import HttpResponseRedirect
 
 from temba.api.v2.internals.views import APIViewMixin
-from temba.api.v2.permissions import IsAdminOrEditorInOrg
+from temba.api.v2.permissions import IsAdminEditorOrAgentInOrg
 from temba.utils import s3
 
 from .exceptions import (
@@ -46,33 +46,37 @@ class S3MediaProxyView(APIViewMixin, APIView):
     Endpoint that serves as a redirect proxy for private S3 files.
 
     Authentication is a Keycloak access token (InternalOIDCAuthentication). The
-    token user must be an administrator or editor of the Flows project identified
-    by project_uuid (or project) in the query string. IsAdminOrEditorInOrg only
-    denies users without that role; missing and unknown projects are resolved
-    here so the response stays 400 / 404.
+    token user must be an administrator, editor or agent (human service) of the
+    Flows project identified by project_uuid (or project) in the query string.
+    IsAdminEditorOrAgentInOrg only denies users without one of those roles;
+    missing and unknown projects are resolved here so the response stays 400 / 404.
 
     This view:
-    1. Authenticates the Keycloak bearer token and checks the admin or editor role
+    1. Authenticates the Keycloak bearer token and checks the user's role
     2. Receives an object_key that identifies a file in S3
     3. Validates the object_key format
     4. Searches for the file across all configured S3 buckets
     5. Generates a pre-signed URL with short expiration (5 minutes)
-    6. Returns HTTP 302 redirect to the pre-signed URL
+    6. Returns HTTP 302 redirect to the pre-signed URL, or HTTP 200 with
+       {"url": <pre-signed URL>} when called with ?response=json
 
-    Buckets are resolved from settings in this order:
-    - S3_MEDIA_BUCKETS (additional buckets list, checked first)
+    Following the 302 from a browser sends Origin: null to S3 (cross-origin
+    redirect), which bucket CORS rules for the dashboard origin don't match.
+    ?response=json lets the client request the URL itself with its real Origin.
     - AWS_STORAGE_BUCKET_NAME (primary bucket, checked last as fallback)
 
     URL: GET /api/v2/internals/media/download/<object_key>/?project_uuid=<uuid>
 
     Example:
         If the file path in S3 is "media/image.jpg", the request would be:
-        GET /api/v2/internals/media/download/media/image.jpg?project_uuid=<uuid>
         Authorization: Bearer <keycloak access token>
+
+        GET /api/v2/internals/media/download/media/image.jpg?project_uuid=<uuid>&response=json
+        -> 200 {"url": "https://<bucket>.s3.amazonaws.com/media/image.jpg?X-Amz-Signature=..."}
     """
 
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, IsAdminOrEditorInOrg]
+    permission_classes = [IsAuthenticated, IsAdminEditorOrAgentInOrg]
     renderer_classes = [JSONRenderer]
 
     def get(self, request, object_key: str, *args, **kwargs):
@@ -93,6 +97,11 @@ class S3MediaProxyView(APIViewMixin, APIView):
             buckets = self._get_buckets()
 
             presigned_url = self._find_and_generate_presigned_url(buckets, object_key)
+
+            if request.query_params.get("response") == "json":
+                response = Response({"url": presigned_url}, status=status.HTTP_200_OK)
+                response["Cache-Control"] = "no-store"
+                return response
 
             return HttpResponseRedirect(presigned_url)
 
