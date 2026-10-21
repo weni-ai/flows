@@ -419,6 +419,18 @@ class InternalProjectMessageCountViewTest(TembaTest):
             response = InternalProjectMessageCountView.as_view()(raw)
         self.assertEqual(response.status_code, 403)
 
+    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
+    def test_attached_org_query_mismatch_is_forbidden(self):
+        from rest_framework.test import APIRequestFactory
+
+        view = InternalProjectMessageCountView()
+        raw = APIRequestFactory().get(f"{self.url}?project_uuid={self.org2.proj_uuid}")
+        request = view.initialize_request(raw)
+        request.org = self.org
+        response = view.get(request)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data, {"error": "Forbidden"})
+
     def test_outsider_is_forbidden_for_foreign_project(self):
         from rest_framework.test import APIRequestFactory
 

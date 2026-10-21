@@ -2,7 +2,13 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from temba.api.v2.internals.broadcasts.context import ProjectMismatch, resolve_org_and_user_internal_whatsapp
+from django.db import IntegrityError
+
+from temba.api.v2.internals.broadcasts.context import (
+    ProjectMismatch,
+    _get_or_create_user,
+    resolve_org_and_user_internal_whatsapp,
+)
 from temba.tests.base import TembaTest
 
 
@@ -60,3 +66,32 @@ class ResolveOrgAndUserInternalWhatsappTests(TembaTest):
             )
         self.assertEqual(org.id, self.org.id)
         self.assertEqual(user.email, "on-behalf@example.com")
+
+    def test_attached_org_and_jwt_project_mismatch_raises(self):
+        request = self._request(
+            user=self.admin,
+            org=self.org,
+            jwt_payload={"project_uuid": str(uuid.uuid4())},
+        )
+        with self.assertRaises(ProjectMismatch):
+            resolve_org_and_user_internal_whatsapp(drf_request=request, data={})
+
+    def test_jwt_project_not_found_raises(self):
+        request = self._request(
+            user=self.admin,
+            jwt_payload={"project_uuid": str(uuid.uuid4()), "email": self.admin.email},
+        )
+        with self.assertRaises(ValueError) as ctx:
+            resolve_org_and_user_internal_whatsapp(drf_request=request, data={})
+        self.assertEqual(str(ctx.exception), "Project not found")
+
+    def test_get_or_create_user_recovers_from_integrity_error(self):
+        with patch(
+            "temba.api.v2.internals.broadcasts.context.User.objects.get_or_create",
+            side_effect=IntegrityError("duplicate"),
+        ), patch(
+            "temba.api.v2.internals.broadcasts.context.User.objects.get",
+            return_value=self.admin,
+        ):
+            user = _get_or_create_user(self.admin.email)
+        self.assertEqual(user.email, self.admin.email)

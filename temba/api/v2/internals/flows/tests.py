@@ -1,6 +1,9 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from rest_framework.authentication import SessionAuthentication
+from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
+from rest_framework.request import Request
+from rest_framework.test import APIRequestFactory
 
 from django.test import override_settings
 
@@ -97,6 +100,26 @@ class TestFlowImportView(TembaTest):
 
     @patch("temba.api.v2.internals.flows.views.FlowImportView.authentication_classes", [SessionAuthentication])
     @patch("temba.api.v2.internals.flows.views.FlowImportView.permission_classes", [])
+    def test_import_rejects_attached_org_mismatch(self):
+        from rest_framework.test import APIRequestFactory
+
+        from temba.api.v2.internals.flows.views import FlowImportView
+
+        view = FlowImportView()
+        raw = APIRequestFactory().post(
+            self.url,
+            {"project_uuid": str(uuid4()), "definition": {"flows": []}},
+            format="json",
+        )
+        request = view.initialize_request(raw)
+        request.org = self.org
+        request.user = self.user
+        response = view.post(request)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data, {"error": "Project mismatch"})
+
+    @patch("temba.api.v2.internals.flows.views.FlowImportView.authentication_classes", [SessionAuthentication])
+    @patch("temba.api.v2.internals.flows.views.FlowImportView.permission_classes", [])
     @mock_mailroom()
     def test_import_flows_has_issues_flag(self, mr_mocks):
         export_definition = self.build_export_definition("Flow With Issues")
@@ -106,3 +129,68 @@ class TestFlowImportView(TembaTest):
         self.assertIn("results", data)
         self.assertEqual(len(data["results"]), 1)
         # response includes at least uuid and name
+
+    @patch("temba.api.v2.internals.flows.views.FlowImportView.authentication_classes", [SessionAuthentication])
+    @patch("temba.api.v2.internals.flows.views.FlowImportView.permission_classes", [])
+    def test_import_uses_body_project_when_org_not_attached(self):
+        from temba.api.v2.internals.flows.views import FlowImportView
+
+        view = FlowImportView()
+        raw = APIRequestFactory().post(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "definition": {"flows": []}},
+            format="json",
+        )
+        request = view.initialize_request(raw)
+        request.user = self.user
+        with patch("temba.api.v2.internals.flows.views.FlowImportUseCase.import_flows", return_value=[]):
+            response = view.post(request)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data, {"results": []})
+
+    @patch("temba.api.v2.internals.flows.views.FlowImportView.authentication_classes", [SessionAuthentication])
+    @patch("temba.api.v2.internals.flows.views.FlowImportView.permission_classes", [])
+    def test_import_uses_attached_org_when_project_matches(self):
+        from temba.api.v2.internals.flows.views import FlowImportView
+
+        view = FlowImportView()
+        raw = APIRequestFactory().post(
+            self.url,
+            {"project_uuid": str(self.org.proj_uuid), "definition": {"flows": []}},
+            format="json",
+        )
+        request = view.initialize_request(raw)
+        request.org = self.org
+        request.user = self.user
+        with patch(
+            "temba.api.v2.internals.flows.views.FlowImportUseCase.import_flows",
+            return_value=[],
+        ) as mock_import:
+            response = view.post(request)
+        self.assertEqual(response.status_code, 201)
+        dto = mock_import.call_args[0][0]
+        self.assertEqual(dto.project_uuid, str(self.org.proj_uuid))
+
+
+class TestFlowStartViewSet(TembaTest):
+    @override_settings(ROUTER_FIXED_ACCESS_TOKEN="abc")
+    def test_create_requires_fixed_query_token(self):
+        from temba.api.v2.internals.flows.views import FlowStartViewSet
+
+        view = FlowStartViewSet()
+        view.format_kwarg = None
+        missing = Request(APIRequestFactory().post("/api/v2/internals/flow_starts/"))
+        with self.assertRaises(NotAuthenticated):
+            view.create(missing)
+
+        wrong = Request(APIRequestFactory().post("/api/v2/internals/flow_starts/?token=nope"))
+        with self.assertRaises(AuthenticationFailed):
+            view.create(wrong)
+
+        ok = Request(APIRequestFactory().post("/api/v2/internals/flow_starts/?token=abc"))
+        serializer = MagicMock()
+        serializer.is_valid.return_value = True
+        serializer.data = {}
+        with patch.object(view, "get_serializer", return_value=serializer), patch.object(view, "perform_create"):
+            response = view.create(ok)
+        self.assertEqual(response.status_code, 201)

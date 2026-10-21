@@ -8,6 +8,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
+from temba.api.v2.internals.broadcasts.context import ProjectMismatch
 from temba.contacts.models import Contact
 from temba.flows.models import Flow
 from temba.msgs.models import Broadcast, BroadcastStatistics, ManagedTriggerGroup
@@ -47,6 +48,34 @@ class TestInternalWhatsappBroadcast(TembaTest):
             self.assertIn("created_on", data)
             self.assertEqual(data["contacts"][0]["uuid"], str(contact.uuid))
             self.assertEqual(data["metadata"].get("text"), body["msg"]["text"])
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.idempotency_release")
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.idempotency_lookup",
+        return_value=("miss", None),
+    )
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.resolve_org_and_user_internal_whatsapp",
+        side_effect=ProjectMismatch("Project mismatch"),
+    )
+    def test_project_mismatch_returns_403(self, _resolve, _lookup, mock_release):
+        url = "/api/v2/internals/whatsapp_broadcasts"
+        body = {
+            "project": self.org.proj_uuid,
+            "contacts": [],
+            "msg": {"text": "Hi"},
+        }
+        response = self.client.post(
+            url,
+            data=body,
+            content_type="application/json",
+            HTTP_IDEMPOTENCY_KEY="mismatch-key",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json(), {"error": "Project mismatch"})
+        mock_release.assert_called_once()
 
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
@@ -484,6 +513,31 @@ class TestInternalBroadcastsUploadMedia(TembaTest):
             self.assertEqual(resp.status_code, 200)
             data = resp.json()
             self.assertEqual(data["type"], "audio/mp4")
+
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalBroadcastsUploadMediaEndpoint.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.InternalBroadcastsUploadMediaEndpoint.permission_classes",
+        [],
+    )
+    def test_upload_rejects_body_project_mismatch(self):
+        from rest_framework.test import APIRequestFactory
+
+        from temba.api.v2.internals.broadcasts.views import InternalBroadcastsUploadMediaEndpoint
+
+        view = InternalBroadcastsUploadMediaEndpoint()
+        raw = APIRequestFactory().post(
+            self.url,
+            {"project_uuid": str(uuid.uuid4())},
+            format="json",
+        )
+        request = view.initialize_request(raw)
+        request.org = self.org
+        response = view.post(request)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data, {"error": "Project mismatch"})
 
     @patch(
         "temba.api.v2.internals.broadcasts.views.InternalBroadcastsUploadMediaEndpoint.authentication_classes",
