@@ -15,6 +15,7 @@ private_file_storage = DefaultStorage()
 
 _s3_client = None
 
+S3_CLIENT_MAX_RETRY_ATTEMPTS = 3
 S3_HOST_REGEX = re.compile(r"(?:(?P<bucket>.+)\.)?s3(?:[.-](?P<region>[a-z0-9-]+))?\.amazonaws\.com")
 
 
@@ -33,7 +34,7 @@ def client():  # pragma: no cover
         session = boto3.Session(
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID, aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
         )
-        _s3_client = session.client("s3", config=Config(retries={"max_attempts": 3}))
+        _s3_client = session.client("s3", config=Config(retries={"max_attempts": S3_CLIENT_MAX_RETRY_ATTEMPTS}))
 
     return _s3_client
 
@@ -46,7 +47,11 @@ def regional_client(region_name: str | None):
     session = boto3.Session(
         aws_access_key_id=settings.AWS_ACCESS_KEY_ID, aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
     )
-    config = Config(signature_version="s3v4", s3={"addressing_style": "virtual"}, retries={"max_attempts": 3})
+    config = Config(
+        signature_version="s3v4",
+        s3={"addressing_style": "virtual"},
+        retries={"max_attempts": S3_CLIENT_MAX_RETRY_ATTEMPTS},
+    )
     return session.client("s3", region_name=region_name, config=config)
 
 

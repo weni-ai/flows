@@ -2839,7 +2839,16 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertTrue(start.include_active)
         self.assertEqual('name ~ "frank"', start.query)
 
-    def _assert_file_upload(self, url, file_name, file_content, content_type, expected_path=None, extra_params=None):
+    def _assert_file_upload(
+        self,
+        url,
+        file_name,
+        file_content,
+        content_type,
+        expected_url=None,
+        expected_path_prefix=None,
+        extra_params=None,
+    ):
         """
         Helper method to test file uploads
         """
@@ -2866,22 +2875,18 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertEqual(response.status_code, 200)
         response_json = response.json()
 
-        # get the path
-        if expected_path:
-            if isinstance(expected_path, str):
-                path = response_json["path"]
-                self.assertTrue(path.startswith(expected_path))
-            else:
-                path = response_json["url"]
-                self.assertEqual(path, expected_path)
+        # recording uploads return a storage path, media uploads return a type and url
+        if expected_path_prefix:
+            path = response_json["path"]
+            self.assertTrue(path.startswith(expected_path_prefix))
         else:
-            # should have a type and url
             self.assertEqual(response_json["type"], content_type)
-            self.assertTrue("url" in response_json)
 
             # url should be relative to STORAGE_URL
             url = response_json["url"]
             self.assertTrue(url.startswith(f"{settings.STORAGE_URL}/"))
+            if expected_url:
+                self.assertEqual(url, expected_url)
             path = url.replace(f"{settings.STORAGE_URL}/", "")
 
         # check that file exists in private storage
@@ -2912,13 +2917,13 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.login(self.admin)
         flow = Flow.create(self.org, self.admin, "Test Flow", base_language="eng")
 
-        upload_url = reverse("flows.flow_upload_action_recording", args=[flow.uuid])
+        upload_url = reverse("flows.flow_upload_action_recording", args=[flow.id])
         self._assert_file_upload(
             upload_url,
             "test.wav",
             b"audio content",
             "audio/wav",
-            expected_path="recordings/",
+            expected_path_prefix="recordings/",
             extra_params={
                 "actionset": "action-uuid",
                 "action": "action-uuid",
@@ -2935,7 +2940,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         mock_uuid.side_effect = ["11111-111-11", "22222-222-22", "33333-333-33", "44444-444-44"]
 
         # test image upload
-        expected_path = (
+        expected_url = (
             f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/11111-111-11/steve.marten.jpg"
         )
         self._assert_file_upload(
@@ -2943,29 +2948,29 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
             f"{settings.MEDIA_ROOT}/test_media/steve.marten.jpg",
             None,  # will read from file
             "image/jpeg",
-            expected_path=expected_path,
+            expected_url=expected_url,
             extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
 
         # test video upload
-        expected_path = f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/22222-222-22/snow.mp4"
+        expected_url = f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/22222-222-22/snow.mp4"
         self._assert_file_upload(
             reverse("flows.flow_upload_media_action", args=[flow.uuid]),
             f"{settings.MEDIA_ROOT}/test_media/snow.mp4",
             None,  # will read from file
             "video/mp4",
-            expected_path=expected_path,
+            expected_url=expected_url,
             extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
 
         # test audio upload
-        expected_path = f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/33333-333-33/snow.m4a"
+        expected_url = f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/33333-333-33/snow.m4a"
         self._assert_file_upload(
             reverse("flows.flow_upload_media_action", args=[flow.uuid]),
             f"{settings.MEDIA_ROOT}/test_media/snow.m4a",
             None,  # will read from file
             "audio/mp4",
-            expected_path=expected_path,
+            expected_url=expected_url,
             extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
 
