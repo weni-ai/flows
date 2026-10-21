@@ -293,14 +293,6 @@
           var containerEle = document.querySelector(container);
           var scriptsEle = document.querySelector(".ajax-scripts");
 
-          if (response.status >= 400 || body.indexOf('ExpiredToken') > -1 || body.indexOf('AccessDenied') > -1 || body.indexOf('InvalidAccessKeyId') > -1) {
-            body = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;text-align:center;color:#666;">' +
-              '<div style="font-size:48px;margin-bottom:16px;">&#9888;</div>' +
-              '<div style="font-size:18px;margin-bottom:8px;">Unable to load content</div>' +
-              '<div style="font-size:14px;color:#999;">The file may have expired or is temporarily unavailable. Try reloading the page.</div>' +
-              '</div>';
-          }
-
           // remove any existing children
           while (containerEle.firstChild) {
             containerEle.removeChild(containerEle.firstChild);
@@ -535,18 +527,12 @@
       if (!href) {
         if(ele.tagName == "TD") {
           href = ele.closest("tr").getAttribute("href");
-        } else {
-          var parent = ele.closest("[href]");
-          if (parent) {
-            href = parent.getAttribute("href");
-          }
         }
       }
 
       if (href) {
           var isExternal = href.startsWith('http://') || href.startsWith('https://');
-          var isDownload = ele.hasAttribute && ele.hasAttribute('download');
-          if (isExternal || isDownload || event.metaKey) {
+          if (isExternal || event.metaKey) {
               window.open(href, '_blank');
           } else {
               fetchURL(href);

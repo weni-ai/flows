@@ -15,6 +15,7 @@ from temba.msgs.models import Msg
 from temba.orgs.models import Org
 from temba.request_logs.models import HTTPLog
 from temba.tickets.models import Ticket, TicketEvent, Topic
+from temba.utils.s3 import presign_attachment
 
 
 class Event:
@@ -281,7 +282,7 @@ def _base_msg(obj) -> dict:
     if obj.channel:
         d["channel"] = {"uuid": str(obj.channel.uuid), "name": obj.channel.name}
     if obj.attachments:
-        d["attachments"] = obj.attachments
+        d["attachments"] = [presign_attachment(a) for a in obj.attachments]
 
     if obj.metadata and obj.metadata.get("body", None):
         d["text"] = obj.metadata.get("body", None)

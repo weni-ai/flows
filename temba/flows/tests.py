@@ -14,7 +14,6 @@ from openpyxl import load_workbook
 
 from django.conf import settings
 from django.contrib.auth.models import Group
-from django.core.files.storage import private_file_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models.functions import TruncDate
 from django.test.utils import override_settings
@@ -2071,38 +2070,54 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         # create a flow for another org
         other_flow = Flow.create(self.org2, self.admin2, "Flow2", base_language="base")
 
-        # prepare post data
-        post_data = {"file": test_file}
-        if extra_params:
-            post_data.update(extra_params)
+        # no login, no list
+        response = self.client.get(reverse("flows.flow_list"))
+        self.assertRedirect(response, reverse("users.user_login"))
 
-        # try to upload it
-        response = self.client.post(url, post_data)
+        user = self.admin
+        user.first_name = "Test"
+        user.last_name = "Contact"
+        user.save()
+        self.login(user)
 
-        # check response
+        # list, should have only one flow (the one created in setUp)
+        response = self.client.get(reverse("flows.flow_list"))
+        self.assertEqual(1, len(response.context["object_list"]))
+
+        # inactive list shouldn't have any flows
+        response = self.client.get(reverse("flows.flow_archived"))
+        self.assertEqual(0, len(response.context["object_list"]))
+
+        # also shouldn't be able to view other flow
+        response = self.client.get(reverse("flows.flow_editor", args=[other_flow.uuid]))
+        self.assertEqual(302, response.status_code)
+
+        # get our create page
+        response = self.client.get(reverse("flows.flow_create"))
+        self.assertTrue(response.context["has_flows"])
+
+        # create a new regular flow
+        response = self.client.post(
+            reverse("flows.flow_create"), dict(name="Flow", flow_type=Flow.TYPE_MESSAGE), follow=True
+        )
+        flow1 = Flow.objects.get(org=self.org, name="Flow")
+        self.assertEqual(1, flow1.revisions.all().count())
+        # add a trigger on this flow
+        Trigger.objects.create(
+            org=self.org, keyword="unique", flow=flow1, created_by=self.admin, modified_by=self.admin
+        )
         self.assertEqual(response.status_code, 200)
-        response_json = response.json()
+        self.assertEqual(flow1.flow_type, Flow.TYPE_MESSAGE)
+        self.assertEqual(flow1.expires_after_minutes, 10080)
 
-        # get the path
-        if expected_path:
-            if isinstance(expected_path, str):
-                path = response_json["path"]
-                self.assertTrue(path.startswith(expected_path))
-            else:
-                path = response_json["url"]
-                self.assertEqual(path, expected_path)
-        else:
-            # should have a type and url
-            self.assertEqual(response_json["type"], content_type)
-            self.assertTrue("url" in response_json)
+        # create a new surveyor flow
+        self.client.post(
+            reverse("flows.flow_create"), dict(name="Surveyor Flow", flow_type=Flow.TYPE_SURVEY), follow=True
+        )
+        flow2 = Flow.objects.get(org=self.org, name="Surveyor Flow")
+        self.assertEqual(flow2.flow_type, "S")
+        self.assertEqual(flow2.expires_after_minutes, 10080)
 
-            # url should be relative to STORAGE_URL
-            url = response_json["url"]
-            self.assertTrue(url.startswith(f"{settings.STORAGE_URL}/"))
-            path = url.replace(f"{settings.STORAGE_URL}/", "")
-
-        # check that file exists in private storage
-        self.assertTrue(private_file_storage.exists(path))
         # make sure we don't get a start flow button for Android Surveys
         response = self.client.get(reverse("flows.flow_editor", args=[flow2.uuid]))
         self.assertNotContains(response, "broadcast-rulesflow btn-primary")
@@ -2268,28 +2283,249 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         flow = self.get_flow("color_v13")
         update_url = reverse("flows.flow_update", args=[flow.id])
 
-        # check content
-        with private_file_storage.open(path) as f:
-            self.assertEqual(f.read(), file_content)
+        # we should only see name and contact creation option on form
+        self.assertUpdateFetch(
+            update_url,
+            allow_viewers=False,
+            allow_editors=True,
+            form_fields=["name", "keyword_triggers", "expires_after_minutes", "ignore_triggers"],
+        )
 
-        return response_json
+        # try to update with empty name
+        self.assertUpdateSubmit(
+            update_url,
+            {"name": "", "expires_after_minutes": 10, "ignore_triggers": True},
+            form_errors={"name": "This field is required."},
+            object_unchanged=flow,
+        )
 
-    @mock_mailroom(queue=False)
-    def test_media_upload_with_private_storage(self, mr_mocks):
-        """
-        Test that media uploads use private storage
-        """
+        # update name and contact creation option to be per login
+        self.assertUpdateSubmit(
+            update_url,
+            {
+                "name": "New Name",
+                "keyword_triggers": ["test", "help"],
+                "expires_after_minutes": 10,
+                "ignore_triggers": True,
+            },
+        )
+
+        flow.refresh_from_db()
+        self.assertEqual("New Name", flow.name)
+        self.assertEqual(10, flow.expires_after_minutes)
+        self.assertEqual({"test", "help"}, {t.keyword for t in flow.triggers.filter(is_active=True)})
+        self.assertTrue(flow.ignore_triggers)
+
+    def test_update_voice_flow(self):
+        flow = self.get_flow("ivr")
+        update_url = reverse("flows.flow_update", args=[flow.id])
+
+        # check fields
+        self.assertUpdateFetch(
+            update_url,
+            allow_viewers=False,
+            allow_editors=True,
+            form_fields=["name", "keyword_triggers", "expires_after_minutes", "ignore_triggers", "ivr_retry"],
+        )
+
+        # try to update with an expires value which is only for messaging flows and an invalid retry value
+        self.assertUpdateSubmit(
+            update_url,
+            {"name": "New Name", "expires_after_minutes": 720, "ignore_triggers": True, "ivr_retry": 1234},
+            form_errors={
+                "expires_after_minutes": "Select a valid choice. 720 is not one of the available choices.",
+                "ivr_retry": "Select a valid choice. 1234 is not one of the available choices.",
+            },
+            object_unchanged=flow,
+        )
+
+        # update name and contact creation option to be per login
+        self.assertUpdateSubmit(
+            update_url,
+            {
+                "name": "New Name",
+                "keyword_triggers": ["test", "help"],
+                "expires_after_minutes": 10,
+                "ignore_triggers": True,
+                "ivr_retry": 30,
+            },
+        )
+
+        flow.refresh_from_db()
+        self.assertEqual("New Name", flow.name)
+        self.assertEqual(10, flow.expires_after_minutes)
+        self.assertEqual({"test", "help"}, {t.keyword for t in flow.triggers.filter(is_active=True)})
+        self.assertTrue(flow.ignore_triggers)
+        self.assertEqual(30, flow.metadata.get("ivr_retry"))
+
+        # check we still have that value after saving a new revision
+        flow.save_revision(self.admin, flow.get_definition())
+        self.assertEqual(30, flow.metadata["ivr_retry"])
+
+    def test_update_surveyor_flow(self):
+        flow = self.get_flow("media_survey")
+        update_url = reverse("flows.flow_update", args=[flow.id])
+
+        # we should only see name and contact creation option on form
+        self.assertUpdateFetch(
+            update_url, allow_viewers=False, allow_editors=True, form_fields=["name", "contact_creation"]
+        )
+
+        # update name and contact creation option to be per login
+        self.assertUpdateSubmit(update_url, {"name": "New Name", "contact_creation": "login"})
+
+        flow.refresh_from_db()
+        self.assertEqual("New Name", flow.name)
+        self.assertEqual("login", flow.metadata.get("contact_creation"))
+
+    def test_update_background_flow(self):
+        flow = self.get_flow("background")
+        update_url = reverse("flows.flow_update", args=[flow.id])
+
+        # we should only see name on form
+        self.assertUpdateFetch(update_url, allow_viewers=False, allow_editors=True, form_fields=["name"])
+
+        # update name and contact creation option to be per login
+        self.assertUpdateSubmit(update_url, {"name": "New Name"})
+
+        flow.refresh_from_db()
+        self.assertEqual("New Name", flow.name)
+
+    def test_list_views(self):
+        flow1 = self.get_flow("color_v13")
+        flow2 = self.get_flow("no_ruleset_flow")
+
+        # archive second flow
+        flow2.is_archived = True
+        flow2.save(update_fields=("is_archived",))
+
+        flow3 = Flow.create(self.org, self.admin, "Flow 3", base_language="base")
+
         self.login(self.admin)
-        flow = Flow.create(self.org, self.admin, "Test Flow", base_language="eng")
 
-        upload_url = reverse("flows.flow_upload_media_action", args=[flow.uuid])
-        self._assert_file_upload(upload_url, "test.txt", b"test content", "text/plain")
+        # see our trigger on the list page
+        response = self.client.get(reverse("flows.flow_list"))
+        self.assertContains(response, flow1.name)
+        self.assertContains(response, flow3.name)
+        self.assertEqual(2, response.context["folders"][0]["count"])
+        self.assertEqual(1, response.context["folders"][1]["count"])
 
-    @mock_mailroom
-    def test_recording_upload_with_private_storage(self, mr_mocks):
-        """
-        Test that recording uploads use private storage
-        """
+        # archive it
+        response = self.client.post(reverse("flows.flow_list"), {"action": "archive", "objects": flow1.id})
+        self.assertEqual(200, response.status_code)
+
+        # flow should no longer appear in list
+        response = self.client.get(reverse("flows.flow_list"))
+        self.assertNotContains(response, flow1.name)
+        self.assertContains(response, flow3.name)
+        self.assertEqual(1, response.context["folders"][0]["count"])
+        self.assertEqual(2, response.context["folders"][1]["count"])
+
+        # but does appear in archived list
+        response = self.client.get(reverse("flows.flow_archived"))
+        self.assertContains(response, flow1.name)
+
+        # flow2 should appear before flow since it was created later
+        self.assertTrue(flow2, response.context["object_list"][0])
+        self.assertTrue(flow1, response.context["object_list"][1])
+
+        # unarchive it
+        response = self.client.post(reverse("flows.flow_archived"), {"action": "restore", "objects": flow1.id})
+        self.assertEqual(200, response.status_code)
+
+        # flow should no longer appear in archived list
+        response = self.client.get(reverse("flows.flow_archived"))
+        self.assertNotContains(response, flow1.name)
+
+        # but does appear in normal list
+        response = self.client.get(reverse("flows.flow_list"))
+        self.assertContains(response, flow1.name)
+        self.assertContains(response, flow3.name)
+        self.assertEqual(2, response.context["folders"][0]["count"])
+        self.assertEqual(1, response.context["folders"][1]["count"])
+
+        # can label flows
+        label1 = FlowLabel.create(self.org, "Important")
+        response = self.client.post(
+            reverse("flows.flow_list"), {"action": "label", "objects": flow1.id, "label": label1.id}
+        )
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({label1}, set(flow1.labels.all()))
+        self.assertEqual({flow1}, set(label1.flows.all()))
+
+        # and unlabel
+        response = self.client.post(
+            reverse("flows.flow_list"), {"action": "label", "objects": flow1.id, "label": label1.id, "add": False}
+        )
+
+        self.assertEqual(200, response.status_code)
+
+        flow1.refresh_from_db()
+        self.assertEqual(set(), set(flow1.labels.all()))
+
+        # voice flows should be included in the count
+        Flow.objects.filter(id=flow1.id).update(flow_type=Flow.TYPE_VOICE)
+
+        response = self.client.get(reverse("flows.flow_list"))
+        self.assertContains(response, flow1.name)
+        self.assertEqual(2, response.context["folders"][0]["count"])
+        self.assertEqual(1, response.context["folders"][1]["count"])
+
+        # single message flow (flom campaign) should not be included in counts and not even on this list
+        Flow.objects.filter(id=flow1.id).update(is_system=True)
+
+        response = self.client.get(reverse("flows.flow_list"))
+
+        self.assertNotContains(response, flow1.name)
+        self.assertEqual(1, response.context["folders"][0]["count"])
+        self.assertEqual(1, response.context["folders"][1]["count"])
+
+        # single message flow should not be even in the archived list
+        Flow.objects.filter(id=flow1.id).update(is_system=True, is_archived=True)
+
+        response = self.client.get(reverse("flows.flow_archived"))
+        self.assertNotContains(response, flow1.name)
+        self.assertEqual(1, response.context["folders"][0]["count"])
+        self.assertEqual(1, response.context["folders"][1]["count"])  # only flow2
+
+    def test_get_definition(self):
+        flow = self.get_flow("color_v13")
+
+        # if definition is outdated, metadata values are updated from db object
+        flow.name = "Amazing Flow"
+        flow.save(update_fields=("name",))
+
+        self.assertEqual("Amazing Flow", flow.get_definition()["name"])
+
+        # make a flow that looks like a legacy flow
+        flow = self.get_flow("color_v11")
+        original_def = self.get_flow_json("color_v11")
+
+        flow.version_number = "11.12"
+        flow.save(update_fields=("version_number",))
+
+        revision = flow.revisions.get()
+        revision.definition = original_def
+        revision.spec_version = "11.12"
+        revision.save(update_fields=("definition", "spec_version"))
+
+        self.assertIn("metadata", flow.get_definition())
+
+        # if definition is outdated, metadata values are updated from db object
+        flow.name = "Amazing Flow"
+        flow.save(update_fields=("name",))
+
+        self.assertEqual("Amazing Flow", flow.get_definition()["metadata"]["name"])
+
+        # metadata section can be missing too
+        del original_def["metadata"]
+        revision.definition = original_def
+        revision.save(update_fields=("definition",))
+
+        self.assertEqual("Amazing Flow", flow.get_definition()["metadata"]["name"])
+
+    def test_fetch_revisions(self):
         self.login(self.admin)
 
         # we should have one revision for an imported flow
@@ -2603,6 +2839,98 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertTrue(start.include_active)
         self.assertEqual('name ~ "frank"', start.query)
 
+    def _assert_file_upload(
+        self,
+        url,
+        file_name,
+        file_content,
+        content_type,
+        expected_url=None,
+        expected_path_prefix=None,
+        extra_params=None,
+    ):
+        """
+        Helper method to test file uploads
+        """
+        # create the test file
+        if isinstance(file_content, str):
+            file_content = file_content.encode()
+
+        if os.path.exists(file_name):
+            with open(file_name, "rb") as f:
+                file_content = f.read()
+                test_file = SimpleUploadedFile(os.path.basename(file_name), file_content, content_type=content_type)
+        else:
+            test_file = SimpleUploadedFile(file_name, file_content, content_type=content_type)
+
+        # prepare post data
+        post_data = {"file": test_file}
+        if extra_params:
+            post_data.update(extra_params)
+
+        # try to upload it
+        response = self.client.post(url, post_data)
+
+        # check response
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+
+        # recording uploads return a storage path, media uploads return a type and url
+        if expected_path_prefix:
+            path = response_json["path"]
+            self.assertTrue(path.startswith(expected_path_prefix))
+        else:
+            self.assertEqual(response_json["type"], content_type)
+
+            # url should be relative to STORAGE_URL
+            url = response_json["url"]
+            self.assertTrue(url.startswith(f"{settings.STORAGE_URL}/"))
+            if expected_url:
+                self.assertEqual(url, expected_url)
+            path = url.replace(f"{settings.STORAGE_URL}/", "")
+
+        # check that file exists in private storage
+        self.assertTrue(private_file_storage.exists(path))
+
+        # check content
+        with private_file_storage.open(path) as f:
+            self.assertEqual(f.read(), file_content)
+
+        return response_json
+
+    @mock_mailroom(queue=False)
+    def test_media_upload_with_private_storage(self, mr_mocks):
+        """
+        Test that media uploads use private storage
+        """
+        self.login(self.admin)
+        flow = Flow.create(self.org, self.admin, "Test Flow", base_language="eng")
+
+        upload_url = reverse("flows.flow_upload_media_action", args=[flow.uuid])
+        self._assert_file_upload(upload_url, "test.txt", b"test content", "text/plain")
+
+    @mock_mailroom
+    def test_recording_upload_with_private_storage(self, mr_mocks):
+        """
+        Test that recording uploads use private storage
+        """
+        self.login(self.admin)
+        flow = Flow.create(self.org, self.admin, "Test Flow", base_language="eng")
+
+        upload_url = reverse("flows.flow_upload_action_recording", args=[flow.id])
+        self._assert_file_upload(
+            upload_url,
+            "test.wav",
+            b"audio content",
+            "audio/wav",
+            expected_path_prefix="recordings/",
+            extra_params={
+                "actionset": "action-uuid",
+                "action": "action-uuid",
+            },
+        )
+
+    @mock_mailroom
     @patch("temba.flows.views.uuid4")
     def test_upload_media_action(self, mock_uuid, mr_mocks):
         flow = self.get_flow("color_v13")
@@ -2612,7 +2940,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         mock_uuid.side_effect = ["11111-111-11", "22222-222-22", "33333-333-33", "44444-444-44"]
 
         # test image upload
-        expected_path = (
+        expected_url = (
             f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/11111-111-11/steve.marten.jpg"
         )
         self._assert_file_upload(
@@ -2620,29 +2948,29 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
             f"{settings.MEDIA_ROOT}/test_media/steve.marten.jpg",
             None,  # will read from file
             "image/jpeg",
-            expected_path=expected_path,
+            expected_url=expected_url,
             extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
 
         # test video upload
-        expected_path = f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/22222-222-22/snow.mp4"
+        expected_url = f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/22222-222-22/snow.mp4"
         self._assert_file_upload(
             reverse("flows.flow_upload_media_action", args=[flow.uuid]),
             f"{settings.MEDIA_ROOT}/test_media/snow.mp4",
             None,  # will read from file
             "video/mp4",
-            expected_path=expected_path,
+            expected_url=expected_url,
             extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
 
         # test audio upload
-        expected_path = f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/33333-333-33/snow.m4a"
+        expected_url = f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/33333-333-33/snow.m4a"
         self._assert_file_upload(
             reverse("flows.flow_upload_media_action", args=[flow.uuid]),
             f"{settings.MEDIA_ROOT}/test_media/snow.m4a",
             None,  # will read from file
             "audio/mp4",
-            expected_path=expected_path,
+            expected_url=expected_url,
             extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
 
