@@ -6782,3 +6782,53 @@ class ContactPhoneValidatorTest(TembaTest):
 
         with self.assertRaises(ValidationError):
             validate_contact_phone("not a phone")
+
+
+class OptInGroupProtectionTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+        from temba.contacts.usecases.opt_in import ensure_audience
+
+        self.group = ensure_audience(self.org, self.admin).group
+
+    def test_studio_refuses_delete_and_rename(self):
+        self.login(self.admin)
+        delete_url = reverse("contacts.contactgroup_delete", args=[self.group.id])
+        response = self.client.post(delete_url)
+        self.assertEqual(response.status_code, 302)
+        self.group.refresh_from_db()
+        self.assertTrue(self.group.is_active)
+        self.assertEqual(self.group.name, "Opt-in")
+
+        update_url = reverse("contacts.contactgroup_update", args=[self.group.id])
+        response = self.client.post(update_url, {"name": "Renamed"})
+        self.assertEqual(response.status_code, 302)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.name, "Opt-in")
+
+        response = self.client.get(reverse("contacts.contact_filter", args=[self.group.uuid]))
+        self.assertNotContains(response, 'id="delete-group"')
+        self.assertNotContains(response, 'id="edit-group"')
+
+    def test_bulk_delete_skips_linked_group_but_release_still_runs(self):
+        other = self.create_group("Ordinary")
+        ContactGroup.apply_action_delete(
+            self.admin, ContactGroup.user_groups.filter(org=self.org, id__in=[self.group.id, other.id])
+        )
+        self.group.refresh_from_db()
+        other.refresh_from_db()
+        self.assertTrue(self.group.is_active)
+        self.assertFalse(other.is_active)
+
+        self.group.release(self.admin)
+        self.group.refresh_from_db()
+        self.assertFalse(self.group.is_active)
+
+    def test_org_delete_removes_the_audience(self):
+        from unittest.mock import patch
+
+        group_id = self.group.id
+        self.org.release(self.admin)
+        with patch("temba.archives.models.Archive.release_org_archives"):
+            self.org.delete()
+        self.assertFalse(ContactGroup.all_groups.filter(id=group_id).exists())

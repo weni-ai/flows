@@ -859,7 +859,15 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
 
     @classmethod
     def create(
-        cls, org, user, name: str, language: str, urns: list[str], fields: dict[ContactField, str], groups: list
+        cls,
+        org,
+        user,
+        name: str,
+        language: str,
+        urns: list[str],
+        fields: dict[ContactField, str],
+        groups: list,
+        timeout=None,
     ):
         fields_by_key = {f.key: v for f, v in fields.items()}
         group_uuids = [g.uuid for g in groups]
@@ -868,6 +876,7 @@ class Contact(RequireUpdateFieldsMixin, TembaModel):
             org.id,
             user.id,
             ContactSpec(name=name, language=language, urns=urns, fields=fields_by_key, groups=group_uuids),
+            timeout=timeout,
         )
         return Contact.objects.get(id=response["contact"]["id"])
 
@@ -1642,6 +1651,7 @@ class ContactGroup(TembaModel, DependencyMixin):
     TYPE_STOPPED = "S"
     TYPE_ARCHIVED = "V"
     TYPE_USER_DEFINED = "U"
+    OPT_IN_GROUP_NAME = "Opt-in"
 
     TYPE_CHOICES = (
         (TYPE_ACTIVE, "Active"),
@@ -1675,6 +1685,8 @@ class ContactGroup(TembaModel, DependencyMixin):
     name = models.CharField(max_length=MAX_NAME_LEN)
 
     group_type = models.CharField(max_length=1, choices=TYPE_CHOICES, default=TYPE_USER_DEFINED)
+
+    is_opt_in = models.BooleanField(default=False)
 
     status = models.CharField(max_length=1, choices=STATUS_CHOICES, default=STATUS_INITIALIZING)
 
@@ -1864,6 +1876,10 @@ class ContactGroup(TembaModel, DependencyMixin):
 
     @classmethod
     def apply_action_delete(cls, user, groups):
+        groups = groups.exclude(is_opt_in=True)
+        if not groups:
+            return
+
         groups.update(is_active=False, modified_by=user)
 
         from .tasks import release_group_task
@@ -2037,6 +2053,13 @@ class ContactGroup(TembaModel, DependencyMixin):
     class Meta:
         verbose_name = _("Group")
         verbose_name_plural = _("Groups")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["org"],
+                condition=Q(is_opt_in=True, is_active=True),
+                name="contacts_contactgroup_one_active_opt_in",
+            )
+        ]
 
 
 class ContactGroupCount(SquashableModel):
