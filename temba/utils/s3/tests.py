@@ -1,12 +1,26 @@
 import io
 from datetime import datetime
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
 import pytz
 
+from django.test import override_settings
+
 from temba.tests import TembaTest
-from temba.tests.s3 import MockEventStream, MockS3Client
-from temba.utils.s3 import EventStreamReader, compile_select, get_body, matches_where, split_url
+from temba.tests.s3 import S3_SIGNING_SETTINGS, MockEventStream, MockS3Client
+from temba.utils.s3 import (
+    EventStreamReader,
+    S3Location,
+    compile_select,
+    get_body,
+    matches_where,
+    parse_s3_url,
+    presign_attachment,
+    presign_url,
+    regional_client,
+    split_url,
+)
 
 
 class S3Test(TembaTest):
@@ -43,6 +57,145 @@ class S3Test(TembaTest):
         with patch("temba.utils.s3.s3.client", return_value=mock_s3):
             body = get_body("https://foo.s3.aws.amazon.com/test/12345")
             self.assertEqual(body, "12345_content")
+
+
+@override_settings(**S3_SIGNING_SETTINGS)
+class PresignTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+
+        regional_client.cache_clear()
+
+    def assertPresigned(self, url: str, host: str, path: str, region: str, expires: int = 600) -> dict:
+        parsed = urlparse(url)
+        query = parse_qs(parsed.query)
+
+        self.assertEqual(host, parsed.hostname)
+        self.assertEqual(path, parsed.path)
+        self.assertEqual(["AWS4-HMAC-SHA256"], query["X-Amz-Algorithm"])
+        self.assertEqual([str(expires)], query["X-Amz-Expires"])
+        self.assertTrue(query["X-Amz-Credential"][0].endswith(f"/{region}/s3/aws4_request"))
+        self.assertIn("X-Amz-Signature", query)
+        return query
+
+    def test_parse_s3_url(self):
+        self.assertEqual(
+            S3Location("media-bucket", "media/photo.jpg", None),
+            parse_s3_url("https://media-bucket.s3.amazonaws.com/media/photo.jpg"),
+        )
+        self.assertEqual(
+            S3Location("media-bucket", "media/photo.jpg", "sa-east-1"),
+            parse_s3_url("https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg"),
+        )
+        self.assertEqual(
+            S3Location("media-bucket", "media/photo.jpg", "sa-east-1"),
+            parse_s3_url("https://media-bucket.s3-sa-east-1.amazonaws.com/media/photo.jpg"),
+        )
+        self.assertEqual(
+            S3Location("my.dotted.bucket", "photo.jpg", "us-west-2"),
+            parse_s3_url("https://my.dotted.bucket.s3.us-west-2.amazonaws.com/photo.jpg"),
+        )
+
+        # path-style
+        self.assertEqual(
+            S3Location("media-bucket", "media/photo.jpg", None),
+            parse_s3_url("https://s3.amazonaws.com/media-bucket/media/photo.jpg"),
+        )
+        self.assertEqual(
+            S3Location("media-bucket", "media/photo.jpg", "sa-east-1"),
+            parse_s3_url("https://s3.sa-east-1.amazonaws.com/media-bucket/media/photo.jpg"),
+        )
+        self.assertEqual(
+            S3Location("media-bucket", "media/photo.jpg", "sa-east-1"),
+            parse_s3_url("https://s3-sa-east-1.amazonaws.com/media-bucket/media/photo.jpg"),
+        )
+
+        # AWS_BUCKET_DOMAIN maps to AWS_STORAGE_BUCKET_NAME
+        self.assertEqual(
+            S3Location("static-bucket", "orgs/1/media/photo.jpg", None),
+            parse_s3_url("https://static.example.com/orgs/1/media/photo.jpg"),
+        )
+
+        # query strings from previously signed URLs are dropped and keys are unquoted
+        self.assertEqual(
+            S3Location("media-bucket", "media/my photo.jpg", "sa-east-1"),
+            parse_s3_url(
+                "https://media-bucket.s3.sa-east-1.amazonaws.com/media/my%20photo.jpg?X-Amz-Signature=abc&X-Amz-Expires=1"
+            ),
+        )
+
+        # not S3 or missing bucket or key
+        self.assertIsNone(parse_s3_url("https://example.com/photo.jpg"))
+        self.assertIsNone(parse_s3_url("https://media-bucket.s3.amazonaws.com/"))
+        self.assertIsNone(parse_s3_url("https://s3.amazonaws.com/media-bucket"))
+        self.assertIsNone(parse_s3_url("https://static.example.com/"))
+        self.assertIsNone(parse_s3_url("-35.998287,26.478109"))
+        self.assertIsNone(parse_s3_url(""))
+
+    def test_presign_url(self):
+        # region from the URL wins over AWS_S3_REGION_NAME
+        query = self.assertPresigned(
+            presign_url("https://media-bucket.s3.us-west-2.amazonaws.com/media/my%20photo.jpg"),
+            "media-bucket.s3.us-west-2.amazonaws.com",
+            "/media/my%20photo.jpg",
+            "us-west-2",
+        )
+        self.assertNotIn("response-content-disposition", query)
+
+        # region falls back to AWS_S3_REGION_NAME, and previous signatures are replaced
+        query = self.assertPresigned(
+            presign_url("https://attachments-bucket.s3.amazonaws.com/media/a.ogg?X-Amz-Signature=stale"),
+            "attachments-bucket.s3.sa-east-1.amazonaws.com",
+            "/media/a.ogg",
+            "sa-east-1",
+        )
+        self.assertNotEqual(["stale"], query["X-Amz-Signature"])
+
+        self.assertPresigned(
+            presign_url("https://static.example.com/orgs/1/media/photo.jpg"),
+            "static-bucket.s3.sa-east-1.amazonaws.com",
+            "/orgs/1/media/photo.jpg",
+            "sa-east-1",
+        )
+
+        query = self.assertPresigned(
+            presign_url(
+                "https://media-bucket.s3.amazonaws.com/media/photo.jpg",
+                expires=30,
+                response_content_disposition="attachment",
+            ),
+            "media-bucket.s3.sa-east-1.amazonaws.com",
+            "/media/photo.jpg",
+            "sa-east-1",
+            expires=30,
+        )
+        self.assertEqual(["attachment"], query["response-content-disposition"])
+
+        # URLs outside our buckets are returned unchanged
+        self.assertEqual(
+            "https://other-bucket.s3.amazonaws.com/photo.jpg",
+            presign_url("https://other-bucket.s3.amazonaws.com/photo.jpg"),
+        )
+        self.assertEqual("https://example.com/photo.jpg", presign_url("https://example.com/photo.jpg"))
+
+    def test_presign_url_reuses_regional_clients(self):
+        presign_url("https://media-bucket.s3.amazonaws.com/a.jpg")
+        presign_url("https://media-bucket.s3.amazonaws.com/b.jpg")
+        presign_url("https://media-bucket.s3.us-west-2.amazonaws.com/c.jpg")
+
+        self.assertEqual(2, regional_client.cache_info().currsize)
+
+    def test_presign_attachment(self):
+        signed_attachment = presign_attachment("image/jpeg:https://media-bucket.s3.amazonaws.com/a.jpg")
+        content_type, _, url = signed_attachment.partition(":")
+        self.assertEqual("image/jpeg", content_type)
+        self.assertPresigned(url, "media-bucket.s3.sa-east-1.amazonaws.com", "/a.jpg", "sa-east-1")
+
+        self.assertEqual("geo:-35.998287,26.478109", presign_attachment("geo:-35.998287,26.478109"))
+        self.assertEqual(
+            "image/jpeg:https://example.com/a.jpg", presign_attachment("image/jpeg:https://example.com/a.jpg")
+        )
+        self.assertEqual("image/jpeg", presign_attachment("image/jpeg"))
 
 
 class SelectTest(TembaTest):

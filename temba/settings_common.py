@@ -79,9 +79,15 @@ STORAGE_ROOT_DIR = "test_orgs" if TESTING else "orgs"
 AWS_ACCESS_KEY_ID = "aws_access_key_id"
 AWS_SECRET_ACCESS_KEY = "aws_secret_access_key"
 AWS_DEFAULT_ACL = "private"
+AWS_S3_REGION_NAME = None
 
 AWS_STORAGE_BUCKET_NAME = "dl-temba-io"
 AWS_BUCKET_DOMAIN = AWS_STORAGE_BUCKET_NAME + ".s3.amazonaws.com"
+
+# other buckets whose attachment URLs are pre-signed when rendered, besides AWS_STORAGE_BUCKET_NAME
+S3_MEDIA_BUCKETS = []
+S3_SIGNED_EXTRA_BUCKETS = []
+S3_PRESIGNED_URL_EXPIRES = 60 * 60
 
 # bucket where archives files are stored
 ARCHIVE_BUCKET = "dl-temba-archives"
