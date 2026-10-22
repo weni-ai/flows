@@ -2,7 +2,6 @@ import io
 import smtplib
 from datetime import timedelta
 from decimal import Decimal
-from unittest import TestCase
 from unittest.mock import patch
 from urllib.parse import urlencode
 
@@ -5214,14 +5213,18 @@ class BackupTokenTest(TembaTest):
         self.assertEqual(10, self.admin.backup_tokens.count())
 
 
-class UserCRUDLTestCase(TestCase):
+class UserCRUDLTestCase(TembaTest):
     def setUp(self):
+        super().setUp()
+
         self.user_email = "test@example.com"
         self.user_recover_attempts_cache_key = USER_RECOVER_ATTEMPTS_CACHE_KEY.format(email=self.user_email)
         self.user_recover_max_attempts = settings.USER_RECOVER_MAX_ATTEMPTS
 
     def tearDown(self):
         cache.delete(self.user_recover_attempts_cache_key)
+
+        super().tearDown()
 
     @patch("django.core.cache.cache.get_or_set")
     @patch("django.core.cache.cache.incr")
@@ -5274,7 +5277,8 @@ class UserCRUDLTestCase(TestCase):
         with private_file_storage.open(path) as f:
             self.assertEqual(f.read(), b"test content")
 
-    def test_flow_media_upload(self):
+    @mock_mailroom
+    def test_flow_media_upload(self, mr_mocks):
         """
         Test that flow media uploads use private storage
         """
@@ -5311,7 +5315,8 @@ class UserCRUDLTestCase(TestCase):
         with private_file_storage.open(path) as f:
             self.assertEqual(f.read(), b"test content")
 
-    def test_flow_recording_upload(self):
+    @mock_mailroom
+    def test_flow_recording_upload(self, mr_mocks):
         """
         Test that flow recording uploads use private storage
         """
@@ -5323,7 +5328,7 @@ class UserCRUDLTestCase(TestCase):
         test_file = SimpleUploadedFile("test.wav", b"audio content", content_type="audio/wav")
 
         # try to upload it
-        upload_url = reverse("flows.flow_upload_action_recording", args=[flow.uuid])
+        upload_url = reverse("flows.flow_upload_action_recording", args=[flow.id])
         response = self.client.post(
             upload_url,
             {
