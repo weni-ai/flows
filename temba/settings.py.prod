@@ -405,6 +405,9 @@ CSP_SCRIPT_SRC = env.tuple("CSP_SCRIPT_SRC", default=CSP_DEFAULT_SRC)
 CSP_SCRIPT_SRC_ELEM = env.tuple("CSP_SCRIPT_SRC_ELEM", default=CSP_SCRIPT_SRC)
 CSP_FRAME_SRC = env.tuple("CSP_FRAME_SRC", default=CSP_DEFAULT_SRC)
 CSP_CONNECT_SRC = env.tuple("CSP_CONNECT_SRC", default=CSP_DEFAULT_SRC)
+# message attachments can be hosted anywhere, so passive content is allowed from any https host
+CSP_IMG_SRC = env.tuple("CSP_IMG_SRC", default=CSP_DEFAULT_SRC + ("https:", "data:", "blob:"))
+CSP_MEDIA_SRC = env.tuple("CSP_MEDIA_SRC", default=CSP_DEFAULT_SRC + ("https:", "blob:"))
 
 
 # Removes 'check-channels' task from Beat Schedule (sent_messages query)
