@@ -17,10 +17,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
 
-from weni.internal.models import Project
-
 from temba.api.auth.jwt import OptionalJWTAuthentication
-from temba.api.tests.weni_jwt_test_utils import WeniJWTTestMixin
 from temba.api.v2.internals.contacts.serializers import CleanContactFieldsSerializer
 from temba.api.v2.internals.contacts.services import (
     CleanContactFieldsService,
@@ -1553,6 +1550,74 @@ class InternalContactFieldsEndpointTest(TembaTest):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {"error": "At least either a channel or a project is required"})
 
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    def test_get_rejects_attached_org_mismatch(self):
+        from rest_framework.test import APIRequestFactory
+
+        from temba.api.v2.internals.contacts.views import InternalContactFieldsEndpoint
+
+        view = InternalContactFieldsEndpoint()
+        raw = APIRequestFactory().get(f"/api/v2/internals/contacts_fields?project={uuid.uuid4()}")
+        request = view.initialize_request(raw)
+        request.org = self.org
+        response = view.get(request)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data, {"error": "Project mismatch"})
+
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    def test_post_rejects_attached_org_mismatch(self):
+        from rest_framework.test import APIRequestFactory
+
+        from temba.api.v2.internals.contacts.views import InternalContactFieldsEndpoint
+
+        view = InternalContactFieldsEndpoint()
+        raw = APIRequestFactory().post(
+            "/api/v2/internals/contacts_fields",
+            {"project": str(uuid.uuid4()), "label": "Nick", "value_type": "text"},
+            format="json",
+        )
+        request = view.initialize_request(raw)
+        request.org = self.org
+        response = view.post(request)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data, {"error": "Project mismatch"})
+
+    @skip_authentication(endpoint_path=CONTACT_FIELDS_ENDPOINT_PATH)
+    def test_post_uses_attached_org_when_project_matches(self):
+        from rest_framework.test import APIRequestFactory
+
+        from temba.api.v2.internals.contacts.views import InternalContactFieldsEndpoint
+
+        view = InternalContactFieldsEndpoint()
+        raw = APIRequestFactory().post(
+            "/api/v2/internals/contacts_fields",
+            {"project": str(self.org.proj_uuid), "label": "Nick", "value_type": "text"},
+            format="json",
+        )
+        request = view.initialize_request(raw)
+        request.org = self.org
+        request.user = self.admin
+        view.post(request)
+        self.assertEqual(view.org.id, self.org.id)
+
+    def test_get_request_email_prefers_jwt_then_trusted_body(self):
+        from temba.api.v2.internals.contacts.views import InternalContactFieldsEndpoint
+
+        view = InternalContactFieldsEndpoint()
+        jwt_request = SimpleNamespace(jwt_payload={"email": "jwt@example.com"}, data={}, user=None)
+        self.assertEqual(view._get_request_email(jwt_request), "jwt@example.com")
+
+        body_request = SimpleNamespace(
+            jwt_payload={},
+            data={"user_email": "on-behalf@example.com"},
+            user=self.admin,
+        )
+        with patch(
+            "temba.api.v2.internals.contacts.views.CanCommunicateInternally.has_permission",
+            return_value=True,
+        ):
+            self.assertEqual(view._get_request_email(body_request), "on-behalf@example.com")
+
     @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.authentication_classes", [])
     @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_project_not_found(self):
@@ -1571,8 +1636,8 @@ class InternalContactFieldsEndpointTest(TembaTest):
     @patch(f"{CONTACT_FIELDS_ENDPOINT_PATH}.permission_classes", [])
     def test_user_not_found(self):
         mock_user = MagicMock(spec=User)
-        mock_user.is_authenticated = False
-        mock_user.email = "mockuser@example.com"
+        mock_user.is_authenticated = True
+        mock_user.email = "unknown-user-not-in-db@example.com"
 
         with patch("rest_framework.request.Request.user", mock_user):
 
@@ -2540,6 +2605,39 @@ class ContactsImportConfirmViewGetMoreTest(TembaTest):
         self.assertEqual(resp.status_code, 403)
 
     @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
+    def test_get_forbidden_when_user_not_in_org(self):
+        from rest_framework.test import APIRequestFactory
+
+        from temba.api.v2.internals.contacts.views import ContactsImportConfirmView
+
+        contact_import = self.create_contact_import("media/test_imports/simple.xlsx")
+        view = ContactsImportConfirmView()
+        raw = APIRequestFactory().get(f"/api/v2/internals/contacts_import_confirm/{contact_import.id}/")
+        request = view.initialize_request(raw)
+        request.user = self.non_org_user
+        response = view.get(request, import_id=contact_import.id)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data, {"error": "Forbidden."})
+
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
+    def test_get_member_who_is_not_confirmer_is_forbidden(self):
+        from rest_framework.test import APIRequestFactory
+
+        from temba.api.v2.internals.contacts.views import ContactsImportConfirmView
+
+        contact_import = self.create_contact_import("media/test_imports/simple.xlsx")
+        other = self.create_user("confirmer@example.com")
+        contact_import.modified_by = other
+        contact_import.save(update_fields=["modified_by"])
+        view = ContactsImportConfirmView()
+        raw = APIRequestFactory().get(f"/api/v2/internals/contacts_import_confirm/{contact_import.id}/")
+        request = view.initialize_request(raw)
+        request.user = self.admin
+        response = view.get(request, import_id=contact_import.id)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data, {"error": "Forbidden."})
+
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
     def test_get_group_serialization_includes_member_count(self):
         from temba.contacts.models import ContactGroup
 
@@ -2608,6 +2706,36 @@ class ContactImportPreviewServiceTest(TembaTest):
 
 
 class ContactsImportConfirmViewPostTest(TembaTest):
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
+    def test_post_rejects_attached_org_mismatch(self):
+        from rest_framework.test import APIRequestFactory
+
+        from temba.api.v2.internals.contacts.views import ContactsImportConfirmView
+
+        contact_import = self.create_contact_import("media/test_imports/simple.xlsx")
+        view = ContactsImportConfirmView()
+        raw = APIRequestFactory().post(
+            f"/api/v2/internals/contacts_import_confirm/{contact_import.id}/",
+            {"project_uuid": str(uuid.uuid4())},
+            format="json",
+        )
+        request = view.initialize_request(raw)
+        request.org = self.org
+        response = view.post(request, import_id=contact_import.id)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data, {"error": "Project mismatch"})
+
+    @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
+    def test_post_unknown_project_returns_404(self):
+        contact_import = self.create_contact_import("media/test_imports/simple.xlsx")
+        resp = self.client.post(
+            f"/api/v2/internals/contacts_import_confirm/{contact_import.id}/",
+            {"project_uuid": "00000000-0000-0000-0000-000000000000"},
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {"error": "Project not found."})
+
     @skip_authentication(endpoint_path=CONTACTS_IMPORT_CONFIRM_PATH)
     def test_post_success_new_group_and_stamp_confirmer(self):
         from temba.api.v2.internals.contacts.views import ContactImportCRUDL
@@ -3248,6 +3376,34 @@ class InternalContactGroupsViewAdditionalTests(TembaTest):
             )
         self.assertEqual(resp.status_code, 404)
         self.assertEqual(resp.json(), {"error": "User not found"})
+
+    @patch(
+        "temba.api.v2.internals.contacts.views.InternalContactGroupsView.authentication_classes",
+        [],
+    )
+    @patch(
+        "temba.api.v2.internals.contacts.views.InternalContactGroupsView.permission_classes",
+        [],
+    )
+    def test_post_rejects_broadcast_from_other_org(self):
+        from rest_framework.test import APIRequestFactory
+
+        from temba.api.v2.internals.contacts.views import InternalContactGroupsView
+
+        contact = self.create_contact("Alice", urns=["tel:+111"])
+        bcast = self.create_broadcast(self.admin, "hi", contacts=[contact])
+        view = InternalContactGroupsView()
+        raw = APIRequestFactory().post(
+            self.url,
+            {"name": "OtherOrgGroup", "broadcast_id": bcast.id, "status": "S"},
+            format="json",
+        )
+        request = view.initialize_request(raw)
+        request.org = self.org2
+        request.user = self.admin
+        response = view.post(request)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.data, {"error": "Project or Broadcast not found"})
 
 
 class ContactSearchViewTest(JWTAuthMockMixin, TembaTest):

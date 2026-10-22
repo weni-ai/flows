@@ -143,7 +143,7 @@ class InternalMessagesView(APIViewMixin, APIView):
         return pagination.get_paginated_response(serializer.data)
 
 
-class MsgStreamView(APIViewMixin, APIView, JWTAuthMixinRequired):
+class MsgStreamView(JWTAuthMixinRequired, APIViewMixin, APIView):
     def post(self, request, *args, **kwargs):
         serializer = MsgStreamSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

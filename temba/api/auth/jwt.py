@@ -10,6 +10,24 @@ from django.contrib.auth.models import AnonymousUser
 logger = logging.getLogger(__name__)
 
 
+def jwt_tenant_claims(payload):
+    """
+    Tenant a module JWT is allowed to act on (SEC-05).
+
+    Flows binds JWT callers to these claims only. Query/body ``project_uuid`` /
+    ``channel_uuid`` are untrusted and must not select another org.
+
+    Issuers (Nexus, webchat, voice, …) must put the authorized project in
+    ``project_uuid`` (or ``project``) and/or the authorized channel in
+    ``channel_uuid`` (or ``channel``). A token without those claims cannot
+    pick a tenant. If both are present, the channel must belong to that project.
+    """
+    payload = payload or {}
+    project_uuid = payload.get("project_uuid") or payload.get("project")
+    channel_uuid = payload.get("channel_uuid") or payload.get("channel")
+    return project_uuid, channel_uuid
+
+
 class OptionalJWTAuthentication(BaseAuthentication):
     """
     JWT authentication that plays well with other authenticators:
@@ -54,8 +72,7 @@ class OptionalJWTAuthentication(BaseAuthentication):
             return None
 
         request.jwt_payload = payload
-        project_uuid = payload.get("project_uuid") or payload.get("project")
-        channel_uuid = payload.get("channel_uuid") or payload.get("channel")
+        project_uuid, channel_uuid = jwt_tenant_claims(payload)
         if project_uuid:
             request.project_uuid = project_uuid
         if channel_uuid:
@@ -127,8 +144,7 @@ class RequiredJWTAuthentication(BaseJWTAuthentication):
     def authenticate(self, request):
         payload = self.verify_and_decode_token(request)
 
-        project_uuid = payload.get("project_uuid")
-        channel_uuid = payload.get("channel_uuid")
+        project_uuid, channel_uuid = jwt_tenant_claims(payload)
 
         if not project_uuid and not channel_uuid:
             raise AuthenticationFailed("project_uuid or channel_uuid must be present in token payload.")

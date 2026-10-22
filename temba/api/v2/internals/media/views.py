@@ -48,8 +48,8 @@ class S3MediaProxyView(APIViewMixin, APIView):
     Authentication is a Keycloak access token (InternalOIDCAuthentication). The
     token user must be an administrator, editor or agent (human service) of the
     Flows project identified by project_uuid (or project) in the query string.
-    IsAdminEditorOrAgentInOrg only denies users without one of those roles;
-    missing and unknown projects are resolved here so the response stays 400 / 404.
+    IsAdminEditorOrAgentInOrg denies users without one of those roles and
+    unknown projects (403); a missing project is resolved here (400).
 
     This view:
     1. Authenticates the Keycloak bearer token and checks the user's role
@@ -63,12 +63,16 @@ class S3MediaProxyView(APIViewMixin, APIView):
     Following the 302 from a browser sends Origin: null to S3 (cross-origin
     redirect), which bucket CORS rules for the dashboard origin don't match.
     ?response=json lets the client request the URL itself with its real Origin.
+
+    Buckets are resolved from settings in this order:
+    - S3_MEDIA_BUCKETS (additional buckets list, checked first)
     - AWS_STORAGE_BUCKET_NAME (primary bucket, checked last as fallback)
 
     URL: GET /api/v2/internals/media/download/<object_key>/?project_uuid=<uuid>
 
     Example:
         If the file path in S3 is "media/image.jpg", the request would be:
+        GET /api/v2/internals/media/download/media/image.jpg?project_uuid=<uuid>
         Authorization: Bearer <keycloak access token>
 
         GET /api/v2/internals/media/download/media/image.jpg?project_uuid=<uuid>&response=json

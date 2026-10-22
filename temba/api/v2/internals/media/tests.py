@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 from botocore.exceptions import ClientError
 from rest_framework.test import APIClient
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from temba.tests.base import TembaTest
@@ -147,6 +147,12 @@ class TestS3MediaProxyView(TembaTest):
         self.assertEqual(mock_client.head_object.call_count, 2)
 
 
+@override_settings(
+    OIDC_OP_TOKEN_ENDPOINT="https://example.com/token",
+    OIDC_OP_USER_ENDPOINT="https://example.com/user",
+    OIDC_RP_CLIENT_ID="test-client-id",
+    OIDC_RP_CLIENT_SECRET="test-client-secret",
+)
 class TestS3MediaProxyEndpoint(TembaTest):
     """Integration tests for the S3 Media Proxy endpoint."""
 
@@ -372,11 +378,10 @@ class TestS3MediaProxyEndpoint(TembaTest):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"], "Project UUID not provided")
 
-    def test_get_unknown_project_returns_404(self):
+    def test_get_unknown_project_returns_403(self):
         response = self._get("media/file.jpg", project_uuid="00000000-0000-0000-0000-000000000000")
 
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["error"], "Project not found")
+        self.assertEqual(response.status_code, 403)
 
 
 class TestPresignedUrlExpiration(TestCase):

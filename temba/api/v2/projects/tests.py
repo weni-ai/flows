@@ -280,7 +280,8 @@ class InternalProjectMessageCountViewTest(TembaTest):
         self.url = reverse("api.v2.internal_project_message_count")
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
-    def test_returns_aggregated_counts_when_no_project_uuid(self):
+    @patch("temba.api.v2.projects.views.CanCommunicateInternally.has_permission", return_value=True)
+    def test_returns_aggregated_counts_when_no_project_uuid(self, _trusted):
         """When no project_uuid is provided, returns aggregated counts (sum) per day."""
         # Create counts for both orgs on the same day
         UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
@@ -339,12 +340,14 @@ class InternalProjectMessageCountViewTest(TembaTest):
         self.assertEqual(data["total"], 60)  # 10 + 20 + 30
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
-    def test_invalid_date_returns_400(self):
+    @patch("temba.api.v2.projects.views.CanCommunicateInternally.has_permission", return_value=True)
+    def test_invalid_date_returns_400(self, _trusted):
         resp = self.client.get(f"{self.url}?after=invalid-date")
         self.assertEqual(resp.status_code, 400)
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
-    def test_returns_empty_results_when_no_data(self):
+    @patch("temba.api.v2.projects.views.CanCommunicateInternally.has_permission", return_value=True)
+    def test_returns_empty_results_when_no_data(self, _trusted):
         """When no data exists for the period, returns empty results."""
         resp = self.client.get(f"{self.url}?after=2026-01-01&before=2026-01-01")
         self.assertEqual(resp.status_code, 200)
@@ -367,7 +370,8 @@ class InternalProjectMessageCountViewTest(TembaTest):
         self.assertEqual(result["count"], 42)
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
-    def test_aggregated_results_ordered_by_day(self):
+    @patch("temba.api.v2.projects.views.CanCommunicateInternally.has_permission", return_value=True)
+    def test_aggregated_results_ordered_by_day(self, _trusted):
         """Results without project_uuid should be aggregated and ordered by day."""
         UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 2), count=20)
         UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
@@ -389,7 +393,8 @@ class InternalProjectMessageCountViewTest(TembaTest):
         self.assertEqual(data["total"], 45)
 
     @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
-    def test_no_date_filters_returns_all_aggregated_data(self):
+    @patch("temba.api.v2.projects.views.CanCommunicateInternally.has_permission", return_value=True)
+    def test_no_date_filters_returns_all_aggregated_data(self, _trusted):
         """When no date filters are provided, returns all available data aggregated by day."""
         UniqueContactCount.objects.create(org=self.org, day=date(2026, 1, 1), count=10)
         UniqueContactCount.objects.create(org=self.org2, day=date(2026, 1, 1), count=5)
@@ -402,3 +407,37 @@ class InternalProjectMessageCountViewTest(TembaTest):
         # Should have 2 results (2 distinct days), aggregated
         self.assertEqual(len(data["results"]), 2)
         self.assertEqual(data["total"], 65)  # 10 + 5 + 50
+
+    def test_outsider_is_forbidden_without_project(self):
+        from rest_framework.test import APIRequestFactory
+
+        raw = APIRequestFactory().get(self.url)
+        with patch("weni.internal.authenticators.InternalOIDCAuthentication.__init__", return_value=None), patch(
+            "weni.internal.authenticators.InternalOIDCAuthentication.authenticate",
+            return_value=(self.non_org_user, "t"),
+        ):
+            response = InternalProjectMessageCountView.as_view()(raw)
+        self.assertEqual(response.status_code, 403)
+
+    @skip_auth_and_permissions(INTERNAL_PROJECT_MESSAGE_COUNT_VIEW_PATH)
+    def test_attached_org_query_mismatch_is_forbidden(self):
+        from rest_framework.test import APIRequestFactory
+
+        view = InternalProjectMessageCountView()
+        raw = APIRequestFactory().get(f"{self.url}?project_uuid={self.org2.proj_uuid}")
+        request = view.initialize_request(raw)
+        request.org = self.org
+        response = view.get(request)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data, {"error": "Forbidden"})
+
+    def test_outsider_is_forbidden_for_foreign_project(self):
+        from rest_framework.test import APIRequestFactory
+
+        raw = APIRequestFactory().get(f"{self.url}?project_uuid={self.org.proj_uuid}")
+        with patch("weni.internal.authenticators.InternalOIDCAuthentication.__init__", return_value=None), patch(
+            "weni.internal.authenticators.InternalOIDCAuthentication.authenticate",
+            return_value=(self.non_org_user, "t"),
+        ):
+            response = InternalProjectMessageCountView.as_view()(raw)
+        self.assertEqual(response.status_code, 403)

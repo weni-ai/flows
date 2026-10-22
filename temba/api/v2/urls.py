@@ -3,6 +3,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 from django.conf.urls import url
 from django.urls import include, path
 
+from temba.api.v2 import weni_authz_patches  # noqa: F401  — patch weni OrgViewSet / ticketer queues
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
 from temba.api.v2.flows.views import InternalFlowsAPIView
 from temba.api.v2.projects.views import (

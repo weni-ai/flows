@@ -1,6 +1,13 @@
+3.102.0
+----------
+* feat: add oidc auth to media proxy endpoint and permission class to only allow admin, editors and
+human agents to get s3 files.
+* feat: implement custom ordering and pagination for flows.json endpoint
+
 3.101.0
 ----------
 * feat: add internal ticketer list GET and item GET/PUT/DELETE on the existing ticketer endpoints
+* fix: security — close fail-open org membership, empty fixed tokens, mixin auth bypass, cross-tenant internals, and bind module JWTs to token tenant claims (SEC-01, 03, 04, 05, 06, 07, 09, 10, 11)
 
 3.100.2
 ----------
