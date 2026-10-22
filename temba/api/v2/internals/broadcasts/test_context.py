@@ -98,10 +98,7 @@ class ResolveOrgAndUserInternalWhatsappTests(TembaTest):
         with patch(
             "temba.api.v2.internals.broadcasts.context.User.objects.get_or_create",
             side_effect=IntegrityError("duplicate"),
-        ), patch(
-            "temba.api.v2.internals.broadcasts.context.User.objects.get",
-            return_value=self.admin,
-        ), patch(
+        ), patch("temba.api.v2.internals.broadcasts.context.User.objects.get", return_value=self.admin,), patch(
             "temba.api.v2.internals.broadcasts.context.logger"
         ) as mock_logger:
             user = _get_or_create_user(self.admin.email)

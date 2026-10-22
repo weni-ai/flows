@@ -79,6 +79,21 @@ class TestInternalWhatsappBroadcast(TembaTest):
 
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    @patch(
+        "temba.api.v2.internals.broadcasts.views.resolve_org_and_user_internal_whatsapp",
+        side_effect=ValueError("unexpected"),
+    )
+    def test_unexpected_value_error_is_logged_and_returns_401(self, _resolve):
+        url = "/api/v2/internals/whatsapp_broadcasts"
+        body = {"project": self.org.proj_uuid, "contacts": [], "msg": {"text": "Hi"}}
+        with patch("temba.api.v2.internals.broadcasts.views.logger") as mock_logger:
+            response = self.client.post(url, data=body, content_type="application/json")
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json(), {"error": "unexpected"})
+        mock_logger.warning.assert_called_once()
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
     def test_project_not_provided(self):
         contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
 

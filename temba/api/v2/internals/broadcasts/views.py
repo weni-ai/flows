@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import status
 from rest_framework.exceptions import ParseError
 from rest_framework.mixins import CreateModelMixin
@@ -38,6 +40,7 @@ from .serializers import BroadcastSerializer, BroadcastWithStatisticsSerializer,
 from .services import upload_broadcast_media
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class BroadcastsViewSet(CreateModelMixin, InternalGenericViewSet):
@@ -102,8 +105,8 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
                     idempotency_release(project_uuid, idem_key)
                 if msg == "Project not found":
                     return Response({"error": msg}, status=404)
-                if msg == "Project not provided":
-                    return Response({"error": msg}, status=401)
+                if msg != "Project not provided":
+                    logger.warning("Unexpected ValueError in whatsapp broadcast: %s", msg)
                 return Response({"error": msg}, status=401)
 
             serializer = WhatsappBroadcastWriteSerializer(
