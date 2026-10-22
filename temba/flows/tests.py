@@ -14,6 +14,7 @@ from openpyxl import load_workbook
 
 from django.conf import settings
 from django.contrib.auth.models import Group
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models.functions import TruncDate
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -36,6 +37,7 @@ from temba.tests.s3 import MockS3Client, jsonlgz_encode
 from temba.tickets.models import Ticketer
 from temba.triggers.models import Trigger
 from temba.utils import json
+from temba.utils.s3 import private_file_storage
 from temba.utils.uuid import uuid4
 from temba.wpp_products.models import Catalog, Product
 
@@ -2837,45 +2839,139 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertTrue(start.include_active)
         self.assertEqual('name ~ "frank"', start.query)
 
+    def _assert_file_upload(
+        self,
+        url,
+        file_name,
+        file_content,
+        content_type,
+        expected_url=None,
+        expected_path_prefix=None,
+        extra_params=None,
+    ):
+        """
+        Helper method to test file uploads
+        """
+        # create the test file
+        if isinstance(file_content, str):
+            file_content = file_content.encode()
+
+        if os.path.exists(file_name):
+            with open(file_name, "rb") as f:
+                file_content = f.read()
+                test_file = SimpleUploadedFile(os.path.basename(file_name), file_content, content_type=content_type)
+        else:
+            test_file = SimpleUploadedFile(file_name, file_content, content_type=content_type)
+
+        # prepare post data
+        post_data = {"file": test_file}
+        if extra_params:
+            post_data.update(extra_params)
+
+        # try to upload it
+        response = self.client.post(url, post_data)
+
+        # check response
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+
+        # recording uploads return a storage path, media uploads return a type and url
+        if expected_path_prefix:
+            path = response_json["path"]
+            self.assertTrue(path.startswith(expected_path_prefix))
+        else:
+            self.assertEqual(response_json["type"], content_type)
+
+            # url should be relative to STORAGE_URL
+            url = response_json["url"]
+            self.assertTrue(url.startswith(f"{settings.STORAGE_URL}/"))
+            if expected_url:
+                self.assertEqual(url, expected_url)
+            path = url.replace(f"{settings.STORAGE_URL}/", "")
+
+        # check that file exists in private storage
+        self.assertTrue(private_file_storage.exists(path))
+
+        # check content
+        with private_file_storage.open(path) as f:
+            self.assertEqual(f.read(), file_content)
+
+        return response_json
+
+    @mock_mailroom(queue=False)
+    def test_media_upload_with_private_storage(self, mr_mocks):
+        """
+        Test that media uploads use private storage
+        """
+        self.login(self.admin)
+        flow = Flow.create(self.org, self.admin, "Test Flow", base_language="eng")
+
+        upload_url = reverse("flows.flow_upload_media_action", args=[flow.uuid])
+        self._assert_file_upload(upload_url, "test.txt", b"test content", "text/plain")
+
+    @mock_mailroom
+    def test_recording_upload_with_private_storage(self, mr_mocks):
+        """
+        Test that recording uploads use private storage
+        """
+        self.login(self.admin)
+        flow = Flow.create(self.org, self.admin, "Test Flow", base_language="eng")
+
+        upload_url = reverse("flows.flow_upload_action_recording", args=[flow.id])
+        self._assert_file_upload(
+            upload_url,
+            "test.wav",
+            b"audio content",
+            "audio/wav",
+            expected_path_prefix="recordings/",
+            extra_params={
+                "actionset": "action-uuid",
+                "action": "action-uuid",
+            },
+        )
+
+    @mock_mailroom
     @patch("temba.flows.views.uuid4")
-    def test_upload_media_action(self, mock_uuid):
+    def test_upload_media_action(self, mr_mocks, mock_uuid):
         flow = self.get_flow("color_v13")
         other_org_flow = self.create_flow(org=self.org2)
 
-        upload_media_action_url = reverse("flows.flow_upload_media_action", args=[flow.uuid])
-
-        def assert_media_upload(filename, expected_type, expected_path):
-            with open(filename, "rb") as data:
-                post_data = dict(file=data, action="", HTTP_X_FORWARDED_HTTPS="https")
-                response = self.client.post(upload_media_action_url, post_data)
-
-                self.assertEqual(response.status_code, 200)
-                actual_type = response.json()["type"]
-                actual_url = response.json()["url"]
-                self.assertEqual(actual_type, expected_type)
-                self.assertEqual(actual_url, expected_path)
-
         self.login(self.admin)
-
         mock_uuid.side_effect = ["11111-111-11", "22222-222-22", "33333-333-33", "44444-444-44"]
 
-        assert_media_upload(
+        # test image upload
+        expected_url = (
+            f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/11111-111-11/steve.marten.jpg"
+        )
+        self._assert_file_upload(
+            reverse("flows.flow_upload_media_action", args=[flow.uuid]),
             f"{settings.MEDIA_ROOT}/test_media/steve.marten.jpg",
+            None,  # will read from file
             "image/jpeg",
-            "%s/attachments/%d/%d/steps/%s/%s"
-            % (settings.STORAGE_URL, self.org.id, flow.id, "11111-111-11", "steve.marten.jpg"),
+            expected_url=expected_url,
+            extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
-        assert_media_upload(
+
+        # test video upload
+        expected_url = f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/22222-222-22/snow.mp4"
+        self._assert_file_upload(
+            reverse("flows.flow_upload_media_action", args=[flow.uuid]),
             f"{settings.MEDIA_ROOT}/test_media/snow.mp4",
+            None,  # will read from file
             "video/mp4",
-            "%s/attachments/%d/%d/steps/%s/%s"
-            % (settings.STORAGE_URL, self.org.id, flow.id, "22222-222-22", "snow.mp4"),
+            expected_url=expected_url,
+            extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
-        assert_media_upload(
+
+        # test audio upload
+        expected_url = f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/33333-333-33/snow.m4a"
+        self._assert_file_upload(
+            reverse("flows.flow_upload_media_action", args=[flow.uuid]),
             f"{settings.MEDIA_ROOT}/test_media/snow.m4a",
+            None,  # will read from file
             "audio/mp4",
-            "%s/attachments/%d/%d/steps/%s/%s"
-            % (settings.STORAGE_URL, self.org.id, flow.id, "33333-333-33", "snow.m4a"),
+            expected_url=expected_url,
+            extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
 
         # can't upload for flow in other org
@@ -3232,7 +3328,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
             response = self.client.get("%s?responded=true" % reverse("flows.flow_run_table", args=[flow.id]))
             self.assertEqual(len(response.context["runs"]), 1)
 
-    def test_activity(self):
+    def test_activity_endpoint(self):
         flow = self.get_flow("favorites_v13")
         flow_nodes = flow.get_definition()["nodes"]
         color_prompt = flow_nodes[0]
