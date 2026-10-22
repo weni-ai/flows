@@ -19,7 +19,7 @@
 - [x] Success criteria tie to verifiable outcomes
 - [x] All acceptance scenarios are defined
 - [x] Edge cases are identified
-- [x] Scope is clearly bounded (SEC-01..11 excluding SEC-02, SEC-05, SEC-08; SEC-12..15 out)
+- [x] Scope is clearly bounded (SEC-01..11 excluding SEC-02 and SEC-08; SEC-12..15 out; SEC-05 in after Nexus alignment)
 - [x] Dependencies and assumptions identified (downstream callers listed)
 
 ## Feature Readiness
@@ -32,7 +32,7 @@
 ## Notes
 
 - This is an SDD Lite: next phase is `implement`, only after the spec and decisions D0–D3 are approved.
-- Scope is SEC-01..11 excluding SEC-02 and SEC-05 (need cross-team alignment) and SEC-08 (done in baseline).
+- Scope is SEC-01..11 excluding SEC-02 (broker, still needs alignment) and SEC-08 (done in baseline). SEC-05 is in after Nexus alignment.
 - D0 (product-spec derivation per Constitution V) is a governance decision to confirm before implement.
 - D1 (act-on-behalf-of policy for `CanCommunicateInternally`) has the highest blast radius on downstream callers.
 - Probes live in `../docs/security/security_probes/`; FR-012 requires flipping the in-scope probes to assert the secured behavior.

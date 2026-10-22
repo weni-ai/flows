@@ -9,6 +9,7 @@ from weni.internal.permissions import CanCommunicateInternally
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 
+from temba.api.auth.jwt import jwt_tenant_claims
 from temba.orgs.models import Org
 
 User = get_user_model()
@@ -43,9 +44,9 @@ def resolve_org_and_user_internal_whatsapp(*, drf_request, data):
     Trusted internal callers (CanCommunicateInternally) may still act on behalf of a body
     user_email for a real project. Everyone else uses request.user or the JWT email.
     """
-    jwt_payload = getattr(drf_request, "jwt_payload", None) or {}
+    jwt_payload = getattr(drf_request, "jwt_payload", None)
+    jwt_project, _ = jwt_tenant_claims(jwt_payload)
     attached_org = getattr(drf_request, "org", None)
-    jwt_project = jwt_payload.get("project_uuid") or jwt_payload.get("project")
     body_project = data.get("project") or data.get("project_uuid")
 
     if attached_org is not None:
@@ -61,6 +62,10 @@ def resolve_org_and_user_internal_whatsapp(*, drf_request, data):
             org = Org.objects.get(proj_uuid=jwt_project)
         except Org.DoesNotExist:
             raise ValueError("Project not found")
+    elif jwt_payload is not None:
+        # SEC-05: a module JWT without project/channel claims cannot pick the
+        # tenant from the body. Put ``project_uuid`` (or ``project``) in the token.
+        raise ValueError("Project not provided")
     else:
         project_uuid = body_project or getattr(drf_request, "project_uuid", None)
         if not project_uuid:
@@ -70,7 +75,8 @@ def resolve_org_and_user_internal_whatsapp(*, drf_request, data):
         except Org.DoesNotExist:
             raise ValueError("Project not found")
 
-    jwt_email = jwt_payload.get("email") or jwt_payload.get("user_email")
+    jwt_claims = jwt_payload or {}
+    jwt_email = jwt_claims.get("email") or jwt_claims.get("user_email")
     request_user = getattr(drf_request, "user", None)
     trusted = _is_trusted_internal(drf_request)
     body_email = data.get("user_email")

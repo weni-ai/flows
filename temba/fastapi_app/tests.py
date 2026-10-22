@@ -74,12 +74,10 @@ class TestPostInternalWhatsappBroadcast(TembaTest):
         with self.assertRaises(HTTPException) as ctx:
             post_internal_whatsapp_broadcast(
                 body={
-                    "project": str(uuid.uuid4()),
                     "urns": ["whatsapp:5561912345678"],
-                    "user_email": "user@example.com",
                     "msg": {"text": "Hi"},
                 },
-                jwt_payload={},
+                jwt_payload={"project_uuid": str(uuid.uuid4()), "email": "user@example.com"},
             )
 
         self.assertEqual(ctx.exception.status_code, 404)
@@ -89,11 +87,10 @@ class TestPostInternalWhatsappBroadcast(TembaTest):
         with self.assertRaises(HTTPException) as ctx:
             post_internal_whatsapp_broadcast(
                 body={
-                    "project": str(self.org.proj_uuid),
                     "urns": ["whatsapp:5561912345678"],
                     "msg": {"text": "Hi"},
                 },
-                jwt_payload={},
+                jwt_payload={"project_uuid": str(self.org.proj_uuid)},
             )
 
         self.assertEqual(ctx.exception.status_code, 401)
@@ -108,7 +105,7 @@ class TestPostInternalWhatsappBroadcast(TembaTest):
                     "urns": ["whatsapp:5561912345678"],
                     "msg": {"text": "Hi"},
                 },
-                jwt_payload={},
+                jwt_payload={"project_uuid": str(self.org.proj_uuid)},
             )
 
         self.assertEqual(ctx.exception.status_code, 401)
@@ -119,7 +116,7 @@ class TestPostInternalWhatsappBroadcast(TembaTest):
                 "project": str(self.org.proj_uuid),
                 "msg": {"text": "Hi"},
             },
-            jwt_payload={"email": "user@example.com"},
+            jwt_payload={"project_uuid": str(self.org.proj_uuid), "email": "user@example.com"},
         )
         status_code, _ = _parse(resp)
         self.assertEqual(status_code, 400)
@@ -132,7 +129,7 @@ class TestPostInternalWhatsappBroadcast(TembaTest):
                 "contacts": [str(contact.uuid)],
                 "msg": {"text": "Hello @contact.name"},
             },
-            jwt_payload={"email": "user@example.com"},
+            jwt_payload={"project_uuid": str(self.org.proj_uuid), "email": "user@example.com"},
         )
 
         status_code, data = _parse(resp)

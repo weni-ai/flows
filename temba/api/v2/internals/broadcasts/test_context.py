@@ -21,7 +21,7 @@ class ResolveOrgAndUserInternalWhatsappTests(TembaTest):
     def _request(self, *, user=None, jwt_payload=None, org=None, project_uuid=None):
         return SimpleNamespace(
             user=user,
-            jwt_payload=jwt_payload or {},
+            jwt_payload=jwt_payload,
             org=org,
             project_uuid=project_uuid,
         )
@@ -85,6 +85,15 @@ class ResolveOrgAndUserInternalWhatsappTests(TembaTest):
             resolve_org_and_user_internal_whatsapp(drf_request=request, data={})
         self.assertEqual(str(ctx.exception), "Project not found")
 
+    def test_module_jwt_without_project_claim_does_not_use_body(self):
+        request = self._request(user=self.admin, jwt_payload={"email": self.admin.email})
+        with self.assertRaises(ValueError) as ctx:
+            resolve_org_and_user_internal_whatsapp(
+                drf_request=request,
+                data={"project": str(self.org.proj_uuid)},
+            )
+        self.assertEqual(str(ctx.exception), "Project not provided")
+
     def test_get_or_create_user_recovers_from_integrity_error(self):
         with patch(
             "temba.api.v2.internals.broadcasts.context.User.objects.get_or_create",
@@ -92,9 +101,9 @@ class ResolveOrgAndUserInternalWhatsappTests(TembaTest):
         ), patch(
             "temba.api.v2.internals.broadcasts.context.User.objects.get",
             return_value=self.admin,
-        ), self.assertLogs(
-            "temba.api.v2.internals.broadcasts.context", level="DEBUG"
-        ) as logs:
+        ), patch(
+            "temba.api.v2.internals.broadcasts.context.logger"
+        ) as mock_logger:
             user = _get_or_create_user(self.admin.email)
         self.assertEqual(user.email, self.admin.email)
-        self.assertTrue(any("Race condition on get_or_create" in message for message in logs.output))
+        mock_logger.debug.assert_called_once()
