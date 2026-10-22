@@ -21,6 +21,7 @@ class TestSMSTagLibrary(TembaTest):
                 "url": "https://example.com/test.jpg",
                 "download_url": "https://example.com/test.jpg",
                 "is_playable": False,
+                "is_external": True,
             },
             attachment_button("image/jpeg:https://example.com/test.jpg"),
         )
@@ -34,6 +35,7 @@ class TestSMSTagLibrary(TembaTest):
                 "url": "https://example.com/test.aspx",
                 "download_url": "https://example.com/test.aspx",
                 "is_playable": False,
+                "is_external": True,
             },
             attachment_button("image:https://example.com/test.aspx"),
         )
@@ -47,6 +49,7 @@ class TestSMSTagLibrary(TembaTest):
                 "url": "https://example.com/test.ogg",
                 "download_url": "https://example.com/test.ogg",
                 "is_playable": True,
+                "is_external": True,
             },
             attachment_button("application/octet-stream:https://example.com/test.ogg"),
         )
@@ -60,6 +63,7 @@ class TestSMSTagLibrary(TembaTest):
                 "url": "https://example.com/test.oga?token=123",
                 "download_url": "https://example.com/test.oga?token=123",
                 "is_playable": True,
+                "is_external": True,
             },
             attachment_button("application/octet-stream:https://example.com/test.oga?token=123"),
         )
@@ -73,6 +77,7 @@ class TestSMSTagLibrary(TembaTest):
                 "url": "https://www.openstreetmap.org/?mlat=-35.998287&mlon=26.478109#map=18/-35.998287/26.478109",
                 "download_url": None,
                 "is_playable": False,
+                "is_external": False,
             },
             attachment_button("geo:-35.998287,26.478109"),
         )
@@ -86,6 +91,7 @@ class TestSMSTagLibrary(TembaTest):
                 "url": "https://www.openstreetmap.org/?mlat=-35.998287&mlon=26.478109#map=18/-35.998287/26.478109",
                 "download_url": None,
                 "is_playable": False,
+                "is_external": False,
             },
             attachment_button(
                 "geo:-35.998287,26.478109;name:Main Street Beach;address:Main Street Beach, Santa Cruz, CA"
@@ -103,6 +109,7 @@ class TestSMSTagLibrary(TembaTest):
 
         self.assertEqual("audio/ogg", button["content_type"])
         self.assertTrue(button["is_playable"])
+        self.assertFalse(button["is_external"])
 
         url, download_url = urlparse(button["url"]), urlparse(button["download_url"])
         self.assertEqual("media-bucket.s3.sa-east-1.amazonaws.com", url.hostname)
@@ -125,3 +132,26 @@ class TestSMSTagLibrary(TembaTest):
 
         download_href = re.search(r"href='([^']*)'[^>]*class='attachment-download", rendered).group(1)
         self.assertIn("response-content-disposition=attachment", download_href)
+
+    def test_attachment_button_external_urls_open_in_new_tab(self):
+        new_tab_link = (
+            r"<a href='https://example.com/%s' target='_blank' rel='noopener noreferrer' "
+            r"onclick='event.stopPropagation\(\)'[^>]*class='%s"
+        )
+
+        rendered = Template(
+            """{% load sms %}{% attachment_button 'image/jpeg:https://example.com/photo.jpg' %}"""
+        ).render(Context())
+
+        self.assertIn('src="https://example.com/photo.jpg"', rendered)
+        self.assertRegex(rendered, new_tab_link % (r"photo\.jpg", "attachment-download"))
+        self.assertIn("title='Open in new tab'", rendered)
+        self.assertNotIn("goto(", rendered)
+
+        rendered = Template(
+            """{% load sms %}{% attachment_button 'application/pdf:https://example.com/doc.pdf' %}"""
+        ).render(Context())
+
+        self.assertRegex(rendered, new_tab_link % (r"doc\.pdf", "attachment-preview"))
+        self.assertRegex(rendered, new_tab_link % (r"doc\.pdf", "attachment-download"))
+        self.assertNotIn("goto(", rendered)

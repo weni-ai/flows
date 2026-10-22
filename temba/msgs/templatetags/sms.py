@@ -4,7 +4,7 @@ from django import template
 from django.utils.safestring import mark_safe
 
 from temba.channels.models import ChannelEvent
-from temba.utils.s3 import presign_url
+from temba.utils.s3 import parse_s3_url, presign_url, signable_buckets
 
 register = template.Library()
 
@@ -133,8 +133,11 @@ def attachment_button(attachment: str) -> dict:
             "lng": lng,
         }
         download_url = None
+        is_external = False
     else:
         preview = (sub_type or category).upper()  # preview the sub type if it exists or category
+        location = parse_s3_url(url)
+        is_external = not location or location.bucket not in signable_buckets()
         download_url = presign_url(url, response_content_disposition="attachment")
         url = presign_url(url)
 
@@ -144,6 +147,7 @@ def attachment_button(attachment: str) -> dict:
         "preview": preview,
         "url": url,
         "download_url": download_url,
+        "is_external": is_external,
         "is_playable": content_type in PLAYABLE_CONTENT_TYPES,
     }
 

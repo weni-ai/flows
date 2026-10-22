@@ -1,3 +1,5 @@
+-load i18n
+
 .attachment
   -if category == 'image'
     %a.attachment-preview.button-light.rounded-r-none(href="#" data-featherlight='<img class="image-full" src="{{url}}"/>' data-featherlight-type="html" data-featherlight-before-open="stopEvent(event)")
@@ -26,11 +28,20 @@
       .attachment-icon.icon-pin_drop
       {{preview}}
 
+  -elif is_external
+    %a.attachment-preview.button-light.rounded-r-none(href="{{url}}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()")
+      .attachment-icon.icon-docs
+      {{preview}}
+
   -else
     .attachment-preview.button-light.rounded-r-none(onclick="goto(event, this)" href="{{url}}" download="true")
       .attachment-icon.icon-docs
       {{preview}}
 
-  -if category != 'geo'
+  -if is_external
+    %a.attachment-download.rounded-l-none.button-light(href="{{url}}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title='{% trans "Open in new tab" %}')
+      .icon-file_download
+
+  -elif category != 'geo'
     .attachment-download.rounded-l-none.button-light(onclick="goto(event, this)" href="{{download_url}}" download="true")
       .icon-file_download
