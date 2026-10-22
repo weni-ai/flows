@@ -13,7 +13,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from temba.api.auth.jwt import OptionalJWTAuthentication
+from temba.api.auth.jwt import OptionalJWTAuthentication, jwt_tenant_claims
 from temba.api.models import APIPermission, SSLPermission
 from temba.api.support import (
     APIBasicAuthentication,
@@ -110,17 +110,30 @@ class BaseAPIView(NonAtomicMixin, generics.GenericAPIView):
 
         return getattr(org, "created_by", None) or getattr(org, "modified_by", None)
 
+    def _assert_channel_belongs_to_org(self, org, channel_uuid):
+        from temba.channels.models import Channel
+
+        try:
+            channel = Channel.objects.filter(uuid=channel_uuid).only("org_id").first()
+        except ValidationError:
+            channel = None
+        if not channel or channel.org_id != org.id:
+            raise InvalidQueryError("Invalid channel")
+
     def _resolve_jwt_user(self, request):
         """
-        When authenticated via JWT, resolve the org from project_uuid/channel_uuid
-        and replace AnonymousUser with a real user (INTERNAL_USER_EMAIL fallback to org.created_by)
-        so that write operations (POST/PUT/DELETE) work correctly.
+        Bind a module-JWT request to the tenant in the token (SEC-05).
+
+        Query/body ``project_uuid`` is ignored here. Issuers must put the
+        project and/or channel in the JWT; see ``jwt_tenant_claims``.
         """
-        project_uuid, channel_uuid = self._extract_uuid_params(request)
+        project_uuid, channel_uuid = jwt_tenant_claims(getattr(request, "jwt_payload", None))
         if not project_uuid and not channel_uuid:
             return
 
         org = self._resolve_org_from_params(project_uuid, channel_uuid)
+        if project_uuid and channel_uuid:
+            self._assert_channel_belongs_to_org(org, channel_uuid)
         request._org = org
 
         user = self._resolve_internal_user(org)

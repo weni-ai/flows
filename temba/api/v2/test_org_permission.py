@@ -22,8 +22,15 @@ class IsUserInOrgPermissionTests(TembaTest):
     def test_denies_when_org_not_found(self):
         random_proj = uuid.uuid4()
         request = SimpleNamespace(query_params={"project": str(random_proj)}, data={}, user=self.user)
-        # org not found is handled by the view layer; permission doesn't decide status code
-        self.assertTrue(self.permission.has_permission(request, view=object()))
+        self.assertFalse(self.permission.has_permission(request, view=object()))
+
+    def test_denies_when_query_and_body_project_disagree(self):
+        request = SimpleNamespace(
+            query_params={"project_uuid": str(self.org.proj_uuid)},
+            data={"project": str(uuid.uuid4())},
+            user=self.user,
+        )
+        self.assertFalse(self.permission.has_permission(request, view=object()))
 
     def test_denies_when_user_not_in_org(self):
         request = SimpleNamespace(
@@ -104,6 +111,6 @@ class IsAdminEditorOrAgentInOrgPermissionTests(TembaTest):
         request = self._request(self.user, project_uuid=None)
         self.assertTrue(self.permission.has_permission(request, view=object()))
 
-    def test_unknown_project_is_left_to_the_view(self):
+    def test_unknown_project_is_denied(self):
         request = self._request(self.admin, project_uuid="00000000-0000-0000-0000-000000000000")
-        self.assertTrue(self.permission.has_permission(request, view=object()))
+        self.assertFalse(self.permission.has_permission(request, view=object()))

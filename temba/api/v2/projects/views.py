@@ -3,6 +3,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
+from weni.internal.permissions import CanCommunicateInternally
 
 from django.core import exceptions as django_exceptions
 from django.db.models import Q, Sum
@@ -147,13 +148,20 @@ class InternalProjectMessageCountView(ISO8601DateFilterQueryParamsMixin, APIView
     """
 
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanCommunicateInternally | IsUserInOrg]
 
     def get(self, request: Request):
         project_uuid = request.query_params.get("project_uuid")
+        trusted = CanCommunicateInternally().has_permission(request, self) is True
+
+        if not project_uuid and not trusted:
+            return Response(status=403, data={"error": "Forbidden"})
 
         # Validate project_uuid if provided
         if project_uuid:
+            attached = getattr(request, "org", None)
+            if attached is not None and str(attached.proj_uuid) != str(project_uuid):
+                return Response(status=403, data={"error": "Forbidden"})
             try:
                 Org.objects.only("id").get(proj_uuid=project_uuid)
             except (Org.DoesNotExist, django_exceptions.ValidationError, ValueError):
