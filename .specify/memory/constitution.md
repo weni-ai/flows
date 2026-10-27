@@ -1,21 +1,21 @@
 <!--
 Sync Impact Report:
-- Version change: 1.0.0 → 2.0.0
+- Version change: 2.0.0 → 3.0.0
+- Bump rationale: MAJOR. Principle V no longer requires every engineering spec to derive from a product spec, and the Constitution Check governance rule no longer assumes every change has a plan.
 - Modified principles:
-  - Redefined I–VII from the 1.0.0 project articles into the canonical root and backend set (I–XVI)
-  - Channel layout, thin views, TembaTest, Courier/Mailroom alignment, and Product Spec inheritance kept as project instantiation
-  - Replaced the incorrect CI gate (`pytest`) with `poetry run coverage run manage.py test` and `code_check.py`
-  - Dropped the test-first red-green rule; coverage is now flow tests plus the repository coverage gate
+  - V. Specification Traceability: redefined to the new root text. An engineering spec either derives from a product spec (inheritance section) or originates in engineering (new `## Origin Without Product Spec` section). Either origin may follow the SDD Full or the SDD Lite cycle
+  - VI. No Silent Divergence: now scoped to engineering specs derived from a product spec
 - Added sections:
-  - Flows Backend Standards
-- Removed sections:
-  - Engineering Standards (folded into principles and Flows Backend Standards)
-  - Delivery Workflow (folded into Governance)
+  - Specification-Driven Delivery (SDD Full and SDD Lite cycles, chosen by complexity, not by origin)
+- Modified sections:
+  - Governance / Compliance Review: Constitution Check runs on the plan in SDD Full and on the spec's Constitution Alignment in SDD Lite; pull requests show product-spec fidelity or the origin acceptance criteria
+- Removed sections: none
 - Follow-up TODOs:
   - TODO(SENTRY_PII): `temba/settings_common.py` initializes Sentry with `send_default_pii=True`, which conflicts with Observability and Diagnosable Errors. A later change MUST stop attaching personal data and MUST send only opaque identifiers. Out of scope for this constitution update.
+  - TODO(SPECKIT_PRESET): the `vtex-cx-engineering` preset is not installed in this repository, so `/speckit.specify` still uses the core command and template, without the origin gate, the `## Origin Without Product Spec` section, or the `Test Strategy` and `Constitution Alignment` sections that SDD Lite relies on. Until then, those sections MUST be added to `spec.md` by hand. Install it with `specify preset add --dev <clone>/speckit/vtex-cx-engineering` in a separate change.
 
 Provenance:
-- Source: weni-ai/vtex-cx-engineering-constitutions (main)
+- Source: weni-ai/vtex-cx-engineering-constitutions (main @ 74ce306)
 - Domains: backend
 -->
 
@@ -49,9 +49,11 @@ Any change to a public interface MUST be versioned with SemVer. In this reposito
 
 ### V. Specification Traceability
 
-Every engineering spec MUST derive from exactly one approved product spec and MUST reference it through an immutable, pinned version (commit or tag). A mutable URL or ID alone MUST NOT be used. The product spec lives in `vtex-cx-engine-specs` and MUST exist and be tagged before its engineering spec is created. An engineering spec MUST NOT redefine the "what" it inherits: problem, scope, success criteria, and binding decisions belong to the product spec. A technical architecture document SHOULD be produced for non-trivial features; when it exists it MUST be linked from the engineering spec, also pinned by commit or tag, but its absence MUST NOT block the engineering spec.
+An engineering spec either derives from a product spec or originates in engineering. Both are regular paths of the process; neither requires a justification, and either may follow the SDD Full or the SDD Lite cycle defined in Specification-Driven Delivery. Engineering specs live under `specs/NNN-<short-name>/spec.md`.
 
-Every engineering spec MUST open with an inheritance section in exactly this format:
+When the change has a product spec, the engineering spec MUST derive from exactly one approved product spec and MUST reference it through an immutable, pinned version (commit or tag). A mutable URL or ID alone MUST NOT be used. The product spec lives in `vtex-cx-engine-specs` and MUST exist and be tagged before its engineering spec is created. An engineering spec MUST NOT redefine the "what" it inherits: problem, scope, success criteria, and binding decisions belong to the product spec. A technical architecture document SHOULD be produced for non-trivial features; when it exists it MUST be linked from the engineering spec, also pinned by commit or tag, but its absence MUST NOT block the engineering spec.
+
+An engineering spec derived from a product spec MUST open with an inheritance section in exactly this format:
 
 ```
 ## Inheritance from Product Spec
@@ -65,11 +67,22 @@ Every engineering spec MUST open with an inheritance section in exactly this for
 
 Binding decisions from the product spec MUST be implemented verbatim. The product spec defines what; this repository owns how to build it.
 
-**Rationale:** Traceability from product intent to technical execution keeps decisions auditable. Pinning the version is what guarantees that every team implements the same version of the feature. A single inheritance format keeps the link machine-checkable across repositories.
+An engineering spec without a product spec — a hotfix, a fix, or technical debt in Flows — states its own "what" and MUST open with an origin section in exactly this format:
+
+```
+## Origin Without Product Spec
+- Product Spec: none
+- Problem: <what is wrong or missing, in one or two sentences>
+- Acceptance criteria: <observable outcomes that prove the change is done>
+```
+
+The problem and acceptance criteria of that section are what the change is verified against, and each acceptance criterion MUST map to a test in this repository.
+
+**Rationale:** Traceability from intent to technical execution keeps decisions auditable and lets any change be traced back to the need that justified it. When the change is born in product, the product spec is that origin, and pinning its version guarantees that every team implements the same version of the feature. When the change is born in engineering, the engineering spec itself is the origin, and its problem and acceptance criteria are what the change is verified against. Keeping the architecture doc optional avoids blocking delivery on ceremony when the design is trivial. A fixed opening format for each path keeps the origin machine-checkable and uniform across repositories.
 
 ### VI. No Silent Divergence
 
-When a technical need contradicts something inherited from the product spec — scope, success criteria, or a binding decision — the divergence MUST NOT be implemented silently in code. It MUST be raised as an amendment in `vtex-cx-engine-specs` and recorded in the `Divergences` field of the engineering spec's inheritance section, linking to that amendment. Once the amendment is approved and produces a new tag, the engineering spec's `Pinned version` MUST be updated to it. A technical difference that contradicts nothing inherited is not a divergence but an implementation decision, and MUST live in the engineering spec.
+When a technical need contradicts something inherited from the product spec — scope, success criteria, or a binding decision — the divergence MUST NOT be implemented silently in code. It MUST be raised as an amendment in `vtex-cx-engine-specs` and recorded in the `Divergences` field of the engineering spec's inheritance section, linking to that amendment. Once the amendment is approved and produces a new tag, the engineering spec's `Pinned version` MUST be updated to it. A technical difference that contradicts nothing inherited is not a divergence but an implementation decision, and MUST live in the engineering spec. This principle applies only to engineering specs derived from a product spec; a spec without one inherits nothing it could diverge from.
 
 **Rationale:** In a federated model the product spec is the single source of truth. A silent code deviation makes intent and implementation drift apart with no audit trail.
 
@@ -150,6 +163,19 @@ These rules instantiate the principles above on the stack and layout of this rep
 - User-facing copy MUST follow the VTEX Content Guide. New locale strings MUST be added for the supported languages (EN source, ES, PT, and RO) in `locale/` when the change introduces them.
 - Prefer extending an existing abstraction over introducing a parallel pattern.
 
+## Specification-Driven Delivery
+
+A change in this repository follows one of two cycles. Both start from an engineering spec written by `/speckit.specify`, with either origin from Principle V. The cycle MUST be chosen by the complexity of the change, not by its origin: a change with a product spec MAY follow SDD Lite, and a change without one MAY follow SDD Full.
+
+- **SDD Full**: `/speckit.specify` → `/speckit.plan` → `/speckit.tasks` → `/speckit.analyze` → `/speckit.implement`. `/speckit.clarify` and `/speckit.checklist` MAY be used between steps. The feature directory carries `spec.md`, `plan.md`, and `tasks.md`.
+- **SDD Lite**: `/speckit.specify` → implementation directly from `spec.md`. `plan.md`, `tasks.md`, and `/speckit.analyze` are not produced. `/speckit.implement` reads `tasks.md` and therefore belongs to SDD Full only.
+
+SDD Full SHOULD be used when the change adds or alters a channel type, changes a public contract listed in Principle IV, ships a migration, needs coordination with Courier or Mailroom, or spans more than one app under `temba/`. SDD Lite SHOULD be used for a hotfix, a contained fix, or technical debt that touches none of those.
+
+SDD Lite reduces artifacts, not obligations. A Lite spec MUST still open with the section Principle V requires for its origin, MUST fill its Test Strategy and Constitution Alignment sections, and MUST declare the peak load whenever Principle XII applies. The pull request MUST pass the same gates as SDD Full: green `.github/workflows/ci.yml`, clean `./code_check.py`, flow tests, and a `WENI-CHANGELOG.md` entry for a user-facing change. When a Lite change turns out to touch any SDD Full trigger above, it SHOULD be promoted to SDD Full by running `/speckit.plan` on the same spec.
+
+**Rationale:** Ceremony should match risk. A plan and a task breakdown pay for themselves on contract, schema, and cross-service work, and only add latency to a one-file fix. Keeping the spec and the gates mandatory in both cycles is what stops the lighter path from becoming a way around the constitution.
+
 ## Governance
 
 This constitution is the authoritative engineering policy for the Flows repository. Specifications, plans, tasks, and code reviews MUST enforce it. It supersedes informal practice when they conflict. Root engineering policy prevails over a domain specialization; a domain rule specializes the root and MUST NOT contradict it. An exception MUST be written in the article that needs it, with the reason.
@@ -168,9 +194,11 @@ This constitution is the authoritative engineering policy for the Flows reposito
 
 **Compliance Review**:
 
-- Every plan MUST pass a Constitution Check before Phase 0 research and again after Phase 1 design. The check MUST cover version control, secrets, observability, versioned contracts, product-spec inheritance, silent divergence, commits, changelog, input validation, timeouts, bounded retry, statelessness and declared peak load, diagnosable errors, flow tests, explicit constants, contained scope, and channel layout when the change adds or alters a channel.
+- The Constitution Check MUST cover version control, secrets, observability, versioned contracts, spec origin (product-spec inheritance or origin without product spec), silent divergence when a product spec exists, commits, changelog, input validation, timeouts, bounded retry, statelessness and declared peak load, diagnosable errors, flow tests, explicit constants, contained scope, and channel layout when the change adds or alters a channel.
+- In SDD Full, every plan MUST pass the Constitution Check before Phase 0 research and again after Phase 1 design.
+- In SDD Lite, there is no plan: the Constitution Alignment section of `spec.md` is the Constitution Check and MUST be complete before implementation starts.
 - `/speckit.analyze` MUST treat a conflict with a MUST in this constitution as CRITICAL.
-- Every pull request MUST show how tests, migrations, changelog, and product-spec fidelity were addressed.
+- Every pull request MUST state the cycle it followed and show how tests, migrations, changelog, and either product-spec fidelity or the origin acceptance criteria were addressed.
 - Reviewers MUST reject a change that bypasses required tests or a binding product decision.
 
-**Version**: 2.0.0 | **Ratified**: 2026-07-21 | **Last Amended**: 2026-10-01
+**Version**: 3.0.0 | **Ratified**: 2026-07-21 | **Last Amended**: 2026-10-27
