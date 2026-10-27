@@ -1,3 +1,7 @@
+3.104.1
+----------
+* chore: update weni rapid pro apps to version 2.13.0
+
 3.104.0
 ----------
 * feat: add PSTN telephony channel type (TPH)
