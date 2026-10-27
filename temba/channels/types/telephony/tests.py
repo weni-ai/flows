@@ -25,11 +25,6 @@ class TelephonyPSTNTypeTest(TembaTest):
             "phone_number": "+12065551212",
         }
 
-        # FR-005: invalid DIDs must be rejected before channel creation
-        response = self._post_claim({**post_data, "phone_number": "404-123-4567"})
-        self.assertFormError(response, "form", "phone_number", "Invalid phone number")
-        self.assertFalse(Channel.objects.exists())
-
         # US1: valid claim creates TPH channel with tel scheme and E.164 DID as address
         response = self._post_claim(post_data)
         self.assertEqual(302, response.status_code)
@@ -51,6 +46,32 @@ class TelephonyPSTNTypeTest(TembaTest):
         response = self.client.get(config_url)
         self.assertEqual(200, response.status_code)
         self.assertContains(response, reverse("courier.tph"))
+
+    def test_claim_rejects_invalid_dids(self):
+        Channel.objects.all().delete()
+        self.login(self.admin)
+
+        post_data = {
+            "name": "Support Line",
+            "country": "US",
+            "phone_number": "+12065551212",
+        }
+
+        # FR-005: invalid DIDs must be rejected before channel creation
+        # 404-123-4567 is possible in NANP but not a valid DID (is_valid_number)
+        response = self._post_claim({**post_data, "phone_number": "404-123-4567"})
+        self.assertFormError(response, "form", "phone_number", "Invalid phone number")
+        self.assertFalse(Channel.objects.exists())
+
+        # too short to be a possible number (URN.validate)
+        response = self._post_claim({**post_data, "phone_number": "123"})
+        self.assertFormError(response, "form", "phone_number", "Invalid phone number")
+        self.assertFalse(Channel.objects.exists())
+
+        # unknown country code: normalize keeps digits, parse without region fails
+        response = self._post_claim({**post_data, "phone_number": "+9991234567"})
+        self.assertFormError(response, "form", "phone_number", "Invalid phone number")
+        self.assertFalse(Channel.objects.exists())
 
     def test_claim_normalizes_national_format_number(self):
         Channel.objects.all().delete()
