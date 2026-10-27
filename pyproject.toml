@@ -68,7 +68,7 @@ flower = "^0.9"
 django-templates-macros = "^0.2"
 django-csp = "^3.7"
 weni-commons = "1.6.2"
-weni-rp-apps = "2.12.0"
+weni-rp-apps = {version = "2.12.1a1", allow-prereleases = true}
 #elasticsearch = "7.13.4"
 slack_sdk = "3.17.0"
 dulwich = "0.20.45"
