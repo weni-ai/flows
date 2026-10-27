@@ -1,10 +1,13 @@
+3.104.0
+----------
+* feat: add PSTN telephony channel type (TPH)
+* fix: allow contact field values to break lines in contact read template
+
 3.103.0
 ----------
 * feat: Add Celery task to validate datalake bronze and silver counts
 * feat: enhance attachment handling with external URL support
 * feat: use private S3 storage and pre-signed URLs for attachments
-* feat: add PSTN telephony channel type (TPH)
-* fix: allow contact field values to break lines in contact read template
 
 3.102.0
 ----------
