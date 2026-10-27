@@ -10,13 +10,14 @@ from ...models import Channel
 from ...views import ALL_COUNTRIES, ClaimViewMixin
 
 INVALID_PHONE_NUMBER = _("Invalid phone number")
+CHANNEL_NAME_MAX_LENGTH = 64
 
 
 class ClaimView(ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
         name = forms.CharField(
             label=_("Name"),
-            max_length=64,
+            max_length=CHANNEL_NAME_MAX_LENGTH,
             help_text=_("Name for this telephony channel"),
         )
         country = forms.ChoiceField(
