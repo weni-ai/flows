@@ -63,6 +63,7 @@ from temba.orgs.models import Org
 from temba.templates.models import Template, TemplateTranslation
 from temba.tests import AnonymousOrg, TembaTest, matchers, mock_mailroom
 from temba.tests.engine import MockSessionWriter
+from temba.tests.s3 import S3_SIGNING_SETTINGS
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.tickets.types.mailgun import MailgunType
 from temba.tickets.types.zendesk import ZendeskType
@@ -1750,7 +1751,9 @@ class APITest(APIJSONMixin, TembaTest):
             },
         )
 
-        self.assertResponseError(response, "non_field_errors", "Invalid channel type")
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+        self.assertEqual({"text": "Send a message"}, broadcast.metadata)
+        self.assertEqual(self.channel, broadcast.channel)
 
         # send a msg with a non existing channel
         response = self.postJSON(
@@ -4182,6 +4185,53 @@ class APITest(APIJSONMixin, TembaTest):
         response = self.fetchJSON(url, "after=%s" % format_datetime(color.modified_on))
         self.assertResultsByUUID(response, [archived, color])
 
+        # order by name
+        response = self.fetchJSON(url, "order_by=name")
+        self.assertResultsByUUID(response, [color, archived, survey])
+
+        response = self.fetchJSON(url, "order_by=-name")
+        self.assertResultsByUUID(response, [survey, archived, color])
+
+        # order by created_on
+        response = self.fetchJSON(url, "order_by=created_on")
+        self.assertResultsByUUID(response, [survey, color, archived])
+
+        response = self.fetchJSON(url, "order_by=-created_on")
+        self.assertResultsByUUID(response, [archived, color, survey])
+
+        # invalid order_by
+        response = self.fetchJSON(url, "order_by=uuid")
+        self.assertResponseError(
+            response, None, "Invalid value for order_by, must be one of: name, -name, created_on, -created_on"
+        )
+
+        # cursor pagination with limit keeps the ordering across pages
+        response = self.fetchJSON(url, "order_by=name&limit=2")
+        resp_json = response.json()
+        self.assertResultsByUUID(response, [color, archived])
+        self.assertNotIn("count", resp_json)
+        self.assertIn("cursor=", resp_json["next"])
+
+        response = self.fetchJSON(resp_json["next"], raw_url=True)
+        self.assertResultsByUUID(response, [survey])
+        self.assertIsNone(response.json()["next"])
+
+        # limit/offset pagination when offset is provided
+        response = self.fetchJSON(url, "order_by=name&limit=1&offset=1")
+        resp_json = response.json()
+        self.assertResultsByUUID(response, [archived])
+        self.assertEqual(resp_json["count"], 3)
+        self.assertIn("offset=2", resp_json["next"])
+        self.assertIn("order_by=name", resp_json["next"])
+
+        response = self.fetchJSON(resp_json["next"], raw_url=True)
+        self.assertResultsByUUID(response, [survey])
+        self.assertIsNone(response.json()["next"])
+
+        response = self.fetchJSON(url, "offset=0")
+        self.assertResultsByUUID(response, [archived, color, survey])
+        self.assertEqual(response.json()["count"], 3)
+
         # inactive flows are never returned
         archived.is_active = False
         archived.save()
@@ -5165,6 +5215,34 @@ class APITest(APIJSONMixin, TembaTest):
                 }
             },
         )
+
+    @override_settings(**S3_SIGNING_SETTINGS)
+    def test_messages_presigns_s3_attachments(self):
+        self.login(self.admin)
+        msg = self.create_incoming_msg(
+            self.joe,
+            "Photo",
+            attachments=[
+                "image/jpeg:https://media-bucket.s3.amazonaws.com/media/photo.jpg",
+                "image/jpeg:https://example.com/test.jpg",
+                "geo:-35.998287,26.478109",
+            ],
+        )
+
+        response = self.fetchJSON(reverse("api.v2.messages"), f"id={msg.id}")
+        result = response.json()["results"][0]
+
+        signed_url_prefix = "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg?"
+        self.assertTrue(result["attachments"][0]["url"].startswith(signed_url_prefix))
+        self.assertIn("X-Amz-Signature=", result["attachments"][0]["url"])
+        self.assertEqual(
+            [
+                {"content_type": "image/jpeg", "url": "https://example.com/test.jpg"},
+                {"content_type": "geo", "url": "-35.998287,26.478109"},
+            ],
+            result["attachments"][1:],
+        )
+        self.assertTrue(result["media"].startswith(f"image/jpeg:{signed_url_prefix}"))
 
     def test_message_actions(self):
         url = reverse("api.v2.message_actions")

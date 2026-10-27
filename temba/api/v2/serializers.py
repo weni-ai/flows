@@ -27,7 +27,7 @@ from temba.globals.models import Global
 from temba.locations.models import AdminBoundary
 from temba.mailroom import modifiers
 from temba.mailroom.client import MailroomException
-from temba.msgs.models import Broadcast, Label, Msg
+from temba.msgs.models import Attachment, Broadcast, Label, Msg
 from temba.msgs.usecases.managed_trigger_group import (
     ContactResolutionError,
     GroupQuotaExceeded,
@@ -40,6 +40,7 @@ from temba.templates.parameter_format import is_named_format
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.triggers.usecases import create_catchall_trigger
 from temba.utils import extract_constants, json, on_transaction_commit
+from temba.utils.s3 import presign_attachment
 from temba.wpp_flows.models import WhatsappFlow
 from temba.wpp_products.models import Product
 
@@ -376,17 +377,11 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             raise serializers.ValidationError("Must provide either urns, contacts or groups")
 
         channel_data = data.get("channel", None)
-        ig_comment_id = data.get("msg", {}).get("ig_comment_id")
         channel = None
         if channel_data:
             try:
                 channel = Channel.objects.get(uuid=channel_data)
                 data["channel"] = channel
-                allowed_channel_types = ["WAC", "WWC"]
-                if ig_comment_id:
-                    allowed_channel_types.append("IG")
-                if channel.channel_type not in allowed_channel_types:
-                    raise serializers.ValidationError("Invalid channel type")
             except Channel.DoesNotExist:
                 raise serializers.ValidationError("Channel not found")
 
@@ -1809,10 +1804,10 @@ class MsgReadSerializer(ReadSerializer):
         return self.STATUSES.get(obj.status)
 
     def get_attachments(self, obj):
-        return [a.as_json() for a in obj.get_attachments()]
+        return [Attachment.parse(presign_attachment(a)).as_json() for a in obj.attachments or []]
 
     def get_media(self, obj):
-        return obj.attachments[0] if obj.attachments else None
+        return presign_attachment(obj.attachments[0]) if obj.attachments else None
 
     def get_archived(self, obj):
         return obj.visibility == Msg.VISIBILITY_ARCHIVED

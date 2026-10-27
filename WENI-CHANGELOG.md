@@ -1,3 +1,28 @@
+3.103.0
+----------
+* feat: Add Celery task to validate datalake bronze and silver counts
+* feat: enhance attachment handling with external URL support
+* feat: use private S3 storage and pre-signed URLs for attachments
+
+3.102.0
+----------
+* feat: add oidc auth to media proxy endpoint and permission class to only allow admin, editors and
+human agents to get s3 files.
+* feat: implement custom ordering and pagination for flows.json endpoint
+
+3.101.0
+----------
+* feat: add internal ticketer list GET and item GET/PUT/DELETE on the existing ticketer endpoints
+* feat: publish ChangeHistory events (weni-rp-apps 2.12.0, weni-commons 1.6.2) behind CHANGE_HISTORY_ENABLED
+
+3.100.2
+----------
+* feat: JWT public key to env variable
+
+3.100.1
+----------
+* feat: Remove channel type validation in whatsapp broadcast API again
+
 3.100.0
 ----------
 * feat: named WhatsApp template parameters — record parameter format/names, accept named broadcast values, resolve per recipient

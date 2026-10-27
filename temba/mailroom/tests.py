@@ -17,6 +17,7 @@ from temba.msgs.models import Broadcast, Msg
 from temba.request_logs.models import HTTPLog
 from temba.tests import MockResponse, TembaTest, matchers, mock_mailroom
 from temba.tests.engine import MockSessionWriter
+from temba.tests.s3 import S3_SIGNING_SETTINGS
 from temba.tickets.models import Ticketer, TicketEvent
 from temba.utils import json
 
@@ -976,6 +977,23 @@ class EventTest(TembaTest):
             },
             Event.from_msg(self.org, self.admin, msg_out3),
         )
+
+    @override_settings(**S3_SIGNING_SETTINGS)
+    def test_from_msg_presigns_s3_attachments(self):
+        contact = self.create_contact("Jim", phone="0979111111")
+        msg_in = self.create_incoming_msg(
+            contact,
+            "Look",
+            attachments=["image/jpeg:https://media-bucket.s3.amazonaws.com/media/photo.jpg", "geo:-35.99,26.47"],
+        )
+
+        signed_attachment, geo_attachment = Event.from_msg(self.org, self.admin, msg_in)["msg"]["attachments"]
+
+        self.assertTrue(
+            signed_attachment.startswith("image/jpeg:https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg?")
+        )
+        self.assertIn("X-Amz-Signature=", signed_attachment)
+        self.assertEqual("geo:-35.99,26.47", geo_attachment)
 
     def test_from_flow_run(self):
         contact = self.create_contact("Jim", phone="0979111111")

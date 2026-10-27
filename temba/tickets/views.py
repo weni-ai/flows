@@ -14,6 +14,7 @@ from temba.notifications.views import NotificationTargetMixin
 from temba.orgs.views import DependencyDeleteModal, ModalMixin, OrgObjPermsMixin, OrgPermsMixin
 from temba.utils.dates import datetime_to_timestamp, timestamp_to_datetime
 from temba.utils.fields import InputWidget, SelectWidget
+from temba.utils.s3 import presign_attachment
 from temba.utils.views import ComponentFormMixin, SpaMixin
 
 from .models import AllFolder, MineFolder, Ticket, TicketCount, Ticketer, TicketFolder, UnassignedFolder
@@ -269,7 +270,7 @@ class TicketCRUDL(SmartCRUDL):
                     "type": m.msg_type,
                     "created_on": m.created_on,
                     "sender": sender,
-                    "attachments": m.attachments,
+                    "attachments": [presign_attachment(a) for a in m.attachments or []],
                 }
 
             def as_json(t):
