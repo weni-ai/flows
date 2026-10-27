@@ -9,32 +9,32 @@ from temba.utils.uuid import uuid4
 class ConnectView(BaseConnectView):
     class Form(BaseConnectView.Form):
         ticketer_name = forms.CharField(
-            label=_("Ticketer Name"),
-            help_text=_("A name to help identify your ticketer"),
+            label=_("Ticketing service name"),
+            help_text=_("A name to help identify your ticketing service"),
         )
         account_sid = forms.CharField(
-            label=_("Authentication User"),
-            help_text=_("Account SID or API Key SID of a Twilio account."),
+            label=_("Authentication user"),
+            help_text=_("Account SID or API key SID of a Twilio account"),
         )
         auth_token = forms.CharField(
-            label=_("Authentication Password"),
-            help_text=_("Auth Token or API Key Secret of a Twilio account."),
+            label=_("Authentication password"),
+            help_text=_("Auth token or API key secret of a Twilio account"),
         )
         flex_instance_sid = forms.CharField(
-            label=_("Flex Instance SID"),
-            help_text=_("SID of the Flex 2.x instance (e.g. GOxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)."),
+            label=_("Flex instance SID"),
+            help_text=_("SID of the Flex 2.x instance. Example: GOxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"),
         )
         flex_workspace_sid = forms.CharField(
             label=_("Workspace SID"),
-            help_text=_("SID of a TaskRouter Workspace (e.g. WSxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)."),
+            help_text=_("SID of a TaskRouter workspace. Example: WSxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"),
         )
         flex_workflow_sid = forms.CharField(
             label=_("Workflow SID"),
-            help_text=_("SID of a TaskRouter Workflow (e.g. WWxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)."),
+            help_text=_("SID of a TaskRouter workflow. Example: WWxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"),
         )
         conversation_service_sid = forms.CharField(
-            label=_("Conversation Service SID"),
-            help_text=_("SID of a Conversation Service (e.g. ISxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)."),
+            label=_("Conversation service SID"),
+            help_text=_("SID of a conversation service. Example: ISxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"),
         )
 
         def clean(self):

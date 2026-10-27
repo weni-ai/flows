@@ -52,7 +52,7 @@ class WhatsAppTypeTest(TembaTest):
 
         # will fail with invalid phone number
         response = self.client.post(url, post_data)
-        self.assertFormError(response, "form", None, ["Please enter a valid phone number"])
+        self.assertFormError(response, "form", None, ["Enter a valid phone number"])
 
         # valid number
         post_data["number"] = "0788123123"
@@ -64,7 +64,7 @@ class WhatsAppTypeTest(TembaTest):
             self.assertEqual(200, response.status_code)
             self.assertFalse(Channel.objects.all())
 
-            self.assertContains(response, "check username and password")
+            self.assertContains(response, "Check username and password")
 
         # Uncomment this when we activate back the checking of Facebook templates
         # # then FB failure
@@ -80,7 +80,7 @@ class WhatsAppTypeTest(TembaTest):
         #             "https://graph.facebook.com/v14.0/1234/message_templates", params={"access_token": "token123"}
         #         )
         #
-        #         self.assertContains(response, "check user id and access token")
+        #         self.assertContains(response, "Check the user ID and access token")
 
         # then success
         with patch("requests.post") as mock_post, patch("requests.get") as mock_get, patch(
@@ -267,7 +267,7 @@ class WhatsAppTypeTest(TembaTest):
                 "https://example.org/v16.0/1234/message_templates", params={"access_token": "token123"}
             )
 
-            self.assertContains(response, "check user id and access token")
+            self.assertContains(response, "Check the user ID and access token")
 
         # success claim
         with patch("requests.post") as mock_post, patch("requests.get") as mock_get, patch(
@@ -432,7 +432,7 @@ class WhatsAppTypeTest(TembaTest):
         # Check if message templates link are in sync_logs view
         response = self.client.get(reverse("channels.types.whatsapp.sync_logs", args=[channel.uuid]))
         gear_links = response.context["view"].get_gear_links()
-        self.assertEqual(gear_links[-1]["title"], "Message Templates")
+        self.assertEqual(gear_links[-1]["title"], "Message templates")
         self.assertEqual(gear_links[-1]["href"], reverse("channels.types.whatsapp.templates", args=[channel.uuid]))
 
         # sync logs and message templates not accessible by user from other org

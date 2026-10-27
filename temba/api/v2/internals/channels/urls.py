@@ -5,6 +5,7 @@ from .views import (
     ChannelElevenLabsApiKeyView,
     ChannelMarketingTagsView,
     ChannelProjectView,
+    ChannelWabaMigrationView,
     InternalChannelView,
 )
 
@@ -14,4 +15,5 @@ urlpatterns = [
     path("channel_allowed_domains", ChannelAllowedDomainsView.as_view(), name="channel_allowed_domains"),
     path("elevenlabs_api_key", ChannelElevenLabsApiKeyView.as_view(), name="elevenlabs_api_key"),
     path("channel_marketing_tags", ChannelMarketingTagsView.as_view(), name="channel_marketing_tags"),
+    path("channel_waba_migration", ChannelWabaMigrationView.as_view(), name="channel_waba_migration"),
 ]

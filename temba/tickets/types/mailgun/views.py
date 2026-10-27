@@ -27,9 +27,9 @@ class ConnectView(BaseConnectView):
             value = self.cleaned_data["verification_code"]
             code = self.request.session.get("verification_code")
             if not code:
-                raise forms.ValidationError(_("No verification code found, please start over."))
+                raise forms.ValidationError(_("No verification code found. Try again."))
             if code != value:
-                raise forms.ValidationError(_("Code does not match, please check your email."))
+                raise forms.ValidationError(_("Code doesn't match. Check your email."))
 
             return value
 
@@ -43,7 +43,7 @@ class ConnectView(BaseConnectView):
         return super().get(request, *args, **kwargs)
 
     def derive_title(self):
-        return _("Verify Email") if self.is_verify_step() else super().derive_title()
+        return _("Check email") if self.is_verify_step() else super().derive_title()
 
     def get_form_class(self):
         return ConnectView.VerifyForm if self.is_verify_step() else ConnectView.EmailForm
@@ -57,8 +57,7 @@ class ConnectView(BaseConnectView):
             ) % {"address": address}
         else:
             return _(
-                "New tickets and replies will be sent to the email address that you configure below. "
-                "You will need to verify it by entering the code sent to you."
+                "New tickets and replies will be sent to the email address that you configure below. You'll need to verify it by entering the code you received."
             )
 
     def form_valid(self, form):
@@ -72,7 +71,7 @@ class ConnectView(BaseConnectView):
         # step 1, they entered their email, off to verify
         if isinstance(form, ConnectView.EmailForm):
             to_address = form.cleaned_data["to_address"]
-            subject = _("Verify your email address for tickets")
+            subject = _("Check your email address for tickets")
             template = "tickets/types/mailgun/verify_email"
             context = {"verification_code": verification_code}
             send_template_email(to_address, subject, template, context, self.request.branding)

@@ -2,12 +2,12 @@
 -load i18n policies
 
 -block title
-  -trans "Your Privacy"
+  -trans "Your privacy"
 -block content
 
   -blocktrans with brand.name as name
-    {{name}} cares deeply about your privacy. We've designed this privacy page to help guide you through what kind of
-    data we collect and what we do with it. Please take the time to review the following policies
+    {{name}} cares deeply about your privacy. We've designed this privacy page to help guide you through what data
+    we collect and what we do with it. Take the time to review the following policies
     as your consent is required to continue to use {{name}}.
 
   .policies
@@ -16,7 +16,7 @@
       .item.needs-consent
         .px-6.py-4.border-primary.border.rounded-lg.bg-white
           - blocktrans with brand.name as name
-            Ahoy! We've updated our policies. Before you continue to use {{name}} you will first need to agree to
+            We've updated our policies. Before you continue to use {{name}}, you'll first need to agree to
             the updated policies below. Don't worry, you can revoke your consent at any time.
 
     -elif consent_date
@@ -25,7 +25,7 @@
           %a.pull-right.posterize{href:'{% url "policies.policy_give_consent" %}?consent=false'}
             -trans "Revoke"
           - blocktrans with brand.name as name and consent_date|date:"M d, Y" as day
-            You agreed to the these policies on {{day}}
+            You agreed to these policies on {{day}}
 
     -for policy in object_list
       .item.policy.collapsed.card{data-policy:'{{policy.id}}', onclick:'javascript:toggle({{policy.id}});'}

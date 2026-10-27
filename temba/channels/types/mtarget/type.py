@@ -32,7 +32,7 @@ class MtargetType(ChannelType):
     }
 
     configuration_blurb = _(
-        "To finish connecting your channel, you need to have Mtarget configure the URLs below for your Service ID."
+        "To finish connecting your channel, ask Mtarget to configure the URLs below for your service ID."
     )
 
     configuration_urls = (

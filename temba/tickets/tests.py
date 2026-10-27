@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from temba.contacts.models import Contact
 from temba.tests import CRUDLTestMixin, TembaTest, matchers, mock_mailroom
+from temba.tests.s3 import S3_SIGNING_SETTINGS
 from temba.utils.dates import datetime_to_timestamp
 
 from .models import Ticket, TicketCount, Ticketer, TicketEvent, Topic
@@ -280,7 +281,7 @@ class TicketCRUDLTest(TembaTest, CRUDLTestMixin):
         menu = response.json()["results"]
         self.assertEqual(
             [
-                {"id": "mine", "name": "My Tickets", "icon": "coffee", "count": 2},
+                {"id": "mine", "name": "My tickets", "icon": "coffee", "count": 2},
                 {"id": "unassigned", "name": "Unassigned", "icon": "mail", "count": 1},
                 {"id": "all", "name": "All", "icon": "archive", "count": 3},
             ],
@@ -440,6 +441,25 @@ class TicketCRUDLTest(TembaTest, CRUDLTestMixin):
             self.assertIsNotNone(response.json()["next"])
 
     @mock_mailroom
+    @override_settings(**S3_SIGNING_SETTINGS)
+    def test_folder_presigns_s3_attachments(self, mr_mocks):
+        self.login(self.admin)
+
+        contact = self.create_contact("Joe", phone="123", last_seen_on=timezone.now())
+        self.create_ticket(self.mailgun, contact, "Question 1")
+        self.create_incoming_msg(
+            contact, "See photo", attachments=["image/jpeg:https://media-bucket.s3.amazonaws.com/media/photo.jpg"]
+        )
+
+        response = self.client.get(reverse("tickets.ticket_folder", kwargs={"folder": "all", "status": "open"}))
+
+        (signed_attachment,) = response.json()["results"][0]["last_msg"]["attachments"]
+        self.assertTrue(
+            signed_attachment.startswith("image/jpeg:https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg?")
+        )
+        self.assertIn("X-Amz-Signature=", signed_attachment)
+
+    @mock_mailroom
     def test_note(self, mr_mocks):
         ticket = self.create_ticket(self.mailgun, self.contact, "Ticket 1")
 
@@ -561,7 +581,7 @@ class TicketerCRUDLTest(TembaTest, CRUDLTestMixin):
 
         self.assertContains(response, "Email (bob@acme.com)")
         self.assertContains(response, "ticketer/delete/")
-        self.assertContains(response, "HTTP Log")
+        self.assertContains(response, "HTTP log")
         self.assertContains(response, reverse("request_logs.httplog_ticketer", args=[ticketer.uuid]))
 
     def test_connect(self):
@@ -594,7 +614,7 @@ class TicketerCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # fetch delete modal
         response = self.assertDeleteFetch(delete_url)
-        self.assertContains(response, "You are about to delete")
+        self.assertContains(response, "You're about to delete")
 
         # submit to delete it
         response = self.assertDeleteSubmit(delete_url, object_deactivated=ticketer, success_status=200)

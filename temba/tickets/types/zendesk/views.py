@@ -18,7 +18,7 @@ from django.views.generic import View
 
 from temba.orgs.views import OrgPermsMixin
 from temba.utils import json
-from temba.utils.s3 import public_file_storage
+from temba.utils.s3 import private_file_storage
 from temba.utils.text import random_string
 from temba.utils.views import ComponentFormMixin
 
@@ -29,8 +29,7 @@ from .client import Client, ClientError
 
 class ConnectView(BaseConnectView):
     form_blurb = _(
-        "Enter your Zendesk subdomain. You will be redirected to Zendesk where you need to grant access to this "
-        "application."
+        "Enter your Zendesk subdomain. You'll be redirected to Zendesk, where you'll need to grant access to this application."
     )
 
     class Form(BaseConnectView.Form):
@@ -46,11 +45,11 @@ class ConnectView(BaseConnectView):
             data = self.cleaned_data["subdomain"].strip().lower()
 
             if not re.match(r"^[\w\-]+$", data):
-                raise forms.ValidationError(_("Not a valid subdomain name."))
+                raise forms.ValidationError(_("Not a valid subdomain name"))
 
             for_domain = org.ticketers.filter(is_active=True, ticketer_type=ZendeskType.slug, config__subdomain=data)
             if for_domain.exists():
-                raise forms.ValidationError(_("There is already a ticketing service configured for this subdomain."))
+                raise forms.ValidationError(_("A ticketing service configured for this subdomain already exists"))
 
             return data
 
@@ -101,7 +100,7 @@ class ConnectView(BaseConnectView):
                 settings.ZENDESK_CLIENT_ID, settings.ZENDESK_CLIENT_SECRET, code, self.get_absolute_url()
             )
         except ClientError:
-            messages.error(request, _("Unable to request OAuth token."))
+            messages.error(request, _("Couldn't request OAuth token"))
             return super(ConnectView, self).get(request, *args, **kwargs)
 
         config = {
@@ -217,7 +216,7 @@ class AdminUIView(SmartFormView):
                 ticketer_type=ZendeskType.slug, config__subdomain=self.subdomain, config__secret=data, is_active=True
             )
             if not ticketers.exists():
-                raise forms.ValidationError(_("Secret is incorrect."))
+                raise forms.ValidationError(_("Secret is incorrect"))
 
             return data
 
@@ -316,4 +315,4 @@ class FileCallbackView(View):
     def post(self, request, *args, **kwargs):
         path = "attachments/" + kwargs["path"]
         assert ".." not in kwargs["path"]
-        return FileResponse(public_file_storage.open(path))
+        return FileResponse(private_file_storage.open(path))

@@ -26,7 +26,7 @@ class MessangiType(ChannelType):
     name = "Messangi"
 
     claim_blurb = _(
-        "If you are based in Jamaica, you can purchase a short code from %(link)s and connect it in a few simple steps."
+        "If you're based in Jamaica, you can purchase a short code from %(link)s and connect it in a few steps."
     ) % {"link": '<a href="http://www.messangi.com/">Messangi</a>'}
     claim_view = ClaimView
 
@@ -36,15 +36,16 @@ class MessangiType(ChannelType):
     attachment_support = False
 
     configuration_blurb = _(
-        "To finish configuring your Messangi connection you'll need to set the following callback URLs on your Messangi"
-        " account."
+        "To finish configuring your Messangi connection, you'll need to set the following callback URLs on your Messangi account."
     )
 
     configuration_urls = (
         dict(
             label=_("Receive URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.mg' channel.uuid 'receive' %}",
-            description=_("To receive incoming messages, you need to set the receive URL for your Messangi account."),
+            description=_(
+                "To receive incoming messages, you'll need to set the receive URL for your Messangi account."
+            ),
         ),
     )
 

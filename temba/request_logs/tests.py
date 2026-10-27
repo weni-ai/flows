@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from email import message_from_string
 from io import BytesIO
 from unittest.mock import MagicMock, Mock, patch
 
@@ -96,7 +97,7 @@ class HTTPLogCRUDLTest(TembaTest, CRUDLTestMixin):
         log_url = reverse("request_logs.httplog_read", args=[l1.id])
 
         response = self.assertListFetch(webhooks_url, allow_viewers=False, allow_editors=True, context_objects=[l1])
-        self.assertContains(response, "Webhook Calls")
+        self.assertContains(response, "Webhook calls")
         self.assertContains(response, log_url)
 
         # view the individual log item
@@ -137,9 +138,9 @@ class HTTPLogCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.assertListFetch(
             list_url, allow_viewers=False, allow_editors=False, allow_org2=False, context_objects=[l1]
         )
-        self.assertContains(response, "Intents Synced")
+        self.assertContains(response, "Intents synced")
         self.assertContains(response, log_url)
-        self.assertNotContains(response, "Classifier Called")
+        self.assertNotContains(response, "Classifier called")
 
         # view the individual log item
         response = self.assertReadFetch(log_url, allow_viewers=False, allow_editors=False, context_object=l1)
@@ -175,7 +176,7 @@ class HTTPLogCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.assertListFetch(
             list_url, allow_viewers=False, allow_editors=False, allow_org2=False, context_objects=[l1]
         )
-        self.assertContains(response, "Ticketing Service Called")
+        self.assertContains(response, "Ticketing service called")
         self.assertContains(response, log_url)
 
         # view the individual log item
@@ -207,7 +208,7 @@ class HTTPLogCRUDLTest(TembaTest, CRUDLTestMixin):
         log_url = reverse("request_logs.httplog_read", args=[log1.id])
         response = self.client.get(log_url)
         self.assertContains(response, "200")
-        self.assertContains(response, "Connection Error")
+        self.assertContains(response, "Connection error")
         self.assertContains(response, "https://graph.facebook.com/v14.0/1234/message_templates")
 
         log2 = HTTPLog.create_from_exception(
@@ -220,7 +221,7 @@ class HTTPLogCRUDLTest(TembaTest, CRUDLTestMixin):
         log2_url = reverse("request_logs.httplog_read", args=[log2.id])
         response = self.client.get(log2_url)
         self.assertContains(response, "200")
-        self.assertContains(response, "Connection Error")
+        self.assertContains(response, "Connection error")
         self.assertContains(
             response, f"https://graph.facebook.com/v14.0/1234/message_templates?access_token={ContactURN.ANON_MASK}"
         )
@@ -258,7 +259,7 @@ class HTTPLogCRUDLQuerySetTest(TembaTest, CRUDLTestMixin):
         log_url = reverse("request_logs.httplog_read", args=[log2.id])
 
         response = self.assertListFetch(webhooks_url, allow_viewers=False, allow_editors=True, context_objects=[log2])
-        self.assertContains(response, "Webhook Calls")
+        self.assertContains(response, "Webhook calls")
         self.assertContains(response, log_url)
 
         self.client.get(webhooks_url + "?flow=dependencies")
@@ -300,7 +301,7 @@ class ExportTest(TembaTest):
 
         mock_process_queryset_results.assert_called_once()
         mock_export_data_to_xls.assert_called_once_with(mock_http_log)
-        mock_send_file.assert_called_once_with("xls_content", "Chamadas Webhook.xlsx", "test2@example.com", "Temba")
+        mock_send_file.assert_called_once_with("xls_content", "Webhook calls.xlsx", "test2@example.com", "Temba")
         self.assertIsInstance(response, HttpResponse)
         self.assertEqual(response.status_code, 200)
 
@@ -390,9 +391,22 @@ class ExportTest(TembaTest):
         mock_sendmail = MagicMock()
         mock_smtp.return_value.sendmail = mock_sendmail
 
-        view.send_file(file_stream, file_name, [user_email], project_name)
+        view.send_file(file_stream, file_name, user_email, project_name)
 
         mock_connection = mock_smtp.return_value
         mock_connection.ehlo.assert_called_once()
         mock_connection.starttls.assert_called_once_with()
         mock_connection.login.assert_called_once_with("your_email_username", "your_email_password")
+
+        mock_sendmail.assert_called_once()
+        from_email, to_email, raw_message = mock_sendmail.call_args[0]
+        self.assertEqual(from_email, "your_from_email")
+        self.assertEqual(to_email, user_email)
+
+        message = message_from_string(raw_message)
+        self.assertEqual(message["Subject"], "Webhook data export")
+        self.assertEqual(message["To"], user_email)
+
+        attachment = list(message.walk())[-1]
+        self.assertEqual(attachment["Content-Disposition"], f"attachment; filename={file_name}")
+        self.assertEqual(attachment.get_payload(decode=True), b"Test file content")

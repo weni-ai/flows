@@ -26,16 +26,16 @@ class FreshchatTypeTest(TembaTest):
         # will fail as we don't have anything filled out
         response = self.client.post(connect_url, {})
         self.assertFormError(
-            response, "form", None, ["Name is required", "OAuth Token is required", "Freshchat Domain is required"]
+            response, "form", None, ["Name is required", "OAuth token is required", "Freshchat domain is required"]
         )
 
         # try with only oauth_token
         response = self.client.post(connect_url, {"oauth_token": "token123"})
-        self.assertFormError(response, "form", None, ["Name is required", "Freshchat Domain is required"])
+        self.assertFormError(response, "form", None, ["Name is required", "Freshchat domain is required"])
 
         # try with only freshchat_domain
         response = self.client.post(connect_url, {"freshchat_domain": "example.freshchat.com"})
-        self.assertFormError(response, "form", None, ["Name is required", "OAuth Token is required"])
+        self.assertFormError(response, "form", None, ["Name is required", "OAuth token is required"])
 
         # try with freshchat_domain already taken by this org
         Ticketer.create(
@@ -53,7 +53,7 @@ class FreshchatTypeTest(TembaTest):
             response,
             "form",
             None,
-            ["A Freshchat ticketer for this domain already exists in this workspace."],
+            ["A Freshchat ticketing service for this domain already exists in this workspace"],
         )
 
         # try with freshchat_domain already taken by another org
@@ -72,7 +72,7 @@ class FreshchatTypeTest(TembaTest):
             response,
             "form",
             None,
-            ["A Freshchat ticketer for this domain already exists in another workspace."],
+            ["A Freshchat ticketing service for this domain already exists in another workspace"],
         )
 
         # submitting with valid data should create ticketer and redirect

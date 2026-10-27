@@ -29,8 +29,7 @@ class TwilioWhatsappType(ChannelType):
     max_length = 1600
 
     configuration_blurb = _(
-        "To finish configuring your Twilio WhatsApp connection you'll need to add the following URL in your Twilio "
-        "Inbound Settings. Check the Twilio WhatsApp documentation for more information."
+        "To finish configuring your Twilio WhatsApp connection, you'll need to add the following URL in your Twilio Inbound Settings. Check the Twilio WhatsApp documentation for more information."
     )
 
     configuration_urls = (

@@ -36,15 +36,15 @@ def clean_contact_name(value):
         return None
 
     if not isinstance(value, str):
-        raise ValidationError(_("Contact name must be a string."))
+        raise ValidationError(_("Contact name must be a string"))
 
     cleaned = value.strip()
 
     if len(cleaned) < CONTACT_NAME_MIN_LEN:
-        raise ValidationError(_("Contact name cannot be empty."))
+        raise ValidationError(_("Contact name can't be empty"))
 
     if len(cleaned) > CONTACT_NAME_MAX_LEN:
-        raise ValidationError(_("Contact name cannot exceed %(max)d characters.") % {"max": CONTACT_NAME_MAX_LEN})
+        raise ValidationError(_("Contact name can't exceed %(max)d characters") % {"max": CONTACT_NAME_MAX_LEN})
 
     return cleaned
 
@@ -66,14 +66,14 @@ def validate_contact_phone(value):
         return None
 
     if not isinstance(value, str):
-        raise ValidationError(_("Phone number must be a string."))
+        raise ValidationError(_("Phone number must be a string"))
 
     digits = _NON_DIGITS_RE.sub("", value)
 
     if len(digits) < CONTACT_PHONE_MIN_DIGITS:
-        raise ValidationError(_("Phone number must have at least %(min)d digits.") % {"min": CONTACT_PHONE_MIN_DIGITS})
+        raise ValidationError(_("Phone number must have at least %(min)d digits") % {"min": CONTACT_PHONE_MIN_DIGITS})
 
     if len(digits) > CONTACT_PHONE_MAX_DIGITS:
-        raise ValidationError(_("Phone number cannot exceed %(max)d digits.") % {"max": CONTACT_PHONE_MAX_DIGITS})
+        raise ValidationError(_("Phone number can't exceed %(max)d digits") % {"max": CONTACT_PHONE_MAX_DIGITS})
 
     return value

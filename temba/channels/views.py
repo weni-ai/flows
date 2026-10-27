@@ -41,6 +41,7 @@ from temba.msgs.models import Msg, SystemLabel
 from temba.msgs.views import InboxView
 from temba.orgs.models import Org
 from temba.orgs.views import AnonMixin, DependencyDeleteModal, MenuMixin, ModalMixin, OrgObjPermsMixin, OrgPermsMixin
+from temba.projects.usecases.channel_creation import is_hidden_from_ui
 from temba.utils import analytics, countries, json
 from temba.utils.fields import SelectWidget
 from temba.utils.models import patch_queryset_count
@@ -320,7 +321,7 @@ def register(request):
     Endpoint for Android devices registering with this server
     """
     if request.method != "POST":
-        return HttpResponse(status=500, content=_("POST Required"))
+        return HttpResponse(status=500, content=_("POST required"))
 
     client_payload = json.loads(force_text(request.body))
     cmds = client_payload["cmds"]
@@ -375,7 +376,7 @@ class ClaimViewMixin(SpaMixin, OrgPermsMixin, ComponentFormMixin):
 
 
 class AuthenticatedExternalClaimView(ClaimViewMixin, SmartFormView):
-    form_blurb = _("You can connect your number by entering your credentials here.")
+    form_blurb = _("You can connect your number by entering your credentials here")
     username_label = _("Username")
     username_help = _("The username provided by the provider to use their API")
     password_label = _("Password")
@@ -401,7 +402,7 @@ class AuthenticatedExternalClaimView(ClaimViewMixin, SmartFormView):
             max_length=14,
             min_length=1,
             label=_("Number"),
-            help_text=_("The phone number or short code you are connecting with country code. ex: +250788123124"),
+            help_text=_("The phone number with the country code or short code. Example: +250788123124"),
         )
         username = forms.CharField(
             label=_("Username"), help_text=_("The username provided by the provider to use their API")
@@ -426,7 +427,7 @@ class AuthenticatedExternalClaimView(ClaimViewMixin, SmartFormView):
                 return phonenumbers.format_number(cleaned, phonenumbers.PhoneNumberFormat.E164)
             except Exception:  # pragma: needs cover
                 raise forms.ValidationError(
-                    _("Invalid phone number, please include the country code. ex: +250788123123")
+                    _("Invalid phone number. Include the country code. Example: +250788123123")
                 )
 
     form_class = Form
@@ -583,12 +584,7 @@ class BaseClaimNumberMixin(ClaimViewMixin):
         if not org:  # pragma: needs cover
             form._errors["upgrade"] = True
             form._errors["phone_number"] = form.error_class(
-                [
-                    _(
-                        "Sorry, you need to have a workspace to add numbers. "
-                        "You can still test things out for free using an Android phone."
-                    )
-                ]
+                [_("You need a workspace to add numbers. You can still try it out for free using an Android phone.")]
             )
             return self.form_invalid(form)
 
@@ -601,9 +597,7 @@ class BaseClaimNumberMixin(ClaimViewMixin):
                 form._errors["phone_number"] = form.error_class(
                     [
                         _(
-                            "Sorry, the number you chose is not supported. "
-                            "You can still deploy in any country using your "
-                            "own SIM card and an Android phone."
+                            "The number you chose isn't supported. You can still deploy in any country using your own SIM card and an Android phone."
                         )
                     ]
                 )
@@ -659,8 +653,7 @@ class BaseClaimNumberMixin(ClaimViewMixin):
                 error_message = form.error_class(
                     [
                         _(
-                            "An error occurred connecting your Twilio number, try removing your "
-                            "Twilio account, reconnecting it and trying again."
+                            "An error occurred connecting your Twilio number. Try removing your Twilio account, reconnecting it and trying again."
                         )
                     ]
                 )
@@ -673,7 +666,7 @@ class BaseClaimNumberMixin(ClaimViewMixin):
 
 class UpdateChannelForm(forms.ModelForm):
     name = forms.CharField(
-        label=_("Name"), max_length=64, required=True, help_text=_("Descriptive name for this channel.")
+        label=_("Name"), max_length=64, required=True, help_text=_("Descriptive name for this channel")
     )
 
     def __init__(self, *args, **kwargs):
@@ -687,7 +680,7 @@ class UpdateChannelForm(forms.ModelForm):
         if URN.TEL_SCHEME in self.object.schemes:
             self.add_config_field(
                 Channel.CONFIG_ALLOW_INTERNATIONAL,
-                forms.BooleanField(required=False, help_text=_("Allow sending to and calling international numbers.")),
+                forms.BooleanField(required=False, help_text=_("Allow sending to and calling international numbers")),
                 default=False,
             )
 
@@ -695,7 +688,8 @@ class UpdateChannelForm(forms.ModelForm):
             self.add_config_field(
                 Channel.CONFIG_MACHINE_DETECTION,
                 forms.BooleanField(
-                    required=False, help_text=_("Perform answering machine detection and hangup if machine detected.")
+                    required=False,
+                    help_text=_("Perform answering machine detection and hang up if a machine is detected"),
                 ),
                 default=False,
             )
@@ -747,6 +741,8 @@ class ChannelCRUDL(SmartCRUDL):
 
                 channels = Channel.objects.filter(org=org, is_active=True, parent=None).order_by("-role")
                 for channel in channels:
+                    if is_hidden_from_ui(channel):
+                        continue
                     icon = channel.get_type().icon.replace("icon-", "")
                     icon = icon.replace("power-cord", "box")
 
@@ -759,7 +755,7 @@ class ChannelCRUDL(SmartCRUDL):
                         )
                     )
 
-            menu.append(self.create_menu_item(menu_id="claim", name=_("Add Channel"), href="channels.channel_claim"))
+            menu.append(self.create_menu_item(menu_id="claim", name=_("Add channel"), href="channels.channel_claim"))
 
             return menu
 
@@ -781,7 +777,7 @@ class ChannelCRUDL(SmartCRUDL):
             if self.object.parent:
                 links.append(
                     dict(
-                        title=_("Android Channel"),
+                        title=_("Android channel"),
                         style="button-primary",
                         href=reverse("channels.channel_read", args=[self.object.parent.uuid]),
                     )
@@ -798,28 +794,30 @@ class ChannelCRUDL(SmartCRUDL):
 
                 if sender:
                     links.append(
-                        dict(title=_("Channel Log"), href=reverse("channels.channellog_list", args=[sender.uuid]))
+                        dict(title=_("Channel log"), href=reverse("channels.channellog_list", args=[sender.uuid]))
                     )
                 elif Channel.ROLE_RECEIVE in self.object.role:
                     links.append(
-                        dict(title=_("Channel Log"), href=reverse("channels.channellog_list", args=[self.object.uuid]))
+                        dict(title=_("Channel log"), href=reverse("channels.channellog_list", args=[self.object.uuid]))
                     )
 
                 if caller and caller != sender:
                     links.append(
                         dict(
-                            title=_("Call Log"),
+                            title=_("Call log"),
                             href=f"{reverse('channels.channellog_list', args=[caller.uuid])}?sessions=1",
                         )
                     )
 
-            if self.has_org_perm("channels.channel_update"):
+            channel_is_hidden = is_hidden_from_ui(self.object)
+
+            if self.has_org_perm("channels.channel_update") and not channel_is_hidden:
                 links.append(
                     dict(
                         id="update-channel",
                         title=_("Edit"),
                         href=reverse("channels.channel_update", args=[self.object.id]),
-                        modax=_("Edit Channel"),
+                        modax=_("Edit channel"),
                     )
                 )
 
@@ -829,15 +827,15 @@ class ChannelCRUDL(SmartCRUDL):
                         links.append(
                             dict(
                                 id="disable-sender",
-                                title=_("Disable Bulk Sending"),
-                                modax=_("Disable Bulk Sending"),
+                                title=_("Disable bulk sending"),
+                                modax=_("Disable bulk sending"),
                                 href=reverse("channels.channel_delete", args=[sender.uuid]),
                             )
                         )
                     elif self.object.is_android():
                         links.append(
                             dict(
-                                title=_("Enable Bulk Sending"),
+                                title=_("Enable bulk sending"),
                                 href="%s?channel=%d"
                                 % (reverse("channels.channel_bulk_sender_options"), self.object.id),
                             )
@@ -848,8 +846,8 @@ class ChannelCRUDL(SmartCRUDL):
                         links.append(
                             dict(
                                 id="disable-voice",
-                                title=_("Disable Voice Calling"),
-                                modax=_("Disable Voice Calling"),
+                                title=_("Disable voice calling"),
+                                modax=_("Disable voice calling"),
                                 href=reverse("channels.channel_delete", args=[caller.uuid]),
                             )
                         )
@@ -857,18 +855,18 @@ class ChannelCRUDL(SmartCRUDL):
                         links.append(
                             dict(
                                 id="enable-voice",
-                                title=_("Enable Voice Calling"),
+                                title=_("Enable voice calling"),
                                 js_class="posterize",
                                 href=f"{reverse('channels.channel_create_caller')}?channel={self.object.id}",
                             )
                         )
 
-            if self.has_org_perm("channels.channel_delete"):
+            if self.has_org_perm("channels.channel_delete") and not channel_is_hidden:
                 links.append(
                     dict(
                         id="delete-channel",
-                        title=_("Delete Channel"),
-                        modax=_("Delete Channel"),
+                        title=_("Delete channel"),
+                        modax=_("Delete channel"),
                         href=reverse("channels.channel_delete", args=[self.object.uuid]),
                     )
                 )
@@ -877,8 +875,8 @@ class ChannelCRUDL(SmartCRUDL):
                 links.append(
                     dict(
                         id="fb-whitelist",
-                        title=_("Whitelist Domain"),
-                        modax=_("Whitelist Domain"),
+                        title=_("Whitelist domain"),
+                        modax=_("Whitelist domain"),
                         href=reverse("channels.channel_facebook_whitelist", args=[self.object.uuid]),
                     )
                 )
@@ -986,8 +984,8 @@ class ChannelCRUDL(SmartCRUDL):
             ivr_in = []
             ivr_out = []
 
-            message_stats.append(dict(name=_("Incoming Text"), data=msg_in))
-            message_stats.append(dict(name=_("Outgoing Text"), data=msg_out))
+            message_stats.append(dict(name=_("Incoming text"), data=msg_in))
+            message_stats.append(dict(name=_("Outgoing text"), data=msg_out))
 
             if context["ivr_count"]:
                 message_stats.append(dict(name=_("Incoming IVR"), data=ivr_in))
@@ -1120,16 +1118,21 @@ class ChannelCRUDL(SmartCRUDL):
 
             if response.status_code != 200:
                 response_json = response.json()
-                default_error = dict(message=_("An error occured contacting the Facebook API"))
+                default_error = dict(message=_("An error occurred contacting the Facebook API"))
                 raise ValidationError(response_json.get("error", default_error)["message"])
 
     class Delete(DependencyDeleteModal):
         cancel_url = "uuid@channels.channel_read"
         success_message = _("Your channel has been removed.")
         success_message_twilio = _(
-            "We have disconnected your Twilio number. "
-            "If you do not need this number you can delete it from the Twilio website."
+            "Your Twilio number has been disconnected. If you don't need this number, you can delete it from the Twilio website."
         )
+
+        def get_object(self, queryset=None):
+            channel = super().get_object(queryset)
+            if is_hidden_from_ui(channel):
+                raise Http404()
+            return channel
 
         def get_success_url(self):
             # if we're deleting a child channel, redirect to parent afterwards
@@ -1143,9 +1146,9 @@ class ChannelCRUDL(SmartCRUDL):
             channel = self.get_object()
 
             if channel.is_delegate_caller():
-                return _("Disable Voice Calling")
+                return _("Disable voice calling")
             if channel.is_delegate_sender():
-                return _("Disable Bulk Sending")
+                return _("Disable bulk sending")
 
             return super().derive_submit_button_name()
 
@@ -1157,9 +1160,7 @@ class ChannelCRUDL(SmartCRUDL):
             except TwilioRestException as e:
                 messages.error(
                     request,
-                    _(
-                        f"Twilio reported an error removing your channel (error code {e.code}). Please try again later."
-                    ),
+                    _(f"Twilio reported an error removing your channel (error code {e.code}). Try again later."),
                 )
 
                 response = HttpResponse()
@@ -1178,10 +1179,16 @@ class ChannelCRUDL(SmartCRUDL):
 
     class Update(OrgObjPermsMixin, ComponentFormMixin, ModalMixin, SmartUpdateView):
         success_message = ""
-        submit_button_name = _("Save Changes")
+        submit_button_name = _("Save changes")
+
+        def get_object(self, queryset=None):
+            channel = super().get_object(queryset)
+            if is_hidden_from_ui(channel):
+                raise Http404()
+            return channel
 
         def derive_title(self):
-            return _("%s Channel") % self.object.get_channel_type_display()
+            return _("%s channel") % self.object.get_channel_type_display()
 
         def derive_readonly(self):
             return self.form.Meta.readonly if hasattr(self, "form") else []
@@ -1350,7 +1357,7 @@ class ChannelCRUDL(SmartCRUDL):
                 channel = self.cleaned_data["channel"]
                 channel = self.org.channels.filter(pk=channel).first()
                 if not channel:
-                    raise forms.ValidationError(_("A caller cannot be added for that number"))
+                    raise forms.ValidationError(_("A caller can't be added for that number"))
                 if channel.get_caller():
                     raise forms.ValidationError(_("A caller has already been added for that number"))
                 return channel
@@ -1411,7 +1418,9 @@ class ChannelCRUDL(SmartCRUDL):
                 org = self.request.user.get_org()
                 queryset = queryset.filter(org=org)
 
-            return queryset.filter(is_active=True)
+            queryset = queryset.filter(is_active=True)
+            hidden_ids = [channel.pk for channel in queryset if is_hidden_from_ui(channel)]
+            return queryset.exclude(pk__in=hidden_ids)
 
         def pre_process(self, *args, **kwargs):
             # superuser sees things as they are
@@ -1420,7 +1429,11 @@ class ChannelCRUDL(SmartCRUDL):
 
             # everybody else goes to a different page depending how many channels there are
             org = self.request.user.get_org()
-            channels = list(Channel.objects.filter(org=org, is_active=True))
+            channels = [
+                channel
+                for channel in Channel.objects.filter(org=org, is_active=True)
+                if not is_hidden_from_ui(channel)
+            ]
 
             if len(channels) == 0:
                 return HttpResponseRedirect(reverse("channels.channel_claim"))
@@ -1492,7 +1505,7 @@ class ChannelLogCRUDL(SmartCRUDL):
             if self.folder != self.FOLDER_CALLS and self.channel.supports_ivr():
                 links.append(dict(title=_("Calls"), href=f"{list_url}?calls=1"))
             if self.folder != self.FOLDER_OTHERS:
-                links.append(dict(title=_("Other Interactions"), href=f"{list_url}?others=1"))
+                links.append(dict(title=_("Other interactions"), href=f"{list_url}?others=1"))
             if self.folder != self.FOLDER_ERRORS:
                 links.append(dict(title=_("Errors"), href=f"{list_url}?errors=1"))
 
@@ -1551,7 +1564,7 @@ class ChannelLogCRUDL(SmartCRUDL):
         def get_gear_links(self):
             return [
                 dict(
-                    title=_("More Calls"),
+                    title=_("More calls"),
                     style="button-light",
                     href=reverse("channels.channellog_list", args=[self.get_object().channel.uuid]) + "?connections=1",
                 )
@@ -1568,7 +1581,7 @@ class ChannelLogCRUDL(SmartCRUDL):
         def get_gear_links(self):
             return [
                 dict(
-                    title=_("Channel Log"),
+                    title=_("Channel log"),
                     style="button-light",
                     href=reverse("channels.channellog_list", args=[self.get_object().channel.uuid]),
                 )

@@ -30,7 +30,7 @@ class Client:
         try:
             return getattr(requests, method)(url, **kwargs)
         except Timeout as err:
-            raise ClientError(timeout_msg or _("Connection to RocketChat is taking too long.")) from err
+            raise ClientError(timeout_msg or _("Connection to Rocket.Chat is taking too long.")) from err
         except Exception as err:
             raise ClientError() from err
 
@@ -45,7 +45,7 @@ class Client:
 
         response = self.put(
             f"{self.base_url}/settings",
-            _("Unable to configure. Connection to RocketChat is taking too long."),
+            _("Couldn't configure. Connection to Rocket.Chat is taking too long."),
             data=json.dumps(payload),
         )
         if response.status_code != 204:

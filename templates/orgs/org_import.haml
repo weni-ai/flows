@@ -4,11 +4,11 @@
 -load i18n humanize
 
 -block title
-  -trans "Import Flows and Campaigns"
+  -trans "Import flows and campaigns"
 
 -block content
   .mb-2
-    -trans "If you have an export file with flows and or campaigns, select it below to import it into your workspace."
+    -trans "If you have an export file with flows and/or campaigns, select it below to import it into your workspace."
 
   -block import-status
     .flex.w-full.mb-4.items-end.flex-wrap{style:"min-height:41px"}
@@ -30,15 +30,15 @@
           #real_button.flex
             %input{type:"text", id:"file-field"}
             .block.button-primary.ml-4(style="margin-top:-1px")
-              -trans "Choose File"
+              -trans "Choose file"
 
         .my-6.alert-warning
           .font-normal.text-2xl
-            -trans "Warning!"
+            -trans "Warning"
           .mt-2
-            -trans "If you have flows or campaigns with the same names or UUIDs as the ones you are importing they will be replaced and all history for them will be lost."
+            -trans "If you have flows or campaigns with the same names or UUIDs as the ones you're importing, they'll be replaced and all their history will be lost."
           .mt-4.font-normal
-            -trans "Do not proceed unless you are willing to replace your existing flows and campaigns."
+            -trans "Don't proceed unless you're willing to replace your existing flows and campaigns."
 
 
         .flex

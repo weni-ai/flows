@@ -19,19 +19,19 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             required=False,
             widget=forms.Textarea,
             label=_("Config (JSON)"),
-            help_text=_("Arbitrary key/values to store in channel config (JSON object)"),
+            help_text=_("Arbitrary key/value pairs to store in the channel config (JSON object)"),
         )
 
         schemes = forms.CharField(
             required=False,
             label=_("Schemes (comma-separated)"),
-            help_text=_("E.g.: ext, tel, whatsapp. Defaults to ext if omitted."),
+            help_text=_("Example: ext, tel, whatsapp. Defaults to ext if omitted."),
         )
 
         address = forms.CharField(
             required=False,
             label=_("Address"),
-            help_text=_("Optional channel address (e.g. external ID or phone number)"),
+            help_text=_("Optional channel address, such as an external ID or phone number"),
         )
 
         name = forms.CharField(

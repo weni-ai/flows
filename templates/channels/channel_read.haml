@@ -114,7 +114,7 @@
           {{ last_sync }} ago
         </span>
       -else
-        -trans "Device has not synced yet"
+        -trans "Device hasn't synced yet"
 
     -else
       .device
@@ -207,9 +207,9 @@
                 
                 -if ivr_count
                   %th
-                    -trans "IVR Messages"
+                    -trans "IVR messages"
                 %th
-                  -trans "Recent Errors"
+                  -trans "Recent errors"
                 
             %tbody
               
@@ -236,14 +236,14 @@
             %th
               -trans "Month"
             %th
-              -trans "Incoming Text Messages"
+              -trans "Incoming text messages"
             %th
-              -trans "Outgoing Text Messages"
+              -trans "Outgoing text messages"
             -if ivr_count
               %th
-                -trans "Incoming IVR Messages"
+                -trans "Incoming IVR messages"
               %th
-                -trans "Outgoing IVR Messages"
+                -trans "Outgoing IVR messages"
         %tbody
           -for month_data in message_stats_table
             %tr

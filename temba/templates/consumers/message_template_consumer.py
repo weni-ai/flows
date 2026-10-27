@@ -1,12 +1,10 @@
 from dataclasses import asdict, dataclass
 
-import amqp
 from sentry_sdk import capture_exception
+from weni.eda.django.consumers import EDAConsumer
+from weni.eda.messages import Message
 from weni_datalake_sdk.clients.client import send_message_template_data_async
 from weni_datalake_sdk.paths.message_template_path import MessageTemplatePath
-
-from temba.event_driven.consumers import EDAConsumer
-from temba.event_driven.parsers import JSONParser
 
 
 @dataclass
@@ -25,9 +23,9 @@ class MessageTemplateDTO:  # pragma: no cover
 
 
 class MessageTemplateConsumer(EDAConsumer):  # pragma: no cover
-    def consume(self, message: amqp.Message):
+    def consume(self, message: Message):
         try:
-            body = JSONParser.parse(message.body)
+            body = message.json()
             message_template_dto = MessageTemplateDTO(
                 contact_urn=body.get("contact_urn"),
                 channel=body.get("channel_uuid"),
@@ -42,12 +40,9 @@ class MessageTemplateConsumer(EDAConsumer):  # pragma: no cover
                 data=body,
             )
 
-            # Add data to lake
             send_message_template_data_async(MessageTemplatePath, asdict(message_template_dto))
 
-            message.channel.basic_ack(message.delivery_tag)
-
+            self.ack()
         except Exception as exception:
             capture_exception(exception)
-            message.channel.basic_reject(message.delivery_tag, requeue=False)
-            print(f"[MessageTemplateConsumer] - Message rejected by: {exception}")
+            raise

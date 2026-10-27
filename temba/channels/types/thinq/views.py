@@ -10,10 +10,10 @@ from ...views import ClaimViewMixin
 
 class ClaimView(ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
-        account_id = forms.IntegerField(help_text=_("Your ThinQ account id"))
+        account_id = forms.IntegerField(help_text=_("Your ThinQ account ID"))
         number = forms.CharField(min_length=10, help_text=_("The ThinQ number you want to connect"))
         country = forms.ChoiceField(choices=(("US", _("United States")),))
-        token_user = forms.CharField(help_text=_("The user name for you API token"))
+        token_user = forms.CharField(help_text=_("The username for your API token"))
         token = forms.CharField(help_text=_("Your API token"))
 
         def clean_number(self):
@@ -22,9 +22,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
                 cleaned = phonenumbers.parse(number, self.data["country"])
                 return phonenumbers.format_number(cleaned, phonenumbers.PhoneNumberFormat.E164)
             except Exception:  # pragma: no cover
-                raise forms.ValidationError(
-                    _("Invalid phone number, please include the country code. ex: +12065551212")
-                )
+                raise forms.ValidationError(_("Invalid phone number. Include the country code. Example: +12065551212"))
 
     form_class = Form
 

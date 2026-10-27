@@ -37,9 +37,9 @@ class BurstSMSType(ChannelType):
 
     claim_view = AuthenticatedExternalClaimView
     claim_view_kwargs = {
-        "username_label": _("API Key"),
+        "username_label": _("API key"),
         "username_help": _("The API key as found on your settings page"),
-        "password_label": _("API Secret"),
+        "password_label": _("API secret"),
         "password_help": _("The API secret as found on your settings page"),
         "form_blurb": _("You can connect your BurstSMS number by entering the settings below."),
     }
@@ -49,7 +49,7 @@ class BurstSMSType(ChannelType):
     }
 
     configuration_blurb = _(
-        "To finish connecting your channel, you need to set your callback URLs below for your number."
+        "To finish connecting your channel, you'll need to set your callback URLs below for your number."
     )
 
     configuration_urls = (
@@ -57,25 +57,21 @@ class BurstSMSType(ChannelType):
             label=_("Receive URL"),
             url="https://{{channel.callback_domain}}/c/bs/{{channel.uuid}}/receive",
             description=_(
-                "This URL should be called by BurstSMS when new messages are received."
-                "You must set this for your number under the 'Inbound Settings' options."
-                "Select 'Yes' to the 'Forward to URL' option and enter this URL."
+                "This URL should be called by BurstSMS when new messages are received. You must set this for your number under the 'Inbound Settings' options. Select 'Yes' for the 'Forward to URL' option and enter this URL."
             ),
         ),
         dict(
             label=_("DLR callback URL"),
             url="https://{{channel.callback_domain}}/c/bs/{{channel.uuid}}/status",
             description=_(
-                "This URL should be called by BurstSMS when the status of an outgoing message is updated."
-                "You can set it on your settings page."
+                "This URL should be called by BurstSMS when the status of an outgoing message is updated. You can set it on the settings page."
             ),
         ),
         dict(
             label=_("Reply callback URL"),
             url="https://{{channel.callback_domain}}/c/bs/{{channel.uuid}}/receive",
             description=_(
-                "This URL should be called by BurstSMS when messages are replied to."
-                "You can set it on your settings page."
+                "This URL should be called by BurstSMS when messages are replied to. You can set it on the settings page."
             ),
         ),
     )

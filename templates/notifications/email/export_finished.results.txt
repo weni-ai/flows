@@ -2,7 +2,7 @@
 {% load i18n %}
 
 {% block notification-body %}
-{% trans "Your export of results for the following flows is ready." %}
+{% trans "Your export of results for the following flows is ready" %}
 
 {% for flow in flows %}
  * {{ flow.name }}

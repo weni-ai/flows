@@ -18,7 +18,7 @@ class ZenviaType(ChannelType):
     name = "Zenvia"
 
     claim_blurb = _(
-        "If you are based in Brazil, you can purchase a short code from %(link)s and connect it in a few simple steps."
+        "If you're based in Brazil, you can purchase a short code from %(link)s and connect it in a few steps."
     ) % {"link": '<a href="http://www.zenvia.com.br/">Zenvia</a>'}
     claim_view = ClaimView
 
@@ -30,8 +30,7 @@ class ZenviaType(ChannelType):
     attachment_support = False
 
     configuration_blurb = _(
-        "To finish configuring your Zenvia connection you'll need to set the following callback URLs on your Zenvia "
-        "account."
+        "To finish configuring your Zenvia connection, set the following callback URLs on your Zenvia account."
     )
 
     configuration_urls = (
@@ -39,14 +38,13 @@ class ZenviaType(ChannelType):
             label=_("Status URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.zv' channel.uuid 'status' %}",
             description=_(
-                "To receive delivery and acknowledgement of sent messages, you need to set the status URL for your "
-                "Zenvia account."
+                "To receive delivery and acknowledgment for sent messages, set the status URL for your Zenvia account."
             ),
         ),
         dict(
             label=_("Receive URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.zv' channel.uuid 'receive' %}",
-            description=_("To receive incoming messages, you need to set the receive URL for your Zenvia account."),
+            description=_("To receive incoming messages, set the receive URL for your Zenvia account."),
         ),
     )
 

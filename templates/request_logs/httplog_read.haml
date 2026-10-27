@@ -6,11 +6,11 @@
 
 -block title
   -if object.flow
-    -trans "Flow Event"
+    -trans "Flow event"
   -elif object.classifier
-    -trans "Classifier Event"
+    -trans "Classifier event"
   -elif object.channel
-    -trans "Channel Event"
+    -trans "Channel event"
 -block subtitle
   {{ object.get_log_type_display }}
 
@@ -72,7 +72,7 @@
         %tr
           %td(colspan="4" style="padding:0;")
             %pre.prettyprint.response<
-              -trans "Connection Error"
+              -trans "Connection error"
 
 -block extra-script
   {{ block.super }}

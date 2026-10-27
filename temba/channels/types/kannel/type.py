@@ -20,8 +20,7 @@ class KannelType(ChannelType):
     icon = "icon-channel-kannel"
 
     claim_blurb = _(
-        "Connect your %(link)s instance, we'll walk you through the steps necessary to get your SMSC connection "
-        "working in a few minutes."
+        "Connect your %(link)s instance and we'll walk you through the steps to get your SMSC connection working in a few minutes."
     ) % {"link": '<a href="http://www.kannel.org/">Kannel</a>'}
     claim_view = ClaimView
 

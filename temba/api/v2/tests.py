@@ -12,6 +12,7 @@ import iso8601
 import pytz
 from rest_framework import serializers
 from rest_framework.test import APIClient, APIRequestFactory
+from weni_commons.auth import SessionContext, SessionUser
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, Group, User
@@ -57,11 +58,12 @@ from temba.externals.models import ExternalService
 from temba.flows.models import Flow, FlowLabel, FlowRun, FlowStart
 from temba.globals.models import Global
 from temba.locations.models import AdminBoundary, BoundaryAlias
-from temba.msgs.models import Broadcast, Label, Msg
+from temba.msgs.models import Broadcast, Label, ManagedTriggerGroup, Msg
 from temba.orgs.models import Org
 from temba.templates.models import Template, TemplateTranslation
 from temba.tests import AnonymousOrg, TembaTest, matchers, mock_mailroom
 from temba.tests.engine import MockSessionWriter
+from temba.tests.s3 import S3_SIGNING_SETTINGS
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.tickets.types.mailgun import MailgunType
 from temba.tickets.types.zendesk import ZendeskType
@@ -82,27 +84,7 @@ from .serializers import (
 NUM_BASE_REQUEST_QUERIES = 6  # number of db queries required for any API request
 
 
-class APITest(TembaTest):
-    def setUp(self):
-        super().setUp()
-
-        self.joe = self.create_contact("Joe Blow", phone="0788123123")
-        self.frank = self.create_contact("Frank", urns=["twitter:franky"])
-
-        self.twitter = self.create_channel("TT", "Twitter Channel", "billy_bob")
-
-        self.hans = self.create_contact("Hans Gruber", phone="+4921551511", org=self.org2)
-
-        self.org2channel = self.create_channel("A", "Org2Channel", "123456", country="RW", org=self.org2)
-
-        # this is needed to prevent REST framework from rolling back transaction created around each unit test
-        connection.settings_dict["ATOMIC_REQUESTS"] = False
-
-    def tearDown(self):
-        super().tearDown()
-
-        connection.settings_dict["ATOMIC_REQUESTS"] = True
-
+class APIJSONMixin:
     def fetchHTML(self, url, query=None):
         if query:
             url += "?" + query
@@ -138,6 +120,28 @@ class APITest(TembaTest):
             url = url + "?" + query
 
         return self.client.delete(url, content_type="application/json", HTTP_X_FORWARDED_HTTPS="https")
+
+
+class APITest(APIJSONMixin, TembaTest):
+    def setUp(self):
+        super().setUp()
+
+        self.joe = self.create_contact("Joe Blow", phone="0788123123")
+        self.frank = self.create_contact("Frank", urns=["twitter:franky"])
+
+        self.twitter = self.create_channel("TT", "Twitter Channel", "billy_bob")
+
+        self.hans = self.create_contact("Hans Gruber", phone="+4921551511", org=self.org2)
+
+        self.org2channel = self.create_channel("A", "Org2Channel", "123456", country="RW", org=self.org2)
+
+        # this is needed to prevent REST framework from rolling back transaction created around each unit test
+        connection.settings_dict["ATOMIC_REQUESTS"] = False
+
+    def tearDown(self):
+        super().tearDown()
+
+        connection.settings_dict["ATOMIC_REQUESTS"] = True
 
     def assertEndpointAccess(self, url, query=None, fetch_returns=200):
         self.client.logout()
@@ -180,6 +184,28 @@ class APITest(TembaTest):
     def assertResultsByUUID(self, response, expected):
         self.assertEqual(response.status_code, 200)
         self.assertEqual([r["uuid"] for r in response.json()["results"]], [o.uuid for o in expected])
+
+    def assertFlowReadResponse(self, actual, flow, *, flow_type, archived, labels, expires, runs, results):
+        flow.refresh_from_db()
+        self.assertEqual(actual["uuid"], str(flow.uuid))
+        self.assertEqual(actual["name"], flow.name)
+        self.assertEqual(actual["type"], flow_type)
+        self.assertEqual(actual["archived"], archived)
+        self.assertEqual(actual["labels"], labels)
+        self.assertEqual(actual["expires"], expires)
+        self.assertEqual(actual["runs"], runs)
+        self.assertEqual(actual["parent_refs"], [])
+        self.assertEqual(actual["created_on"], format_datetime(flow.created_on))
+        self.assertEqual(actual["modified_on"], format_datetime(flow.modified_on))
+
+        self.assertEqual(len(actual["results"]), len(results))
+        for actual_result, expected_result in zip(actual["results"], results):
+            self.assertEqual(actual_result["key"], expected_result["key"])
+            self.assertEqual(actual_result["name"], expected_result["name"])
+            self.assertEqual(actual_result["categories"], expected_result["categories"])
+            self.assertTrue(actual_result["node_uuids"])
+            for node_uuid in actual_result["node_uuids"]:
+                self.assertRegex(node_uuid, matchers.UUID4_REGEX.pattern)
 
     def assertResponseError(self, response, field, expected_message, status_code=400):
         self.assertEqual(response.status_code, status_code)
@@ -330,8 +356,12 @@ class APITest(TembaTest):
                 "tel:0788 123 123": "tel:+250788123123",  # using org country
                 "tel:(078) 812-3123": "tel:+250788123123",
                 "+250788123123": "whatsapp:250788123123",  # bare phone defaults to whatsapp
-                "0788 123 123": "whatsapp:250788123123",  # bare phone defaults to whatsapp
+                "0788 123 123": "whatsapp:250788123123",  # whatsapp phone paths are tel-normalized without +
                 "whatsapp:6831234": serializers.ValidationError,  # too few digits
+                "whatsapp:BR.35029025746744354": "whatsapp:BR.35029025746744354",
+                "whatsapp:US.ENT.11815799212886844830": "whatsapp:US.ENT.11815799212886844830",
+                "whatsapp:BR35029025746744354": serializers.ValidationError,  # malformed whatsapp BSUID path
+                "BR.35029025746744354": serializers.ValidationError,  # BSUID requires explicit scheme
                 "12345": serializers.ValidationError,  # un-parseable
                 "tel:800-123-4567": serializers.ValidationError,  # no country code
                 18_001_234_567: serializers.ValidationError,  # non-string
@@ -393,7 +423,7 @@ class APITest(TembaTest):
             serializers.ValidationError, field.to_internal_value, {"eng": "HelloHello1"}
         )  # base lang not provided
 
-    @override_settings(FLOW_START_PARAMS_SIZE=4)
+    @override_settings(FLOW_START_PARAMS_SIZE=4, FLOW_START_PARAM_VALUE_SIZE=640)
     def test_normalize_extra(self):
         self.assertEqual(OrderedDict(), normalize_extra({}))
         self.assertEqual(
@@ -409,6 +439,12 @@ class APITest(TembaTest):
             normalize_extra({"a": 1, "b": 2, "c": 3, "d": 4, "e": 5}),
         )
         self.assertEqual(OrderedDict([("a", "x" * 640)]), normalize_extra({"a": "x" * 641}))
+
+    def test_normalize_extra_param_value_size_default(self):
+        size = settings.FLOW_START_PARAM_VALUE_SIZE
+        self.assertEqual(4096, size)
+        self.assertEqual(OrderedDict([("a", "x" * size)]), normalize_extra({"a": "x" * size}))
+        self.assertEqual(OrderedDict([("a", "x" * size)]), normalize_extra({"a": "x" * (size + 1)}))
 
     def test_authentication(self):
         def request(endpoint, **headers):
@@ -852,13 +888,109 @@ class APITest(TembaTest):
         view = BaseAPIView()
         view.format_kwarg = None
         request = view.initialize_request(django_request)
-        request.user = SimpleNamespace(set_org=Mock(), is_anonymous=False)
+        request.user = SimpleNamespace(set_org=Mock(), is_anonymous=False, is_active=True)
+        request.auth = None
         view.request = request
 
         view.perform_authentication(request)
 
         self.assertEqual(request._org, self.org)
         request.user.set_org.assert_called_once_with(self.org)
+
+    def _make_session_auth_request(self, *, email, project_uuid=None, auth=True):
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = SessionUser(email=email)
+        if project_uuid is not None:
+            request.project_uuid = project_uuid
+        if auth:
+            request.auth = SessionContext(
+                project=project_uuid or "unused",
+                user=email,
+                expire_at="2026-12-31T00:00:00+00:00",
+            )
+        else:
+            request.auth = None
+        view.request = request
+        return view, request
+
+    def test_resolve_session_user_with_org_member(self):
+        """_resolve_session_user replaces SessionUser with the Django member and clears auth."""
+        view, request = self._make_session_auth_request(
+            email=self.admin.email,
+            project_uuid=str(self.org.proj_uuid),
+        )
+
+        view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user, self.admin)
+        self.assertEqual(request.user.get_org(), self.org)
+        self.assertTrue(request.user.using_token)
+
+    def test_resolve_session_user_unknown_email_becomes_anonymous(self):
+        """_resolve_session_user denies when the session email has no Django user."""
+        view, request = self._make_session_auth_request(
+            email="missing@example.com",
+            project_uuid=str(self.org.proj_uuid),
+        )
+
+        view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+        self.assertTrue(request.user.is_anonymous)
+
+    def test_resolve_session_user_non_member_becomes_anonymous(self):
+        """_resolve_session_user denies when the Django user is not in the org."""
+        view, request = self._make_session_auth_request(
+            email=self.admin2.email,
+            project_uuid=str(self.org.proj_uuid),
+        )
+
+        view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+        self.assertTrue(request.user.is_anonymous)
+
+    def test_resolve_session_user_without_project_uuid_becomes_anonymous(self):
+        """_resolve_session_user clears auth and anonymizes when project_uuid is missing."""
+        view, request = self._make_session_auth_request(email=self.admin.email, project_uuid=None)
+
+        view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+        self.assertTrue(request.user.is_anonymous)
+        self.assertFalse(hasattr(request, "_org"))
+
+    def test_resolve_session_user_invalid_project_raises(self):
+        """_resolve_session_user raises InvalidQueryError for an unknown project_uuid."""
+        view, request = self._make_session_auth_request(
+            email=self.admin.email,
+            project_uuid=str(uuid.uuid4()),
+        )
+
+        with self.assertRaises(InvalidQueryError):
+            view._resolve_session_user(request)
+
+        self.assertIsNone(request.auth)
+
+    def test_perform_authentication_routes_session_to_resolve_session_user(self):
+        """perform_authentication calls _resolve_session_user when auth is SessionContext."""
+        view, request = self._make_session_auth_request(
+            email=self.admin.email,
+            project_uuid=str(self.org.proj_uuid),
+        )
+
+        view.perform_authentication(request)
+
+        self.assertIsNone(request.auth)
+        self.assertEqual(request._org, self.org)
+        self.assertEqual(request.user, self.admin)
+        self.assertTrue(request.user.using_token)
 
     def test_permission_classes_allow_jwt_without_api_token(self):
         """HasValidJWT | APIPermission allows access with valid JWT even without API token."""
@@ -1379,6 +1511,28 @@ class APITest(TembaTest):
         response = self.postJSON(url, None, {"text": "Hello", "msg": {"text": "Test"}})
         self.assertResponseError(response, "non_field_errors", "Must provide either urns, contacts or groups")
 
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:BR.35029025746744354"],
+                "msg": {"text": "Send a message"},
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(["whatsapp:BR.35029025746744354"], response.json()["urns"])
+
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:US.ENT.11815799212886844830"],
+                "msg": {"text": "Send a message"},
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(["whatsapp:US.ENT.11815799212886844830"], response.json()["urns"])
+
         # try to create new broadcast with no recipients
         response = self.postJSON(url, None, {"text": "Hello"})
         self.assertEqual(response.json(), {"msg": ["This field is required."]})
@@ -1597,7 +1751,9 @@ class APITest(TembaTest):
             },
         )
 
-        self.assertResponseError(response, "non_field_errors", "Invalid channel type")
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+        self.assertEqual({"text": "Send a message"}, broadcast.metadata)
+        self.assertEqual(self.channel, broadcast.channel)
 
         # send a msg with a non existing channel
         response = self.postJSON(
@@ -1773,6 +1929,92 @@ class APITest(TembaTest):
         )
         self.assertResponseError(response, "non_field_errors", "Template with name Away not found.")
 
+        ig_channel = self.create_channel("IG", "Instagram: Demo", "12345", org=self.org)
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["instagram:5678"],
+                "channel": str(ig_channel.uuid),
+                "msg": {
+                    "text": "Thanks for your comment!",
+                    "ig_comment_id": "30065218",
+                    "ig_response_type": "comment",
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+        self.assertEqual(
+            {
+                "text": "Thanks for your comment!",
+                "ig_comment_id": "30065218",
+                "ig_response_type": "comment",
+            },
+            broadcast.metadata,
+        )
+
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["instagram:5678"],
+                "channel": str(ig_channel.uuid),
+                "msg": {
+                    "text": "Thanks for your comment!",
+                    "ig_comment_id": "30065218",
+                },
+            },
+        )
+        self.assertResponseError(response, "msg", "ig_response_type is required when ig_comment_id is provided")
+
+        # ig_comment_id must be a string
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["instagram:5678"],
+                "channel": str(ig_channel.uuid),
+                "msg": {
+                    "text": "Thanks for your comment!",
+                    "ig_comment_id": 30065218,
+                    "ig_response_type": "comment",
+                },
+            },
+        )
+        self.assertResponseError(response, "msg", "ig_comment_id must be a string")
+
+        # ig_response_type must be comment or dm_comment
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["instagram:5678"],
+                "channel": str(ig_channel.uuid),
+                "msg": {
+                    "text": "Thanks for your comment!",
+                    "ig_comment_id": "30065218",
+                    "ig_response_type": "invalid",
+                },
+            },
+        )
+        self.assertResponseError(response, "msg", "ig_response_type must be either comment or dm_comment")
+
+        # ig_comment_id is required when ig_response_type is provided
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["instagram:5678"],
+                "channel": str(ig_channel.uuid),
+                "msg": {
+                    "text": "Thanks for your comment!",
+                    "ig_response_type": "comment",
+                },
+            },
+        )
+        self.assertResponseError(response, "msg", "ig_comment_id is required when ig_response_type is provided")
+
         # urns and contacts accept up to 1000 items per request (see WhatsappBroadcastWriteSerializer)
         many_urns = [f"whatsapp:556199{str(i).zfill(7)}" for i in range(1000)]
         response = self.postJSON(url, None, {"urns": many_urns, "msg": {"text": "Bulk"}})
@@ -1787,6 +2029,30 @@ class APITest(TembaTest):
             url, None, {"groups": [str(uuid.uuid4()) for _ in range(101)], "msg": {"text": "Bulk"}}
         )
         self.assertResponseError(response, "groups", "This field can only contain up to 100 items.")
+
+    @patch("temba.mailroom.queue_broadcast")
+    @mock_mailroom
+    def test_whatsapp_broadcasts_trigger_flow_with_urns(self, mocks, mock_queue_broadcast):
+        url = reverse("api.v2.whatsapp_broadcasts")
+        self.assertEndpointAccess(url)
+
+        flow = self.create_flow(flow_type=Flow.TYPE_MESSAGE)
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5511999999999"],
+                "trigger_flow_uuid": str(flow.uuid),
+                "msg": {"text": "Hello"},
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        self.assertEqual(data["groups"], [])
+        self.assertIn("trigger_group", data["metadata"])
+        association = ManagedTriggerGroup.objects.get(org=self.org, flow=flow)
+        self.assertEqual(str(association.group.uuid), data["metadata"]["trigger_group"]["uuid"])
+        self.assertEqual(association.group.contacts.count(), 1)
 
     def test_archives(self):
         url = reverse("api.v2.archives")
@@ -2084,7 +2350,7 @@ class APITest(TembaTest):
                 {
                     "uuid": event3.uuid,
                     "campaign": {"uuid": campaign3.uuid, "name": "Alerts"},
-                    "relative_to": {"key": "created_on", "label": "Created On"},
+                    "relative_to": {"key": "created_on", "label": "Created on"},
                     "offset": 6,
                     "unit": "hours",
                     "delivery_hour": 12,
@@ -2881,7 +3147,7 @@ class APITest(TembaTest):
         whats_user = Contact.objects.get(name="WhatsUser")
         self.assertEqual(set(whats_user.urns.values_list("identity", flat=True)), {"whatsapp:250788999999"})
 
-        # bare brazilian numbers are normalized with country code 55
+        # bare local numbers default to whatsapp without country normalization
         self.org.timezone = "America/Sao_Paulo"
         self.org.save(update_fields=("timezone",))
         if "default_country" in self.org.__dict__:
@@ -2889,7 +3155,7 @@ class APITest(TembaTest):
 
         response = self.postJSON(url, None, {"name": "BR User", "urns": ["11987654321"]})
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["urns"], ["whatsapp:5511987654321"])
+        self.assertEqual(response.json()["urns"], ["whatsapp:11987654321"])
 
         # restore default org country for subsequent tests in this method
         self.org.timezone = "Africa/Kigali"
@@ -2906,6 +3172,29 @@ class APITest(TembaTest):
         response = self.postJSON(url, None, {"name": "ExplicitWhats", "urns": ["whatsapp:250788777777"]})
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["urns"], ["whatsapp:250788777777"])
+
+        response = self.postJSON(url, None, {"name": "BSUID Contact", "urns": ["whatsapp:BR.35029025746744354"]})
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["urns"], ["whatsapp:BR.35029025746744354"])
+
+        response = self.postJSON(
+            url,
+            None,
+            {"name": "Parent BSUID Contact", "urns": ["whatsapp:US.ENT.11815799212886844830"]},
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["urns"], ["whatsapp:US.ENT.11815799212886844830"])
+
+        response = self.postJSON(url, None, {"name": "Bare BSUID", "urns": ["BR.35029025746744354"]})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["urns"],
+            {
+                "0": [
+                    "Invalid URN: BR.35029025746744354. WhatsApp BSUID identifiers must include the whatsapp: scheme."
+                ]
+            },
+        )
 
         # try to create with group from other org
         response = self.postJSON(url, None, {"name": "Jim", "groups": [other_org_group.uuid]})
@@ -3136,17 +3425,17 @@ class APITest(TembaTest):
 
         # reject names that exceed the configured maximum length
         response = self.postJSON(url, None, {"name": "x" * 101, "urns": ["tel:+250787000111"]})
-        self.assertResponseError(response, "name", "Contact name cannot exceed 100 characters.")
+        self.assertResponseError(response, "name", "Contact name can't exceed 100 characters")
 
         # reject empty/whitespace-only names when explicitly provided
         response = self.postJSON(url, None, {"name": "   ", "urns": ["tel:+250787000222"]})
-        self.assertResponseError(response, "name", "Contact name cannot be empty.")
+        self.assertResponseError(response, "name", "Contact name can't be empty")
 
         # reject tel: URN that passes phonenumbers (4-digit Niue national + 3-digit country code)
         # but has fewer than 8 digits, exercising validate_contact_phone in the URN field
         response = self.postJSON(url, None, {"name": "Niue Phone", "urns": ["tel:+6831234"]})
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Phone number must have at least 8 digits.", response.json()["urns"]["0"])
+        self.assertIn("Phone number must have at least 8 digits", response.json()["urns"]["0"])
 
     @mock_mailroom
     def test_contacts_lean(self, mr_mocks):
@@ -3815,99 +4104,49 @@ class APITest(TembaTest):
         resp_json = response.json()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(resp_json["next"], None)
-        self.assertEqual(
-            resp_json["results"],
-            [
-                {
-                    "uuid": archived.uuid,
-                    "name": "Favorites",
-                    "type": "message",
-                    "archived": True,
-                    "labels": [],
-                    "expires": 720,
-                    "runs": {"active": 0, "completed": 0, "interrupted": 0, "expired": 0},
-                    "results": [
-                        {
-                            "key": "color",
-                            "name": "Color",
-                            "categories": ["Red", "Green", "Blue", "Cyan", "Other"],
-                            "node_uuids": [matchers.UUID4String()],
-                        },
-                        {
-                            "key": "beer",
-                            "name": "Beer",
-                            "categories": ["Mutzig", "Primus", "Turbo King", "Skol", "Other"],
-                            "node_uuids": [matchers.UUID4String()],
-                        },
-                        {
-                            "key": "name",
-                            "name": "Name",
-                            "categories": ["All Responses"],
-                            "node_uuids": [matchers.UUID4String()],
-                        },
-                    ],
-                    "parent_refs": [],
-                    "created_on": format_datetime(archived.created_on),
-                    "modified_on": format_datetime(archived.modified_on),
-                },
-                {
-                    "uuid": color.uuid,
-                    "name": "Color Flow",
-                    "type": "message",
-                    "archived": False,
-                    "labels": [{"uuid": reporting.uuid, "name": "Reporting"}],
-                    "expires": 10080,
-                    "runs": {"active": 0, "completed": 1, "interrupted": 0, "expired": 0},
-                    "results": [
-                        {
-                            "key": "color",
-                            "name": "color",
-                            "categories": ["Orange", "Blue", "Other", "Nothing"],
-                            "node_uuids": [matchers.UUID4String()],
-                        }
-                    ],
-                    "parent_refs": [],
-                    "created_on": format_datetime(color.created_on),
-                    "modified_on": format_datetime(color.modified_on),
-                },
-                {
-                    "uuid": survey.uuid,
-                    "name": "Media Survey",
-                    "type": "survey",
-                    "archived": False,
-                    "labels": [],
-                    "expires": 10080,
-                    "runs": {"active": 0, "completed": 0, "interrupted": 0, "expired": 0},
-                    "results": [
-                        {
-                            "key": "name",
-                            "name": "Name",
-                            "categories": ["All Responses"],
-                            "node_uuids": [matchers.UUID4String()],
-                        },
-                        {
-                            "key": "photo",
-                            "name": "Photo",
-                            "categories": ["All Responses"],
-                            "node_uuids": [matchers.UUID4String()],
-                        },
-                        {
-                            "key": "location",
-                            "name": "Location",
-                            "categories": ["All Responses"],
-                            "node_uuids": [matchers.UUID4String()],
-                        },
-                        {
-                            "key": "video",
-                            "name": "Video",
-                            "categories": ["All Responses"],
-                            "node_uuids": [matchers.UUID4String()],
-                        },
-                    ],
-                    "parent_refs": [],
-                    "created_on": format_datetime(survey.created_on),
-                    "modified_on": format_datetime(survey.modified_on),
-                },
+        self.assertResultsByUUID(response, [archived, color, survey])
+
+        by_uuid = {r["uuid"]: r for r in resp_json["results"]}
+
+        self.assertFlowReadResponse(
+            by_uuid[str(archived.uuid)],
+            archived,
+            flow_type="message",
+            archived=True,
+            labels=[],
+            expires=720,
+            runs={"active": 0, "completed": 0, "interrupted": 0, "expired": 0},
+            results=[
+                {"key": "color", "name": "Color", "categories": ["Red", "Green", "Blue", "Cyan", "Other"]},
+                {"key": "beer", "name": "Beer", "categories": ["Mutzig", "Primus", "Turbo King", "Skol", "Other"]},
+                {"key": "name", "name": "Name", "categories": ["All Responses"]},
+            ],
+        )
+        self.assertFlowReadResponse(
+            by_uuid[str(color.uuid)],
+            color,
+            flow_type="message",
+            archived=False,
+            labels=[{"uuid": str(reporting.uuid), "name": "Reporting"}],
+            expires=10080,
+            runs={"active": 0, "completed": 1, "interrupted": 0, "expired": 0},
+            results=[
+                {"key": "color", "name": "color", "categories": ["Orange", "Blue", "Other", "Nothing"]},
+            ],
+        )
+        self.assertFlowReadResponse(
+            by_uuid[str(survey.uuid)],
+            survey,
+            flow_type="survey",
+            archived=False,
+            labels=[],
+            expires=10080,
+            runs={"active": 0, "completed": 0, "interrupted": 0, "expired": 0},
+            results=[
+                {"key": "name", "name": "Name", "categories": ["All Responses"]},
+                {"key": "photo", "name": "Photo", "categories": ["All Responses"]},
+                {"key": "location", "name": "Location", "categories": ["All Responses"]},
+                {"key": "video", "name": "Video", "categories": ["All Responses"]},
             ],
         )
 
@@ -3936,6 +4175,8 @@ class APITest(TembaTest):
         response = self.fetchJSON(url, "labels=Reporting")
         self.assertResultsByUUID(response, [color])
 
+        color.refresh_from_db(fields=("modified_on",))
+
         # filter by before
         response = self.fetchJSON(url, "before=%s" % format_datetime(color.modified_on))
         self.assertResultsByUUID(response, [color, survey])
@@ -3943,6 +4184,53 @@ class APITest(TembaTest):
         # filter by after
         response = self.fetchJSON(url, "after=%s" % format_datetime(color.modified_on))
         self.assertResultsByUUID(response, [archived, color])
+
+        # order by name
+        response = self.fetchJSON(url, "order_by=name")
+        self.assertResultsByUUID(response, [color, archived, survey])
+
+        response = self.fetchJSON(url, "order_by=-name")
+        self.assertResultsByUUID(response, [survey, archived, color])
+
+        # order by created_on
+        response = self.fetchJSON(url, "order_by=created_on")
+        self.assertResultsByUUID(response, [survey, color, archived])
+
+        response = self.fetchJSON(url, "order_by=-created_on")
+        self.assertResultsByUUID(response, [archived, color, survey])
+
+        # invalid order_by
+        response = self.fetchJSON(url, "order_by=uuid")
+        self.assertResponseError(
+            response, None, "Invalid value for order_by, must be one of: name, -name, created_on, -created_on"
+        )
+
+        # cursor pagination with limit keeps the ordering across pages
+        response = self.fetchJSON(url, "order_by=name&limit=2")
+        resp_json = response.json()
+        self.assertResultsByUUID(response, [color, archived])
+        self.assertNotIn("count", resp_json)
+        self.assertIn("cursor=", resp_json["next"])
+
+        response = self.fetchJSON(resp_json["next"], raw_url=True)
+        self.assertResultsByUUID(response, [survey])
+        self.assertIsNone(response.json()["next"])
+
+        # limit/offset pagination when offset is provided
+        response = self.fetchJSON(url, "order_by=name&limit=1&offset=1")
+        resp_json = response.json()
+        self.assertResultsByUUID(response, [archived])
+        self.assertEqual(resp_json["count"], 3)
+        self.assertIn("offset=2", resp_json["next"])
+        self.assertIn("order_by=name", resp_json["next"])
+
+        response = self.fetchJSON(resp_json["next"], raw_url=True)
+        self.assertResultsByUUID(response, [survey])
+        self.assertIsNone(response.json()["next"])
+
+        response = self.fetchJSON(url, "offset=0")
+        self.assertResultsByUUID(response, [archived, color, survey])
+        self.assertEqual(response.json()["count"], 3)
 
         # inactive flows are never returned
         archived.is_active = False
@@ -3958,7 +4246,7 @@ class APITest(TembaTest):
 
         # create some globals
         global1 = Global.get_or_create(self.org, self.admin, "org_name", "Org Name", "Acme Ltd")
-        global2 = Global.get_or_create(self.org, self.admin, "access_token", "Access Token", "23464373")
+        global2 = Global.get_or_create(self.org, self.admin, "access_token", "Access token", "23464373")
 
         # on another org
         Global.get_or_create(self.org2, self.admin, "thingy", "Thingy", "xyz")
@@ -3975,7 +4263,7 @@ class APITest(TembaTest):
             [
                 {
                     "key": "access_token",
-                    "name": "Access Token",
+                    "name": "Access token",
                     "value": "23464373",
                     "modified_on": format_datetime(global2.modified_on),
                 },
@@ -4015,7 +4303,7 @@ class APITest(TembaTest):
             [
                 {
                     "key": "access_token",
-                    "name": "Access Token",
+                    "name": "Access token",
                     "value": "23464373",
                     "modified_on": format_datetime(global2.modified_on),
                 },
@@ -4928,6 +5216,34 @@ class APITest(TembaTest):
             },
         )
 
+    @override_settings(**S3_SIGNING_SETTINGS)
+    def test_messages_presigns_s3_attachments(self):
+        self.login(self.admin)
+        msg = self.create_incoming_msg(
+            self.joe,
+            "Photo",
+            attachments=[
+                "image/jpeg:https://media-bucket.s3.amazonaws.com/media/photo.jpg",
+                "image/jpeg:https://example.com/test.jpg",
+                "geo:-35.998287,26.478109",
+            ],
+        )
+
+        response = self.fetchJSON(reverse("api.v2.messages"), f"id={msg.id}")
+        result = response.json()["results"][0]
+
+        signed_url_prefix = "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg?"
+        self.assertTrue(result["attachments"][0]["url"].startswith(signed_url_prefix))
+        self.assertIn("X-Amz-Signature=", result["attachments"][0]["url"])
+        self.assertEqual(
+            [
+                {"content_type": "image/jpeg", "url": "https://example.com/test.jpg"},
+                {"content_type": "geo", "url": "-35.998287,26.478109"},
+            ],
+            result["attachments"][1:],
+        )
+        self.assertTrue(result["media"].startswith(f"image/jpeg:{signed_url_prefix}"))
+
     def test_message_actions(self):
         url = reverse("api.v2.message_actions")
         self.assertEndpointAccess(url, fetch_returns=405)
@@ -5207,6 +5523,29 @@ class APITest(TembaTest):
         response = self.postJSON(url, None, {})
         self.assertResponseError(response, "flow", "This field is required.")
 
+        # start a flow with BSUID URN
+        response = self.postJSON(
+            url,
+            None,
+            {"flow": flow.uuid, "urns": ["whatsapp:BR.35029025746744354"]},
+        )
+        self.assertEqual(response.status_code, 201)
+        start_bsuid = flow.starts.get(pk=response.json()["id"])
+        self.assertEqual(["whatsapp:BR.35029025746744354"], start_bsuid.urns)
+        mock_async_start.assert_called_once()
+        mock_async_start.reset_mock()
+
+        response = self.postJSON(
+            url,
+            None,
+            {"flow": flow.uuid, "urns": ["whatsapp:US.ENT.11815799212886844830"]},
+        )
+        self.assertEqual(response.status_code, 201)
+        start_parent_bsuid = flow.starts.get(pk=response.json()["id"])
+        self.assertEqual(["whatsapp:US.ENT.11815799212886844830"], start_parent_bsuid.urns)
+        mock_async_start.assert_called_once()
+        mock_async_start.reset_mock()
+
         # start a flow with the minimum required parameters
         response = self.postJSON(url, None, {"flow": flow.uuid, "contacts": [self.joe.uuid]})
         self.assertEqual(response.status_code, 201)
@@ -5393,7 +5732,7 @@ class APITest(TembaTest):
         response = self.fetchJSON(url, readonly_models={FlowStart})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["next"], None)
-        self.assertResultsById(response, [start4, start3, start2, start1])
+        self.assertResultsById(response, [start4, start3, start2, start1, start_parent_bsuid, start_bsuid])
         self.assertEqual(
             response.json()["results"][1],
             {
@@ -5519,6 +5858,23 @@ class APITest(TembaTest):
         tt.is_active = False
         tt.save()
 
+        # translation on an inactive channel should not be returned by the API
+        inactive_channel = self.create_channel("WA", "Inactive WA", "1111", config={"fb_namespace": "foo_namespace"})
+        TemplateTranslation.get_or_create(
+            inactive_channel,
+            "hello",
+            "spa",
+            "ES",
+            "Hola {{1}}",
+            1,
+            TemplateTranslation.STATUS_APPROVED,
+            "3456",
+            "foo_namespace",
+            "AUTHENTICATION",
+        )
+        inactive_channel.is_active = False
+        inactive_channel.save(update_fields=["is_active"])
+
         # templates on other org to test filtering
         TemplateTranslation.get_or_create(
             self.org2channel,
@@ -5552,6 +5908,12 @@ class APITest(TembaTest):
         resp_json = response.json()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(resp_json["next"], None)
+        self.assertEqual(1, len(resp_json["results"]))
+        self.assertEqual("hello", resp_json["results"][0]["name"])
+        languages = {t["language"] for t in resp_json["results"][0]["translations"]}
+        self.assertEqual({"eng", "fra"}, languages)
+        self.assertNotIn("spa", languages)
+        self.assertNotIn("afr", languages)
 
     def test_classifiers(self):
         url = reverse("api.v2.classifiers")
@@ -7402,7 +7764,7 @@ class EventsV2EndpointTest(APITest):
         self.assertEqual(call_kwargs["date_end"], "2025-10-08T23:59:59Z")
 
 
-class EventsGroupByCountEndpointTest(APITest):
+class EventsGroupByCountEndpointTest(APIJSONMixin, TembaTest):
     @patch("temba.api.v2.services.events.fetch_event_counts_for_org")
     def test_events_group_by_count_endpoint(self, mock_fetch_event_counts_for_org):
         url = reverse("api.v2.events_group_by")

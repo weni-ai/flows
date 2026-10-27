@@ -202,7 +202,7 @@ class RocketChatViewTest(RocketChatMixin):
         response = self.submit_form(data)
         # retry with same base_url
         response = self.submit_form(data)
-        self.assertFormError(response, "form", "base_url", "There is already a channel configured for this URL.")
+        self.assertFormError(response, "form", "base_url", "A channel configured for this URL already exists")
 
         data.pop("base_url")
         response = self.submit_form(data)
@@ -225,15 +225,15 @@ class RocketChatViewTest(RocketChatMixin):
 
         data.pop("secret")
         response = self.submit_form(data)
-        self.assertFormError(response, "form", None, "Invalid secret code.")
+        self.assertFormError(response, "form", None, "Invalid secret code")
 
         data["secret"] = ""
         response = self.submit_form(data)
-        self.assertFormError(response, "form", None, "Invalid secret code.")
+        self.assertFormError(response, "form", None, "Invalid secret code")
 
         data["secret"] = self.secret2
         response = self.submit_form(data)
-        self.assertFormError(response, "form", None, "Secret code change detected.")
+        self.assertFormError(response, "form", None, "Secret code change detected")
 
     def test_form_invalid_bot_username(self):
         data = self.new_form_data()
@@ -275,6 +275,6 @@ class RocketChatViewTest(RocketChatMixin):
         self.check_exceptions(
             mock_choices,
             mock_request,
-            "Unable to configure. Connection to RocketChat is taking too long.",
+            "Couldn't configure. Connection to Rocket.Chat is taking too long.",
             "Configuration has failed",
         )

@@ -1,3 +1,4 @@
+import regex
 from rest_framework import relations, serializers
 
 from django.contrib.auth.models import User
@@ -37,7 +38,27 @@ def validate_translations(value, base_language, max_length):
             raise serializers.ValidationError("Ensure translations have no more than %d characters." % max_length)
 
 
+def _invalid_urn_validation_error(value):
+    value = str(value).strip()
+    path = value
+    scheme = None
+    if ":" in value:
+        try:
+            scheme, path, _, _ = URN.to_parts(value)
+        except ValueError:
+            scheme, path = value.split(":", 1)
+
+    if scheme == URN.WHATSAPP_SCHEME and not URN.is_phone_based_path(path):
+        return serializers.ValidationError("Invalid WhatsApp identifier: %s." % value)
+    if URN.is_whatsapp_bsuid_path(path) or regex.match(r"^[A-Z]{2}\.", value, regex.V0):
+        return serializers.ValidationError(
+            "Invalid URN: %s. WhatsApp BSUID identifiers must include the whatsapp: scheme." % value
+        )
+    return serializers.ValidationError("Invalid URN: %s. Ensure phone numbers contain country codes." % value)
+
+
 def validate_urn(value, strict=True, country_code=None):
+    original_value = value
     try:
         value = URN.ensure_scheme(value, country_code=country_code)
         normalized = URN.normalize(value, country_code=country_code)
@@ -45,7 +66,7 @@ def validate_urn(value, strict=True, country_code=None):
         if strict and not URN.validate(normalized, country_code=country_code):
             raise ValueError()
     except ValueError:
-        raise serializers.ValidationError("Invalid URN: %s. Ensure phone numbers contain country codes." % value)
+        raise _invalid_urn_validation_error(original_value)
 
     # enforce strict 8-15 digit length on phone-based URNs (does not affect other schemes).
     # URN.normalize already guarantees the result is parseable, so URN.to_parts is safe here.

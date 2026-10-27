@@ -41,7 +41,7 @@ class KeywordTriggerType(TriggerType):
     code = Trigger.TYPE_KEYWORD
     slug = "keyword"
     name = _("Keyword")
-    title = _("Keyword Triggers")
+    title = _("Keyword triggers")
     allowed_flow_types = (Flow.TYPE_MESSAGE, Flow.TYPE_VOICE)
     export_fields = TriggerType.export_fields + ("keyword",)
     required_fields = TriggerType.required_fields + ("keyword",)
@@ -69,8 +69,8 @@ class CatchallTriggerType(TriggerType):
 
     code = Trigger.TYPE_CATCH_ALL
     slug = "catch_all"
-    name = _("Catch All")
-    title = _("Catch All Triggers")
+    name = _("Catch all")
+    title = _("Catch all triggers")
     allowed_flow_types = (Flow.TYPE_MESSAGE, Flow.TYPE_VOICE)
     form = Form
 
@@ -82,10 +82,10 @@ class ScheduledTriggerType(TriggerType):
 
     class Form(BaseTriggerForm, ScheduleFormMixin):
         contacts = JSONField(
-            label=_("Contacts To Include"),
+            label=_("Contacts to include"),
             required=False,
-            help_text=_("Additional specific contacts that will be started in the flow."),
-            widget=OmniboxChoice(attrs={"placeholder": _("Optional: Search for contacts"), "contacts": True}),
+            help_text=_("Additional specific contacts that will be started in the flow"),
+            widget=OmniboxChoice(attrs={"placeholder": _("Optional: search for contacts"), "contacts": True}),
         )
 
         def __init__(self, user, *args, **kwargs):
@@ -101,7 +101,7 @@ class ScheduledTriggerType(TriggerType):
 
             # schedule triggers must use specific groups or contacts
             if not cleaned_data["groups"] and not cleaned_data["contacts"]:
-                raise forms.ValidationError(_("Must provide at least one group or contact to include."))
+                raise forms.ValidationError(_("Must provide at least one group or contact to include"))
 
             ScheduleFormMixin.clean(self)
 
@@ -110,14 +110,14 @@ class ScheduledTriggerType(TriggerType):
         class Meta(BaseTriggerForm.Meta):
             fields = ScheduleFormMixin.Meta.fields + ("flow", "groups", "contacts", "exclude_groups")
             help_texts = {
-                "groups": _("The groups that will be started in the flow."),
-                "exclude_groups": _("Any contacts in these groups will not be started in the flow."),
+                "groups": _("The groups that will be started in the flow"),
+                "exclude_groups": _("Any contacts in these groups won't be started in the flow"),
             }
 
     code = Trigger.TYPE_SCHEDULE
     slug = "schedule"
     name = _("Schedule")
-    title = _("Schedule Triggers")
+    title = _("Schedule triggers")
     allowed_flow_types = (Flow.TYPE_MESSAGE, Flow.TYPE_VOICE, Flow.TYPE_BACKGROUND)
     exportable = False
     form = Form
@@ -134,8 +134,8 @@ class InboundCallTriggerType(TriggerType):
 
     code = Trigger.TYPE_INBOUND_CALL
     slug = "inbound_call"
-    name = _("Inbound Call")
-    title = _("Inbound Call Triggers")
+    name = _("Inbound call")
+    title = _("Inbound call triggers")
     allowed_flow_types = (Flow.TYPE_VOICE,)
     form = Form
 
@@ -151,8 +151,8 @@ class MissedCallTriggerType(TriggerType):
 
     code = Trigger.TYPE_MISSED_CALL
     slug = "missed_call"
-    name = _("Missed Call")
-    title = _("Missed Call Triggers")
+    name = _("Missed call")
+    title = _("Missed call triggers")
     allowed_flow_types = (Flow.TYPE_MESSAGE, Flow.TYPE_VOICE)
     form = Form
 
@@ -180,8 +180,8 @@ class NewConversationTriggerType(TriggerType):
 
     code = Trigger.TYPE_NEW_CONVERSATION
     slug = "new_conversation"
-    name = _("New Conversation")
-    title = _("New Conversation Triggers")
+    name = _("New conversation")
+    title = _("New conversation triggers")
     allowed_flow_types = (Flow.TYPE_MESSAGE,)
     export_fields = TriggerType.export_fields + ("channel",)
     required_fields = TriggerType.required_fields + ("channel",)
@@ -198,10 +198,13 @@ class ReferralTriggerType(TriggerType):
             Channel.objects.none(),
             label=_("Channel"),
             required=False,
-            help_text=_("The channel to apply this trigger to, leave blank for all Facebook channels"),
+            help_text=_("The channel to apply this trigger to. Leave blank for all Facebook channels."),
         )
         referrer_id = forms.CharField(
-            max_length=255, required=False, label=_("Referrer Id"), help_text=_("The referrer id that will trigger us")
+            max_length=255,
+            required=False,
+            label=_("Referrer ID"),
+            help_text=_("The referrer ID that will trigger this"),
         )
 
         def __init__(self, user, *args, **kwargs):
@@ -221,7 +224,7 @@ class ReferralTriggerType(TriggerType):
     code = Trigger.TYPE_REFERRAL
     slug = "referral"
     name = _("Referral")
-    title = _("Referral Triggers")
+    title = _("Referral triggers")
     allowed_flow_types = (Flow.TYPE_MESSAGE,)
     export_fields = TriggerType.export_fields + ("channel",)
     form = Form
@@ -238,8 +241,8 @@ class ClosedTicketTriggerType(TriggerType):
 
     code = Trigger.TYPE_CLOSED_TICKET
     slug = "closed_ticket"
-    name = _("Closed Ticket")
-    title = _("Closed Ticket Triggers")
+    name = _("Closed ticket")
+    title = _("Closed ticket triggers")
     allowed_flow_types = (Flow.TYPE_MESSAGE, Flow.TYPE_VOICE, Flow.TYPE_BACKGROUND)
     form = Form
 

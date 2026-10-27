@@ -375,7 +375,7 @@ class MineFolder(TicketFolder):
     """
 
     slug = "mine"
-    name = _("My Tickets")
+    name = _("My tickets")
     icon = "coffee"
 
     def get_queryset(self, org, user, ordered):

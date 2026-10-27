@@ -296,7 +296,7 @@
                     All done!
                 .mt-4
                   -blocktrans trimmed
-                    Nice work, there aren't any more tickets here that need your attention.
+                    Nice work, there aren't any more tickets that need your attention.
 
               -else
                 %h2
@@ -305,12 +305,12 @@
 
                 .mt-6
                   -blocktrans with name=brand.name trimmed
-                    {{name}} Tickets makes it easy to chat directly with your contacts.
+                    {{name}} tickets makes it easy to chat directly with your contacts.
 
                 .mt-4
                   -blocktrans trimmed
-                    Sometimes an automated chatbot isn't enough. When your contacts need to chat with a real person, you can use the
-                    Open Ticket action to open a new ticket.
+                    Sometimes an automated chatbot isn't enough. When your contacts need to speak with a real person,
+                    you can use the Open Ticket action to open a new ticket.
                       
                       
             %temba-contact-chat(agent="{{request.user.email}}" -temba-refreshed="handleContactHistoryUpdated" -temba-content-changed="handleTicketUpdated" monitor="true")

@@ -14,6 +14,7 @@ from openpyxl import load_workbook
 
 from django.conf import settings
 from django.contrib.auth.models import Group
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models.functions import TruncDate
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -36,6 +37,7 @@ from temba.tests.s3 import MockS3Client, jsonlgz_encode
 from temba.tickets.models import Ticketer
 from temba.triggers.models import Trigger
 from temba.utils import json
+from temba.utils.s3 import private_file_storage
 from temba.utils.uuid import uuid4
 from temba.wpp_products.models import Catalog, Product
 
@@ -110,7 +112,7 @@ class FlowTest(TembaTest):
 
     @patch("temba.mailroom.queue_interrupt")
     def test_release(self, mock_queue_interrupt):
-        global1 = Global.get_or_create(self.org, self.admin, "api_key", "API Key", "234325")
+        global1 = Global.get_or_create(self.org, self.admin, "api_key", "API key", "234325")
         flow = self.get_flow("color")
         flow.global_dependencies.add(global1)
 
@@ -216,7 +218,7 @@ class FlowTest(TembaTest):
         response = self.client.get(reverse("flows.flow_broadcast", args=[no_topic.id]))
 
         # no warning, we don't have a facebook channel
-        self.assertNotContains(response, "does not specify a Facebook topic")
+        self.assertNotContains(response, "specify a Facebook topic")
 
         # change our channel to use a facebook scheme
         self.channel.schemes = [URN.FACEBOOK_SCHEME]
@@ -224,11 +226,11 @@ class FlowTest(TembaTest):
 
         # should see a warning for no topic now
         response = self.client.get(reverse("flows.flow_broadcast", args=[no_topic.id]))
-        self.assertContains(response, "does not specify a Facebook topic")
+        self.assertContains(response, "specify a Facebook topic")
 
         # warning shouldn't be present for flow with a topic
         response = self.client.get(reverse("flows.flow_broadcast", args=[with_topic.id]))
-        self.assertNotContains(response, "does not specify a Facebook topic")
+        self.assertNotContains(response, "specify a Facebook topic")
 
     def test_template_warnings(self):
         self.login(self.admin)
@@ -251,7 +253,7 @@ class FlowTest(TembaTest):
         flow.save(update_fields=["metadata"])
 
         response = self.client.get(reverse("flows.flow_broadcast", args=[flow.id]))
-        self.assertContains(response, "does not use message")
+        self.assertContains(response, "use message templates")
 
         # restore our dependency
         flow.metadata = metadata
@@ -1975,7 +1977,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertEqual(
             [
                 (Flow.TYPE_MESSAGE, "Messaging"),
-                (Flow.TYPE_VOICE, "Phone Call"),
+                (Flow.TYPE_VOICE, "Phone call"),
                 (Flow.TYPE_BACKGROUND, "Background"),
                 (Flow.TYPE_SURVEY, "Surveyor"),
             ],
@@ -2012,7 +2014,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
                 "flow_type": Flow.TYPE_MESSAGE,
             },
             form_errors={
-                "keyword_triggers": '"toooooooooooooolong" must be a single word, less than 16 characters, containing only letter and numbers'
+                "keyword_triggers": '"toooooooooooooolong" must be a single word, less than 16 characters, containing only letters and numbers'
             },
         )
 
@@ -2139,7 +2141,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
             response,
             "form",
             "keyword_triggers",
-            '"this is" must be a single word, less than 16 characters, containing only letter and numbers',
+            '"this is" must be a single word, less than 16 characters, containing only letters and numbers',
         )
 
         # create a new flow with one existing keyword
@@ -2644,17 +2646,13 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         response = self.client.post(
             reverse("flows.flow_revisions", args=[flow.uuid]), definition, content_type="application/json"
         )
-        self.assertResponseError(
-            response, "description", "Your changes will not be saved until you refresh your browser"
-        )
+        self.assertResponseError(response, "description", "Your changes won't be saved until you refresh your browser")
 
         # but we can't save our old revision
         response = self.client.post(
             reverse("flows.flow_revisions", args=[flow.uuid]), definition, content_type="application/json"
         )
-        self.assertResponseError(
-            response, "description", "Your changes will not be saved until you refresh your browser"
-        )
+        self.assertResponseError(response, "description", "Your changes won't be saved until you refresh your browser")
 
         # or save an old version
         definition = flow.revisions.all().first().definition
@@ -2728,7 +2726,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertUpdateSubmit(
             broadcast_url,
             {"mode": "query", "query": "", "exclude_in_other": False, "exclude_reruns": False},
-            form_errors={"query": "This field is required."},
+            form_errors={"query": "Required field"},
             object_unchanged=flow,
         )
 
@@ -2736,7 +2734,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertUpdateSubmit(
             broadcast_url,
             {"mode": "select", "omnibox": [], "exclude_in_other": False, "exclude_reruns": False},
-            form_errors={"omnibox": "This field is required."},
+            form_errors={"omnibox": "Required field"},
             object_unchanged=flow,
         )
 
@@ -2748,7 +2746,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
             broadcast_url,
             {"mode": "select", "omnibox": selection, "exclude_in_other": False, "exclude_reruns": False},
             form_errors={
-                "omnibox": "Selected groups have 2 contacts in total, which exceeds the maximum of 1 contacts. Please select less or smaller groups and try again."
+                "omnibox": "The selected groups have 2 contacts in total, exceeding the maximum of 1. Select fewer or smaller groups and try again."
             },
             object_unchanged=flow,
         )
@@ -2790,7 +2788,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # trying to start again should fail because there is already a pending start for this flow
         response = self.requestView(broadcast_url, self.admin)
-        self.assertContains(response, "This flow is already being started - please wait")
+        self.assertContains(response, "This flow is already being started. Wait until")
         self.assertNotContains(response, "Start Flow")
 
         # clear that start and try to start the IVR flow
@@ -2800,7 +2798,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         # shouldn't be able to since we don't have a call channel
         response = self.requestView(ivr_bcast_url, self.admin)
         self.assertContains(
-            response, 'To get started you need to <a href="/channels/channel/claim/">add a voice channel</a>'
+            response, 'To get started, <a href="/channels/channel/claim/">add a voice channel</a> to your workspace'
         )
         self.assertNotContains(response, "Start Flow")
 
@@ -2809,7 +2807,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
 
         response = self.requestView(broadcast_url, self.admin)
         self.assertContains(
-            response, 'To get started you need to <a href="/channels/channel/claim/">add a channel</a>'
+            response, 'To get started, <a href="/channels/channel/claim/">add a channel</a> to your workspace'
         )
         self.assertNotContains(response, "Start Flow")
 
@@ -2841,45 +2839,139 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertTrue(start.include_active)
         self.assertEqual('name ~ "frank"', start.query)
 
+    def _assert_file_upload(
+        self,
+        url,
+        file_name,
+        file_content,
+        content_type,
+        expected_url=None,
+        expected_path_prefix=None,
+        extra_params=None,
+    ):
+        """
+        Helper method to test file uploads
+        """
+        # create the test file
+        if isinstance(file_content, str):
+            file_content = file_content.encode()
+
+        if os.path.exists(file_name):
+            with open(file_name, "rb") as f:
+                file_content = f.read()
+                test_file = SimpleUploadedFile(os.path.basename(file_name), file_content, content_type=content_type)
+        else:
+            test_file = SimpleUploadedFile(file_name, file_content, content_type=content_type)
+
+        # prepare post data
+        post_data = {"file": test_file}
+        if extra_params:
+            post_data.update(extra_params)
+
+        # try to upload it
+        response = self.client.post(url, post_data)
+
+        # check response
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+
+        # recording uploads return a storage path, media uploads return a type and url
+        if expected_path_prefix:
+            path = response_json["path"]
+            self.assertTrue(path.startswith(expected_path_prefix))
+        else:
+            self.assertEqual(response_json["type"], content_type)
+
+            # url should be relative to STORAGE_URL
+            url = response_json["url"]
+            self.assertTrue(url.startswith(f"{settings.STORAGE_URL}/"))
+            if expected_url:
+                self.assertEqual(url, expected_url)
+            path = url.replace(f"{settings.STORAGE_URL}/", "")
+
+        # check that file exists in private storage
+        self.assertTrue(private_file_storage.exists(path))
+
+        # check content
+        with private_file_storage.open(path) as f:
+            self.assertEqual(f.read(), file_content)
+
+        return response_json
+
+    @mock_mailroom(queue=False)
+    def test_media_upload_with_private_storage(self, mr_mocks):
+        """
+        Test that media uploads use private storage
+        """
+        self.login(self.admin)
+        flow = Flow.create(self.org, self.admin, "Test Flow", base_language="eng")
+
+        upload_url = reverse("flows.flow_upload_media_action", args=[flow.uuid])
+        self._assert_file_upload(upload_url, "test.txt", b"test content", "text/plain")
+
+    @mock_mailroom
+    def test_recording_upload_with_private_storage(self, mr_mocks):
+        """
+        Test that recording uploads use private storage
+        """
+        self.login(self.admin)
+        flow = Flow.create(self.org, self.admin, "Test Flow", base_language="eng")
+
+        upload_url = reverse("flows.flow_upload_action_recording", args=[flow.id])
+        self._assert_file_upload(
+            upload_url,
+            "test.wav",
+            b"audio content",
+            "audio/wav",
+            expected_path_prefix="recordings/",
+            extra_params={
+                "actionset": "action-uuid",
+                "action": "action-uuid",
+            },
+        )
+
+    @mock_mailroom
     @patch("temba.flows.views.uuid4")
-    def test_upload_media_action(self, mock_uuid):
+    def test_upload_media_action(self, mr_mocks, mock_uuid):
         flow = self.get_flow("color_v13")
         other_org_flow = self.create_flow(org=self.org2)
 
-        upload_media_action_url = reverse("flows.flow_upload_media_action", args=[flow.uuid])
-
-        def assert_media_upload(filename, expected_type, expected_path):
-            with open(filename, "rb") as data:
-                post_data = dict(file=data, action="", HTTP_X_FORWARDED_HTTPS="https")
-                response = self.client.post(upload_media_action_url, post_data)
-
-                self.assertEqual(response.status_code, 200)
-                actual_type = response.json()["type"]
-                actual_url = response.json()["url"]
-                self.assertEqual(actual_type, expected_type)
-                self.assertEqual(actual_url, expected_path)
-
         self.login(self.admin)
-
         mock_uuid.side_effect = ["11111-111-11", "22222-222-22", "33333-333-33", "44444-444-44"]
 
-        assert_media_upload(
+        # test image upload
+        expected_url = (
+            f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/11111-111-11/steve.marten.jpg"
+        )
+        self._assert_file_upload(
+            reverse("flows.flow_upload_media_action", args=[flow.uuid]),
             f"{settings.MEDIA_ROOT}/test_media/steve.marten.jpg",
+            None,  # will read from file
             "image/jpeg",
-            "%s/attachments/%d/%d/steps/%s/%s"
-            % (settings.STORAGE_URL, self.org.id, flow.id, "11111-111-11", "steve.marten.jpg"),
+            expected_url=expected_url,
+            extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
-        assert_media_upload(
+
+        # test video upload
+        expected_url = f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/22222-222-22/snow.mp4"
+        self._assert_file_upload(
+            reverse("flows.flow_upload_media_action", args=[flow.uuid]),
             f"{settings.MEDIA_ROOT}/test_media/snow.mp4",
+            None,  # will read from file
             "video/mp4",
-            "%s/attachments/%d/%d/steps/%s/%s"
-            % (settings.STORAGE_URL, self.org.id, flow.id, "22222-222-22", "snow.mp4"),
+            expected_url=expected_url,
+            extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
-        assert_media_upload(
+
+        # test audio upload
+        expected_url = f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/33333-333-33/snow.m4a"
+        self._assert_file_upload(
+            reverse("flows.flow_upload_media_action", args=[flow.uuid]),
             f"{settings.MEDIA_ROOT}/test_media/snow.m4a",
+            None,  # will read from file
             "audio/mp4",
-            "%s/attachments/%d/%d/steps/%s/%s"
-            % (settings.STORAGE_URL, self.org.id, flow.id, "33333-333-33", "snow.m4a"),
+            expected_url=expected_url,
+            extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
 
         # can't upload for flow in other org
@@ -3236,7 +3328,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
             response = self.client.get("%s?responded=true" % reverse("flows.flow_run_table", args=[flow.id]))
             self.assertEqual(len(response.context["runs"]), 1)
 
-    def test_activity(self):
+    def test_activity_endpoint(self):
         flow = self.get_flow("favorites_v13")
         flow_nodes = flow.get_definition()["nodes"]
         color_prompt = flow_nodes[0]
@@ -3340,7 +3432,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertEqual(
             {
                 "status": "failure",
-                "description": "Your flow failed validation. Please refresh your browser.",
+                "description": "Your flow failed validation. Refresh your browser.",
                 "detail": f"unable to read flow: node UUID {mode0_uuid} isn't unique",
             },
             response.json(),
@@ -3358,7 +3450,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         )
 
         self.assertUpdateSubmit(
-            change_url, {"language": "fra"}, form_errors={"language": "Not a valid language."}, object_unchanged=flow
+            change_url, {"language": "fra"}, form_errors={"language": "Not a valid language"}, object_unchanged=flow
         )
 
         self.assertUpdateSubmit(change_url, {"language": "spa"}, success_status=302)
@@ -3430,7 +3522,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
 
         # submit with something that's not a valid PO file
         response = self.requestView(step1_url, self.admin, post_data={"po_file": io.BytesIO(b"msgid")})
-        self.assertFormError(response, "form", "po_file", "File doesn't appear to be a valid PO file.")
+        self.assertFormError(response, "form", "po_file", "File doesn't appear to be a valid PO file")
 
         # submit with something that's in the base language of the flow
         po_file = io.BytesIO(
@@ -3448,7 +3540,7 @@ msgstr "Bluuu"
         )
         response = self.requestView(step1_url, self.admin, post_data={"po_file": po_file})
         self.assertFormError(
-            response, "form", "po_file", "Contains translations in English which is the base language of this flow."
+            response, "form", "po_file", "Contains translations in English, which is the base language of this flow"
         )
 
         # submit with something that's in the base language of the flow
@@ -3470,7 +3562,7 @@ msgstr "Bleu"
             response,
             "form",
             "po_file",
-            "Contains translations in French which is not a supported translation language.",
+            "Contains translations in French, which isn't a supported translation language",
         )
 
         # submit with something that doesn't have an explicit language
@@ -4192,7 +4284,7 @@ class ExportFlowResultsTest(TembaTest):
         response = self.client.post(
             reverse("flows.flow_export_results"), {"flows": [flow.id], "group_memberships": [devs.id]}, follow=True
         )
-        self.assertContains(response, "already an export in progress")
+        self.assertContains(response, "An export is already in progress")
 
         # ok, mark that one as finished and try again
         blocking_export.update_status(ExportFlowResultsTask.STATUS_COMPLETE)

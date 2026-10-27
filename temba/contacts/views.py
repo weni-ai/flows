@@ -33,10 +33,12 @@ from django.utils.http import is_safe_url, urlquote_plus
 from django.utils.translation import ugettext_lazy as _
 from django.views import View
 
+from temba import mailroom
 from temba.archives.models import Archive
 from temba.channels.models import Channel
 from temba.contacts.templatetags.contacts import MISSING_VALUE
 from temba.contacts.validators import clean_contact_name, validate_contact_phone
+from temba.conversion_events.models import CTWA
 from temba.flows.models import Flow, FlowStart
 from temba.mailroom.events import Event
 from temba.notifications.views import NotificationTargetMixin
@@ -121,16 +123,40 @@ class RemoveFromGroupForm(forms.Form):
 
 
 class ContactGroupForm(forms.ModelForm):
+    WHATSAPP_WITHOUT_PHONE_FIELD = "create_whatsapp_without_phone_group"
+
     preselected_contacts = forms.CharField(required=False, widget=forms.HiddenInput)
     group_query = forms.CharField(required=False, widget=forms.HiddenInput)
 
     def __init__(self, user, *args, **kwargs):
         self.user = user
         self.org = user.get_org()
+        offer_whatsapp_without_phone_group = kwargs.pop("offer_whatsapp_without_phone_group", False)
         super().__init__(*args, **kwargs)
 
+        if offer_whatsapp_without_phone_group and not ContactGroup.get_whatsapp_contacts_without_phone(self.org):
+            self.fields[self.WHATSAPP_WITHOUT_PHONE_FIELD] = forms.BooleanField(
+                required=False,
+                label=_("WhatsApp contacts without phone"),
+                help_text=_("Create a smart group with WhatsApp contacts that have a BSUID and no phone number"),
+                widget=CheckboxWidget(),
+            )
+
+        # this group has a fixed name and query, so nothing else needs to be filled in
+        if self.creating_whatsapp_without_phone_group:
+            self.fields["name"].required = False
+
+    @property
+    def creating_whatsapp_without_phone_group(self):
+        return self.WHATSAPP_WITHOUT_PHONE_FIELD in self.fields and bool(
+            self.data.get(self.WHATSAPP_WITHOUT_PHONE_FIELD)
+        )
+
     def clean_name(self):
-        name = self.cleaned_data["name"].strip()
+        if self.creating_whatsapp_without_phone_group:
+            name = ContactGroup.WHATSAPP_CONTACTS_WITHOUT_PHONE_NAME
+        else:
+            name = self.cleaned_data["name"].strip()
 
         # make sure the name isn't already taken
         existing = ContactGroup.get_user_group_by_name(self.org, name)
@@ -147,9 +173,8 @@ class ContactGroupForm(forms.ModelForm):
         if groups_count >= org_active_group_limit:
             raise forms.ValidationError(
                 _(
-                    "This org has %(count)d groups and the limit is %(limit)d. "
-                    "You must delete existing ones before you can "
-                    "create new ones." % dict(count=groups_count, limit=org_active_group_limit)
+                    "This org has %(count)d groups and the limit is %(limit)d. Delete existing ones before creating new ones."
+                    % dict(count=groups_count, limit=org_active_group_limit)
                 )
             )
 
@@ -159,14 +184,14 @@ class ContactGroupForm(forms.ModelForm):
         try:
             parsed = parse_query(self.org, self.cleaned_data["query"])
             if not parsed.metadata.allow_as_group:
-                raise forms.ValidationError(_('You cannot create a smart group based on "id" or "group".'))
+                raise forms.ValidationError(_('You can\'t create a smart group based on "id" or "group"'))
 
             if (
                 self.instance
                 and self.instance.status != ContactGroup.STATUS_READY
                 and parsed.query != self.instance.query
             ):
-                raise forms.ValidationError(_("You cannot update the query of a group that is evaluating."))
+                raise forms.ValidationError(_("You can't update the query of a group that is evaluating"))
 
             return parsed.query
 
@@ -177,7 +202,7 @@ class ContactGroupForm(forms.ModelForm):
         model = ContactGroup
         fields = ("name", "query")
         labels = {"name": _("Name"), "query": _("Query")}
-        help_texts = {"query": _("Only contacts matching this query will belong to this group.")}
+        help_texts = {"query": _("Only contacts matching this query will belong to this group")}
 
 
 class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
@@ -211,7 +236,16 @@ class ContactListView(SpaMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
         return self.derive_group()
 
     def derive_group(self):
-        return ContactGroup.all_groups.get(org=self.request.user.get_org(), group_type=self.system_group)
+        org = self.request.user.get_org()
+        if not org:
+            raise Http404()
+
+        try:
+            return ContactGroup.all_groups.get(org=org, group_type=self.system_group)
+        except ContactGroup.DoesNotExist:
+            if not org.all_groups(manager="system_groups").exists():
+                ContactGroup.create_system_groups(org)
+            return ContactGroup.all_groups.get(org=org, group_type=self.system_group)
 
     def derive_export_url(self):
         search = urlquote_plus(self.request.GET.get("search", ""))
@@ -469,25 +503,27 @@ class ContactForm(forms.ModelForm):
 
         def validate_urn(key, scheme, path):
             try:
-                if scheme == URN.WHATSAPP_SCHEME and URN.is_phone_based_path(path):
-                    candidate_urns = URN.paired_phone_urns(path, country)
+                phone_digits = ""
+                if scheme in (URN.TEL_SCHEME, URN.WHATSAPP_SCHEME) and URN.is_phone_based_path(path):
+                    phone_digits = "".join(c for c in path.strip().lstrip("+") if c.isdigit())
+                    candidate_urns = URN.paired_phone_urns(phone_digits, country)
+                    normalized = next(u for u in candidate_urns if URN.to_parts(u)[0] == scheme)
                 else:
                     candidate_urns = [URN.normalize(URN.from_parts(scheme, path), country)]
+                    normalized = candidate_urns[0]
 
-                for normalized in candidate_urns:
-                    existing_urn = ContactURN.lookup(self.org, normalized, normalize=False)
+                for candidate in candidate_urns:
+                    existing_urn = ContactURN.lookup(self.org, candidate, normalize=False)
 
                     if existing_urn and existing_urn.contact and existing_urn.contact != self.instance:
                         self._errors[key] = self.error_class([_("Used by another contact")])
                         return False
 
-                normalized = candidate_urns[0]
-
                 # validate but not with country as users are allowed to enter numbers before adding a channel
                 if not URN.validate(normalized):
                     if scheme in (URN.TEL_SCHEME, URN.WHATSAPP_SCHEME) and URN.is_phone_based_path(path):
                         self._errors[key] = self.error_class(
-                            [_("Invalid number. Ensure number includes country code, e.g. +55-11-98765-4321")]
+                            [_("Invalid number. Include the country code. Example: +55-11-98765-4321")]
                         )
                     else:
                         self._errors[key] = self.error_class([_("Invalid format")])
@@ -503,14 +539,16 @@ class ContactForm(forms.ModelForm):
                 elif scheme == URN.WHATSAPP_SCHEME and URN.is_phone_based_path(path):
                     try:
                         _scheme, whatsapp_path, _query, _display = URN.to_parts(normalized)
-                        validate_contact_phone(f"+{whatsapp_path}")
+                        validate_contact_phone(
+                            f"+{whatsapp_path}" if not whatsapp_path.startswith("+") else whatsapp_path
+                        )
                     except ValidationError as e:
                         self._errors[key] = self.error_class([str(e.messages[0])])
                         return False
 
                 # validate whatsapp URN variations
-                if scheme == URN.WHATSAPP_SCHEME and path[:2] == "55":
-                    return validate_urn_whatsapp(key, scheme, path)
+                if scheme == URN.WHATSAPP_SCHEME and phone_digits[:2] == "55":
+                    return validate_urn_whatsapp(key, scheme, phone_digits)
 
                 return True
             except ValueError:
@@ -536,7 +574,7 @@ class ContactForm(forms.ModelForm):
             has_existing_urn = any(value for field_key, value in self.data.items() if field_key.startswith("urn__"))
             has_new_urn = bool(self.data.get("new_path"))
             if not has_existing_urn and not has_new_urn:
-                raise forms.ValidationError(_("At least one WhatsApp number or connection is required."))
+                raise forms.ValidationError(_("At least one WhatsApp number or connection is required"))
 
         return self.cleaned_data
 
@@ -577,7 +615,7 @@ class UpdateContactForm(ContactForm):
 
         self.fields["groups"].initial = self.instance.user_groups.all()
         self.fields["groups"].queryset = ContactGroup.get_user_groups(self.user.get_org(), dynamic=False)
-        self.fields["groups"].help_text = _("The groups which this contact belongs to")
+        self.fields["groups"].help_text = _("The groups this contact belongs to")
 
     class Meta:
         model = Contact
@@ -591,9 +629,9 @@ class ExportForm(Form):
     group_memberships = forms.ModelMultipleChoiceField(
         queryset=ContactGroup.user_groups.none(),
         required=False,
-        label=_("Group Memberships for"),
+        label=_("Group memberships for"),
         widget=SelectMultipleWidget(
-            attrs={"widget_only": True, "placeholder": _("Optional: Choose groups to show in your export")}
+            attrs={"widget_only": True, "placeholder": _("Optional: choose groups to show in your export")}
         ),
     )
 
@@ -606,7 +644,7 @@ class ExportForm(Form):
         ).order_by(Lower("name"))
 
         self.fields["group_memberships"].help_text = _(
-            "Include group membership only for these groups. " "(Leave blank to ignore group memberships)."
+            "Include group membership only for these groups. Leave blank to ignore group memberships."
         )
 
 
@@ -742,8 +780,8 @@ class ContactCRUDL(SmartCRUDL):
                 messages.info(
                     self.request,
                     _(
-                        "There is already an export in progress, started by %s. You must wait "
-                        "for that export to complete before starting another." % existing.created_by.username
+                        "An export is already in progress, started by %s. Wait for it to complete before starting another."
+                        % existing.created_by.username
                     ),
                 )
             else:
@@ -767,7 +805,7 @@ class ContactCRUDL(SmartCRUDL):
                 if not getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):  # pragma: no cover
                     messages.info(
                         self.request,
-                        _("We are preparing your export. We will e-mail you at %s when it is ready.")
+                        _("Your export is in progress. We'll email you at %s when it's ready.")
                         % self.request.user.username,
                     )
 
@@ -775,7 +813,7 @@ class ContactCRUDL(SmartCRUDL):
                     dl_url = reverse("assets.download", kwargs=dict(type="contact_export", pk=export.pk))
                     messages.info(
                         self.request,
-                        _("Export complete, you can find it here: %s (production users will get an email)") % dl_url,
+                        _("Export complete. You can find it here: %s (production users will get an email)") % dl_url,
                     )
             if "HTTP_X_PJAX" not in self.request.META:
                 return HttpResponseRedirect(redirect or reverse("contacts.contact_list"))
@@ -866,6 +904,8 @@ class ContactCRUDL(SmartCRUDL):
                 contact.tickets.filter(status=Ticket.STATUS_OPEN).select_related("ticketer").order_by("-opened_on")
             )
 
+            context["latest_ctwa_event"] = CTWA.objects.latest_for_contact(contact)
+
             # divide contact's URNs into those we can send to, and those we can't
             sendable_schemes = contact.org.get_schemes(Channel.ROLE_SEND)
 
@@ -942,10 +982,10 @@ class ContactCRUDL(SmartCRUDL):
                     links.append(
                         dict(
                             id="send-message",
-                            title=_("Send Message"),
+                            title=_("Send message"),
                             style="button-primary",
                             href=f"{reverse('msgs.broadcast_send')}?c={self.object.uuid}",
-                            modax=_("Send Message"),
+                            modax=_("Send message"),
                         )
                     )
 
@@ -953,9 +993,9 @@ class ContactCRUDL(SmartCRUDL):
                     links.append(
                         dict(
                             id="start-flow",
-                            title=_("Start In Flow"),
+                            title=_("Start in Flows"),
                             href=f"{reverse('contacts.contact_start', args=[self.object.id])}",
-                            modax=_("Start In Flow"),
+                            modax=_("Start in Flows"),
                         )
                     )
 
@@ -964,7 +1004,7 @@ class ContactCRUDL(SmartCRUDL):
                     dict(
                         id="edit-contact",
                         title=_("Edit"),
-                        modax=_("Edit Contact"),
+                        modax=_("Edit contact"),
                         href=f"{reverse('contacts.contact_update', args=[self.object.pk])}",
                     )
                 )
@@ -972,8 +1012,8 @@ class ContactCRUDL(SmartCRUDL):
                 links.append(
                     dict(
                         id="update-custom-fields",
-                        title=_("Custom Fields"),
-                        modax=_("Custom Fields"),
+                        title=_("Custom fields"),
+                        modax=_("Custom fields"),
                         href=f"{reverse('contacts.contact_update_fields', args=[self.object.pk])}",
                     )
                 )
@@ -1168,8 +1208,8 @@ class ContactCRUDL(SmartCRUDL):
                         links.append(
                             dict(
                                 id="create-smartgroup",
-                                title=_("Create Smart Group"),
-                                modax=_("Create Smart Group"),
+                                title=_("Create smart group"),
+                                modax=_("Create smart group"),
                                 href=f"{reverse('contacts.contactgroup_create')}?search={urlquote_plus(search)}",
                             )
                         )
@@ -1177,14 +1217,14 @@ class ContactCRUDL(SmartCRUDL):
                     pass
 
             if self.has_org_perm("contacts.contactfield_list") and not is_spa:
-                links.append(dict(title=_("Manage Fields"), href=reverse("contacts.contactfield_list")))
+                links.append(dict(title=_("Manage fields"), href=reverse("contacts.contactfield_list")))
 
             if self.has_org_perm("contacts.contact_export"):
                 links.append(
                     dict(
                         id="export-contacts",
                         title=_("Export"),
-                        modax=_("Export Contacts"),
+                        modax=_("Export contacts"),
                         href=self.derive_export_url(),
                     )
                 )
@@ -1193,8 +1233,8 @@ class ContactCRUDL(SmartCRUDL):
                 links.append(
                     dict(
                         id="create-contact",
-                        title=_("New Contact"),
-                        modax=_("New Contact"),
+                        title=_("New contact"),
+                        modax=_("New contact"),
                         href=reverse("contacts.contact_create"),
                     )
                 )
@@ -1202,8 +1242,8 @@ class ContactCRUDL(SmartCRUDL):
                 links.append(
                     dict(
                         id="create-group",
-                        title=_("New Group"),
-                        modax=_("New Group"),
+                        title=_("New group"),
+                        modax=_("New group"),
                         href=reverse("contacts.contactgroup_create"),
                     )
                 )
@@ -1220,7 +1260,7 @@ class ContactCRUDL(SmartCRUDL):
             return context
 
     class Blocked(ContactListView):
-        title = _("Blocked Contacts")
+        title = _("Blocked contacts")
         system_group = ContactGroup.TYPE_BLOCKED
 
         def get_bulk_actions(self):
@@ -1232,7 +1272,7 @@ class ContactCRUDL(SmartCRUDL):
             return context
 
     class Stopped(ContactListView):
-        title = _("Stopped Contacts")
+        title = _("Stopped contacts")
         template_name = "contacts/contact_stopped.haml"
         system_group = ContactGroup.TYPE_STOPPED
 
@@ -1245,7 +1285,7 @@ class ContactCRUDL(SmartCRUDL):
             return context
 
     class Archived(ContactListView):
-        title = _("Archived Contacts")
+        title = _("Archived contacts")
         template_name = "contacts/contact_archived.haml"
         system_group = ContactGroup.TYPE_ARCHIVED
         bulk_action_permissions = {"delete": "contacts.contact_delete"}
@@ -1268,7 +1308,7 @@ class ContactCRUDL(SmartCRUDL):
             if self.has_org_perm("contacts.contact_delete"):
                 links.append(
                     dict(
-                        title=_("Delete All"),
+                        title=_("Delete all"),
                         style="btn-default",
                         on_click="handleDeleteAllContacts(event)",
                         js_class="contacts-btn-delete-all",
@@ -1286,14 +1326,14 @@ class ContactCRUDL(SmartCRUDL):
             is_spa = "HTTP_TEMBA_SPA" in self.request.META
 
             if self.has_org_perm("contacts.contactfield_list") and not is_spa:
-                links.append(dict(title=_("Manage Fields"), href=reverse("contacts.contactfield_list")))
+                links.append(dict(title=_("Manage fields"), href=reverse("contacts.contactfield_list")))
 
             if self.has_org_perm("contacts.contactgroup_update"):
                 links.append(
                     dict(
                         id="edit-group",
-                        title=_("Edit Group"),
-                        modax=_("Edit Group"),
+                        title=_("Edit group"),
+                        modax=_("Edit group"),
                         href=reverse("contacts.contactgroup_update", args=[self.group.id]),
                     )
                 )
@@ -1303,7 +1343,7 @@ class ContactCRUDL(SmartCRUDL):
                     dict(
                         id="export-contacts",
                         title=_("Export"),
-                        modax=_("Export Contacts"),
+                        modax=_("Export contacts"),
                         href=self.derive_export_url(),
                     )
                 )
@@ -1321,8 +1361,8 @@ class ContactCRUDL(SmartCRUDL):
                 links.append(
                     dict(
                         id="delete-group",
-                        title=_("Delete Group"),
-                        modax=_("Delete Group"),
+                        title=_("Delete group"),
+                        modax=_("Delete group"),
                         href=reverse("contacts.contactgroup_delete", args=[self.group.id]),
                     )
                 )
@@ -1362,32 +1402,33 @@ class ContactCRUDL(SmartCRUDL):
             form_kwargs["user"] = self.request.user
             return form_kwargs
 
-        def get_form(self):
-            return super().get_form()
-
         def pre_save(self, obj):
             obj = super().pre_save(obj)
             obj.org = self.request.user.get_org()
             return obj
 
         def save(self, obj):
-            urns = []
             country = obj.org.default_country_code
+            urns = []
             for field_key, value in self.form.cleaned_data.items():
                 if field_key.startswith("urn__") and value:
                     scheme = field_key.split("__")[1]
                     if scheme == URN.WHATSAPP_SCHEME and URN.is_phone_based_path(value):
-                        urns.extend(URN.paired_phone_urns(value, country))
+                        phone_digits = "".join(c for c in value.strip().lstrip("+") if c.isdigit())
+                        urns.extend(URN.paired_phone_urns(phone_digits, country))
                     else:
                         urns.append(URN.normalize(URN.from_parts(scheme, value), country))
 
-            Contact.create(obj.org, self.request.user, obj.name, language="", urns=urns, fields={}, groups=[])
+            try:
+                Contact.create(obj.org, self.request.user, obj.name, language="", urns=urns, fields={}, groups=[])
+            except mailroom.MailroomException:
+                raise ValidationError(_("An error occurred creating your contact. Try again later."))
 
     class Update(NonAtomicMixin, ModalMixin, OrgObjPermsMixin, SmartUpdateView):
         form_class = UpdateContactForm
         success_url = "uuid@contacts.contact_read"
         success_message = ""
-        submit_button_name = _("Save Changes")
+        submit_button_name = _("Save changes")
 
         def derive_exclude(self):
             obj = self.get_object()
@@ -1423,6 +1464,7 @@ class ContactCRUDL(SmartCRUDL):
                 mods += obj.update_static_groups(new_groups)
 
             if not self.org.is_anon:
+                country = obj.org.default_country_code
                 urns = []
 
                 for field_key, value in self.form.data.items():
@@ -1431,13 +1473,13 @@ class ContactCRUDL(SmartCRUDL):
                         scheme = parts[1]
 
                         order = int(self.form.data.get("order__" + field_key, "0"))
-                        urns.append((order, URN.from_parts(scheme, value)))
+                        urns.append((order, URN.normalize(URN.from_parts(scheme, value), country)))
 
                 new_scheme = data.get("new_scheme", None)
                 new_path = data.get("new_path", None)
 
                 if new_scheme and new_path:
-                    urns.append((len(urns), URN.from_parts(new_scheme, new_path)))
+                    urns.append((len(urns), URN.normalize(URN.from_parts(new_scheme, new_path), country)))
 
                 # sort our urns by the supplied order
                 urns = [urn[1] for urn in sorted(urns, key=lambda x: x[0])]
@@ -1447,7 +1489,7 @@ class ContactCRUDL(SmartCRUDL):
                 obj.modify(self.request.user, mods)
             except Exception:
                 errors = form._errors.setdefault(forms.forms.NON_FIELD_ERRORS, forms.utils.ErrorList())
-                errors.append(_("An error occurred updating your contact. Please try again later."))
+                errors.append(_("An error occurred updating your contact. Try again later."))
                 return self.render_to_response(self.get_context_data(form=form))
 
             messages.success(self.request, self.derive_success_message())
@@ -1476,7 +1518,7 @@ class ContactCRUDL(SmartCRUDL):
         form_class = Form
         success_url = "uuid@contacts.contact_read"
         success_message = ""
-        submit_button_name = _("Save Changes")
+        submit_button_name = _("Save changes")
 
         def get_form_kwargs(self):
             kwargs = super().get_form_kwargs()
@@ -1656,10 +1698,10 @@ class ContactGroupCRUDL(SmartCRUDL):
                 links.append(
                     {
                         "id": "new-group",
-                        "title": _("New Group"),
+                        "title": _("New group"),
                         "style": "button-primary",
                         "href": f"{reverse('contacts.contactgroup_create')}",
-                        "modax": _("New Group"),
+                        "modax": _("New group"),
                     }
                 )
 
@@ -1694,6 +1736,24 @@ class ContactGroupCRUDL(SmartCRUDL):
         success_message = ""
         submit_button_name = _("Create")
 
+        def derive_fields(self):
+            fields = list(self.fields)
+            if self.offer_whatsapp_without_phone_group():
+                fields.append(ContactGroupForm.WHATSAPP_WITHOUT_PHONE_FIELD)
+            return fields
+
+        def offer_whatsapp_without_phone_group(self):
+            org = self.request.user.get_org()
+            if not org:
+                return False
+
+            # heal outdated query on existing groups (e.g. after adding whatsapp_phone)
+            if ContactGroup.get_whatsapp_contacts_without_phone(org):
+                ContactGroup.ensure_whatsapp_contacts_without_phone_query(org, self.request.user)
+                return False
+
+            return True
+
         def save(self, obj):
             org = self.request.user.get_org()
             user = self.request.user
@@ -1701,7 +1761,9 @@ class ContactGroupCRUDL(SmartCRUDL):
             query = self.form.cleaned_data.get("group_query")
             preselected_contacts = self.form.cleaned_data.get("preselected_contacts")
 
-            if query:
+            if self.form.cleaned_data.get(ContactGroupForm.WHATSAPP_WITHOUT_PHONE_FIELD):
+                self.object = ContactGroup.create_whatsapp_contacts_without_phone(org, user)
+            elif query:
                 self.object = ContactGroup.create_dynamic(org, user, name, query)
             else:
                 self.object = ContactGroup.create_static(org, user, name)
@@ -1720,6 +1782,7 @@ class ContactGroupCRUDL(SmartCRUDL):
         def get_form_kwargs(self):
             kwargs = super().get_form_kwargs()
             kwargs["user"] = self.request.user
+            kwargs["offer_whatsapp_without_phone_group"] = self.offer_whatsapp_without_phone_group()
             return kwargs
 
     class Update(ComponentFormMixin, ModalMixin, OrgObjPermsMixin, SmartUpdateView):
@@ -1802,26 +1865,26 @@ class ContactFieldForm(forms.ModelForm):
         label = self.cleaned_data["label"]
 
         if not ContactField.is_valid_label(label):
-            raise forms.ValidationError(_("Can only contain letters, numbers, hyphens and underscores."))
+            raise forms.ValidationError(_("Can only contain letters, numbers, hyphens and underscores"))
 
         key = ContactField.make_key(label)
 
         if not ContactField.is_valid_key(key):
-            raise forms.ValidationError(_("Can't be a reserved word."))
+            raise forms.ValidationError(_("Can't be a reserved word"))
 
         conflict = ContactField.user_fields.active_for_org(org=self.org).filter(label__iexact=label.lower())
         if self.instance:
             conflict = conflict.exclude(id=self.instance.id)
 
         if conflict.exists():
-            raise forms.ValidationError(_("Must be unique."))
+            raise forms.ValidationError(_("Must be unique"))
 
         conflict_key = ContactField.user_fields.active_for_org(org=self.org).filter(key=key)
         if self.instance:
             conflict_key = conflict_key.exclude(id=self.instance.id)
 
         if conflict_key.exists():
-            raise forms.ValidationError(_("A field with the same generated key already exists."))
+            raise forms.ValidationError(_("A field with the same generated key already exists"))
 
         return label
 
@@ -1829,7 +1892,7 @@ class ContactFieldForm(forms.ModelForm):
         model = ContactField
         fields = ("label", "value_type", "show_in_table")
         labels = {"label": _("Name"), "value_type": _("Data Type"), "show_in_table": _("Featured")}
-        help_texts = {"value_type": _("The type of the values that will be stored in this field.")}
+        help_texts = {"value_type": _("The type of the values that will be stored in this field")}
         widgets = {
             "label": InputWidget(attrs={"widget_only": False}),
             "value_type": SelectWidget(attrs={"widget_only": False}),
@@ -1839,7 +1902,7 @@ class ContactFieldForm(forms.ModelForm):
 
 class ContactFieldListView(SpaMixin, OrgPermsMixin, SmartListView):
     queryset = ContactField.user_fields
-    title = _("Manage Contact Fields")
+    title = _("Manage contact fields")
     fields = ("label", "show_in_table", "key", "value_type")
     search_fields = ("label__icontains", "key__icontains")
     default_order = ("label",)
@@ -1937,7 +2000,7 @@ class ContactFieldCRUDL(SmartCRUDL):
                 field_count = ContactField.user_fields.count_active_for_org(org=self.org)
                 if field_count >= org_active_fields_limit:
                     raise forms.ValidationError(
-                        _(f"Cannot create a new field as limit is %(limit)s."),
+                        _(f"Can't create a new field as the limit is %(limit)s"),
                         params={"limit": org_active_fields_limit},
                     )
 
@@ -2206,26 +2269,24 @@ class ContactImportCRUDL(SmartCRUDL):
                     if mapping["type"] == "new_field" and data["include"]:
                         field_name = data["name"]
                         if not field_name:
-                            raise ValidationError(
-                                _("Field name for '%(header)s' can't be empty.") % {"header": header}
-                            )
+                            raise ValidationError(_("Field name for '%(header)s' can't be empty") % {"header": header})
                         else:
                             field_key = ContactField.make_key(field_name)
                             if field_key in existing_field_keys:
                                 raise forms.ValidationError(
-                                    _("Field name for '%(header)s' matches an existing field."),
+                                    _("Field name for '%(header)s' matches an existing field"),
                                     params={"header": header},
                                 )
 
                             if not ContactField.is_valid_label(field_name) or not ContactField.is_valid_key(field_key):
                                 raise forms.ValidationError(
-                                    _("Field name for '%(header)s' is invalid or a reserved word."),
+                                    _("Field name for '%(header)s' is invalid or a reserved word"),
                                     params={"header": header},
                                 )
 
                             if field_key in used_field_keys:
                                 raise forms.ValidationError(
-                                    _("Field name '%(name)s' is repeated.") % {"name": field_name}
+                                    _("Field name '%(name)s' is repeated") % {"name": field_name}
                                 )
 
                             used_field_keys.add(field_key)
@@ -2236,21 +2297,21 @@ class ContactImportCRUDL(SmartCRUDL):
                     if group_mode == self.GROUP_MODE_NEW:
                         new_group_name = self.cleaned_data.get("new_group_name")
                         if not new_group_name:
-                            self.add_error("new_group_name", _("Required."))
+                            self.add_error("new_group_name", _("Required"))
                         elif not ContactGroup.is_valid_name(new_group_name):
-                            self.add_error("new_group_name", _("Invalid group name."))
+                            self.add_error("new_group_name", _("Invalid group name"))
                         elif ContactGroup.get_user_group_by_name(self.org, new_group_name):
-                            self.add_error("new_group_name", _("Already exists."))
+                            self.add_error("new_group_name", _("Already exists"))
                     else:
                         existing_group = self.cleaned_data.get("existing_group")
                         if not existing_group:
-                            self.add_error("existing_group", _("Required."))
+                            self.add_error("existing_group", _("Required"))
 
                     groups_count = ContactGroup.get_user_groups(self.org, ready_only=False).count()
                     groups_limit = self.org.get_limit(Org.LIMIT_GROUPS)
                     if groups_count >= groups_limit:
                         raise forms.ValidationError(
-                            _("This workspace has reached the limit of %(count)d groups."),
+                            _("This workspace has reached the limit of %(count)d groups"),
                             params={"count": groups_limit},
                         )
 

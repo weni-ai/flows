@@ -18,7 +18,7 @@ class BlackmynaType(ChannelType):
 
     name = "Blackmyna"
 
-    claim_blurb = _("Easily add a two way number you have configured with %(link)s using their APIs.") % {
+    claim_blurb = _("Easily add a two-way number you have configured with %(link)s using their APIs.") % {
         "link": '<a href="http://blackmyna.com">Blackmyna</a>'
     }
     claim_view = AuthenticatedExternalClaimView
@@ -28,7 +28,7 @@ class BlackmynaType(ChannelType):
     attachment_support = False
 
     configuration_blurb = _(
-        "To finish configuring your Blackmyna connection you'll need to notify Blackmyna of the following URLs."
+        "To finish configuring your Blackmyna connection, you'll need to notify Blackmyna of the following URLs."
     )
 
     configuration_urls = (
@@ -36,14 +36,14 @@ class BlackmynaType(ChannelType):
             label=_("Inbound URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.bm' channel.uuid 'receive' %}",
             description=_(
-                "This endpoint should be called by Blackmyna when new messages are received to your number."
+                "This endpoint should be called by Blackmyna when new messages are received at your number."
             ),
         ),
         dict(
             label=_("DLR URL"),
             url="https://{{ channel.callback_domain }}{% url 'courier.bm' channel.uuid 'status' %}",
             description=_(
-                "This endpoint should be called by Blackmyna when the message status changes. (delivery reports)"
+                "This endpoint should be called by Blackmyna when the message status changes (delivery reports)."
             ),
         ),
     )

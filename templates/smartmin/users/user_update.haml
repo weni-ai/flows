@@ -7,7 +7,7 @@
     %a.btn.btn-alert.delete
       -with user.get_owned_orgs as orgs
         -if orgs
-          -trans "Delete "
+          -trans "Delete"
           -for org in orgs
             %span.org
               {{org.name}}{{forloop|oxford}}
@@ -20,24 +20,24 @@
     .deletion.hide
       .title
         -if orgs
-          -trans "Delete Workspace"
+          -trans "Delete workspace"
         -else
-          -trans "Delete Login"
+          -trans "Delete login"
 
       .body
         - with user.get_owned_orgs as orgs
           -if orgs
             .delete-warning
               .attn
-                -trans "Whoa, whoa, whoa!"
+                -trans "Hold on!"
               .orgs
                 -trans "By deleting this login,"
                 -for org in orgs
                   %span.org
                     {{org.name}}{{forloop|oxford}}
                 -blocktrans
-                  will also be deleted. All workspace data will be deleted and there is no
-                  going back. This includes all flows, contacts, messages, etc.
+                  will also be deleted. All workspace data will be deleted and this action can't be undone.
+                  This includes all flows, contacts, messages, etc.
           - else
             -blocktrans with user.username as name
               Are you sure you want to delete the login {{name}}?

@@ -11,8 +11,8 @@ from ...views import ClaimViewMixin
 
 class ClaimView(ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
-        auth_token = forms.CharField(label=_("Authentication Token"), help_text=_("The discord bot token"))
-        proxy_url = forms.CharField(label=_("Proxy URL"), help_text=_("The URL on which the discord proxy is running"))
+        auth_token = forms.CharField(label=_("Authentication token"), help_text=_("The Discord bot token"))
+        proxy_url = forms.CharField(label=_("Proxy URL"), help_text=_("The URL on which the Discord proxy is running"))
 
         def clean_auth_token(self):
             org = self.request.user.get_org()
@@ -28,9 +28,9 @@ class ClaimView(ClaimViewMixin, SmartFormView):
                     "https://discord.com/api/users/@me", headers={"Authorization": f"Bot {value}"}, timeout=2
                 )
                 if req.status_code != 200:
-                    raise ValidationError(_("Couldn't log in using that bot token. Please check and try again"))
+                    raise ValidationError(_("Couldn't log in using that bot token. Check and try again."))
             except requests.RequestException:
-                raise ValidationError(_("An error occurred accessing the Discord API. Please try again"))
+                raise ValidationError(_("An error occurred accessing the Discord API. Try again."))
 
             return value
 

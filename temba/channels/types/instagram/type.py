@@ -16,7 +16,7 @@ class InstagramType(ChannelType):
 
     extra_links = [
         dict(
-            name=_("Reconnect Instagram Business Account"),
+            name=_("Reconnect Instagram business account"),
             link="channels.types.instagram.refresh_token",
         )
     ]
@@ -32,10 +32,7 @@ class InstagramType(ChannelType):
     show_config_page = False
 
     claim_blurb = _(
-        "Add a %(link)s bot to send and receive messages on behalf of one of your business Instagram acounts for free. You will "
-        "need to connect your page by logging into your Facebook and checking the Facebook page to connect. "
-        "Your page must be linked to a business Instagram account, see how %(link1)s."
-        "On the Facebook page, navigate Settings > Page roles and verify you have an admin page role on the page."
+        "Add a %(link)s bot to send and receive messages on behalf of one of your business Instagram accounts for free. You'll need to connect your page by logging into Facebook and selecting the page to connect. Your page must be linked to a business Instagram account; see how %(link1)s. On the Facebook page, navigate to Settings > Page roles and verify you have an admin role."
     ) % {
         "link": '<a href="http://instagram.com">Instagram</a>',
         "link1": '<a href="https://help.instagram.com/399237934150902"> here </a>',

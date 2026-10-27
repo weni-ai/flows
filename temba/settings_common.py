@@ -3,7 +3,6 @@ import socket
 import sys
 import urllib
 from datetime import timedelta
-from pathlib import Path
 
 import iptools
 import sentry_sdk
@@ -79,10 +78,17 @@ STORAGE_ROOT_DIR = "test_orgs" if TESTING else "orgs"
 # -----------------------------------------------------------------------------------
 AWS_ACCESS_KEY_ID = "aws_access_key_id"
 AWS_SECRET_ACCESS_KEY = "aws_secret_access_key"
-AWS_DEFAULT_ACL = "private"
+# buckets with ACLs disabled reject uploads that send any x-amz-acl header
+AWS_DEFAULT_ACL = None
+AWS_S3_REGION_NAME = None
 
 AWS_STORAGE_BUCKET_NAME = "dl-temba-io"
 AWS_BUCKET_DOMAIN = AWS_STORAGE_BUCKET_NAME + ".s3.amazonaws.com"
+
+# other buckets whose attachment URLs are pre-signed when rendered, besides AWS_STORAGE_BUCKET_NAME
+S3_MEDIA_BUCKETS = []
+S3_SIGNED_EXTRA_BUCKETS = []
+S3_PRESIGNED_URL_EXPIRES = 60 * 60
 
 # bucket where archives files are stored
 ARCHIVE_BUCKET = "dl-temba-archives"
@@ -114,6 +120,7 @@ LANGUAGES = (
     ("fr", _("French")),
     ("mn", _("Mongolian")),
     ("pt-br", _("Portuguese")),
+    ("ro", _("Romanian")),
     ("ru", _("Russian")),
 )
 DEFAULT_LANGUAGE = "en-us"
@@ -307,6 +314,8 @@ INSTALLED_APPS = (
     "smartmin.users",
     # django-timezone-field
     "timezone_field",
+    # weni shared utilities
+    "weni_commons",
     # temba apps
     "temba.apks",
     "temba.archives",
@@ -340,7 +349,9 @@ INSTALLED_APPS = (
     "temba.wpp_flows",
     "temba.projects",
     "temba.event_driven",
+    "weni.eda.django.eda_app",
     "temba.conversion_events",
+    "temba.wa_conversation_handovers",
 )
 
 # the last installed app that uses smartmin permissions
@@ -621,6 +632,11 @@ GROUP_PERMISSIONS = {
         "policies.policy_history",
     ),
     "Marketing": (
+        "classifiers.classifier_api",
+        "classifiers.classifier_read",
+        "classifiers.classifier_list",
+        "classifiers.classifier_menu",
+        "classifiers.intent_api",
         "contacts.contact_api",
         "contacts.contact_archive",
         "contacts.contact_archived",
@@ -645,6 +661,12 @@ GROUP_PERMISSIONS = {
         "contacts.contactfield.*",
         "contacts.contactgroup.*",
         "contacts.contactimport.*",
+        "flows.flow.*",
+        "flows.flowstart_api",
+        "flows.flowstart_list",
+        "flows.flowlabel.*",
+        "flows.ruleset.*",
+        "globals.global_api",
         "msgs.broadcast.*",
         "msgs.broadcastschedule.*",
         "msgs.label.*",
@@ -662,6 +684,9 @@ GROUP_PERMISSIONS = {
         "msgs.msg_outbox",
         "msgs.msg_sent",
         "msgs.msg_update",
+        "tickets.ticket.*",
+        "tickets.ticketer_api",
+        "tickets.topic_api",
     ),
     "Administrators": (
         "airtime.airtimetransfer_list",
@@ -1142,6 +1167,7 @@ CELERY_BEAT_SCHEDULE = {
     "trim-webhook-event": {"task": "trim_webhook_event_task", "schedule": crontab(hour=3, minute=0)},
     "update-org-activity": {"task": "update_org_activity_task", "schedule": crontab(hour=3, minute=5)},
     "update-unique-contact-counts": {"task": "update_unique_contact_counts", "schedule": crontab(hour=8, minute=0)},
+    "validate-datalake-layers": {"task": "validate_datalake_layers_task", "schedule": crontab(minute=30)},
     "refresh-teams-tokens": {"task": "refresh_teams_tokens", "schedule": timedelta(minutes=30)},
     "squash-flow-category-counts": {"task": "squash_flow_category_counts", "schedule": timedelta(seconds=60)},
 }
@@ -1401,6 +1427,9 @@ IP_ADDRESSES = ("172.16.10.10", "162.16.10.20")
 # -----------------------------------------------------------------------------------
 MSG_FIELD_SIZE = os.environ.get("MSG_FIELD_SIZE", 1500)  # used for broadcast text and message campaign events
 FLOW_START_PARAMS_SIZE = 256  # used for params passed to flow start API endpoint
+FLOW_START_PARAM_VALUE_SIZE = int(
+    os.environ.get("FLOW_START_PARAM_VALUE_SIZE", 4096)
+)  # max length of each string in flow start params
 GLOBAL_VALUE_SIZE = 10_000  # max length of global values
 
 ORG_LIMIT_DEFAULTS = {
@@ -1437,6 +1466,12 @@ RETENTION_PERIODS = {
 MAILROOM_URL = None
 MAILROOM_AUTH_TOKEN = None
 
+# Concurrent mailroom contact creates when arming trigger_flow_uuid on a WhatsApp broadcast.
+# Sequential fallback is used inside atomic blocks (Django TestCase) so tests share the transaction.
+WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY = int(
+    os.environ.get("WHATSAPP_BROADCAST_URN_RESOLVE_CONCURRENCY", default=20)
+)
+
 # To allow manage fields to support up to 1000 fields
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 4000
 
@@ -1468,6 +1503,28 @@ FLOWEDITOR_SENTRY_DSN = os.environ.get("FLOWEDITOR_SENTRY_DSN", default="")
 
 INTERNAL_USER_EMAIL = os.environ.get("INTERNAL_USER_EMAIL", default="")
 
+# Connect session tokens (weni_commons.auth.SessionTokenAuthentication).
+# Override per environment via env vars — DynamoDB table/region differ between staging and production.
+WENI_SESSION_TOKEN_DYNAMODB_TABLE = os.environ.get(
+    "WENI_SESSION_TOKEN_DYNAMODB_TABLE", default="arn:aws:dynamodb:sa-east-1:739649339569:table/weni-session-tokens"
+)
+WENI_SESSION_TOKEN_DYNAMODB_REGION = os.environ.get("WENI_SESSION_TOKEN_DYNAMODB_REGION", default="sa-east-1")
+WENI_SESSION_TOKEN_MAX_REDIS_TTL = int(os.environ.get("WENI_SESSION_TOKEN_MAX_REDIS_TTL", default="3600"))
+WENI_SESSION_TOKEN_REDIS_ALIAS = os.environ.get("WENI_SESSION_TOKEN_REDIS_ALIAS", default="default")
+
+# Connect project authorization (weni_commons.auth.ConnectProjectAuthorization).
+# Without WENI_CONNECT_API_URL the permission class denies every request.
+WENI_CONNECT_API_URL = os.environ.get("WENI_CONNECT_API_URL", default="")
+WENI_CONNECT_AUTHORIZATION_TIMEOUT = int(os.environ.get("WENI_CONNECT_AUTHORIZATION_TIMEOUT", default="5"))
+
+# Kong API Gateway (weni_commons.kong) — used by kong_sync / kong_ensure_service.
+# Resolved from Django settings first, then env; no CLI flags needed when these are set.
+KONG_ADMIN_URL = os.environ.get("KONG_ADMIN_URL", default="http://kong-kong-admin.kong.svc:8001")
+KONG_URL_PREFIX = os.environ.get("KONG_URL_PREFIX", default="/flows")
+KONG_SERVICE = os.environ.get("KONG_SERVICE", default="flows-service")
+KONG_SERVICE_URL = os.environ.get("KONG_SERVICE_URL", default="https://flows.weni.ai")
+
+
 FLOW_PATH_RECENT_RUN_BATCH_SIZE = os.environ.get("FLOW_PATH_RECENT_RUN_BATCH_SIZE", default=50)
 
 LAMBDA_VALIDATION_URL = os.environ.get("LAMBDA_VALIDATION_URL", default="")
@@ -1478,18 +1535,27 @@ EVENTS_METRIC_NAME = os.environ.get("EVENTS_METRIC_NAME", default="")
 REDSHIFT_QUERY_BASE_URL = os.environ.get("REDSHIFT_QUERY_BASE_URL", default="")
 REDSHIFT_SECRET = os.environ.get("REDSHIFT_SECRET", default="")
 REDSHIFT_ROLE_ARN = os.environ.get("REDSHIFT_ROLE_ARN", default="")
+DATALAKE_VALIDATION_SLACK_WEBHOOK_URL = os.environ.get("DATALAKE_VALIDATION_SLACK_WEBHOOK_URL", default="")
+DATALAKE_VALIDATION_PROJECTS = [
+    project.strip()
+    for project in os.environ.get("DATALAKE_VALIDATION_PROJECTS", default="").split(",")
+    if project.strip()
+]
 
-# Path to the JWT public key
-BASE_DIR = Path(__file__).resolve().parent.parent
 
-JWT_PUBLIC_KEY_PATH = BASE_DIR / "temba" / "jwt_public_key.pem"
+def load_jwt_public_key(raw):
+    """Return the RS256 public key PEM from an env value, or None when unset.
 
-# The public key is loaded a single time at application startup.
-try:
-    with open(JWT_PUBLIC_KEY_PATH, "rb") as f:
-        JWT_PUBLIC_KEY = f.read()
-except FileNotFoundError:
-    JWT_PUBLIC_KEY = None
+    Newlines may be real or escaped as \\n, which is how single-line secrets are stored.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    return raw.replace("\\n", "\n").encode()
+
+
+# JWT public key used to verify RS256 Bearer tokens.
+JWT_PUBLIC_KEY = load_jwt_public_key(os.environ.get("JWT_PUBLIC_KEY", ""))
 
 WENI_VOICE_TOKEN = os.environ.get("WENI_VOICE_TOKEN", default="")
 
@@ -1502,3 +1568,50 @@ WENI_WEBCHAT_ALLOWED_DOMAINS = [
 ]
 
 SOCKET_BASE_URL = os.environ.get("SOCKET_BASE_URL", default="")
+
+# -----------------------------------------------------------------------------------
+# Event Driven Architecture configurations
+# -----------------------------------------------------------------------------------
+
+USE_EDA = os.environ.get("USE_EDA", "false").lower() in ("true", "1", "yes")
+
+if USE_EDA:
+    _eda_connection_backend = os.environ.get("EDA_CONNECTION_BACKEND")
+    if _eda_connection_backend:
+        EDA_CONNECTION_BACKEND = _eda_connection_backend
+
+    EDA_CONSUMERS_HANDLE = os.environ.get("EDA_CONSUMERS_HANDLE", "temba.event_driven.handle.handle_consumers")
+
+    EDA_BROKER_HOST = os.environ.get("EDA_BROKER_HOST", "localhost")
+    EDA_VIRTUAL_HOST = os.environ.get("EDA_VIRTUAL_HOST", "/")
+    EDA_BROKER_PORT = int(os.environ.get("EDA_BROKER_PORT", 5672))
+    EDA_BROKER_USER = os.environ.get("EDA_BROKER_USER", "guest")
+    EDA_BROKER_PASSWORD = os.environ.get("EDA_BROKER_PASSWORD", "guest")
+    EDA_WAIT_TIME_RETRY = int(os.environ.get("EDA_WAIT_TIME_RETRY", 5))
+
+    PIKA_EDA_BROKER_HOST = os.environ.get("PIKA_EDA_BROKER_HOST", EDA_BROKER_HOST)
+    PIKA_EDA_BROKER_PORT = int(os.environ.get("PIKA_EDA_BROKER_PORT", 5671))
+    PIKA_EDA_BROKER_USER = os.environ.get("PIKA_EDA_BROKER_USER", EDA_BROKER_USER)
+    PIKA_EDA_BROKER_PASSWORD = os.environ.get("PIKA_EDA_BROKER_PASSWORD", EDA_BROKER_PASSWORD)
+    PIKA_EDA_VIRTUAL_HOST = os.environ.get("PIKA_EDA_VIRTUAL_HOST", EDA_VIRTUAL_HOST)
+    PIKA_EDA_SSL_ENABLED = os.environ.get("PIKA_EDA_SSL_ENABLED", "true").lower() in ("true", "1", "yes")
+
+    AMQ_BROKER_HOST = os.environ.get("AMQ_BROKER_HOST", PIKA_EDA_BROKER_HOST)
+    AMQ_BROKER_PORT = int(os.environ.get("AMQ_BROKER_PORT", PIKA_EDA_BROKER_PORT))
+    AMQ_BROKER_USER = os.environ.get("AMQ_BROKER_USER", PIKA_EDA_BROKER_USER)
+    AMQ_BROKER_PASSWORD = os.environ.get("AMQ_BROKER_PASSWORD", PIKA_EDA_BROKER_PASSWORD)
+    AMQ_VIRTUAL_HOST = os.environ.get("AMQ_VIRTUAL_HOST", PIKA_EDA_VIRTUAL_HOST)
+    AMQ_BROKER_HEARTBEAT = int(os.environ.get("AMQ_BROKER_HEARTBEAT", 300))
+    AMQ_BROKER_SSL_SERVER_HOSTNAME = os.environ.get("AMQ_BROKER_SSL_SERVER_HOSTNAME")
+
+# -----------------------------------------------------------------------------------
+# Recent activities / Change history (weni.activities)
+# -----------------------------------------------------------------------------------
+
+RECENT_ACTIVITIES_LEGACY_ENABLED = os.environ.get("RECENT_ACTIVITIES_LEGACY_ENABLED", "true").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+# Publishing requires USE_EDA and the AMQ_* broker settings above
+CHANGE_HISTORY_ENABLED = USE_EDA and os.environ.get("CHANGE_HISTORY_ENABLED", "false").lower() in ("true", "1", "yes")

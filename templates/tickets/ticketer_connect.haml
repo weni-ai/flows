@@ -2,15 +2,15 @@
 -load i18n compress temba
 
 -block title
-  -trans "Connect a Ticketing Service"
+  -trans "Connect a ticketing service"
 
 
 -block content
 
   -blocktrans trimmed
-    Ticketing Services let a human agent take over communication for a contact. In a flow you can open a new
-    ticket for a contact and from that point until the ticket is closed all incoming messages from the contact
-    will be forwarded to the service and all replies from the service will be sent back to the contact.
+    Ticketing services let a human agent communicate directly with a contact. In a flow, you can open a new ticket for
+    a contact. Until the ticket is closed, all messages from the contact will be forwarded to the service and all
+    replies will be sent back to the contact.
 
   .my-6
     -blocktrans trimmed
@@ -26,7 +26,7 @@
           .title
             -if ticketer_type.slug == 'internal'
               -blocktrans with brand=brand.name trimmed
-                {{brand}} Tickets
+                {{brand}} tickets
             -else
               {{ ticketer_type.name }}
 

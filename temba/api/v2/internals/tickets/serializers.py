@@ -10,6 +10,7 @@ from temba.contacts.models import Contact, ContactURN
 from temba.orgs.models import Org
 from temba.tickets.models import Ticketer, Topic
 from temba.tickets.types.generic.type import GenericType
+from temba.tickets.types.wenichats.type import WeniChatsType
 
 User = get_user_model()
 
@@ -55,10 +56,70 @@ class CreateTicketerSerializer(serializers.Serializer):
         )
 
 
+REDACTED_CONFIG_VALUE = "***"
+REDACTED_CONFIG_KEYS = (
+    "api_token",
+    "webhook_secret",
+    "oauth_token",
+    "secret",
+    "push_token",
+    "auth_token",
+    "admin_auth_token",
+    "api_key",
+    "project_auth",
+)
+
+
+def redact_ticketer_config(config):
+    if not isinstance(config, dict):
+        return {}
+    redacted = dict(config)
+    for key in REDACTED_CONFIG_KEYS:
+        if key in redacted and redacted[key]:
+            redacted[key] = REDACTED_CONFIG_VALUE
+    return redacted
+
+
+class TicketerListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Ticketer
+        fields = ("uuid", "name", "ticketer_type", "created_on")
+
+
+class TicketerDetailSerializer(serializers.ModelSerializer):
+    config = serializers.SerializerMethodField()
+
+    def get_config(self, obj):
+        return redact_ticketer_config(obj.config or {})
+
+    class Meta:
+        model = Ticketer
+        fields = ("uuid", "name", "ticketer_type", "created_on", "modified_on", "config")
+
+
+class UpdateTicketerSerializer(CreateTicketerSerializer):
+    ticketer_type = serializers.CharField(required=False, max_length=16)
+
+    def validate(self, attrs):
+        instance = self.instance
+        if instance is not None and "ticketer_type" in self.initial_data:
+            requested_type = attrs.get("ticketer_type")
+            if requested_type and requested_type != instance.ticketer_type:
+                raise serializers.ValidationError({"ticketer_type": ["ticketer_type cannot be changed"]})
+        return attrs
+
+    def update(self, instance, validated_data):
+        instance.name = validated_data["name"]
+        instance.config = validated_data["config"]
+        instance.modified_by = self.acting_user
+        instance.save(update_fields=("name", "config", "modified_by", "modified_on"))
+        return instance
+
+
 class OpenTicketSerializer(serializers.Serializer):
     project = serializers.UUIDField()
     ticketer = serializers.UUIDField()
-    topic = serializers.UUIDField()
+    topic = serializers.UUIDField(required=False, allow_null=True)
     contact = serializers.UUIDField(required=False, allow_null=True)
     contact_urn = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     assignee = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
@@ -82,10 +143,15 @@ class OpenTicketSerializer(serializers.Serializer):
         except Ticketer.DoesNotExist:
             raise serializers.ValidationError({"ticketer": "ticketer not found"})
 
-        try:
-            topic = Topic.objects.get(uuid=topic_uuid)
-        except Topic.DoesNotExist:
-            raise serializers.ValidationError({"topic": "topic not found"})
+        if topic_uuid is not None:
+            try:
+                topic = Topic.objects.get(uuid=topic_uuid)
+            except Topic.DoesNotExist:
+                raise serializers.ValidationError({"topic": "topic not found"})
+        elif ticketer.ticketer_type == WeniChatsType.slug:
+            raise serializers.ValidationError({"topic": "This field is required."})
+        else:
+            topic = org.default_ticket_topic
 
         if contact_uuid is not None:
             try:

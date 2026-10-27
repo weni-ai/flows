@@ -27,7 +27,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             country = self.cleaned_data["country"]
             normalized = URN.normalize_number(self.cleaned_data["number"], country)
             if not URN.validate(URN.from_parts(URN.TEL_SCHEME, normalized), country):
-                raise forms.ValidationError(_("Please enter a valid phone number"))
+                raise forms.ValidationError(_("Enter a valid phone number"))
             self.cleaned_data["number"] = normalized
 
             return self.cleaned_data

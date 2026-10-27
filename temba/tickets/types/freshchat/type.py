@@ -15,7 +15,9 @@ class FreshchatType(TicketerType):
     icon = "icon-freshchat"
 
     connect_view = ConnectView
-    connect_blurb = _("%(link)s freshchat ticketer.") % {"link": '<a href="https://freshchat.com/">Freshchat</a>'}
+    connect_blurb = _("%(link)s Freshchat ticketing service.") % {
+        "link": '<a href="https://freshchat.com/">Freshchat</a>'
+    }
 
     def is_available_to(self, user):
         return True

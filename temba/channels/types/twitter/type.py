@@ -27,8 +27,7 @@ class TwitterType(ChannelType):
     icon = "icon-twitter"
 
     claim_blurb = _(
-        "Send and receive messages on Twitter using their %(link)s API. You will have to apply for Twitter API access "
-        "and create a Twitter application."
+        "Send and receive messages on X using their %(link)s API. You'll have to request access to the X API and create an X application."
     ) % {
         "link": '<a href="https://developer.twitter.com/en/docs/accounts-and-users/subscribe-account-activity/overview">Twitter Activity</a>'
     }

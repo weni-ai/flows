@@ -25,12 +25,13 @@ class TestUpdateProjectStatus(TembaTest):
             config={"description": "Test description"},
             language="en-us",
             is_active=True,
+            is_suspended=False,
         )
         self.project_uuid = str(self.test_org.proj_uuid)
 
     def test_update_status_to_active(self):
         """Test updating project status to ACTIVE"""
-        self.test_org.is_active = False
+        self.test_org.is_suspended = True
         self.test_org.save()
 
         updated_org = update_project_status(
@@ -42,13 +43,14 @@ class TestUpdateProjectStatus(TembaTest):
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
 
         self.assertIsNotNone(updated_org)
+        self.assertFalse(reloaded_org.is_suspended)
         self.assertTrue(reloaded_org.is_active)
         self.assertEqual(updated_org, reloaded_org)
         self.assertEqual(reloaded_org.modified_by, self.user)
 
     def test_update_status_to_in_test(self):
-        """Test updating project status to IN_TEST (should set is_active to True)"""
-        self.test_org.is_active = False
+        """Test updating project status to IN_TEST (should set is_suspended to False)"""
+        self.test_org.is_suspended = True
         self.test_org.save()
 
         updated_org = update_project_status(
@@ -60,12 +62,13 @@ class TestUpdateProjectStatus(TembaTest):
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
 
         self.assertIsNotNone(updated_org)
+        self.assertFalse(reloaded_org.is_suspended)
         self.assertTrue(reloaded_org.is_active)
         self.assertEqual(updated_org, reloaded_org)
 
     def test_update_status_to_inactive(self):
-        """Test updating project status to INACTIVE (should set is_active to False)"""
-        self.assertTrue(self.test_org.is_active)
+        """Test updating project status to INACTIVE (should set is_suspended to True)"""
+        self.assertFalse(self.test_org.is_suspended)
 
         updated_org = update_project_status(
             project_uuid=self.project_uuid,
@@ -76,7 +79,8 @@ class TestUpdateProjectStatus(TembaTest):
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
 
         self.assertIsNotNone(updated_org)
-        self.assertFalse(reloaded_org.is_active)
+        self.assertTrue(reloaded_org.is_suspended)
+        self.assertTrue(reloaded_org.is_active)
         self.assertEqual(updated_org, reloaded_org)
 
     def test_update_status_with_new_user(self):
@@ -95,13 +99,14 @@ class TestUpdateProjectStatus(TembaTest):
 
         # Verify project was updated
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
-        self.assertFalse(reloaded_org.is_active)
+        self.assertTrue(reloaded_org.is_suspended)
+        self.assertTrue(reloaded_org.is_active)
         self.assertEqual(reloaded_org.modified_by, new_user)
         self.assertIsNotNone(updated_org)
 
     def test_update_status_same_value_does_not_modify(self):
         """Test that updating to the same status doesn't change modified_on"""
-        self.assertTrue(self.test_org.is_active)
+        self.assertFalse(self.test_org.is_suspended)
         original_modified_on = self.test_org.modified_on
 
         updated_org = update_project_status(
@@ -113,7 +118,7 @@ class TestUpdateProjectStatus(TembaTest):
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
 
         self.assertIsNotNone(updated_org)
-        self.assertTrue(reloaded_org.is_active)
+        self.assertFalse(reloaded_org.is_suspended)
         # modified_on should not change
         self.assertEqual(reloaded_org.modified_on, original_modified_on)
 
@@ -144,7 +149,7 @@ class TestUpdateProjectStatus(TembaTest):
     def test_update_status_transitions(self):
         """Test multiple status transitions"""
         # Start with ACTIVE
-        self.assertTrue(self.test_org.is_active)
+        self.assertFalse(self.test_org.is_suspended)
 
         # Change to INACTIVE
         update_project_status(
@@ -153,7 +158,8 @@ class TestUpdateProjectStatus(TembaTest):
             user_email=self.user.email,
         )
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
-        self.assertFalse(reloaded_org.is_active)
+        self.assertTrue(reloaded_org.is_suspended)
+        self.assertTrue(reloaded_org.is_active)
 
         # Change to IN_TEST
         update_project_status(
@@ -162,6 +168,7 @@ class TestUpdateProjectStatus(TembaTest):
             user_email=self.user.email,
         )
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertFalse(reloaded_org.is_suspended)
         self.assertTrue(reloaded_org.is_active)
 
         # Change to ACTIVE
@@ -171,30 +178,50 @@ class TestUpdateProjectStatus(TembaTest):
             user_email=self.user.email,
         )
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertFalse(reloaded_org.is_suspended)
         self.assertTrue(reloaded_org.is_active)
 
     def test_status_mapping_correctness(self):
         """Test that status mapping is correct for all valid statuses"""
-        # Test ACTIVE -> True
-        self.test_org.is_active = False
+        # Test ACTIVE -> is_suspended False
+        self.test_org.is_suspended = True
         self.test_org.save()
 
         update_project_status(self.project_uuid, "ACTIVE", self.user.email)
         self.test_org.refresh_from_db()
+        self.assertFalse(self.test_org.is_suspended)
         self.assertTrue(self.test_org.is_active)
 
-        # Test IN_TEST -> True
-        self.test_org.is_active = False
+        # Test IN_TEST -> is_suspended False
+        self.test_org.is_suspended = True
         self.test_org.save()
 
         update_project_status(self.project_uuid, "IN_TEST", self.user.email)
         self.test_org.refresh_from_db()
+        self.assertFalse(self.test_org.is_suspended)
         self.assertTrue(self.test_org.is_active)
 
-        # Test INACTIVE -> False
-        self.test_org.is_active = True
+        # Test INACTIVE -> is_suspended True
+        self.test_org.is_suspended = False
         self.test_org.save()
 
         update_project_status(self.project_uuid, "INACTIVE", self.user.email)
         self.test_org.refresh_from_db()
-        self.assertFalse(self.test_org.is_active)
+        self.assertTrue(self.test_org.is_suspended)
+        self.assertTrue(self.test_org.is_active)
+
+    def test_update_status_does_not_change_is_active(self):
+        """Test that status updates never modify is_active (reserved for org release)"""
+        self.test_org.is_active = False
+        self.test_org.is_suspended = False
+        self.test_org.save()
+
+        update_project_status(
+            project_uuid=self.project_uuid,
+            status="INACTIVE",
+            user_email=self.user.email,
+        )
+
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertTrue(reloaded_org.is_suspended)
+        self.assertFalse(reloaded_org.is_active)

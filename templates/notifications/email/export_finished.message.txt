@@ -2,6 +2,6 @@
 {% load i18n %}
 
 {% block notification-body %}
-{% trans "Your message export is ready." %}
+{% trans "Your message export is ready" %}
 {% blocktrans with url=branding.link|add:target_url %}Download the Excel file here: {{ url }}{% endblocktrans %}
 {% endblock notification-body %}

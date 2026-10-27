@@ -1,3 +1,151 @@
+3.103.0
+----------
+* feat: Add Celery task to validate datalake bronze and silver counts
+* feat: enhance attachment handling with external URL support
+* feat: use private S3 storage and pre-signed URLs for attachments
+
+3.102.0
+----------
+* feat: add oidc auth to media proxy endpoint and permission class to only allow admin, editors and
+human agents to get s3 files.
+* feat: implement custom ordering and pagination for flows.json endpoint
+
+3.101.0
+----------
+* feat: add internal ticketer list GET and item GET/PUT/DELETE on the existing ticketer endpoints
+* feat: publish ChangeHistory events (weni-rp-apps 2.12.0, weni-commons 1.6.2) behind CHANGE_HISTORY_ENABLED
+
+3.100.2
+----------
+* feat: JWT public key to env variable
+
+3.100.1
+----------
+* feat: Remove channel type validation in whatsapp broadcast API again
+
+3.100.0
+----------
+* feat: named WhatsApp template parameters — record parameter format/names, accept named broadcast values, resolve per recipient
+* fix: Translate global form labels and cancel buttons
+
+3.99.0
+----------
+* feat: add validation for Instagram comment ID and response type in WhatsappBroadcastWriteSerializer
+
+3.98.0
+----------
+* feat: Create a hidden WWC Copilot channel when projects are created via EDA with is_live_desk_copilot=True
+
+3.97.1
+----------
+* feat: Remove channel type validation in whatsapp broadcast API
+
+3.97.0
+----------
+* feat: add WA Conversation Handovers app
+
+3.96.0
+----------
+* feat: Full localization review of the project for the officially supported languages: EN (source), ES, PT and RO.
+
+3.95.0
+----------
+* feat: add speckit
+* feat: add broadcast flows trigger group
+
+3.94.2
+----------
+* fix: normalizing whatsapp urn on create
+
+3.94.1
+----------
+* feat: increase flow start params string limit from 640 to 4096
+* fix: add break-all to CTWA contact fields to prevent overflow
+
+3.94.0
+----------
+* feat: add search functionality to ListCtwaReferralSource API
+* feat: collapse legacy CTWA referral sources into single canonical row per org
+* feat: add date formatting utility for Datalake events
+
+3.93.1
+----------
+* feat: refactored api gateway implementation
+
+3.93.0
+----------
+* feat: integrate CTWA events into contact detail view
+* feat: Add CTWA referral sources internal API endpoint
+* feat: enhance CtwaReferralSource model with org field and backfill functionality
+* feat: implement Courier fixed access token authentication and add conversation_started event type
+
+3.92.0
+----------
+* feat: add CtwaReferralSource model and enhance CTWA with new fields
+
+3.91.0
+----------
+* feat: add URN support in multiple languages and update contact templates
+* chore: remove structured logging from EDA consumers
+* feat: Add whatsapp contacts without numbers dynamic group
+
+3.90.3
+----------
+* Avoid get template translations from a inactive channel
+* Handle lock not owned error in nonoverlapping tasks
+
+3.90.2
+----------
+* fix: guard broadcast statistics sent/delivered counters against out-of-order DLRs
+
+3.90.1
+----------
+* fix: sanitize unpaired Unicode surrogates in WhatsApp Flow assets sync
+
+3.90.0
+----------
+* feat: add whatsapp bsuid urn validation
+
+3.89.0
+----------
+* fix: Migrate project consumer to AmazonMQ
+
+3.88.1
+----------
+* fix: adding missing dynamodb ambiente variables
+
+3.88.0
+----------
+* feat: first api gateway implementation
+
+3.87.2
+----------
+* feat: change header for import contacts spreadsheet to URN:whatsapp default
+
+3.87.1
+----------
+* feat: create commando to inspect flows by org or flow ids
+
+3.87.0
+----------
+* feat: implement template category update functionality in WhatsApp tasks
+
+3.86.1
+----------
+* Add classifier, flow, global, and ticket permissions to Marketing group
+* Endpoint to update waba in WAC
+
+3.86.0
+----------
+* feat: add marketing_opt_in field to contact updates
+* feat: add request_contact_info to interaction_type in the WhatsappBroadcastsEndpoint documentation
+
+3.85.0
+----------
+* fix: map project INACTIVE status to is_suspended instead of is_active to prevent contacts module failures
+* feat: revert whatsapp and tel urns normalization for old stable state
+* feat: allow none topic on open ticket if is not wenichats
+
 3.84.0
 ----------
 * feat: add ChannelMarketingTags functionality

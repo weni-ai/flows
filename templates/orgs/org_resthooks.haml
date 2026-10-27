@@ -5,8 +5,8 @@
 
   .mb-4
     -blocktrans trimmed
-      You can create flow events which external services can subscribe to. For example, Zapier can subscribe
-      to flow events you create and trigger any number of Zapier integrations when they occur in your flows.
+      You can create flow events that external services can subscribe to. For example, Zapier can subscribe to flow
+      events you create and trigger any number of Zapier integrations when they occur in your flows.
 
   -if brand.guided_zaps|length > 0
     <script type="module" src="https://zapier.com/partner/embed/app-directory/wrapper.js?id=zapier-app-directory&app=textit&theme=light&hide=salesforce-legacy%2Czendesk&zapstyle=row&introcopy=hide"></script>
@@ -40,10 +40,10 @@
   -with org.get_resthooks as resthooks
     -if resthooks|length == 0
       -blocktrans trimmed
-        You have <b>no flow events</b> configured.
+        You have <b>no flow events</b> configured
     -else
       -blocktrans trimmed count counter=resthooks|length
-        You have <b>1 flow event</b> configured.
+        You have <b>1 flow event</b> configured
       -plural
         You have <b>{{ counter }} flow events</b> configured.
 

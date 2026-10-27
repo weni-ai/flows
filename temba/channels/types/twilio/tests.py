@@ -80,9 +80,7 @@ class TwilioTypeTest(TembaTest):
 
             mock_search.return_value = []
             response = self.client.post(search_url, {"country": "US", "pattern": ""})
-            self.assertEqual(
-                response.json()["error"], "Sorry, no numbers found, please enter another area code and try again."
-            )
+            self.assertEqual(response.json()["error"], "No numbers found. Enter another area code and try again.")
 
             # try searching for non-US number
             mock_search.return_value = [MockTwilioClient.MockPhoneNumber("+442812345678")]
@@ -91,9 +89,7 @@ class TwilioTypeTest(TembaTest):
 
             mock_search.return_value = []
             response = self.client.post(search_url, {"country": "GB", "pattern": ""})
-            self.assertEqual(
-                response.json()["error"], "Sorry, no numbers found, please enter another pattern and try again."
-            )
+            self.assertEqual(response.json()["error"], "No numbers found. Enter another pattern and try again.")
 
         with patch("temba.tests.twilio.MockTwilioClient.MockPhoneNumbers.stream") as mock_numbers:
             mock_numbers.return_value = iter([MockTwilioClient.MockPhoneNumber("+12062345678")])

@@ -1,41 +1,50 @@
-import amqp
 from sentry_sdk import capture_exception
+from weni.eda.django.consumers import EDAConsumer
+from weni.eda.messages import Message
 
-from temba.event_driven.consumers import EDAConsumer
-from temba.event_driven.parsers import JSONParser
 from temba.projects.usecases.project_creation import ProjectCreationUseCase
 
 from ..usecases import FlowSetupHandlerUseCase, ProjectCreationDTO, TemplateTypeIntegrationUseCase
 
 
+class ProjectEventType:
+    CREATED = "project.created"
+
+
 class ProjectConsumer(EDAConsumer):
-    def consume(self, message: amqp.Message):  # pragma: no cover
-        print(f"[ProjectConsumer] - Consuming a message. Body: {message.body}")
+    def consume(self, message: Message):  # pragma: no cover
         try:
-            body = JSONParser.parse(message.body)
-            project_dto = ProjectCreationDTO(
-                uuid=body.get("uuid"),
-                name=body.get("name"),
-                is_template=body.get("is_template"),
-                date_format=body.get("date_format"),
-                template_type_uuid=body.get("template_type_uuid"),
-                timezone=body.get("timezone"),
-                description=body.get("description"),
-                brain_on=body.get("brain_on", False),
-                language=body.get("language"),
-                inline_agent_switch=body.get("inline_agent_switch", True),
-            )
+            event = message.event()
 
-            flow_setup_handler = FlowSetupHandlerUseCase()
-            template_type_integration = TemplateTypeIntegrationUseCase(flow_setup_handler)
-            project_creation = ProjectCreationUseCase(template_type_integration)
-            project_creation.create_project(
-                project_dto, body.get("user_email"), body.get("extra_fields"), body.get("authorizations")
-            )
+            if event.event_type == ProjectEventType.CREATED:
+                self._handle_project_created(event.data)
 
-            message.channel.basic_ack(message.delivery_tag)
-
+            self.ack()
         except Exception as exception:
             capture_exception(exception)
-            message.channel.basic_reject(message.delivery_tag, requeue=False)
-            print(f"[ProjectConsumer] - Message rejected by: {exception}")
+            raise
+
+    def _handle_project_created(self, body: dict):
+        project_dto = ProjectCreationDTO(
+            uuid=body.get("uuid"),
+            name=body.get("name"),
+            is_template=body.get("is_template"),
+            date_format=body.get("date_format"),
+            template_type_uuid=body.get("template_type_uuid"),
+            timezone=body.get("timezone"),
+            description=body.get("description"),
+            brain_on=body.get("brain_on", False),
+            language=body.get("language"),
+            inline_agent_switch=body.get("inline_agent_switch", True),
+            is_live_desk_copilot=body.get("is_live_desk_copilot", False),
+        )
+
+        flow_setup_handler = FlowSetupHandlerUseCase()
+        template_type_integration = TemplateTypeIntegrationUseCase(flow_setup_handler)
+        project_creation = ProjectCreationUseCase(template_type_integration)
+        project_creation.create_project(
+            project_dto,
+            body.get("user_email"),
+            body.get("extra_fields"),
+            body.get("authorizations"),
+        )

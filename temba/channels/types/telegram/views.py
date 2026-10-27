@@ -12,7 +12,7 @@ from ...views import ClaimViewMixin
 class ClaimView(ClaimViewMixin, SmartFormView):
     class Form(ClaimViewMixin.Form):
         auth_token = forms.CharField(
-            label=_("Authentication Token"), help_text=_("The Authentication token for your Telegram Bot")
+            label=_("Authentication token"), help_text=_("The authentication token for your Telegram bot")
         )
 
         def clean_auth_token(self):
@@ -22,13 +22,13 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             # does a bot already exist on this account with that auth token
             for channel in Channel.objects.filter(org=org, is_active=True, channel_type=self.channel_type.code):
                 if channel.config["auth_token"] == value:
-                    raise ValidationError(_("A telegram channel for this bot already exists on your account."))
+                    raise ValidationError(_("A Telegram channel for this bot already exists on your account."))
 
             try:
                 bot = telegram.Bot(token=value)
                 bot.get_me()
             except telegram.TelegramError:
-                raise ValidationError(_("Your authentication token is invalid, please check and try again"))
+                raise ValidationError(_("Your authentication token is invalid. Check and try again."))
 
             return value
 
