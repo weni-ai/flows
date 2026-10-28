@@ -60,7 +60,7 @@ class BroadcastWithStatisticsSerializer(serializers.ModelSerializer):
         ]
 
     def get_statistics(self, obj):
-        stat = obj.statistics.first()
+        stat = self.load_statistics(obj)
         return {
             "processed": stat.processed if stat else 0,
             "sent": stat.sent if stat else 0,
@@ -78,10 +78,16 @@ class BroadcastWithStatisticsSerializer(serializers.ModelSerializer):
     def get_template(self, obj):
         if not obj.template_id:
             return None
-        template = Template.objects.filter(id=obj.template_id).first()
+        template = self.load_template(obj.template_id)
         if not template:
             return None
         return {"id": template.id, "name": template.name}
+
+    def load_statistics(self, obj):
+        return obj.statistics.first()
+
+    def load_template(self, template_id):
+        return Template.objects.filter(id=template_id).first()
 
     def get_created_by(self, obj):
         return obj.created_by.email if obj.created_by else None
