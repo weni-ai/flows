@@ -27,7 +27,14 @@ class BroadcastStatisticsReadSerializer(BroadcastWithStatisticsSerializer):
     """
 
     def load_statistics(self, obj):
-        statistics = obj.statistics.all()
+        """
+        First statistics row, or None.
+
+        Callers MUST prefetch ``statistics`` (see BroadcastsStatisticsEndpoint.apply_filters).
+        ``.first()`` would always hit the database and reintroduce N+1; this only reads
+        the prefetched cache.
+        """
+        statistics = list(obj.statistics.all())
         return statistics[0] if statistics else None
 
     def load_template(self, template_id):
