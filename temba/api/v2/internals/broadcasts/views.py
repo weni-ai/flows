@@ -1,5 +1,7 @@
+import logging
+
 from rest_framework import status
-from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated, ParseError
+from rest_framework.exceptions import ParseError
 from rest_framework.mixins import CreateModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -9,13 +11,13 @@ from weni.internal.authenticators import InternalOIDCAuthentication
 from weni.internal.permissions import CanCommunicateInternally
 from weni.internal.views import InternalGenericViewSet
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils.decorators import method_decorator
 
+from temba.api.auth.fixed_token import require_fixed_query_token
 from temba.api.auth.jwt import OptionalJWTAuthentication
-from temba.api.v2.internals.broadcasts.context import resolve_org_and_user_internal_whatsapp
+from temba.api.v2.internals.broadcasts.context import ProjectMismatch, resolve_org_and_user_internal_whatsapp
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.api.v2.serializers import WhatsappBroadcastReadSerializer, WhatsappBroadcastWriteSerializer
@@ -23,7 +25,6 @@ from temba.api.v2.views_base import DefaultLimitOffsetPagination
 from temba.contacts.models import ContactGroup
 from temba.msgs.models import Broadcast, BroadcastStatistics
 from temba.msgs.services import count_duplicate_contacts_across_groups, count_unique_contacts_in_groups
-from temba.orgs.models import Org
 
 from .idempotency import (
     LOOKUP_CONFLICT,
@@ -39,6 +40,7 @@ from .serializers import BroadcastSerializer, BroadcastWithStatisticsSerializer,
 from .services import upload_broadcast_media
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class BroadcastsViewSet(CreateModelMixin, InternalGenericViewSet):
@@ -58,15 +60,7 @@ class BroadcastsViewSet(CreateModelMixin, InternalGenericViewSet):
         return super().get_serializer(*args, **kwargs, context=context)
 
     def create(self, request, *args, **kwargs):
-        params = request.query_params
-        token = params.get("token")
-
-        if token is None:
-            raise NotAuthenticated()
-
-        if token != settings.ROUTER_FIXED_ACCESS_TOKEN:
-            raise AuthenticationFailed()
-
+        require_fixed_query_token(request, "ROUTER_FIXED_ACCESS_TOKEN")
         return super().create(request, *args, **kwargs)
 
 
@@ -78,7 +72,7 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
 
     def post(self, request, *args, **kwargs):
         data = dict(request.data)
-        project_uuid = data.get("project") or getattr(request, "project_uuid", None)
+        project_uuid = getattr(request, "project_uuid", None) or data.get("project")
 
         idem_key = extract_idempotency_key(request)
         body_hash = compute_body_hash(request) if idem_key else None
@@ -101,12 +95,18 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
         try:
             try:
                 org, user = resolve_org_and_user_internal_whatsapp(drf_request=request, data=data)
+            except ProjectMismatch as e:
+                if idem_key and project_uuid:
+                    idempotency_release(project_uuid, idem_key)
+                return Response({"error": str(e)}, status=403)
             except ValueError as e:
                 msg = str(e)
                 if idem_key and project_uuid:
                     idempotency_release(project_uuid, idem_key)
                 if msg == "Project not found":
                     return Response({"error": msg}, status=404)
+                if msg != "Project not provided":
+                    logger.warning("Unexpected ValueError in whatsapp broadcast: %s", msg)
                 return Response({"error": msg}, status=401)
 
             serializer = WhatsappBroadcastWriteSerializer(
@@ -250,24 +250,24 @@ class InternalBroadcastsUploadMediaEndpoint(APIViewMixin, APIView):
     permission_classes = [IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)]
 
     def post(self, request: Request):
-        project_uuid = request.data.get("project_uuid") or request.data.get("project")
+        org = getattr(request, "org", None)
+        if org is None:
+            org = self.get_org_from_request(
+                request,
+                missing_status=400,
+                missing_error="project_uuid is required",
+                not_found_error="Project not found",
+            )
+            if isinstance(org, Response):
+                return org
 
-        if not project_uuid:
-            return Response({"error": "project_uuid is required"}, status=400)
-
-        try:
-            org = Org.objects.get(proj_uuid=project_uuid)
-        except Org.DoesNotExist:
-            return Response({"error": "Project not found"}, status=404)
-
-        result = {}
-        result["last_30_days_stats"] = BroadcastStatistics.last_30_days_stats(org)
-        result["success_rate_30_days"] = BroadcastStatistics.success_rate_30_days(org)
+        body_project = request.data.get("project_uuid") or request.data.get("project")
+        if body_project and str(body_project) != str(org.proj_uuid):
+            return Response({"error": "Project mismatch"}, status=403)
 
         upload = request.FILES.get("file") or request.data.get("file")
         if not upload:
             raise ParseError(detail="file is required")
 
         result = upload_broadcast_media(org, upload)
-
         return Response(result)

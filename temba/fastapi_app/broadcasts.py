@@ -3,7 +3,8 @@ from fastapi.responses import JSONResponse
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
-from temba.api.v2.internals.broadcasts.context import resolve_org_and_user_internal_whatsapp
+from temba.api.auth.jwt import jwt_tenant_claims
+from temba.api.v2.internals.broadcasts.context import ProjectMismatch, resolve_org_and_user_internal_whatsapp
 from temba.api.v2.serializers import WhatsappBroadcastReadSerializer, WhatsappBroadcastWriteSerializer
 from temba.fastapi_app.auth import verify_jwt
 
@@ -29,6 +30,9 @@ def post_internal_whatsapp_broadcast(
 
     Requires a valid Bearer JWT signed with settings.JWT_PUBLIC_KEY. Any auth failure
     (missing/invalid/expired token or missing public key) returns 403 from verify_jwt.
+
+    SEC-05: the tenant comes from JWT claims (see ``jwt_tenant_claims``), not from
+    the body. Put ``project_uuid`` (or ``project``) in the token.
     """
     factory = APIRequestFactory()
     django_request = factory.post(
@@ -38,12 +42,14 @@ def post_internal_whatsapp_broadcast(
     )
     drf_request = Request(django_request)
     setattr(drf_request, "jwt_payload", jwt_payload)
-    project_uuid_from_jwt = jwt_payload.get("project_uuid") or jwt_payload.get("project")
+    project_uuid_from_jwt, _ = jwt_tenant_claims(jwt_payload)
     if project_uuid_from_jwt:
         setattr(drf_request, "project_uuid", project_uuid_from_jwt)
 
     try:
         org, user = resolve_org_and_user_internal_whatsapp(drf_request=drf_request, data=dict(body))
+    except ProjectMismatch as e:
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail={"error": str(e)})
     except ValueError as e:
         msg = str(e)
         status_code = (
