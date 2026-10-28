@@ -1,5 +1,4 @@
 from rest_framework import status
-from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
 from rest_framework.mixins import CreateModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -9,9 +8,9 @@ from weni.internal.authenticators import InternalOIDCAuthentication
 from weni.internal.permissions import CanCommunicateInternally
 from weni.internal.views import InternalGenericViewSet
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 
+from temba.api.auth.fixed_token import require_fixed_query_token
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import IsUserInOrg
 
@@ -38,15 +37,7 @@ class FlowStartViewSet(CreateModelMixin, InternalGenericViewSet):
         return super().get_serializer(*args, **kwargs, context=context)
 
     def create(self, request, *args, **kwargs):
-        params = request.query_params
-        token = params.get("token")
-
-        if token is None:
-            raise NotAuthenticated()
-
-        if token != settings.ROUTER_FIXED_ACCESS_TOKEN:
-            raise AuthenticationFailed()
-
+        require_fixed_query_token(request, "ROUTER_FIXED_ACCESS_TOKEN")
         return super().create(request, *args, **kwargs)
 
 
@@ -58,8 +49,17 @@ class FlowImportView(APIViewMixin, APIView):
         serializer = FlowImportSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        attached_org = getattr(request, "org", None)
+        body_project = serializer.validated_data["project_uuid"]
+        if attached_org is not None:
+            if str(body_project) != str(attached_org.proj_uuid):
+                return Response({"error": "Project mismatch"}, status=status.HTTP_403_FORBIDDEN)
+            project_uuid = str(attached_org.proj_uuid)
+        else:
+            project_uuid = str(body_project)
+
         dto = FlowImportDTO(
-            project_uuid=serializer.validated_data["project_uuid"],
+            project_uuid=project_uuid,
             user_email=request.user.email,
             definition=serializer.validated_data["definition"],
             is_mutable=serializer.validated_data.get("is_mutable", True),

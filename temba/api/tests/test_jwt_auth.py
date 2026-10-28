@@ -12,8 +12,24 @@ from temba.api.auth.jwt import (
     JWTAuthMixinRequired,
     OptionalJWTAuthentication,
     RequiredJWTAuthentication,
+    jwt_tenant_claims,
 )
 from temba.api.v2.permissions import HasValidJWT
+
+
+class JwtTenantClaimsTests(TestCase):
+    def test_reads_project_and_channel_aliases(self):
+        self.assertEqual(jwt_tenant_claims(None), (None, None))
+        self.assertEqual(jwt_tenant_claims({}), (None, None))
+        self.assertEqual(
+            jwt_tenant_claims({"project_uuid": "p1", "channel_uuid": "c1"}),
+            ("p1", "c1"),
+        )
+        self.assertEqual(jwt_tenant_claims({"project": "p2", "channel": "c2"}), ("p2", "c2"))
+        self.assertEqual(
+            jwt_tenant_claims({"project_uuid": "p1", "project": "ignored"}),
+            ("p1", None),
+        )
 
 
 class OptionalJWTAuthenticationTests(TestCase):

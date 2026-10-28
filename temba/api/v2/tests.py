@@ -768,6 +768,70 @@ class APITest(APIJSONMixin, TembaTest):
         self.assertEqual(request._org, self.org)
         self.assertEqual(request.user, self.org.created_by)
 
+    def test_resolve_jwt_user_ignores_query_project_when_token_has_channel_only(self):
+        """SEC-05: a channel-only JWT must not adopt ``?project_uuid=`` of another org."""
+        channel = self.create_channel("TT", "JWT Channel", "99999")
+        self.org2.proj_uuid = self.org2.proj_uuid or uuid.uuid4()
+        self.org2.save(update_fields=("proj_uuid",))
+
+        factory = APIRequestFactory()
+        django_request = factory.get(f"/api/v2/contacts.json?project_uuid={self.org2.proj_uuid}")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"channel_uuid": str(channel.uuid)}
+        request.channel_uuid = str(channel.uuid)
+        view.request = request
+
+        with override_settings(INTERNAL_USER_EMAIL=""):
+            view._resolve_jwt_user(request)
+
+        self.assertEqual(request._org, channel.org)
+        self.assertEqual(request._org.id, self.org.id)
+
+    def test_resolve_jwt_user_uses_token_project_not_query(self):
+        """SEC-05: JWT project claim wins over ``?project_uuid=``."""
+        self.org.proj_uuid = self.org.proj_uuid or uuid.uuid4()
+        self.org.save(update_fields=("proj_uuid",))
+        self.org2.proj_uuid = self.org2.proj_uuid or uuid.uuid4()
+        self.org2.save(update_fields=("proj_uuid",))
+
+        factory = APIRequestFactory()
+        django_request = factory.get(f"/api/v2/contacts.json?project_uuid={self.org2.proj_uuid}")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"project_uuid": str(self.org.proj_uuid)}
+        view.request = request
+
+        with override_settings(INTERNAL_USER_EMAIL=""):
+            view._resolve_jwt_user(request)
+
+        self.assertEqual(request._org.id, self.org.id)
+
+    def test_resolve_jwt_user_rejects_channel_from_other_org(self):
+        """SEC-05: token project + channel of another org is rejected."""
+        self.org.proj_uuid = self.org.proj_uuid or uuid.uuid4()
+        self.org.save(update_fields=("proj_uuid",))
+        channel_b = self.create_channel("TT", "Other Org Channel", "88888", org=self.org2)
+
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "channel_uuid": str(channel_b.uuid),
+        }
+        view.request = request
+
+        with self.assertRaises(InvalidQueryError):
+            view._resolve_jwt_user(request)
+
     def test_resolve_jwt_user_with_channel_uuid(self):
         """_resolve_jwt_user resolves org via channel_uuid."""
         channel = self.create_channel("TT", "JWT Channel", "99999")

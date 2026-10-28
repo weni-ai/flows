@@ -1,10 +1,8 @@
 from rest_framework import status, viewsets
-from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from django.conf import settings
-
+from temba.api.auth.fixed_token import require_fixed_query_token
 from temba.wpp_flows.models import WhatsappFlow
 from temba.wpp_flows.tasks import update_whatsapp_flow_by_id
 
@@ -15,14 +13,7 @@ class WhatsappFlowsViewset(viewsets.ViewSet):
 
     def create(self, request):
         payload = request.data
-        params = request.query_params
-        token = params.get("token")
-
-        if token is None:
-            raise NotAuthenticated()
-
-        if token != settings.COURIER_FIXED_ACCESS_TOKEN:
-            raise AuthenticationFailed()
+        require_fixed_query_token(request, "COURIER_FIXED_ACCESS_TOKEN")
 
         entry_list = payload.get("entry", None)
 
