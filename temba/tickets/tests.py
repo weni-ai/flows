@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from temba.contacts.models import Contact
 from temba.tests import CRUDLTestMixin, TembaTest, matchers, mock_mailroom
+from temba.tests.s3 import S3_SIGNING_SETTINGS
 from temba.utils.dates import datetime_to_timestamp
 
 from .models import Ticket, TicketCount, Ticketer, TicketEvent, Topic
@@ -438,6 +439,25 @@ class TicketCRUDLTest(TembaTest, CRUDLTestMixin):
         with patch("temba.tickets.views.TicketCRUDL.Folder.paginate_by", 1):
             response = self.client.get(open_url + "?_format=json")
             self.assertIsNotNone(response.json()["next"])
+
+    @mock_mailroom
+    @override_settings(**S3_SIGNING_SETTINGS)
+    def test_folder_presigns_s3_attachments(self, mr_mocks):
+        self.login(self.admin)
+
+        contact = self.create_contact("Joe", phone="123", last_seen_on=timezone.now())
+        self.create_ticket(self.mailgun, contact, "Question 1")
+        self.create_incoming_msg(
+            contact, "See photo", attachments=["image/jpeg:https://media-bucket.s3.amazonaws.com/media/photo.jpg"]
+        )
+
+        response = self.client.get(reverse("tickets.ticket_folder", kwargs={"folder": "all", "status": "open"}))
+
+        (signed_attachment,) = response.json()["results"][0]["last_msg"]["attachments"]
+        self.assertTrue(
+            signed_attachment.startswith("image/jpeg:https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg?")
+        )
+        self.assertIn("X-Amz-Signature=", signed_attachment)
 
     @mock_mailroom
     def test_note(self, mr_mocks):

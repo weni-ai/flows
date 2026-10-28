@@ -78,10 +78,17 @@ STORAGE_ROOT_DIR = "test_orgs" if TESTING else "orgs"
 # -----------------------------------------------------------------------------------
 AWS_ACCESS_KEY_ID = "aws_access_key_id"
 AWS_SECRET_ACCESS_KEY = "aws_secret_access_key"
-AWS_DEFAULT_ACL = "private"
+# buckets with ACLs disabled reject uploads that send any x-amz-acl header
+AWS_DEFAULT_ACL = None
+AWS_S3_REGION_NAME = None
 
 AWS_STORAGE_BUCKET_NAME = "dl-temba-io"
 AWS_BUCKET_DOMAIN = AWS_STORAGE_BUCKET_NAME + ".s3.amazonaws.com"
+
+# other buckets whose attachment URLs are pre-signed when rendered, besides AWS_STORAGE_BUCKET_NAME
+S3_MEDIA_BUCKETS = []
+S3_SIGNED_EXTRA_BUCKETS = []
+S3_PRESIGNED_URL_EXPIRES = 60 * 60
 
 # bucket where archives files are stored
 ARCHIVE_BUCKET = "dl-temba-archives"
@@ -1160,6 +1167,7 @@ CELERY_BEAT_SCHEDULE = {
     "trim-webhook-event": {"task": "trim_webhook_event_task", "schedule": crontab(hour=3, minute=0)},
     "update-org-activity": {"task": "update_org_activity_task", "schedule": crontab(hour=3, minute=5)},
     "update-unique-contact-counts": {"task": "update_unique_contact_counts", "schedule": crontab(hour=8, minute=0)},
+    "validate-datalake-layers": {"task": "validate_datalake_layers_task", "schedule": crontab(minute=30)},
     "refresh-teams-tokens": {"task": "refresh_teams_tokens", "schedule": timedelta(minutes=30)},
     "squash-flow-category-counts": {"task": "squash_flow_category_counts", "schedule": timedelta(seconds=60)},
 }
@@ -1320,6 +1328,7 @@ CHANNEL_TYPES = [
     "temba.channels.types.instagram.InstagramType",
     "temba.channels.types.slack.SlackType",
     "temba.channels.types.teams.TeamsType",
+    "temba.channels.types.telephony.TelephonyPSTNType",
     "temba.channels.types.email.EmailType",
     "temba.channels.types.externalv2.ExternalV2Type",
 ]
@@ -1526,6 +1535,12 @@ EVENTS_METRIC_NAME = os.environ.get("EVENTS_METRIC_NAME", default="")
 REDSHIFT_QUERY_BASE_URL = os.environ.get("REDSHIFT_QUERY_BASE_URL", default="")
 REDSHIFT_SECRET = os.environ.get("REDSHIFT_SECRET", default="")
 REDSHIFT_ROLE_ARN = os.environ.get("REDSHIFT_ROLE_ARN", default="")
+DATALAKE_VALIDATION_SLACK_WEBHOOK_URL = os.environ.get("DATALAKE_VALIDATION_SLACK_WEBHOOK_URL", default="")
+DATALAKE_VALIDATION_PROJECTS = [
+    project.strip()
+    for project in os.environ.get("DATALAKE_VALIDATION_PROJECTS", default="").split(",")
+    if project.strip()
+]
 
 
 def load_jwt_public_key(raw):
