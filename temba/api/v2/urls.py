@@ -15,6 +15,7 @@ from temba.api.v2.projects.views import (
 from temba.api.v2.templates.views import TemplateByIdEndpoint, TemplatesTranslationsEndpoint
 
 from .billing.views import BillingPricingEndpoint
+from .broadcasts_statistics.views import BroadcastsStatisticsEndpoint
 from .flows.urls import urlpatterns as flows_urlpatterns
 from .internals.urls import urlpatterns as internals_urlpatterns
 from .views import (
@@ -80,6 +81,7 @@ urlpatterns = [
     url(r"^boundaries$", BoundariesEndpoint.as_view(), name="api.v2.boundaries"),
     url(r"^broadcasts$", BroadcastsEndpoint.as_view(), name="api.v2.broadcasts"),
     url(r"^whatsapp_broadcasts$", WhatsappBroadcastsEndpoint.as_view(), name="api.v2.whatsapp_broadcasts"),
+    url(r"^broadcasts_statistics$", BroadcastsStatisticsEndpoint.as_view(), name="api.v2.broadcasts_statistics"),
     url(r"^campaigns$", CampaignsEndpoint.as_view(), name="api.v2.campaigns"),
     url(r"^campaign_events$", CampaignEventsEndpoint.as_view(), name="api.v2.campaign_events"),
     url(r"^channels$", ChannelsEndpoint.as_view(), name="api.v2.channels"),
