@@ -27,6 +27,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 
 from temba.api.models import APIToken, Resthook, ResthookSubscriber, WebHookEvent
+from temba.api.v2.broadcasts_statistics.views import BroadcastsStatisticsEndpoint
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
 from temba.api.v2.pagination import FlowsPagination
 from temba.api.v2.views_base import (
@@ -242,6 +243,7 @@ class RootView(views.APIView):
                 "boundaries": reverse("api.v2.boundaries", request=request),
                 "broadcasts": reverse("api.v2.broadcasts", request=request),
                 "whastapp_broadcasts": reverse("api.v2.whatsapp_broadcasts", request=request),
+                "broadcasts_statistics": reverse("api.v2.broadcasts_statistics", request=request),
                 "campaigns": reverse("api.v2.campaigns", request=request),
                 "campaign_events": reverse("api.v2.campaign_events", request=request),
                 "channels": reverse("api.v2.channels", request=request),
@@ -293,6 +295,7 @@ class ExplorerView(SmartTemplateView):
             BroadcastsEndpoint.get_write_explorer(),
             WhatsappBroadcastsEndpoint.get_read_explorer(),
             WhatsappBroadcastsEndpoint.get_write_explorer(),
+            BroadcastsStatisticsEndpoint.get_read_explorer(),
             CampaignsEndpoint.get_read_explorer(),
             CampaignsEndpoint.get_write_explorer(),
             CampaignEventsEndpoint.get_read_explorer(),
