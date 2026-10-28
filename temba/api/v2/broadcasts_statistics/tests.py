@@ -30,6 +30,7 @@ ITEM_FIELDS = {
     "statistics",
     "template",
 }
+NONEXISTENT_TEMPLATE_ID = 999999
 STATISTICS_FIELDS = {
     "processed",
     "sent",
@@ -166,7 +167,7 @@ class BroadcastsStatisticsEndpointTest(APIJSONMixin, TembaTest):
 
     def test_missing_template_and_template_of_other_org_are_null(self):
         other_org_template = Template.objects.create(org=self.org2, name="Not yours")
-        self.create_bulk_broadcast("Deleted template", days_ago=2, template_id=999999)
+        self.create_bulk_broadcast("Deleted template", days_ago=2, template_id=NONEXISTENT_TEMPLATE_ID)
         self.create_bulk_broadcast("Foreign template", days_ago=1, template_id=other_org_template.id)
 
         self.login(self.admin)
