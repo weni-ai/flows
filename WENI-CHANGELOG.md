@@ -1,3 +1,7 @@
+3.106.2
+----------
+* feat: add public `/api/v2/broadcasts_statistics.json` endpoint, a new externally reachable read API authenticated by API key, session or JWT, readable by every workspace role through the new `msgs.broadcast_statistics_api` permission; the internal broadcasts-statistics endpoint is unchanged
+
 3.106.1
 ----------
 * feat: persist platform ElevenLabs voice config on new TPH channels
@@ -10,7 +14,6 @@
 ----------
 * fix: security — close fail-open org membership, empty fixed tokens, mixin auth bypass, cross-tenant internals, and bind module JWTs to token tenant claims (SEC-01, 03, 04, 05, 06, 07, 09, 10, 11)
 * chore: update weni rapid pro apps to version 2.13.0
-* feat: add public `/api/v2/broadcasts_statistics.json` endpoint, a new externally reachable read API authenticated by API key, session or JWT, readable by every workspace role through the new `msgs.broadcast_statistics_api` permission; the internal broadcasts-statistics endpoint is unchanged
 
 3.104.0
 ----------
