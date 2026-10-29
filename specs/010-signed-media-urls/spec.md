@@ -22,7 +22,7 @@
   - AC-3: An anonymous request, a user without the `flows.flow_media_urls` permission, or a flow in another org receives `403` with a JSON body and no redirect, and nothing is signed. An unknown flow UUID receives `404`. Administrators, Editors, Marketing and Viewers of the org are allowed; Agents and Surveyors are not.
   - AC-4: A malformed JSON body, a missing or non-list `urls`, an empty list, more than 20 URLs, or a URL longer than 2048 characters receives `400` and nothing is signed. `GET` receives `405`. A `POST` without a valid CSRF token is rejected by Django's CSRF middleware.
   - AC-5: Every response produced by the endpoint's view (`200`, `400`, `403`, `404`, `405` and `500`) carries `Cache-Control: no-store` and, except for `405`, a JSON body. The CSRF rejection from Django's middleware is excluded, because it happens before the view runs and carries no URL. No original or signed URL is written to the application log or included in any Sentry event raised while the endpoint handles a request, including unhandled errors outside signing.
-  - AC-6: The flow editor page renders `endpoints.media_urls = '/flow/media_urls/<flow_uuid>/'` and Flows ships `@weni/flow-editor` 3.7.0, so a user can download an uploaded attachment, see simulator media and play a Say Message recording on the private bucket.
+  - AC-6: The flow editor page renders `endpoints.media_urls = '/flow/media_urls/<flow_uuid>/'`. Once Flows also ships `@weni/flow-editor` 3.7.0, in a follow-up PR, a user can download an uploaded attachment, see simulator media and play a Say Message recording on the private bucket.
   - AC-7: An unexpected failure while signing returns `500` with a generic JSON error, without a stack trace, and is reported to Sentry once with opaque identifiers only.
 
 ## Clarifications
@@ -43,7 +43,8 @@
 - An org-scoped signing helper in `temba/utils/s3/s3.py` that builds on `parse_s3_url`, `signable_buckets` and `presign_url`, and refuses object keys that do not belong to the given org.
 - A new permission, `flows.flow_media_urls`, granted to Administrators, Editors and Marketing (through the existing `flows.flow.*` wildcard) and to Viewers explicitly.
 - A new setting, `S3_ORG_SCOPED_KEY_PREFIXES`, read from the environment in production.
-- The `media_urls` key in the `endpoints` block of `templates/flows/flow_editor.haml`, and the `@weni/flow-editor` bump from 3.6.5 to 3.7.0.
+- The `media_urls` key in the `endpoints` block of `templates/flows/flow_editor.haml`.
+- The `@weni/flow-editor` bump from 3.6.5 to 3.7.0, in a follow-up PR opened once floweditor 3.7.0 is published. [flows#904](https://github.com/weni-ai/flows/pull/904) ships everything else.
 - A `WENI-CHANGELOG.md` entry.
 
 **Out of scope here**:
@@ -91,7 +92,7 @@
 | `temba/settings_common.py` | modified | Add `"media_urls"` to the `flows.flow` permissions, `"flows.flow_media_urls"` to Viewers, and `S3_ORG_SCOPED_KEY_PREFIXES = ["attachments", "media"]`. |
 | `temba/settings.py.prod` | modified | `S3_ORG_SCOPED_KEY_PREFIXES = env.list("S3_ORG_SCOPED_KEY_PREFIXES", default=["attachments", "media"])`. |
 | `templates/flows/flow_editor.haml` | modified | Add `media_urls: '/flow/media_urls/{{object.uuid}}/'` next to `attachments`. |
-| `package.json`, `package-lock.json` | modified | Bump `@weni/flow-editor` to 3.7.0. |
+| `package.json`, `package-lock.json` | modified, in a follow-up PR | Bump `@weni/flow-editor` to 3.7.0 after it is published. Not part of [flows#904](https://github.com/weni-ai/flows/pull/904). |
 | `temba/flows/tests.py`, `temba/utils/s3/tests.py` | modified | Flow and unit tests, see **Test Strategy**. |
 | `WENI-CHANGELOG.md` | modified | Entry under the version that ships the change. |
 
@@ -126,7 +127,7 @@
 | Editor config `endpoints.media_urls` in `flow_editor.haml` | added | Flows minor | yes. Editor 3.6.5 ignores the key; editor 3.7.0 without it keeps today's behavior. |
 | Permission `flows.flow_media_urls` | added | Flows minor | yes. Granted to Administrators, Editors, Marketing and Viewers on `migrate`. |
 | Setting `S3_ORG_SCOPED_KEY_PREFIXES` | added | Flows minor | yes. Defaults to `["attachments", "media"]`. |
-| `@weni/flow-editor` dependency | 3.6.5 → 3.7.0 | Flows minor | yes. See the paired spec. |
+| `@weni/flow-editor` dependency | 3.6.5 → 3.7.0, in a follow-up PR | Flows minor | yes. See the paired spec. The endpoint and the template key work with either editor version. |
 | `temba/utils/s3` (`presign_org_url`, `is_org_object_key`) | added | internal | yes. Existing functions are unchanged. |
 | Courier and Mailroom versions | unchanged | none | yes. No new version is required. |
 
@@ -218,7 +219,7 @@ No model or schema change, and no migration file. The `flows.flow_media_urls` pe
 
 1. **Floweditor 3.7.0 is released first** or in parallel. Without `media_urls` in the config it behaves like 3.6.5.
 2. **Before deploying Flows**, confirm the `S3MediaPrefix` used by Courier and Mailroom in each production deployment. If it is not `attachments` or `media`, set `S3_ORG_SCOPED_KEY_PREFIXES` in the Flows environment to include it. Otherwise inbound media in the simulator is returned unsigned and the editor falls back to the original URL.
-3. **Deploy Flows** with the endpoint, the template key and `@weni/flow-editor` 3.7.0, and run `migrate` so the permission exists.
+3. **Deploy Flows** with the endpoint and the template key ([flows#904](https://github.com/weni-ai/flows/pull/904)), and run `migrate` so the permission exists. Editor 3.6.5 ignores the new key, so this deploy changes nothing visible. Then merge and deploy the follow-up PR that bumps `@weni/flow-editor` to 3.7.0, which turns signing on in the editor.
 4. **Validate in staging against the private bucket:**
    - download an uploaded attachment from Send Message;
    - run the simulator with an image, a video, a document and an audio sent by the flow;
