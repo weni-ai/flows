@@ -97,6 +97,30 @@ def presign_url(url: str, expires: int | None = None, response_content_dispositi
     )
 
 
+def is_org_object_key(key: str, org_id: int) -> bool:
+    """
+    Whether an object key sits under one of the org-scoped prefixes, e.g. media/<org_id>/..., for the given org.
+    Keys with an empty, "." or ".." segment are refused so a key can never resolve into another org's prefix.
+    """
+    if any(segment in ("", ".", "..") for segment in key.split("/")):
+        return False
+
+    prefixes = {prefix.strip("/") for prefix in settings.S3_ORG_SCOPED_KEY_PREFIXES} - {""}
+
+    return any(key.startswith(f"{prefix}/{org_id}/") for prefix in prefixes)
+
+
+def presign_org_url(url: str, org_id: int) -> str:
+    """
+    Like presign_url, but only signs objects whose key belongs to the given org, returning any other URL unchanged
+    """
+    location = parse_s3_url(url)
+    if not location or not is_org_object_key(location.key, org_id):
+        return url
+
+    return presign_url(url)
+
+
 def presign_attachment(attachment: str) -> str:
     """
     Pre-signs the URL of a type:url message attachment
