@@ -85,6 +85,7 @@
 | Component | Change | Why |
 |-----------|--------|-----|
 | `temba/utils/s3/s3.py` | modified | Add `is_org_object_key(key, org_id)` and `presign_org_url(url, org_id)`. The org check lives next to the other signing rules so every caller gets the same boundary. |
+| `temba/utils/sentry.py` | new | `scrub_events_for_current_request()` and its event processor, which remove the request body and the stack-frame variables from every Sentry event raised while the request is handled. Kept out of `views.py` because nothing in it is specific to flows or media. Tested in `temba/utils/tests.py`. |
 | `temba/flows/serializers.py` | new | `MediaUrlsSerializer`, the input boundary: `urls` is a list of 1 to `MAX_MEDIA_URLS_PER_REQUEST` (20) non-blank strings of at most `MAX_MEDIA_URL_LENGTH` (2048) characters. |
 | `temba/flows/views.py` | modified | Add `"media_urls"` to `FlowCRUDL.actions` and the `MediaUrls` view. |
 | `temba/settings_common.py` | modified | Add `"media_urls"` to the `flows.flow` permissions, `"flows.flow_media_urls"` to Viewers, and `S3_ORG_SCOPED_KEY_PREFIXES = ["attachments", "media"]`. |
