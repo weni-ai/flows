@@ -2932,7 +2932,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
 
     @mock_mailroom
     @patch("temba.flows.views.uuid4")
-    def test_upload_media_action(self, mock_uuid, mr_mocks):
+    def test_upload_media_action(self, mr_mocks, mock_uuid):
         flow = self.get_flow("color_v13")
         other_org_flow = self.create_flow(org=self.org2)
 

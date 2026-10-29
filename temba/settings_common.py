@@ -569,7 +569,7 @@ PERMISSIONS = {
         "sent",
         "update",
     ),
-    "msgs.broadcast": ("api", "detail", "schedule", "schedule_list", "schedule_read", "send"),
+    "msgs.broadcast": ("api", "detail", "schedule", "schedule_list", "schedule_read", "send", "statistics_api"),
     "msgs.label": ("api", "create_folder", "delete_folder"),
     "orgs.topup": ("manage",),
     "policies.policy": ("admin", "history", "give_consent"),
@@ -599,6 +599,7 @@ GROUP_PERMISSIONS = {
         "orgs.org_api",
         "orgs.org_spa",
         "orgs.org_surveyor",
+        "msgs.broadcast_statistics_api",
         "msgs.msg_api",
     ),
     "Granters": ("orgs.org_grant",),
@@ -973,6 +974,7 @@ GROUP_PERMISSIONS = {
         "contacts.contactgroup_read",
         "contacts.contactimport_read",
         "globals.global_api",
+        "msgs.broadcast_statistics_api",
         "locations.adminboundary_boundaries",
         "locations.adminboundary_geometry",
         "locations.adminboundary_alias",
@@ -1043,6 +1045,7 @@ GROUP_PERMISSIONS = {
         "contacts.contactgroup_api",
         "globals.global_api",
         "msgs.broadcast_api",
+        "msgs.broadcast_statistics_api",
         "notifications.notification_list",
         "tickets.ticket_api",
         "tickets.ticket_assign",
@@ -1173,6 +1176,7 @@ CELERY_BEAT_SCHEDULE = {
     "trim-webhook-event": {"task": "trim_webhook_event_task", "schedule": crontab(hour=3, minute=0)},
     "update-org-activity": {"task": "update_org_activity_task", "schedule": crontab(hour=3, minute=5)},
     "update-unique-contact-counts": {"task": "update_unique_contact_counts", "schedule": crontab(hour=8, minute=0)},
+    "validate-datalake-layers": {"task": "validate_datalake_layers_task", "schedule": crontab(minute=30)},
     "refresh-teams-tokens": {"task": "refresh_teams_tokens", "schedule": timedelta(minutes=30)},
     "squash-flow-category-counts": {"task": "squash_flow_category_counts", "schedule": timedelta(seconds=60)},
 }
@@ -1546,6 +1550,12 @@ EVENTS_METRIC_NAME = os.environ.get("EVENTS_METRIC_NAME", default="")
 REDSHIFT_QUERY_BASE_URL = os.environ.get("REDSHIFT_QUERY_BASE_URL", default="")
 REDSHIFT_SECRET = os.environ.get("REDSHIFT_SECRET", default="")
 REDSHIFT_ROLE_ARN = os.environ.get("REDSHIFT_ROLE_ARN", default="")
+DATALAKE_VALIDATION_SLACK_WEBHOOK_URL = os.environ.get("DATALAKE_VALIDATION_SLACK_WEBHOOK_URL", default="")
+DATALAKE_VALIDATION_PROJECTS = [
+    project.strip()
+    for project in os.environ.get("DATALAKE_VALIDATION_PROJECTS", default="").split(",")
+    if project.strip()
+]
 
 
 def load_jwt_public_key(raw):

@@ -5,6 +5,8 @@ from temba.contacts.models import URN
 from ...models import ChannelType
 from .views import ClaimView
 
+MAX_MESSAGE_LENGTH = 4096
+
 
 class TelephonyPSTNType(ChannelType):
     """
@@ -28,7 +30,7 @@ class TelephonyPSTNType(ChannelType):
     claim_view = ClaimView
 
     schemes = [URN.TEL_SCHEME]
-    max_length = 4096
+    max_length = MAX_MESSAGE_LENGTH
     attachment_support = False
     free_sending = True
 
