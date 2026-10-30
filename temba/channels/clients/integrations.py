@@ -16,8 +16,10 @@ STATUS_ERROR = "error"
 
 class IntegrationsInternalClient(BaseInternalClient):
     def __init__(self, base_url=None, authenticator=None):
-        base_url = base_url or getattr(settings, "INTEGRATIONS_BASE_URL", None)
+        base_url = base_url or getattr(settings, "INTEGRATIONS_BASE_URL", "")
         super().__init__(base_url=base_url, authenticator=authenticator)
+        # BaseInternalClient falls back to CONNECT_BASE_URL when base_url is empty
+        self.base_url = base_url
 
     def report_app_migration_status(
         self,

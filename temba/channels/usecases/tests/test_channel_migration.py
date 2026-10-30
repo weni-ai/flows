@@ -1,7 +1,13 @@
 import uuid
 
+from temba.channels.models import Channel
 from temba.channels.usecases.channel_migration import MigrateChannelUseCase
-from temba.channels.usecases.exceptions import ChannelNotFoundError, ChannelOrgMismatchError, DestOrgNotFoundError
+from temba.channels.usecases.exceptions import (
+    ChannelNotFoundError,
+    ChannelOrgMismatchError,
+    ChannelWithoutOrgError,
+    DestOrgNotFoundError,
+)
 from temba.templates.models import Template, TemplateTranslation
 from temba.tests.base import TembaTest
 
@@ -165,6 +171,15 @@ class MigrateChannelUseCaseTest(TembaTest):
             MigrateChannelUseCase().execute(
                 channel_uuid=self.wac_channel.uuid,
                 project_to=str(uuid.uuid4()),
+            )
+
+    def test_raises_when_channel_has_no_org(self):
+        Channel.objects.filter(id=self.wac_channel.id).update(org=None)
+
+        with self.assertRaises(ChannelWithoutOrgError):
+            MigrateChannelUseCase().execute(
+                channel_uuid=self.wac_channel.uuid,
+                project_to=self.dest_org.proj_uuid,
             )
 
     def test_raises_when_project_from_does_not_match(self):
