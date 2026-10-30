@@ -1,3 +1,7 @@
+3.107.0
+----------
+* feat: Add channel migration consumer for integrations.channel.migrated events
+
 3.106.0
 ----------
 * fix: sign media URLs in the flow editor and simulator through /flow/media_urls/ (security-relevant: signing is restricted to objects of the flow's org)
