@@ -22,6 +22,11 @@ CTWA_DATALAKE_VALUE_MAP = {
     "purchase": "purchase_completed",
 }
 
+META_EVENT_NAME_MAP = {"lead": "LeadSubmitted", "purchase": "Purchase"}
+
+# Keeps today's conversion behaviour; channel wa_currency is a later cut.
+DEFAULT_PURCHASE_CURRENCY = "BRL"
+
 logger = logging.getLogger(__name__)
 
 
@@ -196,16 +201,34 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
             logger.error(f"Error fetching channel dataset_id: {str(e)}")
             return None
 
+    def _purchase_custom_data(self, original_payload):
+        """Return Meta custom_data for a purchase, or None when value is absent or invalid.
+
+        Zero is a valid amount (check is not None, not truthiness). Currency omitted or empty
+        stays DEFAULT_PURCHASE_CURRENCY so Meta always receives the value/currency pair.
+        """
+        if not original_payload or "value" not in original_payload:
+            return None
+
+        value = original_payload.get("value")
+        if value is None:
+            return None
+
+        try:
+            parsed_value = float(value)
+        except (ValueError, TypeError):
+            logger.warning("Invalid value format in purchase event")
+            return None
+
+        currency = original_payload.get("currency") or DEFAULT_PURCHASE_CURRENCY
+        return {"value": parsed_value, "currency": currency}
+
     def _build_meta_payload(self, event_type, ctwa_data, original_payload):
         """Build payload for Meta Conversion API"""
         event_time = int(datetime.now().timestamp())
 
-        # Map event types for Meta
-        event_name_map = {"lead": "LeadSubmitted", "purchase": "Purchase"}
-
-        # Payload following the specified format for Meta
         meta_event = {
-            "event_name": event_name_map.get(event_type, "LeadSubmitted"),
+            "event_name": META_EVENT_NAME_MAP.get(event_type, "LeadSubmitted"),
             "event_time": event_time,
             "action_source": "business_messaging",
             "messaging_channel": "whatsapp",
@@ -215,18 +238,10 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
             },
         }
 
-        # Add value and currency only for purchase events
         if event_type == "purchase":
-            value = original_payload.get("value")
-            currency = original_payload.get("currency", "BRL")  # Default to BRL if not provided
-            if value:
-                try:
-                    # Convert value to float and keep it as float
-                    value = float(value)
-                    meta_event["value"] = value
-                    meta_event["currency"] = currency
-                except (ValueError, TypeError):
-                    logger.warning(f"Invalid value format in purchase event: {value}")
+            custom_data = self._purchase_custom_data(original_payload)
+            if custom_data is not None:
+                meta_event["custom_data"] = custom_data
 
         return {
             "data": [meta_event],
@@ -253,9 +268,19 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
 
             response = requests.post(url, json=payload, headers=headers, timeout=30)
 
+            first_event = (payload.get("data") or [{}])[0]
+            log_extra = {
+                "event_name": first_event.get("event_name"),
+                "dataset_id": dataset_id,
+                "http_status": response.status_code,
+                "has_custom_data": "custom_data" in first_event,
+            }
+
             if response.status_code == 200:
+                logger.info("Meta CAPI event accepted", extra=log_extra)
                 return True, "Success"
             else:
+                logger.warning("Meta CAPI event rejected", extra=log_extra)
                 error_detail = response.json()
                 return False, str(error_detail)
 
@@ -405,8 +430,9 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
             if value is not None:
                 try:
                     metadata["order_value"] = float(value)
+                    metadata["currency"] = payload.get("currency") or DEFAULT_PURCHASE_CURRENCY
                 except (ValueError, TypeError):
-                    logger.warning(f"Invalid order_value format in purchase event: {value}")
+                    logger.warning("Invalid order_value format in purchase event")
 
         return {
             "event_name": "ctwa",

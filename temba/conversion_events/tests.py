@@ -264,6 +264,11 @@ class ConversionEventAPITest(TembaTest):
                 call_args = mock_post.call_args
                 self.assertIn("test_dataset_123", call_args[0][0])
                 self.assertIn("access_token=test_token", call_args[0][0])
+                lead_event = call_args[1]["json"]["data"][0]
+                self.assertEqual(lead_event["event_name"], "LeadSubmitted")
+                self.assertNotIn("custom_data", lead_event)
+                self.assertNotIn("value", lead_event)
+                self.assertNotIn("currency", lead_event)
 
                 # Verify Datalake call
                 mock_send_event.assert_called_once()
@@ -396,10 +401,11 @@ class ConversionEventAPITest(TembaTest):
                 meta_payload = mock_post.call_args[1]["json"]
                 meta_event = meta_payload["data"][0]
 
-                # Value should be float and currency should be string
-                self.assertEqual(meta_event["value"], 123.45)
-                self.assertEqual(meta_event["currency"], "USD")
                 self.assertEqual(meta_event["event_name"], "Purchase")
+                self.assertNotIn("value", meta_event)
+                self.assertNotIn("currency", meta_event)
+                self.assertEqual(meta_event["custom_data"]["value"], 123.45)
+                self.assertEqual(meta_event["custom_data"]["currency"], "USD")
 
                 # Verify Datalake API call
                 mock_send_event.assert_called_once()
@@ -458,6 +464,7 @@ class ConversionEventAPITest(TembaTest):
                 # Verify value and currency are not present due to invalid value
                 self.assertNotIn("value", meta_event)
                 self.assertNotIn("currency", meta_event)
+                self.assertNotIn("custom_data", meta_event)
 
                 # Verify Datalake call still includes the original payload
                 mock_send_event.assert_called_once()
@@ -465,6 +472,137 @@ class ConversionEventAPITest(TembaTest):
                 event_data = datalake_call[0][1]
                 self.assertEqual(event_data["metadata"]["value"], "invalid")
                 self.assertEqual(event_data["metadata"]["currency"], "USD")
+
+    def _post_purchase_to_meta(self, mock_post, mock_send_event, inner_payload, log_level="INFO"):
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"success": True}
+        mock_post.return_value = mock_response
+
+        self.org.proj_uuid = uuid4()
+        self.org.save(update_fields=["proj_uuid"])
+
+        payload = self.valid_payload.copy()
+        payload["event_type"] = "purchase"
+        payload["payload"] = inner_payload
+
+        with override_settings(
+            WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
+            WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
+            META_PARTNER_AGENT="Weni by VTEX",
+        ):
+            with self.assertLogs("temba.conversion_events.views", level=log_level) as captured:
+                response = self.client.post(
+                    self.endpoint_url,
+                    data=json.dumps(payload),
+                    content_type="application/json",
+                )
+
+        self.assertEqual(response.status_code, 200)
+        mock_post.assert_called_once()
+        meta_event = mock_post.call_args[1]["json"]["data"][0]
+        return meta_event, captured, mock_send_event
+
+    def test_purchase_zero_value_is_sent_in_custom_data(self):
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
+            for raw_value in (0, 0.0, "0"):
+                mock_post.reset_mock()
+                meta_event, _, _ = self._post_purchase_to_meta(
+                    mock_post, mock_send_event, {"value": raw_value, "currency": "USD"}
+                )
+                self.assertEqual(meta_event["custom_data"]["value"], 0.0)
+                self.assertEqual(meta_event["custom_data"]["currency"], "USD")
+                self.assertNotIn("value", meta_event)
+                self.assertNotIn("currency", meta_event)
+
+    def test_purchase_missing_value_omits_custom_data(self):
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
+            meta_event, _, _ = self._post_purchase_to_meta(mock_post, mock_send_event, {"currency": "USD"})
+            self.assertNotIn("custom_data", meta_event)
+            self.assertNotIn("value", meta_event)
+            self.assertNotIn("currency", meta_event)
+
+            mock_post.reset_mock()
+            meta_event, _, _ = self._post_purchase_to_meta(
+                mock_post, mock_send_event, {"value": None, "currency": "USD"}
+            )
+            self.assertNotIn("custom_data", meta_event)
+
+    def test_purchase_missing_currency_defaults_to_brl(self):
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
+            meta_event, _, _ = self._post_purchase_to_meta(mock_post, mock_send_event, {"value": 150.0})
+            self.assertEqual(meta_event["custom_data"]["value"], 150.0)
+            self.assertEqual(meta_event["custom_data"]["currency"], "BRL")
+
+    def test_purchase_invalid_value_logs_without_contact_urn(self):
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
+            meta_event, captured, _ = self._post_purchase_to_meta(
+                mock_post, mock_send_event, {"value": "abc", "currency": "USD"}
+            )
+            self.assertNotIn("custom_data", meta_event)
+            log_text = "\n".join(captured.output)
+            self.assertIn("Invalid value format in purchase event", log_text)
+            self.assertNotIn("whatsapp:5511999999999", log_text)
+            self.assertNotIn("test_clid_123", log_text)
+
+    def test_meta_success_log_omits_clid_and_token(self):
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ) as mock_send_event:
+            _, captured, _ = self._post_purchase_to_meta(mock_post, mock_send_event, {"value": 10, "currency": "BRL"})
+            accepted = [r for r in captured.records if r.getMessage() == "Meta CAPI event accepted"]
+            self.assertEqual(len(accepted), 1)
+            record = accepted[0]
+            self.assertEqual(record.event_name, "Purchase")
+            self.assertEqual(record.dataset_id, "test_dataset_123")
+            self.assertEqual(record.http_status, 200)
+            self.assertTrue(record.has_custom_data)
+            log_text = "\n".join(captured.output)
+            self.assertNotIn("test_clid_123", log_text)
+            self.assertNotIn("test_token", log_text)
+
+    def test_meta_failure_log_includes_status_without_clid(self):
+        payload = self.valid_payload.copy()
+        payload["event_type"] = "purchase"
+        payload["payload"] = {"value": 10, "currency": "BRL"}
+
+        self.org.proj_uuid = uuid4()
+        self.org.save(update_fields=["proj_uuid"])
+
+        with patch("temba.conversion_events.views.requests.post") as mock_post, patch(
+            "temba.conversion_events.views.send_event_data"
+        ):
+            mock_response = Mock()
+            mock_response.status_code = 400
+            mock_response.json.return_value = {"error": "Invalid request"}
+            mock_post.return_value = mock_response
+
+            with override_settings(
+                WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token",
+                WHATSAPP_API_URL="https://graph.facebook.com/v18.0",
+            ):
+                with self.assertLogs("temba.conversion_events.views", level="WARNING") as captured:
+                    response = self.client.post(
+                        self.endpoint_url,
+                        data=json.dumps(payload),
+                        content_type="application/json",
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        rejected = [r for r in captured.records if r.getMessage() == "Meta CAPI event rejected"]
+        self.assertEqual(len(rejected), 1)
+        self.assertEqual(rejected[0].http_status, 400)
+        self.assertEqual(rejected[0].event_name, "Purchase")
+        self.assertTrue(rejected[0].has_custom_data)
+        self.assertNotIn("test_clid_123", "\n".join(captured.output))
 
     def test_ctwa_data_not_found(self):
         """Test that event is still sent to Datalake when CTWA data is not found"""
@@ -1187,6 +1325,7 @@ class CtwaDatalakeDualWriteTest(TembaTest):
             ctwa_event = mock_send_event.call_args_list[1][0][1]
             self.assertEqual(ctwa_event["value"], "purchase_completed")
             self.assertEqual(ctwa_event["metadata"]["order_value"], 456.78)
+            self.assertEqual(ctwa_event["metadata"]["currency"], "BRL")
 
     def test_lead_without_ctwa_sends_legacy_only(self):
         payload = self.valid_payload.copy()
