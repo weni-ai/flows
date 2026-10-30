@@ -4,17 +4,24 @@ import io
 import os
 import re
 import uuid
+from contextlib import contextmanager
 from datetime import timedelta
-from unittest.mock import PropertyMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
+from urllib.parse import urlparse
 
 import iso8601
 import pytz
+import sentry_sdk
+from botocore.exceptions import NoCredentialsError
 from django_redis import get_redis_connection
 from openpyxl import load_workbook
+from sentry_sdk.integrations.django import DjangoIntegration
 
 from django.conf import settings
 from django.contrib.auth.models import Group
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models.functions import TruncDate
+from django.test import Client
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -29,13 +36,15 @@ from temba.externals.models import ExternalService
 from temba.globals.models import Global
 from temba.mailroom import FlowValidationException
 from temba.orgs.integrations.dtone import DTOneType
+from temba.orgs.models import OrgRole
 from temba.templates.models import Template, TemplateTranslation
 from temba.tests import AnonymousOrg, CRUDLTestMixin, MockResponse, TembaTest, matchers, mock_mailroom
 from temba.tests.engine import MockSessionWriter
-from temba.tests.s3 import MockS3Client, jsonlgz_encode
+from temba.tests.s3 import S3_SIGNING_SETTINGS, MockS3Client, jsonlgz_encode
 from temba.tickets.models import Ticketer
 from temba.triggers.models import Trigger
 from temba.utils import json
+from temba.utils.s3 import private_file_storage, regional_client
 from temba.utils.uuid import uuid4
 from temba.wpp_products.models import Catalog, Product
 
@@ -58,6 +67,7 @@ from .models import (
     FlowVersionConflictException,
     get_flow_user,
 )
+from .serializers import MAX_MEDIA_URL_LENGTH, MAX_MEDIA_URLS_PER_REQUEST
 from .tasks import (
     interrupt_flow_sessions,
     squash_flow_category_counts,
@@ -345,6 +355,7 @@ class FlowTest(TembaTest):
         self.assertTrue(response.context["can_simulate"])
         self.assertContains(response, reverse("flows.flow_simulate", args=[flow.id]))
         self.assertContains(response, "id='rp-flow-editor'")
+        self.assertContains(response, f"media_urls: '/flow/media_urls/{flow.uuid}/'")
 
         # customer service gets a service button
         csrep = self.create_user("csrep")
@@ -2837,45 +2848,139 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
         self.assertTrue(start.include_active)
         self.assertEqual('name ~ "frank"', start.query)
 
+    def _assert_file_upload(
+        self,
+        url,
+        file_name,
+        file_content,
+        content_type,
+        expected_url=None,
+        expected_path_prefix=None,
+        extra_params=None,
+    ):
+        """
+        Helper method to test file uploads
+        """
+        # create the test file
+        if isinstance(file_content, str):
+            file_content = file_content.encode()
+
+        if os.path.exists(file_name):
+            with open(file_name, "rb") as f:
+                file_content = f.read()
+                test_file = SimpleUploadedFile(os.path.basename(file_name), file_content, content_type=content_type)
+        else:
+            test_file = SimpleUploadedFile(file_name, file_content, content_type=content_type)
+
+        # prepare post data
+        post_data = {"file": test_file}
+        if extra_params:
+            post_data.update(extra_params)
+
+        # try to upload it
+        response = self.client.post(url, post_data)
+
+        # check response
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+
+        # recording uploads return a storage path, media uploads return a type and url
+        if expected_path_prefix:
+            path = response_json["path"]
+            self.assertTrue(path.startswith(expected_path_prefix))
+        else:
+            self.assertEqual(response_json["type"], content_type)
+
+            # url should be relative to STORAGE_URL
+            url = response_json["url"]
+            self.assertTrue(url.startswith(f"{settings.STORAGE_URL}/"))
+            if expected_url:
+                self.assertEqual(url, expected_url)
+            path = url.replace(f"{settings.STORAGE_URL}/", "")
+
+        # check that file exists in private storage
+        self.assertTrue(private_file_storage.exists(path))
+
+        # check content
+        with private_file_storage.open(path) as f:
+            self.assertEqual(f.read(), file_content)
+
+        return response_json
+
+    @mock_mailroom(queue=False)
+    def test_media_upload_with_private_storage(self, mr_mocks):
+        """
+        Test that media uploads use private storage
+        """
+        self.login(self.admin)
+        flow = Flow.create(self.org, self.admin, "Test Flow", base_language="eng")
+
+        upload_url = reverse("flows.flow_upload_media_action", args=[flow.uuid])
+        self._assert_file_upload(upload_url, "test.txt", b"test content", "text/plain")
+
+    @mock_mailroom
+    def test_recording_upload_with_private_storage(self, mr_mocks):
+        """
+        Test that recording uploads use private storage
+        """
+        self.login(self.admin)
+        flow = Flow.create(self.org, self.admin, "Test Flow", base_language="eng")
+
+        upload_url = reverse("flows.flow_upload_action_recording", args=[flow.id])
+        self._assert_file_upload(
+            upload_url,
+            "test.wav",
+            b"audio content",
+            "audio/wav",
+            expected_path_prefix="recordings/",
+            extra_params={
+                "actionset": "action-uuid",
+                "action": "action-uuid",
+            },
+        )
+
+    @mock_mailroom
     @patch("temba.flows.views.uuid4")
-    def test_upload_media_action(self, mock_uuid):
+    def test_upload_media_action(self, mr_mocks, mock_uuid):
         flow = self.get_flow("color_v13")
         other_org_flow = self.create_flow(org=self.org2)
 
-        upload_media_action_url = reverse("flows.flow_upload_media_action", args=[flow.uuid])
-
-        def assert_media_upload(filename, expected_type, expected_path):
-            with open(filename, "rb") as data:
-                post_data = dict(file=data, action="", HTTP_X_FORWARDED_HTTPS="https")
-                response = self.client.post(upload_media_action_url, post_data)
-
-                self.assertEqual(response.status_code, 200)
-                actual_type = response.json()["type"]
-                actual_url = response.json()["url"]
-                self.assertEqual(actual_type, expected_type)
-                self.assertEqual(actual_url, expected_path)
-
         self.login(self.admin)
-
         mock_uuid.side_effect = ["11111-111-11", "22222-222-22", "33333-333-33", "44444-444-44"]
 
-        assert_media_upload(
+        # test image upload
+        expected_url = (
+            f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/11111-111-11/steve.marten.jpg"
+        )
+        self._assert_file_upload(
+            reverse("flows.flow_upload_media_action", args=[flow.uuid]),
             f"{settings.MEDIA_ROOT}/test_media/steve.marten.jpg",
+            None,  # will read from file
             "image/jpeg",
-            "%s/attachments/%d/%d/steps/%s/%s"
-            % (settings.STORAGE_URL, self.org.id, flow.id, "11111-111-11", "steve.marten.jpg"),
+            expected_url=expected_url,
+            extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
-        assert_media_upload(
+
+        # test video upload
+        expected_url = f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/22222-222-22/snow.mp4"
+        self._assert_file_upload(
+            reverse("flows.flow_upload_media_action", args=[flow.uuid]),
             f"{settings.MEDIA_ROOT}/test_media/snow.mp4",
+            None,  # will read from file
             "video/mp4",
-            "%s/attachments/%d/%d/steps/%s/%s"
-            % (settings.STORAGE_URL, self.org.id, flow.id, "22222-222-22", "snow.mp4"),
+            expected_url=expected_url,
+            extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
-        assert_media_upload(
+
+        # test audio upload
+        expected_url = f"{settings.STORAGE_URL}/attachments/{self.org.id}/{flow.id}/steps/33333-333-33/snow.m4a"
+        self._assert_file_upload(
+            reverse("flows.flow_upload_media_action", args=[flow.uuid]),
             f"{settings.MEDIA_ROOT}/test_media/snow.m4a",
+            None,  # will read from file
             "audio/mp4",
-            "%s/attachments/%d/%d/steps/%s/%s"
-            % (settings.STORAGE_URL, self.org.id, flow.id, "33333-333-33", "snow.m4a"),
+            expected_url=expected_url,
+            extra_params={"action": "", "HTTP_X_FORWARDED_HTTPS": "https"},
         )
 
         # can't upload for flow in other org
@@ -3232,7 +3337,7 @@ class FlowCRUDLTest(TembaTest, CRUDLTestMixin):
             response = self.client.get("%s?responded=true" % reverse("flows.flow_run_table", args=[flow.id]))
             self.assertEqual(len(response.context["runs"]), 1)
 
-    def test_activity(self):
+    def test_activity_endpoint(self):
         flow = self.get_flow("favorites_v13")
         flow_nodes = flow.get_definition()["nodes"]
         color_prompt = flow_nodes[0]
@@ -3527,6 +3632,281 @@ msgstr "Azul"
 
         # should have a new revision
         self.assertEqual(2, flow.revisions.count())
+
+
+@override_settings(**S3_SIGNING_SETTINGS)
+class FlowMediaUrlsTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+
+        regional_client.cache_clear()
+
+        self.flow = Flow.create(self.org, self.admin, "Test Flow")
+        self.url = reverse("flows.flow_media_urls", args=[self.flow.uuid])
+
+        self.own_attachment = (
+            f"https://static-bucket.s3.amazonaws.com/attachments/{self.org.id}/{self.flow.id}/steps/a/b.jpg"
+        )
+        self.own_media = (
+            f"https://media-bucket.s3.sa-east-1.amazonaws.com/media/{self.org.id}/ab12/cd34/secret-photo.jpg"
+        )
+
+    def post_urls(self, urls, client=None, flow=None):
+        url = reverse("flows.flow_media_urls", args=[flow.uuid]) if flow else self.url
+        return (client or self.client).post(url, json.dumps({"urls": urls}), content_type="application/json")
+
+    def post_body(self, body):
+        return self.client.post(self.url, body, content_type="application/json")
+
+    def assertNoStore(self, response):
+        self.assertEqual("no-store", response["Cache-Control"])
+
+    def assertJsonError(self, response, status, error):
+        self.assertEqual(status, response.status_code)
+        self.assertEqual({"error": error}, response.json())
+        self.assertNoStore(response)
+
+    @contextmanager
+    def capture_sentry_events(self):
+        events = []
+        client = sentry_sdk.Client(
+            dsn="https://key@sentry.example.invalid/1",
+            integrations=[DjangoIntegration()],
+            send_default_pii=True,
+            before_send=lambda event, hint: events.append(event),  # returns None so nothing is sent
+        )
+        with sentry_sdk.Hub(client):
+            yield events
+
+    def test_signs_own_org_urls(self):
+        self.login(self.admin)
+
+        response = self.post_urls([self.own_attachment, self.own_media])
+
+        self.assertEqual(200, response.status_code)
+        self.assertNoStore(response)
+        self.assertEqual(600, response.json()["expires_in"])
+
+        signed = response.json()["urls"]
+        self.assertEqual({self.own_attachment, self.own_media}, set(signed))
+        for original, signed_url in signed.items():
+            self.assertEqual(urlparse(original).path, urlparse(signed_url).path)
+            self.assertIn("X-Amz-Signature=", signed_url)
+            self.assertIn("X-Amz-Expires=600", signed_url)
+
+    def test_duplicate_urls_are_signed_once(self):
+        self.login(self.admin)
+
+        with patch("temba.utils.s3.s3.presign_url", return_value="signed") as mock_presign:
+            response = self.post_urls([self.own_media, self.own_media])
+
+        self.assertEqual({"urls": {self.own_media: "signed"}, "expires_in": 600}, response.json())
+        mock_presign.assert_called_once_with(self.own_media)
+
+    def test_unsignable_urls_are_returned_unchanged(self):
+        self.login(self.admin)
+
+        other_org_id = self.org2.id
+        unchanged = [
+            # another org's object
+            f"https://media-bucket.s3.amazonaws.com/media/{other_org_id}/ab12/cd34/photo.jpg",
+            # a key outside the org-scoped prefixes
+            f"https://static-bucket.s3.amazonaws.com/archives/{self.org.id}/export.csv",
+            # a bucket we don't sign, and the public sample media
+            f"https://other-bucket.s3.amazonaws.com/media/{self.org.id}/ab12/cd34/photo.jpg",
+            "https://floweditor-assets.temba.io/sample.png",
+            "https://example.com/media/photo.jpg",
+            # keys that could walk out of the org's prefix
+            f"https://media-bucket.s3.amazonaws.com/media/{self.org.id}/../{other_org_id}/ab12/photo.jpg",
+            f"https://media-bucket.s3.amazonaws.com/media/{self.org.id}/./photo.jpg",
+            f"https://media-bucket.s3.amazonaws.com/media/{self.org.id}//photo.jpg",
+            f"https://media-bucket.s3.amazonaws.com/media/{self.org.id}/%2E%2E/{other_org_id}/photo.jpg",
+            # not a URL at all
+            "-35.998287,26.478109",
+        ]
+
+        response = self.post_urls(unchanged)
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({url: url for url in unchanged}, response.json()["urls"])
+
+    def test_authorization(self):
+        # anonymous gets a JSON 403 rather than the login redirect
+        with patch("temba.utils.s3.s3.presign_url") as mock_presign:
+            response = self.post_urls([self.own_media])
+            self.assertJsonError(response, 403, "Forbidden")
+            self.assertNotIn("Location", response)
+
+            # users from other orgs, or without the permission
+            other_org_flow = Flow.create(self.org2, self.admin2, "Other Flow")
+            self.login(self.admin)
+            self.assertJsonError(self.post_urls([self.own_media], flow=other_org_flow), 403, "Forbidden")
+
+            for user in (self.agent, self.surveyor, self.non_org_user):
+                self.login(user)
+                self.assertJsonError(self.post_urls([self.own_media]), 403, "Forbidden")
+
+            self.login(self.admin2)
+            self.assertJsonError(self.post_urls([self.own_media]), 403, "Forbidden")
+
+            mock_presign.assert_not_called()
+
+        # unknown and inactive flows
+        self.login(self.admin)
+        unknown_url = reverse("flows.flow_media_urls", args=[uuid4()])
+        response = self.client.post(
+            unknown_url, json.dumps({"urls": [self.own_media]}), content_type="application/json"
+        )
+        self.assertJsonError(response, 404, "Not found")
+
+        self.flow.release(self.admin)
+        self.assertJsonError(self.post_urls([self.own_media]), 404, "Not found")
+
+    def test_allowed_roles(self):
+        marketing = self.create_user("Marketing")
+        marketing.set_org(self.org)
+        self.org.add_user(marketing, OrgRole.MARKETING)
+
+        for user in (self.admin, self.editor, self.user, marketing):
+            self.login(user)
+
+            response = self.post_urls([self.own_media])
+
+            self.assertEqual(200, response.status_code, user.username)
+            self.assertIn("X-Amz-Signature=", response.json()["urls"][self.own_media])
+
+    def test_invalid_requests(self):
+        self.login(self.admin)
+
+        bad_bodies = [
+            "not json",
+            "\xff\xfe",
+            "null",
+            "[]",
+            "{}",
+            json.dumps({"urls": "x"}),
+            json.dumps({"urls": []}),
+            json.dumps({"urls": [{"a": 1}]}),
+            json.dumps({"urls": ["https://example.com/a", "   "]}),
+            json.dumps({"urls": [""]}),
+            json.dumps({"urls": ["https://example.com/a"] * (MAX_MEDIA_URLS_PER_REQUEST + 1)}),
+            json.dumps({"urls": ["https://example.com/" + "a" * MAX_MEDIA_URL_LENGTH]}),
+            "[" * 100000,
+        ]
+
+        with patch("temba.utils.s3.s3.presign_url") as mock_presign:
+            for body in bad_bodies:
+                self.assertJsonError(self.post_body(body), 400, "Invalid request")
+
+            # a body above the allowed upload size
+            with override_settings(DATA_UPLOAD_MAX_MEMORY_SIZE=10):
+                self.assertJsonError(self.post_body(json.dumps({"urls": [self.own_media]})), 400, "Invalid request")
+
+            # the limits themselves are accepted
+            urls = [f"https://example.com/{i}" for i in range(MAX_MEDIA_URLS_PER_REQUEST - 1)]
+            urls.append("https://example.com/" + "a" * (MAX_MEDIA_URL_LENGTH - len("https://example.com/")))
+            response = self.post_urls(urls)
+            self.assertEqual(200, response.status_code)
+            self.assertEqual(set(urls), set(response.json()["urls"]))
+
+            mock_presign.assert_not_called()
+
+    def test_method_not_allowed(self):
+        self.login(self.admin)
+
+        for method in ("get", "put", "delete"):
+            response = getattr(self.client, method)(self.url)
+
+            self.assertEqual(405, response.status_code)
+            self.assertNoStore(response)
+
+    def test_csrf_is_enforced(self):
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.admin)
+
+        with patch("temba.utils.s3.s3.presign_url") as mock_presign:
+            response = self.post_urls([self.own_media], client=csrf_client)
+
+        self.assertEqual(403, response.status_code)
+        mock_presign.assert_not_called()
+
+    def test_upload_then_sign(self):
+        with override_settings(STORAGE_URL="https://static.example.com"):
+            self.login(self.admin)
+
+            with open(f"{settings.MEDIA_ROOT}/test_media/steve.marten.jpg", "rb") as data:
+                response = self.client.post(
+                    reverse("flows.flow_upload_media_action", args=[self.flow.uuid]), {"file": data}
+                )
+
+        uploaded_url = response.json()["url"]
+        self.assertTrue(
+            uploaded_url.startswith(f"https://static.example.com/attachments/{self.org.id}/{self.flow.id}/")
+        )
+
+        response = self.post_urls([uploaded_url])
+        signed = response.json()["urls"][uploaded_url]
+        self.assertTrue(
+            signed.startswith(uploaded_url.replace("static.example.com", "static-bucket.s3.sa-east-1.amazonaws.com"))
+        )
+        self.assertIn("X-Amz-Signature=", signed)
+
+        # the same URL posted for a flow of another org is returned unchanged
+        other_org_flow = Flow.create(self.org2, self.admin2, "Other Flow")
+        self.login(self.admin2)
+        self.admin2.set_org(self.org2)
+
+        response = self.post_urls([uploaded_url], flow=other_org_flow)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({uploaded_url: uploaded_url}, response.json()["urls"])
+
+    def test_nothing_is_logged_on_success(self):
+        self.login(self.admin)
+
+        with self.assertNoLogs(level="INFO"):
+            response = self.post_urls([self.own_media])
+
+        self.assertEqual(200, response.status_code)
+
+    def test_signing_failure(self):
+        self.login(self.admin)
+
+        failing_client = MagicMock()
+        failing_client.generate_presigned_url.side_effect = NoCredentialsError()
+
+        with self.capture_sentry_events() as events, self.assertLogs("temba.flows.views", level="ERROR") as logs:
+            with patch("temba.utils.s3.s3.regional_client", return_value=failing_client):
+                response = self.post_urls([self.own_media])
+
+        self.assertJsonError(response, 500, "Internal server error")
+        self.assertNotIn("Traceback", response.content.decode())
+
+        self.assertEqual(["media url signing failed"], [record.getMessage() for record in logs.records])
+
+        # reported to Sentry once, with opaque identifiers and without any URL
+        self.assertEqual(1, len(events))
+        event = events[0]
+        self.assertEqual({"feature": "media-signing", "org_id": self.org.id}, event["tags"])
+        self.assertEqual(str(self.flow.uuid), event["extra"]["flow_uuid"])
+        self.assertEqual(1, event["extra"]["url_count"])
+        self.assertIn("request", event)
+        self.assertNotIn("data", event["request"])
+        self.assertNotIn("secret-photo", json.dumps(event, default=str))
+
+    def test_unhandled_error_events_have_no_urls(self):
+        self.login(self.admin)
+        self.client.raise_request_exception = False
+
+        with self.capture_sentry_events() as events:
+            with patch.object(FlowCRUDL.MediaUrls, "get_object", side_effect=ValueError("boom")):
+                response = self.post_urls([self.own_media])
+
+        self.assertEqual(500, response.status_code)
+
+        self.assertEqual(1, len(events))
+        self.assertIn("request", events[0])
+        self.assertNotIn("data", events[0]["request"])
+        self.assertNotIn("secret-photo", json.dumps(events[0], default=str))
 
 
 class FlowRunTest(TembaTest):

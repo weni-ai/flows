@@ -1,6 +1,41 @@
-3.101.0
+3.107.0
 ----------
 * feat: Add channel migration consumer for integrations.channel.migrated events
+
+3.106.0
+----------
+* fix: sign media URLs in the flow editor and simulator through /flow/media_urls/ (security-relevant: signing is restricted to objects of the flow's org)
+
+3.105.0
+----------
+* fix: security — close fail-open org membership, empty fixed tokens, mixin auth bypass, cross-tenant internals, and bind module JWTs to token tenant claims (SEC-01, 03, 04, 05, 06, 07, 09, 10, 11)
+* chore: update weni rapid pro apps to version 2.13.0
+
+3.104.0
+----------
+* feat: add PSTN telephony channel type (TPH)
+* fix: allow contact field values to break lines in contact read template
+
+3.103.0
+----------
+* feat: Add Celery task to validate datalake bronze and silver counts
+* feat: enhance attachment handling with external URL support
+* feat: use private S3 storage and pre-signed URLs for attachments
+
+3.102.0
+----------
+* feat: add oidc auth to media proxy endpoint and permission class to only allow admin, editors and
+human agents to get s3 files.
+* feat: implement custom ordering and pagination for flows.json endpoint
+
+3.101.0
+----------
+* feat: add internal ticketer list GET and item GET/PUT/DELETE on the existing ticketer endpoints
+* feat: publish ChangeHistory events (weni-rp-apps 2.12.0, weni-commons 1.6.2) behind CHANGE_HISTORY_ENABLED
+
+3.100.2
+----------
+* feat: JWT public key to env variable
 
 3.100.1
 ----------

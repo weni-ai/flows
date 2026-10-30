@@ -11,6 +11,17 @@ from botocore.exceptions import ClientError
 from temba.archives.models import FileAndHash, jsonlgz_iterate
 from temba.utils import chunk_list, json
 
+S3_SIGNING_SETTINGS = {
+    "AWS_ACCESS_KEY_ID": "AKIAIOSFODNN7EXAMPLE",
+    "AWS_SECRET_ACCESS_KEY": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    "AWS_STORAGE_BUCKET_NAME": "static-bucket",
+    "AWS_BUCKET_DOMAIN": "static.example.com",
+    "AWS_S3_REGION_NAME": "sa-east-1",
+    "S3_MEDIA_BUCKETS": ["media-bucket"],
+    "S3_SIGNED_EXTRA_BUCKETS": ["attachments-bucket"],
+    "S3_PRESIGNED_URL_EXPIRES": 600,
+}
+
 
 class MockEventStream:
     def __init__(self, records: list[dict], max_payload_size: int = 256, error: Exception = None):

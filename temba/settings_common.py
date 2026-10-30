@@ -3,7 +3,6 @@ import socket
 import sys
 import urllib
 from datetime import timedelta
-from pathlib import Path
 
 import iptools
 import sentry_sdk
@@ -79,10 +78,20 @@ STORAGE_ROOT_DIR = "test_orgs" if TESTING else "orgs"
 # -----------------------------------------------------------------------------------
 AWS_ACCESS_KEY_ID = "aws_access_key_id"
 AWS_SECRET_ACCESS_KEY = "aws_secret_access_key"
-AWS_DEFAULT_ACL = "private"
+# buckets with ACLs disabled reject uploads that send any x-amz-acl header
+AWS_DEFAULT_ACL = None
+AWS_S3_REGION_NAME = None
 
 AWS_STORAGE_BUCKET_NAME = "dl-temba-io"
 AWS_BUCKET_DOMAIN = AWS_STORAGE_BUCKET_NAME + ".s3.amazonaws.com"
+
+# other buckets whose attachment URLs are pre-signed when rendered, besides AWS_STORAGE_BUCKET_NAME
+S3_MEDIA_BUCKETS = []
+S3_SIGNED_EXTRA_BUCKETS = []
+S3_PRESIGNED_URL_EXPIRES = 60 * 60
+
+# key prefixes under which objects are stored per org as <prefix>/<org_id>/..., only these can be signed for the editor
+S3_ORG_SCOPED_KEY_PREFIXES = ["attachments", "media"]
 
 # bucket where archives files are stored
 ARCHIVE_BUCKET = "dl-temba-archives"
@@ -535,6 +544,7 @@ PERMISSIONS = {
         "import_translation",
         "export_results",
         "filter",
+        "media_urls",
         "menu",
         "recent_messages",
         "recent_contacts",
@@ -991,6 +1001,7 @@ GROUP_PERMISSIONS = {
         "flows.flow_export_results",
         "flows.flow_filter",
         "flows.flow_list",
+        "flows.flow_media_urls",
         "flows.flow_menu",
         "flows.flow_editor",
         "flows.flow_recent_messages",
@@ -1161,6 +1172,7 @@ CELERY_BEAT_SCHEDULE = {
     "trim-webhook-event": {"task": "trim_webhook_event_task", "schedule": crontab(hour=3, minute=0)},
     "update-org-activity": {"task": "update_org_activity_task", "schedule": crontab(hour=3, minute=5)},
     "update-unique-contact-counts": {"task": "update_unique_contact_counts", "schedule": crontab(hour=8, minute=0)},
+    "validate-datalake-layers": {"task": "validate_datalake_layers_task", "schedule": crontab(minute=30)},
     "refresh-teams-tokens": {"task": "refresh_teams_tokens", "schedule": timedelta(minutes=30)},
     "squash-flow-category-counts": {"task": "squash_flow_category_counts", "schedule": timedelta(seconds=60)},
 }
@@ -1321,6 +1333,7 @@ CHANNEL_TYPES = [
     "temba.channels.types.instagram.InstagramType",
     "temba.channels.types.slack.SlackType",
     "temba.channels.types.teams.TeamsType",
+    "temba.channels.types.telephony.TelephonyPSTNType",
     "temba.channels.types.email.EmailType",
     "temba.channels.types.externalv2.ExternalV2Type",
 ]
@@ -1529,18 +1542,27 @@ EVENTS_METRIC_NAME = os.environ.get("EVENTS_METRIC_NAME", default="")
 REDSHIFT_QUERY_BASE_URL = os.environ.get("REDSHIFT_QUERY_BASE_URL", default="")
 REDSHIFT_SECRET = os.environ.get("REDSHIFT_SECRET", default="")
 REDSHIFT_ROLE_ARN = os.environ.get("REDSHIFT_ROLE_ARN", default="")
+DATALAKE_VALIDATION_SLACK_WEBHOOK_URL = os.environ.get("DATALAKE_VALIDATION_SLACK_WEBHOOK_URL", default="")
+DATALAKE_VALIDATION_PROJECTS = [
+    project.strip()
+    for project in os.environ.get("DATALAKE_VALIDATION_PROJECTS", default="").split(",")
+    if project.strip()
+]
 
-# Path to the JWT public key
-BASE_DIR = Path(__file__).resolve().parent.parent
 
-JWT_PUBLIC_KEY_PATH = BASE_DIR / "temba" / "jwt_public_key.pem"
+def load_jwt_public_key(raw):
+    """Return the RS256 public key PEM from an env value, or None when unset.
 
-# The public key is loaded a single time at application startup.
-try:
-    with open(JWT_PUBLIC_KEY_PATH, "rb") as f:
-        JWT_PUBLIC_KEY = f.read()
-except FileNotFoundError:
-    JWT_PUBLIC_KEY = None
+    Newlines may be real or escaped as \\n, which is how single-line secrets are stored.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    return raw.replace("\\n", "\n").encode()
+
+
+# JWT public key used to verify RS256 Bearer tokens.
+JWT_PUBLIC_KEY = load_jwt_public_key(os.environ.get("JWT_PUBLIC_KEY", ""))
 
 WENI_VOICE_TOKEN = os.environ.get("WENI_VOICE_TOKEN", default="")
 
@@ -1588,3 +1610,15 @@ if USE_EDA:
     AMQ_VIRTUAL_HOST = os.environ.get("AMQ_VIRTUAL_HOST", PIKA_EDA_VIRTUAL_HOST)
     AMQ_BROKER_HEARTBEAT = int(os.environ.get("AMQ_BROKER_HEARTBEAT", 300))
     AMQ_BROKER_SSL_SERVER_HOSTNAME = os.environ.get("AMQ_BROKER_SSL_SERVER_HOSTNAME")
+
+# -----------------------------------------------------------------------------------
+# Recent activities / Change history (weni.activities)
+# -----------------------------------------------------------------------------------
+
+RECENT_ACTIVITIES_LEGACY_ENABLED = os.environ.get("RECENT_ACTIVITIES_LEGACY_ENABLED", "true").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+# Publishing requires USE_EDA and the AMQ_* broker settings above
+CHANGE_HISTORY_ENABLED = USE_EDA and os.environ.get("CHANGE_HISTORY_ENABLED", "false").lower() in ("true", "1", "yes")

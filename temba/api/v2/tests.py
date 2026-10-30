@@ -63,6 +63,7 @@ from temba.orgs.models import Org
 from temba.templates.models import Template, TemplateTranslation
 from temba.tests import AnonymousOrg, TembaTest, matchers, mock_mailroom
 from temba.tests.engine import MockSessionWriter
+from temba.tests.s3 import S3_SIGNING_SETTINGS
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.tickets.types.mailgun import MailgunType
 from temba.tickets.types.zendesk import ZendeskType
@@ -766,6 +767,70 @@ class APITest(APIJSONMixin, TembaTest):
 
         self.assertEqual(request._org, self.org)
         self.assertEqual(request.user, self.org.created_by)
+
+    def test_resolve_jwt_user_ignores_query_project_when_token_has_channel_only(self):
+        """SEC-05: a channel-only JWT must not adopt ``?project_uuid=`` of another org."""
+        channel = self.create_channel("TT", "JWT Channel", "99999")
+        self.org2.proj_uuid = self.org2.proj_uuid or uuid.uuid4()
+        self.org2.save(update_fields=("proj_uuid",))
+
+        factory = APIRequestFactory()
+        django_request = factory.get(f"/api/v2/contacts.json?project_uuid={self.org2.proj_uuid}")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"channel_uuid": str(channel.uuid)}
+        request.channel_uuid = str(channel.uuid)
+        view.request = request
+
+        with override_settings(INTERNAL_USER_EMAIL=""):
+            view._resolve_jwt_user(request)
+
+        self.assertEqual(request._org, channel.org)
+        self.assertEqual(request._org.id, self.org.id)
+
+    def test_resolve_jwt_user_uses_token_project_not_query(self):
+        """SEC-05: JWT project claim wins over ``?project_uuid=``."""
+        self.org.proj_uuid = self.org.proj_uuid or uuid.uuid4()
+        self.org.save(update_fields=("proj_uuid",))
+        self.org2.proj_uuid = self.org2.proj_uuid or uuid.uuid4()
+        self.org2.save(update_fields=("proj_uuid",))
+
+        factory = APIRequestFactory()
+        django_request = factory.get(f"/api/v2/contacts.json?project_uuid={self.org2.proj_uuid}")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {"project_uuid": str(self.org.proj_uuid)}
+        view.request = request
+
+        with override_settings(INTERNAL_USER_EMAIL=""):
+            view._resolve_jwt_user(request)
+
+        self.assertEqual(request._org.id, self.org.id)
+
+    def test_resolve_jwt_user_rejects_channel_from_other_org(self):
+        """SEC-05: token project + channel of another org is rejected."""
+        self.org.proj_uuid = self.org.proj_uuid or uuid.uuid4()
+        self.org.save(update_fields=("proj_uuid",))
+        channel_b = self.create_channel("TT", "Other Org Channel", "88888", org=self.org2)
+
+        factory = APIRequestFactory()
+        django_request = factory.get("/api/v2/contacts.json")
+        view = BaseAPIView()
+        view.format_kwarg = None
+        request = view.initialize_request(django_request)
+        request.user = AnonymousUser()
+        request.jwt_payload = {
+            "project_uuid": str(self.org.proj_uuid),
+            "channel_uuid": str(channel_b.uuid),
+        }
+        view.request = request
+
+        with self.assertRaises(InvalidQueryError):
+            view._resolve_jwt_user(request)
 
     def test_resolve_jwt_user_with_channel_uuid(self):
         """_resolve_jwt_user resolves org via channel_uuid."""
@@ -4184,6 +4249,53 @@ class APITest(APIJSONMixin, TembaTest):
         response = self.fetchJSON(url, "after=%s" % format_datetime(color.modified_on))
         self.assertResultsByUUID(response, [archived, color])
 
+        # order by name
+        response = self.fetchJSON(url, "order_by=name")
+        self.assertResultsByUUID(response, [color, archived, survey])
+
+        response = self.fetchJSON(url, "order_by=-name")
+        self.assertResultsByUUID(response, [survey, archived, color])
+
+        # order by created_on
+        response = self.fetchJSON(url, "order_by=created_on")
+        self.assertResultsByUUID(response, [survey, color, archived])
+
+        response = self.fetchJSON(url, "order_by=-created_on")
+        self.assertResultsByUUID(response, [archived, color, survey])
+
+        # invalid order_by
+        response = self.fetchJSON(url, "order_by=uuid")
+        self.assertResponseError(
+            response, None, "Invalid value for order_by, must be one of: name, -name, created_on, -created_on"
+        )
+
+        # cursor pagination with limit keeps the ordering across pages
+        response = self.fetchJSON(url, "order_by=name&limit=2")
+        resp_json = response.json()
+        self.assertResultsByUUID(response, [color, archived])
+        self.assertNotIn("count", resp_json)
+        self.assertIn("cursor=", resp_json["next"])
+
+        response = self.fetchJSON(resp_json["next"], raw_url=True)
+        self.assertResultsByUUID(response, [survey])
+        self.assertIsNone(response.json()["next"])
+
+        # limit/offset pagination when offset is provided
+        response = self.fetchJSON(url, "order_by=name&limit=1&offset=1")
+        resp_json = response.json()
+        self.assertResultsByUUID(response, [archived])
+        self.assertEqual(resp_json["count"], 3)
+        self.assertIn("offset=2", resp_json["next"])
+        self.assertIn("order_by=name", resp_json["next"])
+
+        response = self.fetchJSON(resp_json["next"], raw_url=True)
+        self.assertResultsByUUID(response, [survey])
+        self.assertIsNone(response.json()["next"])
+
+        response = self.fetchJSON(url, "offset=0")
+        self.assertResultsByUUID(response, [archived, color, survey])
+        self.assertEqual(response.json()["count"], 3)
+
         # inactive flows are never returned
         archived.is_active = False
         archived.save()
@@ -5167,6 +5279,34 @@ class APITest(APIJSONMixin, TembaTest):
                 }
             },
         )
+
+    @override_settings(**S3_SIGNING_SETTINGS)
+    def test_messages_presigns_s3_attachments(self):
+        self.login(self.admin)
+        msg = self.create_incoming_msg(
+            self.joe,
+            "Photo",
+            attachments=[
+                "image/jpeg:https://media-bucket.s3.amazonaws.com/media/photo.jpg",
+                "image/jpeg:https://example.com/test.jpg",
+                "geo:-35.998287,26.478109",
+            ],
+        )
+
+        response = self.fetchJSON(reverse("api.v2.messages"), f"id={msg.id}")
+        result = response.json()["results"][0]
+
+        signed_url_prefix = "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg?"
+        self.assertTrue(result["attachments"][0]["url"].startswith(signed_url_prefix))
+        self.assertIn("X-Amz-Signature=", result["attachments"][0]["url"])
+        self.assertEqual(
+            [
+                {"content_type": "image/jpeg", "url": "https://example.com/test.jpg"},
+                {"content_type": "geo", "url": "-35.998287,26.478109"},
+            ],
+            result["attachments"][1:],
+        )
+        self.assertTrue(result["media"].startswith(f"image/jpeg:{signed_url_prefix}"))
 
     def test_message_actions(self):
         url = reverse("api.v2.message_actions")

@@ -28,6 +28,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from temba.api.models import APIToken, Resthook, ResthookSubscriber, WebHookEvent
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
+from temba.api.v2.pagination import FlowsPagination
 from temba.api.v2.views_base import (
     BaseAPIView,
     BulkWriteAPIMixin,
@@ -3181,10 +3182,10 @@ class FlowsEndpoint(ListAPIMixin, BaseAPIView):
 
     ## Listing Flows
 
-    A **GET** returns the list of flows for your organization, in the order of last created.
+    A **GET** returns the list of flows for your organization, in the order of last created by default.
 
      * **uuid** - the UUID of the flow (string), filterable as `uuid`
-     * **name** - the name of the flow (string)
+     * **name** - the name of the flow (string), orderable as `order_by=name` or `order_by=-name`
      * **type** - the type of the flow (one of "message", "voice", "survey"), filterable as `type`
      * **archived** - whether this flow is archived (boolean), filterable as `archived`
      * **labels** - the labels for this flow (array of objects), filterable as `labels`
@@ -3192,12 +3193,20 @@ class FlowsEndpoint(ListAPIMixin, BaseAPIView):
      * **runs** - the counts of completed, interrupted and expired runs (object)
      * **results** - the results that this flow may create (array)
      * **parent_refs** - the keys of the parent flow results referenced in this flow (array)
-     * **created_on** - when this flow was created (datetime)
+     * **created_on** - when this flow was created (datetime), orderable as `order_by=created_on` or
+       `order_by=-created_on` (default)
      * **modified_on** - when this flow was last modified (datetime), filterable as `before` and `after`.
+
+    Results are paginated with a cursor by default, and `limit` sets the page size (max 250). Providing `offset`
+    switches to limit/offset pagination, and the response then also includes the total `count`.
 
     Example:
 
         GET /api/v2/flows.json
+
+    Example ordered by name with limit/offset pagination:
+
+        GET /api/v2/flows.json?order_by=name&limit=50&offset=100
 
     Response containing the flows for your organization:
 
@@ -3238,9 +3247,30 @@ class FlowsEndpoint(ListAPIMixin, BaseAPIView):
     permission = "flows.flow_api"
     model = Flow
     serializer_class = FlowReadSerializer
-    pagination_class = CreatedOnCursorPagination
+    pagination_class = FlowsPagination
 
     FLOW_TYPES = {v: k for k, v in FlowReadSerializer.FLOW_TYPES.items()}
+
+    DEFAULT_ORDER_BY = "-created_on"
+    ORDERINGS = {
+        "name": ("name", "id"),
+        "-name": ("-name", "-id"),
+        "created_on": ("created_on", "id"),
+        "-created_on": ("-created_on", "-id"),
+    }
+
+    def check_query(self, params):
+        super().check_query(params)
+
+        order_by = params.get("order_by")
+        if order_by and order_by not in self.ORDERINGS:
+            raise InvalidQueryError(
+                "Invalid value for order_by, must be one of: %s" % ", ".join(self.ORDERINGS.keys())
+            )
+
+    def get_ordering(self):
+        order_by = self.request.query_params.get("order_by") or self.DEFAULT_ORDER_BY
+        return self.ORDERINGS[order_by]
 
     def filter_queryset(self, queryset):
         params = self.request.query_params
@@ -3268,7 +3298,9 @@ class FlowsEndpoint(ListAPIMixin, BaseAPIView):
 
         queryset = queryset.prefetch_related("labels")
 
-        return self.filter_before_after(queryset, "modified_on")
+        queryset = self.filter_before_after(queryset, "modified_on")
+
+        return queryset.order_by(*self.get_ordering())
 
     @classmethod
     def get_read_explorer(cls):
@@ -3292,6 +3324,21 @@ class FlowsEndpoint(ListAPIMixin, BaseAPIView):
                     "name": "after",
                     "required": False,
                     "help": "Only return flows modified after this date, ex: 2017-01-28T18:00:00.000",
+                },
+                {
+                    "name": "order_by",
+                    "required": False,
+                    "help": "The order of results, one of: name, -name, created_on, -created_on (default)",
+                },
+                {
+                    "name": "limit",
+                    "required": False,
+                    "help": "The number of flows per page (max 250), ex: 50",
+                },
+                {
+                    "name": "offset",
+                    "required": False,
+                    "help": "Switches to limit/offset pagination and skips this number of flows, ex: 100",
                 },
             ],
         }
