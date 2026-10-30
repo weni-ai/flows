@@ -1,3 +1,7 @@
+3.107.0
+----------
+* fix: sign media URLs in the flow editor and simulator through /flow/media_urls/
+
 3.106.0
 ----------
 * feat: add public `/api/v2/broadcasts_statistics.json` endpoint, a new externally reachable read API authenticated by API key, session or JWT, readable by every workspace role through the new `msgs.broadcast_statistics_api` permission; the internal broadcasts-statistics endpoint is unchanged

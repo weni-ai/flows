@@ -90,6 +90,9 @@ S3_MEDIA_BUCKETS = []
 S3_SIGNED_EXTRA_BUCKETS = []
 S3_PRESIGNED_URL_EXPIRES = 60 * 60
 
+# key prefixes under which objects are stored per org as <prefix>/<org_id>/..., only these can be signed for the editor
+S3_ORG_SCOPED_KEY_PREFIXES = ["attachments", "media"]
+
 # bucket where archives files are stored
 ARCHIVE_BUCKET = "dl-temba-archives"
 
@@ -543,6 +546,7 @@ PERMISSIONS = {
         "import_translation",
         "export_results",
         "filter",
+        "media_urls",
         "menu",
         "recent_messages",
         "recent_contacts",
@@ -1004,6 +1008,7 @@ GROUP_PERMISSIONS = {
         "flows.flow_export_results",
         "flows.flow_filter",
         "flows.flow_list",
+        "flows.flow_media_urls",
         "flows.flow_menu",
         "flows.flow_editor",
         "flows.flow_recent_messages",

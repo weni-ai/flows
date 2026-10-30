@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 import iso8601
 import regex
 import requests
+import sentry_sdk
 from packaging.version import Version
 from smartmin.views import (
     SmartCreateView,
@@ -21,10 +22,10 @@ from smartmin.views import (
 from django import forms
 from django.conf import settings
 from django.contrib import messages
-from django.core.exceptions import ValidationError
+from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.db.models import Count, Max, Min, Sum
 from django.db.models.functions import Lower
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_text
@@ -46,7 +47,7 @@ from temba.mailroom import FlowValidationException
 from temba.orgs.models import IntegrationType, Org
 from temba.orgs.views import MenuMixin, ModalMixin, OrgFilterMixin, OrgObjPermsMixin, OrgPermsMixin
 from temba.triggers.models import Trigger
-from temba.utils import analytics, gettext, json, languages, on_transaction_commit, str_to_bool
+from temba.utils import analytics, gettext, json, languages, on_transaction_commit, sentry, str_to_bool
 from temba.utils.fields import (
     CheckboxWidget,
     ContactSearchWidget,
@@ -56,7 +57,7 @@ from temba.utils.fields import (
     SelectMultipleWidget,
     SelectWidget,
 )
-from temba.utils.s3 import private_file_storage
+from temba.utils.s3 import presign_org_url, private_file_storage
 from temba.utils.text import slugify_with
 from temba.utils.uuid import uuid4
 from temba.utils.views import BulkActionMixin, SpaMixin
@@ -69,6 +70,7 @@ from .models import (
     FlowUserConflictException,
     FlowVersionConflictException,
 )
+from .serializers import MediaUrlsSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -213,6 +215,7 @@ class FlowCRUDL(SmartCRUDL):
         "recent_contacts",
         "assets",
         "upload_media_action",
+        "media_urls",
     )
 
     model = Flow
@@ -785,6 +788,73 @@ class FlowCRUDL(SmartCRUDL):
                 "attachments/%d/%d/steps/%s/%s" % (flow.org.pk, flow.id, random_uuid_folder_name, file.name), file
             )
             return {"type": file.content_type, "url": f"{settings.STORAGE_URL}/{url}"}
+
+    class MediaUrls(AllowOnlyActiveFlowMixin, OrgObjPermsMixin, SmartReadView):
+        """
+        Used by the editor to exchange the canonical S3 URLs of a flow's media for pre-signed ones. Only objects that
+        belong to the flow's org are signed, any other URL is returned unchanged.
+        """
+
+        slug_url_kwarg = "uuid"
+        http_method_names = ["post"]
+
+        @classmethod
+        def derive_url_pattern(cls, path, action):
+            return r"^%s/%s/(?P<uuid>[0-9a-f-]+)/$" % (path, action)
+
+        def dispatch(self, request, *args, **kwargs):
+            # the submitted URLs are bearer-credential material, keep them out of every Sentry event raised from here
+            sentry.scrub_events_for_current_request()
+
+            try:
+                response = self.dispatch_if_permitted(request, *args, **kwargs)
+            except Http404:
+                response = JsonResponse({"error": "Not found"}, status=404)
+
+            response["Cache-Control"] = "no-store"
+            return response
+
+        def dispatch_if_permitted(self, request, *args, **kwargs):
+            # the caller is an XHR that can't follow smartmin's redirect to the HTML login page, so answer with a 403
+            if not self.has_permission(request, *args, **kwargs):
+                return JsonResponse({"error": "Forbidden"}, status=403)
+
+            return super().dispatch(request, *args, **kwargs)
+
+        def post(self, request, *args, **kwargs):
+            try:
+                body = json.loads(request.body)
+            except (ValueError, RecursionError, SuspiciousOperation):
+                return self.invalid_request_response()
+
+            serializer = MediaUrlsSerializer(data=body)
+            if not serializer.is_valid():
+                return self.invalid_request_response()
+
+            flow = self.get_object()
+            urls = list(dict.fromkeys(serializer.validated_data["urls"]))
+
+            try:
+                signed_urls = {url: presign_org_url(url, flow.org_id) for url in urls}
+            except Exception:
+                self.report_signing_failure(flow, len(urls))
+                return JsonResponse({"error": "Internal server error"}, status=500)
+
+            return JsonResponse({"urls": signed_urls, "expires_in": settings.S3_PRESIGNED_URL_EXPIRES})
+
+        @staticmethod
+        def invalid_request_response():
+            return JsonResponse({"error": "Invalid request"}, status=400)
+
+        @staticmethod
+        def report_signing_failure(flow, url_count):
+            with sentry_sdk.push_scope() as scope:
+                scope.set_tag("feature", "media-signing")
+                scope.set_tag("org_id", flow.org_id)
+                scope.set_extra("flow_uuid", str(flow.uuid))
+                scope.set_extra("url_count", url_count)
+
+                logger.exception("media url signing failed")
 
     class BaseList(SpaMixin, OrgFilterMixin, OrgPermsMixin, BulkActionMixin, SmartListView):
         title = _("Flows")

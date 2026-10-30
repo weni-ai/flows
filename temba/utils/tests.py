@@ -32,7 +32,7 @@ import temba.utils.analytics
 from temba.contacts.models import Contact, ExportContactsTask
 from temba.flows.models import Flow, FlowRun
 from temba.tests import TembaTest, matchers
-from temba.utils import json, uuid
+from temba.utils import json, sentry, uuid
 from temba.utils.templatetags.temba import format_datetime
 
 from . import chunk_list, countries, format_number, languages, percentage, redact, sizeof_fmt, str_to_bool
@@ -1816,3 +1816,32 @@ class TestUUIDs(TembaTest):
         g = uuid.seeded_generator(456)
         self.assertEqual(uuid.UUID("8c338abf-94e2-4c73-9944-72f7a6ff5877", version=4), g())
         self.assertEqual(uuid.UUID("c8e0696f-b3f6-4e63-a03a-57cb95bdb6e3", version=4), g())
+
+
+class SentryTest(TestCase):
+    def test_remove_request_body_and_frame_vars(self):
+        event = {
+            "request": {"url": "https://example.com/", "data": {"urls": ["https://example.com/a.jpg"]}},
+            "exception": {
+                "values": [
+                    {"stacktrace": {"frames": [{"function": "f", "vars": {"url": "https://example.com/a.jpg"}}]}},
+                    {"stacktrace": None},
+                    {},
+                ]
+            },
+        }
+
+        scrubbed = sentry.remove_request_body_and_frame_vars(event, {})
+
+        self.assertEqual({"url": "https://example.com/"}, scrubbed["request"])
+        self.assertEqual([{"function": "f"}], scrubbed["exception"]["values"][0]["stacktrace"]["frames"])
+
+        # events without a request or exception are left alone
+        self.assertEqual({"message": "hi"}, sentry.remove_request_body_and_frame_vars({"message": "hi"}, {}))
+
+    def test_scrub_events_for_current_request(self):
+        with patch("sentry_sdk.configure_scope") as mock_configure_scope:
+            sentry.scrub_events_for_current_request()
+
+        scope = mock_configure_scope.return_value.__enter__.return_value
+        scope.add_event_processor.assert_called_once_with(sentry.remove_request_body_and_frame_vars)

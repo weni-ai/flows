@@ -199,6 +199,7 @@ COURIER_S3_ENDPOINT = env("COURIER_S3_ENDPOINT")
 S3_MEDIA_BUCKETS = env.list("S3_MEDIA_BUCKETS", default=[])
 S3_SIGNED_EXTRA_BUCKETS = env.list("S3_SIGNED_EXTRA_BUCKETS", default=[])
 S3_PRESIGNED_URL_EXPIRES = env.int("S3_PRESIGNED_URL_EXPIRES", default=60 * 60)
+S3_ORG_SCOPED_KEY_PREFIXES = env.list("S3_ORG_SCOPED_KEY_PREFIXES", default=["attachments", "media"])
 
 # CELERY
 # ------------------------------------------------------------------------------

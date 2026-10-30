@@ -14,9 +14,11 @@ from temba.utils.s3 import (
     S3Location,
     compile_select,
     get_body,
+    is_org_object_key,
     matches_where,
     parse_s3_url,
     presign_attachment,
+    presign_org_url,
     presign_url,
     regional_client,
     split_url,
@@ -184,6 +186,74 @@ class PresignTest(TembaTest):
         presign_url("https://media-bucket.s3.us-west-2.amazonaws.com/c.jpg")
 
         self.assertEqual(2, regional_client.cache_info().currsize)
+
+    def test_is_org_object_key(self):
+        self.assertTrue(is_org_object_key("attachments/12/34/steps/abc/photo.jpg", 12))
+        self.assertTrue(is_org_object_key("media/12/ab12/cd34/photo.jpg", 12))
+        self.assertTrue(is_org_object_key("media/12/photo.jpg", 12))
+
+        # other orgs, including ones whose ID only shares a prefix with this one
+        self.assertFalse(is_org_object_key("media/12/ab12/photo.jpg", 1))
+        self.assertFalse(is_org_object_key("media/1/ab12/photo.jpg", 12))
+        self.assertFalse(is_org_object_key("media/123/ab12/photo.jpg", 12))
+
+        # prefixes that aren't configured, or that only share a leading substring with one
+        self.assertFalse(is_org_object_key("archives/12/export.csv", 12))
+        self.assertFalse(is_org_object_key("media2/12/photo.jpg", 12))
+        self.assertFalse(is_org_object_key("12/media/photo.jpg", 12))
+        self.assertFalse(is_org_object_key("photo.jpg", 12))
+
+        # nothing after the org ID
+        self.assertFalse(is_org_object_key("media/12", 12))
+        self.assertFalse(is_org_object_key("media/12/", 12))
+
+        # empty, "." and ".." segments
+        self.assertFalse(is_org_object_key("media/12/../13/photo.jpg", 12))
+        self.assertFalse(is_org_object_key("media/12/./photo.jpg", 12))
+        self.assertFalse(is_org_object_key("media/12//photo.jpg", 12))
+        self.assertFalse(is_org_object_key("/media/12/photo.jpg", 12))
+
+        # prefixes are matched without their slashes, and can be configured
+        with override_settings(S3_ORG_SCOPED_KEY_PREFIXES=["/media/", "", "custom/path"]):
+            self.assertTrue(is_org_object_key("media/12/photo.jpg", 12))
+            self.assertTrue(is_org_object_key("custom/path/12/photo.jpg", 12))
+            self.assertFalse(is_org_object_key("attachments/12/photo.jpg", 12))
+            self.assertFalse(is_org_object_key("12/photo.jpg", 12))
+
+        with override_settings(S3_ORG_SCOPED_KEY_PREFIXES=[]):
+            self.assertFalse(is_org_object_key("media/12/photo.jpg", 12))
+
+    def test_presign_org_url(self):
+        # own org's objects are signed
+        self.assertPresigned(
+            presign_org_url("https://media-bucket.s3.sa-east-1.amazonaws.com/media/12/ab12/cd34/my%20photo.jpg", 12),
+            "media-bucket.s3.sa-east-1.amazonaws.com",
+            "/media/12/ab12/cd34/my%20photo.jpg",
+            "sa-east-1",
+        )
+        self.assertPresigned(
+            presign_org_url(
+                "https://static.example.com/attachments/12/34/steps/abc/photo.jpg?X-Amz-Signature=stale", 12
+            ),
+            "static-bucket.s3.sa-east-1.amazonaws.com",
+            "/attachments/12/34/steps/abc/photo.jpg",
+            "sa-east-1",
+        )
+
+        unchanged = [
+            "https://media-bucket.s3.amazonaws.com/media/13/ab12/cd34/photo.jpg",
+            "https://media-bucket.s3.amazonaws.com/archives/12/photo.jpg",
+            "https://media-bucket.s3.amazonaws.com/media/12/../13/photo.jpg",
+            "https://media-bucket.s3.amazonaws.com/media/12/%2E%2E/13/photo.jpg",
+            "https://media-bucket.s3.amazonaws.com/media/12/./photo.jpg",
+            "https://media-bucket.s3.amazonaws.com/media/12//photo.jpg",
+            "https://other-bucket.s3.amazonaws.com/media/12/photo.jpg",
+            "https://floweditor-assets.temba.io/media/12/photo.jpg",
+            "-35.998287,26.478109",
+            "",
+        ]
+        for url in unchanged:
+            self.assertEqual(url, presign_org_url(url, 12), url)
 
     def test_presign_attachment(self):
         signed_attachment = presign_attachment("image/jpeg:https://media-bucket.s3.amazonaws.com/a.jpg")
