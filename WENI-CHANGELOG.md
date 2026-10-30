@@ -1,3 +1,7 @@
+3.106.0
+----------
+* fix: sign media URLs in the flow editor and simulator through /flow/media_urls/ (security-relevant: signing is restricted to objects of the flow's org)
+
 3.105.0
 ----------
 * fix: security — close fail-open org membership, empty fixed tokens, mixin auth bypass, cross-tenant internals, and bind module JWTs to token tenant claims (SEC-01, 03, 04, 05, 06, 07, 09, 10, 11)
