@@ -1,6 +1,6 @@
 # Engineering Spec: Persist ElevenLabs voice config on TPH claim
 
-**Feature Branch**: `spec/012-tph-voice-config` (spec) → `feat/012-tph-voice-config` (implementation)
+**Feature Branch**: `feat/012-tph-voice-config`
 
 **Created**: 2026-11-03
 
@@ -8,7 +8,7 @@
 
 **Cycle**: SDD Lite
 
-**Input**: User description: "On TPH channel create, persist the same voice_mode.elevenLabs.{apiKey,voiceId} blob WWC preview uses, plus tests. Specify then implement as a Graphite stack."
+**Input**: User description: "On TPH channel create, persist the same voice_mode.elevenLabs.{apiKey,voiceId} blob WWC preview uses, plus tests. Specify then implement on one feat branch."
 
 ## Inheritance from Product Spec
 
@@ -88,13 +88,13 @@ Failure paths covered: invalid DID still rejects before create (existing tests).
 
 ## Constitution Alignment
 
-- **I. Version Control and Review**: Delivered as a Graphite stack of two pull requests (`spec/012-tph-voice-config` then `feat/012-tph-voice-config`), gated by `.github/workflows/ci.yml` and review.
+- **I. Version Control and Review**: Delivered through a pull request from `feat/012-tph-voice-config`, gated by `.github/workflows/ci.yml` and review.
 - **II. Security and Secrets**: No secret is committed. Credentials continue to come from `WENI_VOICE_TOKEN` and `WENI_ELEVENLABS_VOICE_ID` and are stored on Temba channel config, which is the constitutionally required place for channel credentials. They are not logged.
 - **III. Observability**: No new logging. Claim errors stay on the existing form path.
 - **IV. Versioned Contracts**: Additive channel-config field on new TPH channels only. The internals ElevenLabs key lookup contract is unchanged. Released as MINOR `3.107.0`. No migration. No Courier or Mailroom version dependency.
 - **V. Specification Traceability**: Derived from product spec `004-voice-mode-telephony` at pin `b977cb60859d2238eb57f0b6ea3ad173aff4a6f4`. This spec does not redefine problem, scope, or binding decisions; it implements the Flows slice that lets a TPH channel carry the host-environment ElevenLabs credentials the gateway already consumes.
 - **VI. No Silent Divergence**: None. Credentials still come from the host environment (product NFR-004). Persisting the env-sourced blob on channel config is the existing Flows HOW used by Weni Web Chat preview so the gateway can fetch the key at runtime; it does not contradict BD-003 or BD-010.
-- **VII. Commit Messages**: Conventional Commits, atomic (spec on the first branch, implementation + tests + changelog on the second).
+- **VII. Commit Messages**: Conventional Commits, atomic (spec, then implementation + tests + changelog).
 - **VIII. Changelog Maintenance**: `WENI-CHANGELOG.md` entry under a new `3.107.0` heading: `feat:` bullet that newly claimed TPH channels persist the platform ElevenLabs voice configuration.
 - **IX. Never Trust the Client**: Admins still cannot supply ElevenLabs credentials on the form; values are taken from the server environment after DID validation at the form boundary.
 - **X. Fail Gracefully and Predictably**: Empty environment values do not crash claim; they persist as empty strings, same as Weni Web Chat preview. Invalid DID still returns a form error.
