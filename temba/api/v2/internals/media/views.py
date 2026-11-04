@@ -22,7 +22,7 @@ from django.conf import settings
 from django.http import HttpResponseRedirect
 
 from temba.api.v2.internals.views import APIViewMixin
-from temba.api.v2.permissions import IsAdminEditorOrAgentInOrg
+from temba.api.v2.permissions import CanDownloadOrgMedia
 from temba.utils import s3
 
 from .exceptions import (
@@ -46,10 +46,10 @@ class S3MediaProxyView(APIViewMixin, APIView):
     Endpoint that serves as a redirect proxy for private S3 files.
 
     Authentication is a Keycloak access token (InternalOIDCAuthentication). The
-    token user must be an administrator, editor or agent (human service) of the
-    Flows project identified by project_uuid (or project) in the query string.
-    IsAdminEditorOrAgentInOrg denies users without one of those roles and
-    unknown projects (403); a missing project is resolved here (400).
+    token user must be an administrator, editor, agent (human service) or viewer
+    of the Flows project identified by project_uuid (or project) in the query
+    string. CanDownloadOrgMedia only denies users without one of those roles;
+    missing and unknown projects are resolved here so the response stays 400 / 404.
 
     This view:
     1. Authenticates the Keycloak bearer token and checks the user's role
@@ -80,7 +80,7 @@ class S3MediaProxyView(APIViewMixin, APIView):
     """
 
     authentication_classes = [InternalOIDCAuthentication]
-    permission_classes = [IsAuthenticated, IsAdminEditorOrAgentInOrg]
+    permission_classes = [IsAuthenticated, CanDownloadOrgMedia]
     renderer_classes = [JSONRenderer]
 
     def get(self, request, object_key: str, *args, **kwargs):
