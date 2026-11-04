@@ -1,8 +1,13 @@
+from django.test import override_settings
 from django.urls import reverse
 
+from temba.api.v2.internals.channels.usecases import GetElevenLabsApiKeyUseCase
 from temba.tests import TembaTest
 
 from ...models import Channel
+
+TEST_ELEVENLABS_API_KEY = "test-el-api-key"
+TEST_ELEVENLABS_VOICE_ID = "test-el-voice-id"
 
 
 class TelephonyPSTNTypeTest(TembaTest):
@@ -12,6 +17,7 @@ class TelephonyPSTNTypeTest(TembaTest):
     def _post_claim(self, post_data):
         return self.client.post(self._claim_url(), post_data)
 
+    @override_settings(WENI_VOICE_TOKEN=TEST_ELEVENLABS_API_KEY, WENI_ELEVENLABS_VOICE_ID=TEST_ELEVENLABS_VOICE_ID)
     def test_claim(self):
         Channel.objects.all().delete()
         self.login(self.admin)
@@ -37,6 +43,17 @@ class TelephonyPSTNTypeTest(TembaTest):
         self.assertEqual(["tel"], channel.schemes)
         self.assertFalse(channel.config.get("base_url"))
         self.assertFalse(channel.config.get("auth_token"))
+        self.assertEqual(
+            {
+                "enabled": True,
+                "elevenLabs": {
+                    "apiKey": TEST_ELEVENLABS_API_KEY,
+                    "voiceId": TEST_ELEVENLABS_VOICE_ID,
+                },
+            },
+            channel.config.get("voice_mode"),
+        )
+        self.assertEqual(TEST_ELEVENLABS_API_KEY, GetElevenLabsApiKeyUseCase().execute(str(channel.uuid)))
 
         read_url = reverse("channels.channel_read", args=[channel.uuid])
         self.assertRedirect(response, read_url)
@@ -88,3 +105,26 @@ class TelephonyPSTNTypeTest(TembaTest):
 
         channel = Channel.objects.get(name="Support Line")
         self.assertEqual("+12065551212", channel.address)
+
+    @override_settings(WENI_VOICE_TOKEN="", WENI_ELEVENLABS_VOICE_ID="")
+    def test_claim_persists_empty_elevenlabs_credentials(self):
+        Channel.objects.all().delete()
+        self.login(self.admin)
+
+        response = self._post_claim(
+            {
+                "name": "Support Line",
+                "country": "US",
+                "phone_number": "+12065551212",
+            }
+        )
+        self.assertEqual(302, response.status_code)
+
+        channel = Channel.objects.get(name="Support Line")
+        self.assertEqual(
+            {
+                "enabled": True,
+                "elevenLabs": {"apiKey": "", "voiceId": ""},
+            },
+            channel.config.get("voice_mode"),
+        )
