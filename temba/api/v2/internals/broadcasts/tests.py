@@ -49,6 +49,85 @@ class TestInternalWhatsappBroadcast(TembaTest):
             self.assertEqual(data["contacts"][0]["uuid"], str(contact.uuid))
             self.assertEqual(data["metadata"].get("text"), body["msg"]["text"])
 
+    def _post_internal(self, body):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+        with patch("rest_framework.request.Request.user", mock_user):
+            return self.client.post(
+                "/api/v2/internals/whatsapp_broadcasts", data=body, content_type="application/json"
+            )
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_custom_data_success_and_absence(self):
+        contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+        custom_data = {"order_id": "1234567890-01", "tags": ["vip"]}
+        url_body = {
+            "project": self.org.proj_uuid,
+            "contacts": [contact.uuid],
+            "msg": {"text": "Hi", "custom_data": custom_data},
+        }
+        response = self._post_internal(url_body)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(custom_data, Broadcast.objects.get(id=response.json()["id"]).metadata["custom_data"])
+
+        wac = self.create_channel("WAC", "WhatsApp Cloud", "1234", org=self.org)
+        response = self._post_internal(
+            {
+                "project": self.org.proj_uuid,
+                "contacts": [contact.uuid],
+                "channel": str(wac.uuid),
+                "msg": {"text": "Hi", "custom_data": custom_data},
+            }
+        )
+        self.assertEqual(response.status_code, 201)
+
+        response = self._post_internal(
+            {"project": self.org.proj_uuid, "contacts": [contact.uuid], "msg": {"text": "Hi"}}
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertNotIn("custom_data", Broadcast.objects.get(id=response.json()["id"]).metadata)
+
+        response = self._post_internal(
+            {"project": self.org.proj_uuid, "contacts": [contact.uuid], "msg": {"text": "Hi", "custom_data": {}}}
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertNotIn("custom_data", Broadcast.objects.get(id=response.json()["id"]).metadata)
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_custom_data_invalid(self):
+        contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+        before = Broadcast.objects.filter(org=self.org).count()
+        nested = {}
+        current = nested
+        for _ in range(32):
+            current["x"] = {}
+            current = current["x"]
+        cases = [
+            (None, "custom_data must be an object"),
+            ("x", "custom_data must be an object"),
+            ([], "custom_data must be an object"),
+            (1, "custom_data must be an object"),
+            ({"pad": "x" * 16385}, "custom_data must be at most 16384 bytes when serialized"),
+            (nested, "custom_data must have at most 32 levels of nesting"),
+            ({"$x": 1}, "custom_data keys must not start with '$' or contain '.'"),
+            ({"outer": {"a.b": 1}}, "custom_data keys must not start with '$' or contain '.'"),
+            ({"items": [{"bad.key": True}]}, "custom_data keys must not start with '$' or contain '.'"),
+        ]
+        for payload, message in cases:
+            response = self._post_internal(
+                {
+                    "project": self.org.proj_uuid,
+                    "contacts": [contact.uuid],
+                    "msg": {"text": "Hi", "custom_data": payload},
+                }
+            )
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(response.json()["msg"], [message])
+        self.assertEqual(before, Broadcast.objects.filter(org=self.org).count())
+
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
     @patch("temba.api.v2.internals.broadcasts.views.idempotency_release")
@@ -1211,6 +1290,39 @@ class TestInternalWhatsappBroadcastIdempotency(TembaTest):
                 data=self._make_body(contact, text="segunda mensagem diferente"),
                 content_type="application/json",
                 HTTP_IDEMPOTENCY_KEY=idem_key,
+            )
+            self.assertEqual(second.status_code, 409)
+            self.assertIn("different body", second.json()["error"])
+
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.authentication_classes", [])
+    @patch("temba.api.v2.internals.broadcasts.views.InternalWhatsappBroadcastsEndpoint.permission_classes", [])
+    def test_replay_different_custom_data_returns_409(self):
+        mock_user = MagicMock(spec=User)
+        mock_user.is_authenticated = True
+        mock_user.email = "mockuser@example.com"
+
+        idem_key = "test-key-custom-data"
+
+        with patch("rest_framework.request.Request.user", mock_user):
+            contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+            first_body = {
+                "project": str(self.org.proj_uuid),
+                "contacts": [str(contact.uuid)],
+                "msg": {"text": "Hi", "custom_data": {"order_id": "1"}},
+            }
+            second_body = {
+                "project": str(self.org.proj_uuid),
+                "contacts": [str(contact.uuid)],
+                "msg": {"text": "Hi", "custom_data": {"order_id": "2"}},
+            }
+
+            first = self.client.post(
+                self.url, data=first_body, content_type="application/json", HTTP_IDEMPOTENCY_KEY=idem_key
+            )
+            self.assertEqual(first.status_code, 201)
+
+            second = self.client.post(
+                self.url, data=second_body, content_type="application/json", HTTP_IDEMPOTENCY_KEY=idem_key
             )
             self.assertEqual(second.status_code, 409)
             self.assertIn("different body", second.json()["error"])

@@ -24,8 +24,8 @@ Repository is a Django monolith under `temba/`. Unit helpers: `temba/msgs/custom
 
 **Purpose**: Feature workspace ready; no product code yet
 
-- [ ] T001 Confirm feature directory `specs/012-wwc-custom-data/` has spec.md, plan.md, research.md, data-model.md, contracts/, quickstart.md
-- [ ] T002 Create or switch to git branch `012-wwc-custom-data` from the current integration branch without changing `temba/mailroom/queue.py`
+- [x] T001 Confirm feature directory `specs/012-wwc-custom-data/` has spec.md, plan.md, research.md, data-model.md, contracts/, quickstart.md
+- [x] T002 Create or switch to git branch `012-wwc-custom-data` from the current integration branch without changing `temba/mailroom/queue.py`
 
 ---
 
@@ -35,10 +35,10 @@ Repository is a Django monolith under `temba/`. Unit helpers: `temba/msgs/custom
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 Add `CUSTOM_DATA_MAX_SERIALIZED_BYTES`, `CUSTOM_DATA_MAX_DEPTH`, and OpenAPI error-string constants in `temba/msgs/custom_data.py`
-- [ ] T004 Implement `validate_custom_data` and `normalize_custom_data_in_msg` in `temba/msgs/custom_data.py` (type, compact `json.dumps` UTF-8 size, depth with root object = 1, keys starting with `$` or containing `.` at any nesting level, `{}` → absence)
-- [ ] T005 Write unit tests for helpers in `temba/msgs/tests_custom_data.py` covering depth 32 vs 33, nested forbidden keys (including object inside array), byte boundary, `null`/non-object, and `{}` normalization
-- [ ] T006 Call helpers from `WhatsappBroadcastWriteSerializer.validate_msg` in `temba/api/v2/serializers.py` after existing content checks; map `ValueError` to `serializers.ValidationError` so errors land under `msg`; strip `{}` from returned `msg`
+- [x] T003 Add `CUSTOM_DATA_MAX_SERIALIZED_BYTES`, `CUSTOM_DATA_MAX_DEPTH`, and OpenAPI error-string constants in `temba/msgs/custom_data.py`
+- [x] T004 Implement `validate_custom_data` and `normalize_custom_data_in_msg` in `temba/msgs/custom_data.py` (type, compact `json.dumps` UTF-8 size, depth with root object = 1, keys starting with `$` or containing `.` at any nesting level, `{}` → absence)
+- [x] T005 Write unit tests for helpers in `temba/msgs/tests_custom_data.py` covering depth 32 vs 33, nested forbidden keys (including object inside array), byte boundary, `null`/non-object, and `{}` normalization
+- [x] T006 Call helpers from `WhatsappBroadcastWriteSerializer.validate_msg` in `temba/api/v2/serializers.py` after existing content checks; map `ValueError` to `serializers.ValidationError` so errors land under `msg`; strip `{}` from returned `msg`
 
 **Checkpoint**: Foundation ready — `poetry run coverage run manage.py test temba.msgs.tests_custom_data` can run; HTTP story tests still fail until later phases
 
@@ -54,15 +54,15 @@ Repository is a Django monolith under `temba/`. Unit helpers: `temba/msgs/custom
 
 > Write these tests FIRST, ensure they FAIL before relying on T006 behavior for HTTP
 
-- [ ] T007 [P] [US1] Add public v2 success tests (OpenAPI example, no channel, WAC channel) in `temba/api/v2/tests.py` next to `test_whatsapp_broadcasts`
-- [ ] T008 [P] [US1] Add internal Django success tests in `temba/api/v2/internals/broadcasts/tests.py` on `TestInternalWhatsappBroadcast`
-- [ ] T009 [P] [US1] Add FastAPI success tests in `temba/fastapi_app/tests.py` on `TestPostInternalWhatsappBroadcast`
-- [ ] T010 [US1] Assert queued batch task `msg.custom_data` using the `assert_queued_batch_task` pattern from `temba/mailroom/tests.py` without modifying `temba/mailroom/queue.py` (place in `temba/api/v2/tests.py` or `temba/mailroom/tests.py` only if the latter already owns the fixture)
+- [x] T007 [P] [US1] Add public v2 success tests (OpenAPI example, no channel, WAC channel) in `temba/api/v2/tests.py` next to `test_whatsapp_broadcasts`
+- [x] T008 [P] [US1] Add internal Django success tests in `temba/api/v2/internals/broadcasts/tests.py` on `TestInternalWhatsappBroadcast`
+- [x] T009 [P] [US1] Add FastAPI success tests in `temba/fastapi_app/tests.py` on `TestPostInternalWhatsappBroadcast`
+- [x] T010 [US1] Assert queued batch task `msg.custom_data` using the `assert_queued_batch_task` pattern from `temba/mailroom/tests.py` without modifying `temba/mailroom/queue.py` (place in `temba/api/v2/tests.py` or `temba/mailroom/tests.py` only if the latter already owns the fixture)
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Ensure `validate_msg` in `temba/api/v2/serializers.py` leaves a valid non-empty object on `msg` so `Broadcast.create` stores it on `metadata` (FR-006, FR-007, FR-008)
-- [ ] T012 [US1] Confirm `git diff` does not include `temba/mailroom/queue.py`
+- [x] T011 [US1] Ensure `validate_msg` in `temba/api/v2/serializers.py` leaves a valid non-empty object on `msg` so `Broadcast.create` stores it on `metadata` (FR-006, FR-007, FR-008)
+- [x] T012 [US1] Confirm `git diff` does not include `temba/mailroom/queue.py`
 
 **Checkpoint**: User Story 1 independently testable via the three POST success paths
 
@@ -76,14 +76,14 @@ Repository is a Django monolith under `temba/`. Unit helpers: `temba/msgs/custom
 
 ### Tests for User Story 2
 
-- [ ] T013 [P] [US2] Public v2 400 cases in `temba/api/v2/tests.py`: `null`, `"x"`, `[]`, `1`, compact payload >16384 bytes, depth 33, key `$x`, nested `a.b`, object-in-array with `.` in a key
-- [ ] T014 [P] [US2] Same invalid shapes in `temba/api/v2/internals/broadcasts/tests.py`
-- [ ] T015 [P] [US2] Same invalid shapes in `temba/fastapi_app/tests.py`
-- [ ] T016 [US2] Assert error bodies match [contracts/whatsapp-broadcast-custom-data.md](./contracts/whatsapp-broadcast-custom-data.md) strings and no `Broadcast` row is created in those three test files
+- [x] T013 [P] [US2] Public v2 400 cases in `temba/api/v2/tests.py`: `null`, `"x"`, `[]`, `1`, compact payload >16384 bytes, depth 33, key `$x`, nested `a.b`, object-in-array with `.` in a key
+- [x] T014 [P] [US2] Same invalid shapes in `temba/api/v2/internals/broadcasts/tests.py`
+- [x] T015 [P] [US2] Same invalid shapes in `temba/fastapi_app/tests.py`
+- [x] T016 [US2] Assert error bodies match [contracts/whatsapp-broadcast-custom-data.md](./contracts/whatsapp-broadcast-custom-data.md) strings and no `Broadcast` row is created in those three test files
 
 ### Implementation for User Story 2
 
-- [ ] T017 [US2] Align `validate_custom_data` in `temba/msgs/custom_data.py` and `validate_msg` mapping in `temba/api/v2/serializers.py` so DRF/FastAPI emit only the four contract messages (FR-001–FR-004, FR-011)
+- [x] T017 [US2] Align `validate_custom_data` in `temba/msgs/custom_data.py` and `validate_msg` mapping in `temba/api/v2/serializers.py` so DRF/FastAPI emit only the four contract messages (FR-001–FR-004, FR-011)
 
 **Checkpoint**: User Stories 1 and 2 both pass independently
 
@@ -97,13 +97,13 @@ Repository is a Django monolith under `temba/`. Unit helpers: `temba/msgs/custom
 
 ### Tests for User Story 3
 
-- [ ] T018 [P] [US3] Public v2 omit + `{}` cases in `temba/api/v2/tests.py`
-- [ ] T019 [P] [US3] Internal Django omit + `{}` plus `Idempotency-Key` 409 when `custom_data` differs in `temba/api/v2/internals/broadcasts/tests.py`
-- [ ] T020 [P] [US3] FastAPI omit + `{}` in `temba/fastapi_app/tests.py` (do not invent FastAPI idempotency)
+- [x] T018 [P] [US3] Public v2 omit + `{}` cases in `temba/api/v2/tests.py`
+- [x] T019 [P] [US3] Internal Django omit + `{}` plus `Idempotency-Key` 409 when `custom_data` differs in `temba/api/v2/internals/broadcasts/tests.py`
+- [x] T020 [P] [US3] FastAPI omit + `{}` in `temba/fastapi_app/tests.py` (do not invent FastAPI idempotency)
 
 ### Implementation for User Story 3
 
-- [ ] T021 [US3] Ensure `normalize_custom_data_in_msg` in `temba/msgs/custom_data.py` removes `custom_data` when `{}` before `Broadcast.create` in `temba/api/v2/serializers.py`
+- [x] T021 [US3] Ensure `normalize_custom_data_in_msg` in `temba/msgs/custom_data.py` removes `custom_data` when `{}` before `Broadcast.create` in `temba/api/v2/serializers.py`
 
 **Checkpoint**: All three user stories independently functional
 
@@ -113,10 +113,10 @@ Repository is a Django monolith under `temba/`. Unit helpers: `temba/msgs/custom
 
 **Purpose**: Changelog, gates, deploy notes
 
-- [ ] T022 Add `feat:` bullet for optional `msg.custom_data` in `WENI-CHANGELOG.md` under the shipping version; note Mailroom/Courier coordination and Delivery Sequence (Flows step 3)
-- [ ] T023 [P] Run `./code_check.py` and fix Black/isort/flake8 issues in `temba/msgs/custom_data.py`, `temba/msgs/tests_custom_data.py`, `temba/api/v2/serializers.py`
-- [ ] T024 Run `poetry run coverage run manage.py test temba.api.v2 temba.api.v2.internals.broadcasts temba.fastapi_app temba.msgs` per [quickstart.md](./quickstart.md)
-- [ ] T025 Confirm `git diff` still excludes `temba/mailroom/queue.py` and that no `# pragma: no cover` was added
+- [x] T022 Add `feat:` bullet for optional `msg.custom_data` in `WENI-CHANGELOG.md` under the shipping version; note Mailroom/Courier coordination and Delivery Sequence (Flows step 3)
+- [x] T023 [P] Run `./code_check.py` and fix Black/isort/flake8 issues in `temba/msgs/custom_data.py`, `temba/msgs/tests_custom_data.py`, `temba/api/v2/serializers.py`
+- [x] T024 Run `poetry run coverage run manage.py test temba.api.v2 temba.api.v2.internals.broadcasts temba.fastapi_app temba.msgs` per [quickstart.md](./quickstart.md)
+- [x] T025 Confirm `git diff` still excludes `temba/mailroom/queue.py` and that no `# pragma: no cover` was added
 
 ---
 
