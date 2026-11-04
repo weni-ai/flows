@@ -103,14 +103,14 @@ class IsUserInOrg(BasePermission):
         return org.get_users(roles=list(self.allowed_roles)).filter(id=user.id).exists()
 
 
-class IsAdminEditorOrAgentInOrg(IsUserInOrg):
+class CanDownloadOrgMedia(IsUserInOrg):
     """
-    Same project resolution as IsUserInOrg, but only Administrator, Editor
-    (contributor) and Agent (human service / chat user) roles may proceed. Role
-    is read from the org membership, not from staff status.
+    Same project resolution as IsUserInOrg. Allows Administrator, Editor
+    (contributor), Agent (human service / chat user) and Viewer to download
+    org media. Role is read from the org membership, not from staff status.
     """
 
-    allowed_roles = (OrgRole.ADMINISTRATOR, OrgRole.EDITOR, OrgRole.AGENT)
+    allowed_roles = (OrgRole.ADMINISTRATOR, OrgRole.EDITOR, OrgRole.AGENT, OrgRole.VIEWER)
 
 
 class HasValidJWT(BasePermission):
