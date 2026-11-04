@@ -1,4 +1,4 @@
-3.107.0
+3.106.1
 ----------
 * feat: persist platform ElevenLabs voice config on new TPH channels
 * fix: sign media URLs in the flow editor and simulator through /flow/media_urls/
