@@ -2,6 +2,7 @@ import phonenumbers
 from smartmin.views import SmartFormView
 
 from django import forms
+from django.conf import settings
 from django.utils.translation import ugettext_lazy as _
 
 from temba.contacts.models import URN
@@ -11,6 +12,18 @@ from ...views import ALL_COUNTRIES, ClaimViewMixin
 
 INVALID_PHONE_NUMBER = _("Invalid phone number")
 CHANNEL_NAME_MAX_LENGTH = 64
+VOICE_MODE_ENABLED = True
+
+
+def build_default_voice_mode_config():
+    """Same ElevenLabs blob Weni Web Chat preview stores on channel config."""
+    return {
+        "enabled": VOICE_MODE_ENABLED,
+        "elevenLabs": {
+            "apiKey": settings.WENI_VOICE_TOKEN,
+            "voiceId": settings.WENI_ELEVENLABS_VOICE_ID,
+        },
+    }
 
 
 class ClaimView(ClaimViewMixin, SmartFormView):
@@ -59,7 +72,7 @@ class ClaimView(ClaimViewMixin, SmartFormView):
             self.request.user,
             data["country"],
             self.channel_type,
-            config={},
+            config={"voice_mode": build_default_voice_mode_config()},
             name=data["name"],
             address=data["phone_number"],
         )
