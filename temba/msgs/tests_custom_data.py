@@ -86,9 +86,14 @@ class CustomDataValidationTest(TestCase):
             validate_custom_data({"items": [{"bad.key": True}]})
         self.assertEqual(str(ctx.exception), CUSTOM_DATA_ERR_FORBIDDEN_KEY)
 
+    def test_lone_surrogate_rejected_with_contract_message(self):
+        with self.assertRaises(ValueError) as ctx:
+            validate_custom_data({"a": "\ud800"})
+        self.assertEqual(str(ctx.exception), CUSTOM_DATA_ERR_NOT_OBJECT)
+
     def test_serialized_byte_boundary(self):
-        prefix_len = len('{"a":"') + len('"}')
-        exact_payload = "x" * (CUSTOM_DATA_MAX_SERIALIZED_BYTES - prefix_len)
+        base_size = len(json.dumps({"a": ""}, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
+        exact_payload = "x" * (CUSTOM_DATA_MAX_SERIALIZED_BYTES - base_size)
         exact = {"a": exact_payload}
         self.assertEqual(
             len(json.dumps(exact, separators=(",", ":"), ensure_ascii=False).encode("utf-8")),

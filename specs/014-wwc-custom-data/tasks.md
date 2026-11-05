@@ -1,6 +1,6 @@
 # Tasks: custom_data on WhatsApp Broadcasts (Flows slice)
 
-**Input**: Design documents from `specs/012-wwc-custom-data/`
+**Input**: Design documents from `specs/014-wwc-custom-data/`
 
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md), [research.md](./research.md), [data-model.md](./data-model.md), [contracts/whatsapp-broadcast-custom-data.md](./contracts/whatsapp-broadcast-custom-data.md)
 
@@ -24,8 +24,8 @@ Repository is a Django monolith under `temba/`. Unit helpers: `temba/msgs/custom
 
 **Purpose**: Feature workspace ready; no product code yet
 
-- [x] T001 Confirm feature directory `specs/012-wwc-custom-data/` has spec.md, plan.md, research.md, data-model.md, contracts/, quickstart.md
-- [x] T002 Create or switch to git branch `012-wwc-custom-data` from the current integration branch without changing `temba/mailroom/queue.py`
+- [x] T001 Confirm feature directory `specs/014-wwc-custom-data/` has spec.md, plan.md, research.md, data-model.md, contracts/, quickstart.md
+- [x] T002 Create or switch to git branch `014-wwc-custom-data` from the current integration branch without changing `temba/mailroom/queue.py`
 
 ---
 

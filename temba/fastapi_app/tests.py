@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from temba.fastapi_app.auth import verify_jwt
 from temba.fastapi_app.broadcasts import app, post_internal_whatsapp_broadcast
+from temba.msgs.custom_data import CUSTOM_DATA_MAX_DEPTH
 from temba.msgs.models import Broadcast
 from temba.tests.base import TembaTest
 
@@ -186,7 +187,7 @@ class TestPostInternalWhatsappBroadcast(TembaTest):
         before = Broadcast.objects.filter(org=self.org).count()
         nested = {}
         current = nested
-        for _ in range(32):
+        for _ in range(CUSTOM_DATA_MAX_DEPTH):
             current["x"] = {}
             current = current["x"]
         cases = [

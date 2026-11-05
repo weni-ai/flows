@@ -11,6 +11,7 @@ from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.v2.internals.broadcasts.context import ProjectMismatch
 from temba.contacts.models import Contact
 from temba.flows.models import Flow
+from temba.msgs.custom_data import CUSTOM_DATA_MAX_DEPTH
 from temba.msgs.models import Broadcast, BroadcastStatistics, ManagedTriggerGroup
 from temba.msgs.usecases.managed_trigger_group import resolve_or_create_managed_trigger_group
 from temba.orgs.models import Org
@@ -102,7 +103,7 @@ class TestInternalWhatsappBroadcast(TembaTest):
         before = Broadcast.objects.filter(org=self.org).count()
         nested = {}
         current = nested
-        for _ in range(32):
+        for _ in range(CUSTOM_DATA_MAX_DEPTH):
             current["x"] = {}
             current = current["x"]
         cases = [

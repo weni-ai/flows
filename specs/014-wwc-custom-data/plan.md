@@ -1,8 +1,8 @@
 # Implementation Plan: custom_data on WhatsApp Broadcasts (Flows slice)
 
-**Branch**: `012-wwc-custom-data` | **Date**: 2026-11-04 | **Spec**: [spec.md](./spec.md)
+**Branch**: `014-wwc-custom-data` | **Date**: 2026-11-04 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `specs/012-wwc-custom-data/spec.md`
+**Input**: Feature specification from `specs/014-wwc-custom-data/spec.md`
 
 ## Summary
 
@@ -59,7 +59,7 @@ Architecture pin: `vtex-cx-experience-specs` tag `006-wwc-custom-data/arch-v1` (
 ### Documentation (this feature)
 
 ```text
-specs/012-wwc-custom-data/
+specs/014-wwc-custom-data/
 ├── spec.md
 ├── plan.md
 ├── research.md
