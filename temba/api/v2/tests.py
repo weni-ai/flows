@@ -84,6 +84,15 @@ from .serializers import (
 NUM_BASE_REQUEST_QUERIES = 6  # number of db queries required for any API request
 
 
+def _nested_custom_data(depth):
+    root = {}
+    current = root
+    for _ in range(depth - 1):
+        current["x"] = {}
+        current = current["x"]
+    return root
+
+
 class APIJSONMixin:
     def fetchHTML(self, url, query=None):
         if query:
@@ -2093,6 +2102,80 @@ class APITest(APIJSONMixin, TembaTest):
             url, None, {"groups": [str(uuid.uuid4()) for _ in range(101)], "msg": {"text": "Bulk"}}
         )
         self.assertResponseError(response, "groups", "This field can only contain up to 100 items.")
+
+    @patch("temba.mailroom.queue_broadcast")
+    def test_whatsapp_broadcasts_custom_data(self, mock_queue_broadcast):
+        url = reverse("api.v2.whatsapp_broadcasts")
+        self.assertEndpointAccess(url)
+
+        custom_data = {
+            "order_id": "1234567890-01",
+            "coupon": {"code": "BLACKFRIDAY10", "expires_at": "2026-11-30T23:59:59Z"},
+            "tags": ["vip", "recovery"],
+        }
+        wac = self.create_channel("WAC", "WhatsApp Cloud", "1234", org=self.org)
+        wwc = self.create_channel("WWC", "Web Chat", "chat-1", org=self.org)
+
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["whatsapp:5561912345678"],
+                "channel": str(wac.uuid),
+                "msg": {"text": "Hi", "custom_data": custom_data},
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        broadcast = Broadcast.objects.get(id=response.json()["id"])
+        self.assertEqual(custom_data, broadcast.metadata["custom_data"])
+        self.assertEqual(wac, broadcast.channel)
+
+        response = self.postJSON(
+            url, None, {"urns": ["whatsapp:5561912345678"], "msg": {"text": "Hi", "custom_data": custom_data}}
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(custom_data, Broadcast.objects.get(id=response.json()["id"]).metadata["custom_data"])
+
+        response = self.postJSON(
+            url,
+            None,
+            {
+                "urns": ["ext:4f7a0c1e-0b9e-4d33-8a5b-9b6a2f1d8c11"],
+                "channel": str(wwc.uuid),
+                "msg": {"text": "Hi", "custom_data": custom_data},
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(custom_data, Broadcast.objects.get(id=response.json()["id"]).metadata["custom_data"])
+
+        response = self.postJSON(url, None, {"urns": ["whatsapp:5561912345678"], "msg": {"text": "Hi"}})
+        self.assertEqual(response.status_code, 201)
+        self.assertNotIn("custom_data", Broadcast.objects.get(id=response.json()["id"]).metadata)
+
+        response = self.postJSON(
+            url, None, {"urns": ["whatsapp:5561912345678"], "msg": {"text": "Hi", "custom_data": {}}}
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertNotIn("custom_data", Broadcast.objects.get(id=response.json()["id"]).metadata)
+
+        before_invalid = Broadcast.objects.filter(org=self.org).count()
+        invalid_cases = [
+            (None, "custom_data must be an object"),
+            ("x", "custom_data must be an object"),
+            ([], "custom_data must be an object"),
+            (1, "custom_data must be an object"),
+            ({"pad": "x" * 16385}, "custom_data must be at most 16384 bytes when serialized"),
+            (_nested_custom_data(33), "custom_data must have at most 32 levels of nesting"),
+            ({"$x": 1}, "custom_data keys must not start with '$' or contain '.'"),
+            ({"outer": {"a.b": 1}}, "custom_data keys must not start with '$' or contain '.'"),
+            ({"items": [{"bad.key": True}]}, "custom_data keys must not start with '$' or contain '.'"),
+        ]
+        for payload, message in invalid_cases:
+            response = self.postJSON(
+                url, None, {"urns": ["whatsapp:5561912345678"], "msg": {"text": "Hi", "custom_data": payload}}
+            )
+            self.assertResponseError(response, "msg", message)
+        self.assertEqual(before_invalid, Broadcast.objects.filter(org=self.org).count())
 
     @patch("temba.mailroom.queue_broadcast")
     @mock_mailroom
