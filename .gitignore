@@ -125,3 +125,6 @@ ansible/site.retry
 
 # autoenv
 .direnv/
+
+.env
+.env.*

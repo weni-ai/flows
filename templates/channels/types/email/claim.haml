@@ -1,0 +1,17 @@
+-extends "channels/channel_claim_form.html"
+-load i18n
+
+-block form
+  -if outlook_enabled
+    .card.mb-4
+      %h3
+        -trans "Connect a Microsoft mailbox"
+      %form(method="post" action="{% url 'channels.types.email.outlook_start' %}")
+        {% csrf_token %}
+        .mb-2
+          %label
+            -trans "Primary mailbox"
+          %input(type="text" name="username" autocomplete="off")
+        %button.button-primary(type="submit")
+          -trans "Continue with Microsoft"
+  {{ block.super }}
