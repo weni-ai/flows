@@ -22,6 +22,16 @@ def _nested_object(depth):
     return root
 
 
+def _nested_list_chain(list_depth):
+    inner = []
+    current = inner
+    for _ in range(list_depth - 1):
+        nested = []
+        current.append(nested)
+        current = nested
+    return {"items": inner}
+
+
 class CustomDataValidationTest(TestCase):
     def test_null_and_non_object(self):
         for value in (None, "x", [], 1, True):
@@ -41,6 +51,21 @@ class CustomDataValidationTest(TestCase):
     def test_normalize_omitted_key(self):
         msg = {"text": "hi"}
         self.assertIs(normalize_custom_data_in_msg(msg), msg)
+
+    def test_normalize_non_empty_custom_data_unchanged(self):
+        msg = {"text": "hi", "custom_data": {"order_id": "1"}}
+        self.assertIs(normalize_custom_data_in_msg(msg), msg)
+        self.assertEqual(msg["custom_data"], {"order_id": "1"})
+
+    def test_non_string_dict_keys_coerced(self):
+        validate_custom_data({1: "ok", 2: ["a"]})
+
+    def test_list_nesting_depth_limit(self):
+        # Deepest list is entered at depth list_depth + 1 (root dict is depth 1).
+        validate_custom_data(_nested_list_chain(CUSTOM_DATA_MAX_DEPTH - 1))
+        with self.assertRaises(ValueError) as ctx:
+            validate_custom_data(_nested_list_chain(CUSTOM_DATA_MAX_DEPTH))
+        self.assertEqual(str(ctx.exception), CUSTOM_DATA_ERR_TOO_DEEP)
 
     def test_depth_32_accepted_33_rejected(self):
         validate_custom_data(_nested_object(CUSTOM_DATA_MAX_DEPTH))
