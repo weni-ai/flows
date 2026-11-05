@@ -1414,6 +1414,11 @@ FACEBOOK_APPLICATION_ID = os.environ.get("FACEBOOK_APPLICATION_ID", "")
 FACEBOOK_APPLICATION_SECRET = os.environ.get("FACEBOOK_APPLICATION_SECRET", "")
 FACEBOOK_WEBHOOK_SECRET = os.environ.get("FACEBOOK_WEBHOOK_SECRET", "")
 
+# Outlook mailbox consent. Leave the client id empty until email-proxy can refresh
+# Microsoft tokens. The secret is used only for the code exchange.
+APP_MICROSOFT_CLIENT_ID = os.environ.get("APP_MICROSOFT_CLIENT_ID", "")
+APP_MICROSOFT_CLIENT_SECRET = os.environ.get("APP_MICROSOFT_CLIENT_SECRET", "")
+
 WHATSAPP_ADMIN_SYSTEM_USER_ID = os.environ.get("WHATSAPP_ADMIN_SYSTEM_USER_ID", "")
 WHATSAPP_ADMIN_SYSTEM_USER_TOKEN = os.environ.get("WHATSAPP_ADMIN_SYSTEM_USER_TOKEN", "")
 WHATSAPP_FACEBOOK_BUSINESS_ID = os.environ.get("WHATSAPP_FACEBOOK_BUSINESS_ID", "")
