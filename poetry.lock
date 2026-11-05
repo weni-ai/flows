@@ -4727,27 +4727,28 @@ files = [
 
 [[package]]
 name = "weni-commons"
-version = "1.6.2"
+version = "1.7.0"
 description = "Weni's common utilities for Python backends"
 optional = false
 python-versions = "<4.0,>=3.8"
 groups = ["main"]
 files = [
-    {file = "weni_commons-1.6.2-py3-none-any.whl", hash = "sha256:ac5c2db31c5649db87edbcfb4fa1c7641cb6c4661ddb2b885c218427ed2c8474"},
-    {file = "weni_commons-1.6.2.tar.gz", hash = "sha256:4fc9d815c61d459ef9430849f4a8e4ad840f31431419f11fea6b13793eb14163"},
+    {file = "weni_commons-1.7.0-py3-none-any.whl", hash = "sha256:129d5ca2d0c0779afff5112ea741f16820709cc79abaa9a3b1b63821adb24d2a"},
+    {file = "weni_commons-1.7.0.tar.gz", hash = "sha256:4aee4c06d34729190f56384387313572e2bcaa25c69453a57167a32b88e41821"},
 ]
 
 [package.dependencies]
-boto3 = ">=1.18.0,<2.0.0"
-celery = ">=5.0.0,<6.0"
 django = ">=3.2.22,<6.0"
-django-redis = ">=4.0.0,<=6.0"
 djangorestframework = ">=3.12.0,<4.0"
+django-redis = ">=4.0.0,<=6.0"
+celery = ">=5.0.0,<6.0"
 mozilla-django-oidc = ">=2.0.0,<5.0"
 pyjwt = ">=2.8.0,<3.0"
-requests = ">=2.25.0"
-weni-eda = "0.3.0"
 weni-feature-flags = ">=2.2.0,<3.0.0"
+weni-eda = "==0.3.0"
+requests = ">=2.25.0"
+boto3 = ">=1.18.0,<2.0.0"
+
 
 [[package]]
 name = "weni-datalake-sdk"
@@ -5144,4 +5145,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.12"
-content-hash = "88c3b5a86acba69c53e4f5f31919f04954cbb9b1d09934d321f66471e5f245ec"
+content-hash = "88307a9d3c9d228d248e08778550b81da8027d55f557047181c5f619c56a9aa5"
