@@ -26,16 +26,29 @@ class BroadcastStatisticsReadSerializer(BroadcastWithStatisticsSerializer):
     built once per page, so the number of queries does not grow with the page size.
     """
 
-    def load_statistics(self, obj):
-        """
-        First statistics row, or None.
-
-        Callers MUST prefetch ``statistics`` (see BroadcastsStatisticsEndpoint.apply_filters).
-        ``.first()`` would always hit the database and reintroduce N+1; this only reads
-        the prefetched cache.
-        """
+    def get_statistics(self, obj):
+        # Prefetch is required (BroadcastsStatisticsEndpoint.apply_filters). ``.first()``
+        # would always hit the database and reintroduce N+1.
         statistics = list(obj.statistics.all())
-        return statistics[0] if statistics else None
+        stat = statistics[0] if statistics else None
+        return {
+            "processed": stat.processed if stat else 0,
+            "sent": stat.sent if stat else 0,
+            "delivered": stat.delivered if stat else 0,
+            "failed": stat.failed if stat else 0,
+            "contact_count": stat.contact_count if stat else 0,
+            "read": stat.read if stat else 0,
+            "cost": stat.cost if stat else 0,
+            "currency": stat.currency if stat else "BRL",
+            "template_price": stat.template_price if stat else 0,
+            "created_on": stat.created_on if stat else None,
+            "modified_on": stat.modified_on if stat else None,
+        }
 
-    def load_template(self, template_id):
-        return self.context["templates_by_id"].get(template_id)
+    def get_template(self, obj):
+        if not obj.template_id:
+            return None
+        template = self.context["templates_by_id"].get(obj.template_id)
+        if not template:
+            return None
+        return {"id": template.id, "name": template.name}
