@@ -4,6 +4,7 @@
 * Update constitution to 3.1.0
 * feat: Updated CanDownloadOrgMedia permission class to include Viewer role alongside Administrator, Editor, and Agent roles.
 * fix: improve ChangeHistory events for flow deletion, rename and archive/restore (weni-rp-apps 2.13.1, weni-commons 1.7.0)
+* chore: update weni rapid pro apps to version 2.13.1
 
 3.107.0
 ----------
