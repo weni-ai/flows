@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from temba.fastapi_app.auth import verify_jwt
 from temba.fastapi_app.broadcasts import app, post_internal_whatsapp_broadcast
+from temba.msgs.models import Broadcast
 from temba.tests.base import TembaTest
 
 
@@ -138,6 +139,80 @@ class TestPostInternalWhatsappBroadcast(TembaTest):
         self.assertIn("created_on", data)
         self.assertEqual(data["contacts"][0]["uuid"], str(contact.uuid))
         self.assertEqual(data["metadata"].get("text"), "Hello @contact.name")
+
+    def test_custom_data_success_and_absence(self):
+        contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+        custom_data = {"order_id": "1234567890-01", "tags": ["vip"]}
+        jwt = {"project_uuid": str(self.org.proj_uuid), "email": "user@example.com"}
+        resp = post_internal_whatsapp_broadcast(
+            body={
+                "project": str(self.org.proj_uuid),
+                "contacts": [str(contact.uuid)],
+                "msg": {"text": "Hello", "custom_data": custom_data},
+            },
+            jwt_payload=jwt,
+        )
+        status_code, data = _parse(resp)
+        self.assertEqual(status_code, 201)
+        self.assertEqual(custom_data, Broadcast.objects.get(id=data["id"]).metadata["custom_data"])
+
+        resp = post_internal_whatsapp_broadcast(
+            body={
+                "project": str(self.org.proj_uuid),
+                "contacts": [str(contact.uuid)],
+                "msg": {"text": "Hello"},
+            },
+            jwt_payload=jwt,
+        )
+        status_code, data = _parse(resp)
+        self.assertEqual(status_code, 201)
+        self.assertNotIn("custom_data", Broadcast.objects.get(id=data["id"]).metadata)
+
+        resp = post_internal_whatsapp_broadcast(
+            body={
+                "project": str(self.org.proj_uuid),
+                "contacts": [str(contact.uuid)],
+                "msg": {"text": "Hello", "custom_data": {}},
+            },
+            jwt_payload=jwt,
+        )
+        status_code, data = _parse(resp)
+        self.assertEqual(status_code, 201)
+        self.assertNotIn("custom_data", Broadcast.objects.get(id=data["id"]).metadata)
+
+    def test_custom_data_invalid(self):
+        contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])
+        jwt = {"project_uuid": str(self.org.proj_uuid), "email": "user@example.com"}
+        before = Broadcast.objects.filter(org=self.org).count()
+        nested = {}
+        current = nested
+        for _ in range(32):
+            current["x"] = {}
+            current = current["x"]
+        cases = [
+            (None, "custom_data must be an object"),
+            ("x", "custom_data must be an object"),
+            ([], "custom_data must be an object"),
+            (1, "custom_data must be an object"),
+            ({"pad": "x" * 16385}, "custom_data must be at most 16384 bytes when serialized"),
+            (nested, "custom_data must have at most 32 levels of nesting"),
+            ({"$x": 1}, "custom_data keys must not start with '$' or contain '.'"),
+            ({"outer": {"a.b": 1}}, "custom_data keys must not start with '$' or contain '.'"),
+            ({"items": [{"bad.key": True}]}, "custom_data keys must not start with '$' or contain '.'"),
+        ]
+        for payload, message in cases:
+            resp = post_internal_whatsapp_broadcast(
+                body={
+                    "project": str(self.org.proj_uuid),
+                    "contacts": [str(contact.uuid)],
+                    "msg": {"text": "Hello", "custom_data": payload},
+                },
+                jwt_payload=jwt,
+            )
+            status_code, data = _parse(resp)
+            self.assertEqual(status_code, 400)
+            self.assertEqual(data["msg"], [message])
+        self.assertEqual(before, Broadcast.objects.filter(org=self.org).count())
 
     def test_jwt_payload_project_uuid_is_used(self):
         contact = self.create_contact("Junior", urns=["whatsapp:5561912345678"])

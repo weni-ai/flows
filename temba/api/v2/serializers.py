@@ -27,6 +27,7 @@ from temba.globals.models import Global
 from temba.locations.models import AdminBoundary
 from temba.mailroom import modifiers
 from temba.mailroom.client import MailroomException
+from temba.msgs.custom_data import normalize_custom_data_in_msg, validate_custom_data
 from temba.msgs.models import Attachment, Broadcast, Label, Msg
 from temba.msgs.usecases.managed_trigger_group import (
     ContactResolutionError,
@@ -339,6 +340,12 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
             raise serializers.ValidationError("ig_response_type is required when ig_comment_id is provided")
         if value.get("ig_response_type") and not value.get("ig_comment_id"):
             raise serializers.ValidationError("ig_comment_id is required when ig_response_type is provided")
+        if "custom_data" in value:
+            try:
+                validate_custom_data(value["custom_data"])
+            except ValueError as exc:
+                raise serializers.ValidationError(str(exc))
+            value = normalize_custom_data_in_msg(value)
         return value
 
     def _validate_recipients(self, data):
