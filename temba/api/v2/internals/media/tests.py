@@ -286,12 +286,18 @@ class TestS3MediaProxyEndpoint(TembaTest):
 
         self.assertEqual(response.status_code, 403)
 
-    def test_get_viewer_returns_403(self):
+    @patch("temba.api.v2.internals.media.views.s3")
+    @patch("temba.api.v2.internals.media.views.settings")
+    def test_get_viewer_redirect_success(self, mock_settings, mock_s3):
+        presigned_url = "https://test-bucket.s3.amazonaws.com/presigned?signature=viewer"
+        self._mock_found(mock_settings, mock_s3, presigned_url)
+
         client = APIClient()
         client.force_authenticate(user=self.user)
         response = self._get("media/image.jpg", client=client)
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, presigned_url)
 
     @patch("temba.api.v2.internals.media.views.s3")
     @patch("temba.api.v2.internals.media.views.settings")
