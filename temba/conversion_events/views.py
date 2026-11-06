@@ -216,8 +216,12 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
 
         try:
             parsed_value = float(value)
-        except (ValueError, TypeError):
-            logger.warning("Invalid value format in purchase event")
+        except (ValueError, TypeError) as exc:
+            logger.warning(
+                "Invalid value format in purchase event: %s",
+                str(exc),
+                extra={"error": str(exc)},
+            )
             return None
 
         currency = original_payload.get("currency") or DEFAULT_PURCHASE_CURRENCY
