@@ -1,3 +1,10 @@
+3.108.0
+----------
+* feat: add public `/api/v2/broadcasts_statistics.json` endpoint, a new externally reachable read API authenticated by API key, session or JWT, readable by every workspace role through the new `msgs.broadcast_statistics_api` permission
+* Update constitution to 3.1.0
+* feat: Updated CanDownloadOrgMedia permission class to include Viewer role alongside Administrator, Editor, and Agent roles.
+* chore: update weni rapid pro apps to version 2.13.1
+
 3.107.0
 ----------
 * feat: implement custom_data validation for WhatsApp broadcasts

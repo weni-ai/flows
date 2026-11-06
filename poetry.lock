@@ -4727,27 +4727,28 @@ files = [
 
 [[package]]
 name = "weni-commons"
-version = "1.6.2"
+version = "1.7.0"
 description = "Weni's common utilities for Python backends"
 optional = false
 python-versions = "<4.0,>=3.8"
 groups = ["main"]
 files = [
-    {file = "weni_commons-1.6.2-py3-none-any.whl", hash = "sha256:ac5c2db31c5649db87edbcfb4fa1c7641cb6c4661ddb2b885c218427ed2c8474"},
-    {file = "weni_commons-1.6.2.tar.gz", hash = "sha256:4fc9d815c61d459ef9430849f4a8e4ad840f31431419f11fea6b13793eb14163"},
+    {file = "weni_commons-1.7.0-py3-none-any.whl", hash = "sha256:129d5ca2d0c0779afff5112ea741f16820709cc79abaa9a3b1b63821adb24d2a"},
+    {file = "weni_commons-1.7.0.tar.gz", hash = "sha256:4aee4c06d34729190f56384387313572e2bcaa25c69453a57167a32b88e41821"},
 ]
 
 [package.dependencies]
-boto3 = ">=1.18.0,<2.0.0"
-celery = ">=5.0.0,<6.0"
 django = ">=3.2.22,<6.0"
-django-redis = ">=4.0.0,<=6.0"
 djangorestframework = ">=3.12.0,<4.0"
+django-redis = ">=4.0.0,<=6.0"
+celery = ">=5.0.0,<6.0"
 mozilla-django-oidc = ">=2.0.0,<5.0"
 pyjwt = ">=2.8.0,<3.0"
-requests = ">=2.25.0"
-weni-eda = "0.3.0"
 weni-feature-flags = ">=2.2.0,<3.0.0"
+weni-eda = "==0.3.0"
+requests = ">=2.25.0"
+boto3 = ">=1.18.0,<2.0.0"
+
 
 [[package]]
 name = "weni-datalake-sdk"
@@ -4808,14 +4809,14 @@ requests = ">=2.25.0,<3.0"
 
 [[package]]
 name = "weni-rp-apps"
-version = "2.13.0"
+version = "2.13.2"
 description = "Weni apps for Rapidpro Platform"
 optional = false
 python-versions = "<3.13,>=3.10"
 groups = ["main"]
 files = [
-    {file = "weni_rp_apps-2.13.0-py3-none-any.whl", hash = "sha256:fefa35b3865896f34915e1699eda12bb83fe5fe993e11db12674ff6a4dcbf6ab"},
-    {file = "weni_rp_apps-2.13.0.tar.gz", hash = "sha256:1acdfa36c5707bec68b51c30bd2f042f13736b3d9a36a34b49ededbb6895c947"},
+    {file = "weni_rp_apps-2.13.2-py3-none-any.whl", hash = "sha256:201de1a0f25ff0664234a56c4c720a72251f0437f2246d35f6798f3961b40a9c"},
+    {file = "weni_rp_apps-2.13.2.tar.gz", hash = "sha256:dd1ea630e557259b9504c451f360bb05802d4fc6a814bc0cdaca207d9c641b81"},
 ]
 
 [package.dependencies]
@@ -4830,7 +4831,7 @@ pre-commit = ">=2.20.0,<3.0.0"
 drf-nested-routers = ">=0.93.4,<0.94.0"
 grpcio = ">=1.71.0,<2.0.0"
 protobuf = ">=6.30.0,<7.0.0"
-weni-commons = ">=1.6.2"
+weni-commons = ">=1.7.0"
 
 
 [[package]]
@@ -5144,4 +5145,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.12"
-content-hash = "4ad0d22dcdf6310129207a4b53407aa10a92c7076001fdfed965d277d965b3fc"
+content-hash = "3d7faa02052c1f1bd74da1f870d3ed0e8781ae3eebc12a943a27de9320751b72"
