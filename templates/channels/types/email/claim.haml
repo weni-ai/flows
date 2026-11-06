@@ -6,12 +6,12 @@
     .card.mb-4
       %h3
         -trans "Connect a Microsoft mailbox"
-      %form(method="post" action="{% url 'channels.types.email.outlook_start' %}")
+      %form(method="post" action="{% url 'channels.types.email.outlook_start' %}" target="_top")
         {% csrf_token %}
         .mb-2
-          %label
+          %label(for="outlook-mailbox")
             -trans "Primary mailbox"
-          %input(type="text" name="username" autocomplete="off")
+          %input#outlook-mailbox(type="text" name="username" autocomplete="off")
         %button.button-primary(type="submit")
           -trans "Continue with Microsoft"
   {{ block.super }}
