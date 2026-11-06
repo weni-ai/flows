@@ -5,6 +5,6 @@ from .consumers.channel_migrated_consumer import ChannelMigratedConsumer  # prag
 
 def handle_amq_consumers(channel: Channel) -> None:  # pragma: no cover
     channel.basic_consume(
-        "flows.channels.migrated",
+        "flows.channels.queue",
         callback=ChannelMigratedConsumer().handle,
     )
