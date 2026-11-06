@@ -374,6 +374,8 @@ LOGGING = {
         "django.security.DisallowedHost": {"handlers": ["null"], "propagate": False},
         "django.db.backends": {"level": "ERROR", "handlers": ["console"], "propagate": False},
         "temba.formax": {"level": "DEBUG" if DEBUG else "ERROR", "handlers": ["console"], "propagate": False},
+        # Enables temba.conversion_events.* loggers under disable_existing_loggers=True (see assertLogs in tests).
+        "temba.conversion_events": {"level": "INFO", "handlers": ["console"], "propagate": False},
     },
 }
 
