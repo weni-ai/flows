@@ -281,10 +281,24 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
             }
 
             if response.status_code == 200:
-                logger.info("Meta CAPI event accepted", extra=log_extra)
+                logger.info(
+                    "Meta CAPI event accepted event_name=%s dataset_id=%s http_status=%s has_custom_data=%s",
+                    log_extra["event_name"],
+                    log_extra["dataset_id"],
+                    log_extra["http_status"],
+                    log_extra["has_custom_data"],
+                    extra=log_extra,
+                )
                 return True, "Success"
             else:
-                logger.warning("Meta CAPI event rejected", extra=log_extra)
+                logger.warning(
+                    "Meta CAPI event rejected event_name=%s dataset_id=%s http_status=%s has_custom_data=%s",
+                    log_extra["event_name"],
+                    log_extra["dataset_id"],
+                    log_extra["http_status"],
+                    log_extra["has_custom_data"],
+                    extra=log_extra,
+                )
                 error_detail = response.json()
                 return False, str(error_detail)
 

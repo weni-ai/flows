@@ -558,7 +558,7 @@ class ConversionEventAPITest(TembaTest):
             "temba.conversion_events.views.send_event_data"
         ) as mock_send_event:
             _, captured, _ = self._post_purchase_to_meta(mock_post, mock_send_event, {"value": 10, "currency": "BRL"})
-            accepted = [r for r in captured.records if r.getMessage() == "Meta CAPI event accepted"]
+            accepted = [r for r in captured.records if r.getMessage().startswith("Meta CAPI event accepted")]
             self.assertEqual(len(accepted), 1)
             record = accepted[0]
             self.assertEqual(record.event_name, "Purchase")
@@ -566,6 +566,10 @@ class ConversionEventAPITest(TembaTest):
             self.assertEqual(record.http_status, 200)
             self.assertTrue(record.has_custom_data)
             log_text = "\n".join(captured.output)
+            self.assertIn("event_name=Purchase", log_text)
+            self.assertIn("dataset_id=test_dataset_123", log_text)
+            self.assertIn("http_status=200", log_text)
+            self.assertIn("has_custom_data=True", log_text)
             self.assertNotIn("test_clid_123", log_text)
             self.assertNotIn("test_token", log_text)
 
@@ -597,12 +601,17 @@ class ConversionEventAPITest(TembaTest):
                     )
 
         self.assertEqual(response.status_code, 200)
-        rejected = [r for r in captured.records if r.getMessage() == "Meta CAPI event rejected"]
+        rejected = [r for r in captured.records if r.getMessage().startswith("Meta CAPI event rejected")]
         self.assertEqual(len(rejected), 1)
         self.assertEqual(rejected[0].http_status, 400)
         self.assertEqual(rejected[0].event_name, "Purchase")
         self.assertTrue(rejected[0].has_custom_data)
-        self.assertNotIn("test_clid_123", "\n".join(captured.output))
+        log_text = "\n".join(captured.output)
+        self.assertIn("event_name=Purchase", log_text)
+        self.assertIn("dataset_id=test_dataset_123", log_text)
+        self.assertIn("http_status=400", log_text)
+        self.assertIn("has_custom_data=True", log_text)
+        self.assertNotIn("test_clid_123", log_text)
 
     def test_ctwa_data_not_found(self):
         """Test that event is still sent to Datalake when CTWA data is not found"""
