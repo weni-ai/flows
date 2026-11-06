@@ -1,21 +1,21 @@
 <!--
 Sync Impact Report:
-- Version change: 2.0.0 → 3.0.0
-- Bump rationale: MAJOR. Principle V no longer requires every engineering spec to derive from a product spec, and the Constitution Check governance rule no longer assumes every change has a plan.
-- Modified principles:
-  - V. Specification Traceability: redefined to the new root text. An engineering spec either derives from a product spec (inheritance section) or originates in engineering (new `## Origin Without Product Spec` section). Either origin may follow the SDD Full or the SDD Lite cycle
-  - VI. No Silent Divergence: now scoped to engineering specs derived from a product spec
+- Version change: 3.0.0 → 3.1.0
+- Bump rationale: MINOR. The backend base adds Explicit, Scoped Authorization. Appended as Principle XVII so existing spec citations of Principles XI and XIV stay valid.
+- Modified principles: none
 - Added sections:
-  - Specification-Driven Delivery (SDD Full and SDD Lite cycles, chosen by complexity, not by origin)
+  - XVII. Explicit, Scoped Authorization
 - Modified sections:
-  - Governance / Compliance Review: Constitution Check runs on the plan in SDD Full and on the spec's Constitution Alignment in SDD Lite; pull requests show product-spec fidelity or the origin acceptance criteria
+  - Flows Backend Standards: DRF default permission and FastAPI authorization
+  - Governance / Compliance Review: Constitution Check covers explicit scoped authorization
 - Removed sections: none
 - Follow-up TODOs:
   - TODO(SENTRY_PII): `temba/settings_common.py` initializes Sentry with `send_default_pii=True`, which conflicts with Observability and Diagnosable Errors. A later change MUST stop attaching personal data and MUST send only opaque identifiers. Out of scope for this constitution update.
   - TODO(SPECKIT_PRESET): the `vtex-cx-engineering` preset is not installed in this repository, so `/speckit.specify` still uses the core command and template, without the origin gate, the `## Origin Without Product Spec` section, or the `Test Strategy` and `Constitution Alignment` sections that SDD Lite relies on. Until then, those sections MUST be added to `spec.md` by hand. Install it with `specify preset add --dev <clone>/speckit/vtex-cx-engineering` in a separate change.
+  - TODO(DRF_PERMISSIONS): `REST_FRAMEWORK["DEFAULT_PERMISSION_CLASSES"]` in `temba/settings_common.py` is `IsAuthenticated`. Views also set `permission_classes` to `IsAuthenticated`, `AllowAny`, or an empty list. A later change MUST replace them with explicit resource permissions. An endpoint that must stay open MUST use a dedicated named permission whose check replaces user identity, and MUST record the justification in the engineering spec. Out of scope for this constitution update.
 
 Provenance:
-- Source: weni-ai/vtex-cx-engineering-constitutions (main @ 74ce306)
+- Source: weni-ai/vtex-cx-engineering-constitutions (main @ bc782d1)
 - Domains: backend
 -->
 
@@ -150,6 +150,16 @@ A change MUST be limited to the context it was asked to address. Refactoring, re
 
 **Rationale:** A change that reaches beyond its stated scope is a change nobody reviewed on purpose. It hides the intended fix inside unrelated edits and turns a revert into a choice between losing the fix and keeping an unrelated regression.
 
+### XVII. Explicit, Scoped Authorization
+
+Every endpoint MUST declare an explicit permission that verifies the caller is allowed to perform that action on that specific resource. Identity alone MUST NOT be treated as authorization. Access MUST be denied by default: an endpoint that declares no permission, or declares an empty one, MUST be rejected rather than left open. In the rare case an endpoint must be reachable without an authenticated user, it MUST use a permission dedicated to that endpoint, named for the reason it is open and implementing the check that replaces user identity (such as a webhook signature or an internal token), and the justification MUST be recorded in the engineering spec.
+
+In Django REST Framework, `IsAuthenticated` and `AllowAny` MUST NOT be used under any circumstance: not in `permission_classes`, not in the `@permission_classes` decorator, not in `DEFAULT_PERMISSION_CLASSES`, not composed with other permissions through `&` or `|`, and not as a base class. A custom permission whose check unconditionally grants access is equivalent to `AllowAny` and is equally forbidden. `DEFAULT_PERMISSION_CLASSES` MUST be set explicitly, because when it is omitted the framework falls back to `AllowAny`. In this repository that setting is `REST_FRAMEWORK` in `temba/settings_common.py` and applies to every Django REST Framework view, including `temba/api`.
+
+FastAPI routes in `temba/fastapi_app` MUST declare an explicit authorization dependency for the resource they touch. Verifying a token or session MUST NOT by itself authorize access to an org, channel, contact, or flow resource.
+
+**Rationale:** `IsAuthenticated` only proves that a caller has a valid session, not that they may touch a given org or record, so it opens every resource to any logged-in user of any tenant. `AllowAny` removes the check entirely, and it is also what the framework applies when no default is configured, so an omission becomes a public endpoint. Forbidding both by name makes the rule mechanically checkable in review and CI, and forcing open endpoints through a dedicated, named permission keeps every exception visible and tied to the check that justifies it.
+
 ## Flows Backend Standards
 
 These rules instantiate the principles above on the stack and layout of this repository.
@@ -162,6 +172,7 @@ These rules instantiate the principles above on the stack and layout of this rep
 - Python formatting MUST pass `./code_check.py`, which runs Black (`--line-length=119`), flake8, isort (`setup.cfg`), and checks for missing migrations.
 - User-facing copy MUST follow the VTEX Content Guide. New locale strings MUST be added for the supported languages (EN source, ES, PT, and RO) in `locale/` when the change introduces them.
 - Prefer extending an existing abstraction over introducing a parallel pattern.
+- Django REST Framework authorization MUST follow Principle XVII. `REST_FRAMEWORK["DEFAULT_PERMISSION_CLASSES"]` in `temba/settings_common.py` MUST be set explicitly and MUST NOT be `IsAuthenticated` or `AllowAny`. An empty `permission_classes` MUST NOT be used. FastAPI routes in `temba/fastapi_app` MUST declare an explicit authorization dependency for the resource they touch.
 
 ## Specification-Driven Delivery
 
@@ -194,11 +205,11 @@ This constitution is the authoritative engineering policy for the Flows reposito
 
 **Compliance Review**:
 
-- The Constitution Check MUST cover version control, secrets, observability, versioned contracts, spec origin (product-spec inheritance or origin without product spec), silent divergence when a product spec exists, commits, changelog, input validation, timeouts, bounded retry, statelessness and declared peak load, diagnosable errors, flow tests, explicit constants, contained scope, and channel layout when the change adds or alters a channel.
+- The Constitution Check MUST cover version control, secrets, observability, versioned contracts, spec origin (product-spec inheritance or origin without product spec), silent divergence when a product spec exists, commits, changelog, input validation, explicit scoped authorization, timeouts, bounded retry, statelessness and declared peak load, diagnosable errors, flow tests, explicit constants, contained scope, and channel layout when the change adds or alters a channel.
 - In SDD Full, every plan MUST pass the Constitution Check before Phase 0 research and again after Phase 1 design.
 - In SDD Lite, there is no plan: the Constitution Alignment section of `spec.md` is the Constitution Check and MUST be complete before implementation starts.
 - `/speckit.analyze` MUST treat a conflict with a MUST in this constitution as CRITICAL.
 - Every pull request MUST state the cycle it followed and show how tests, migrations, changelog, and either product-spec fidelity or the origin acceptance criteria were addressed.
 - Reviewers MUST reject a change that bypasses required tests or a binding product decision.
 
-**Version**: 3.0.0 | **Ratified**: 2026-07-21 | **Last Amended**: 2026-10-27
+**Version**: 3.1.0 | **Ratified**: 2026-07-21 | **Last Amended**: 2026-11-05

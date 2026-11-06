@@ -1,3 +1,11 @@
+3.107.0
+----------
+* feat: implement custom_data validation for WhatsApp broadcasts
+
+3.106.1
+----------
+* feat: persist platform ElevenLabs voice config on new TPH channels
+
 3.106.0
 ----------
 * fix: sign media URLs in the flow editor and simulator through /flow/media_urls/ (security-relevant: signing is restricted to objects of the flow's org)
