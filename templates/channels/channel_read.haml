@@ -24,6 +24,12 @@
     .text-gray-500.text-base
       {{ object.get_address_display }}
 
+  -if object.config.oauth_provider == 'microsoft' and object.config.oauth_status == 'needs_reconnect'
+    .mt-2
+      -trans "This mailbox needs to be connected again."
+      %a(href="{% url 'channels.types.email.claim' %}")
+        -trans "Connect again"
+
   -if object.get_country_display
     .text-gray-500.text-base
       {{ object.get_country_display }}

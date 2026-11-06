@@ -1,0 +1,15 @@
+-extends "channels/channel_claim_form.html"
+-load i18n
+
+-block form
+  -if outlook_enabled
+    .card.mb-4
+      %h3
+        -trans "Connect a Microsoft mailbox"
+      %form(method="post" action="{% url 'channels.types.email.outlook_start' %}" target="_top")
+        {% csrf_token %}
+        {% trans "Primary mailbox" as mailbox_label %}
+        %temba-textinput#outlook-mailbox.block.w-full.mb-4(type="text" name="username" autocomplete="off" label="{{ mailbox_label }}")
+        %button.button-primary(type="submit")
+          -trans "Continue with Microsoft"
+  {{ block.super }}
