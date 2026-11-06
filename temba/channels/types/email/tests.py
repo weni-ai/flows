@@ -126,8 +126,10 @@ class EmailTypeTest(TembaTest):
         self.login(self.admin)
         response = self.client.get(reverse("channels.types.email.claim"))
         html = response.content.decode()
-        self.assertRegex(html, r"<label[^>]*for=['\"]outlook-mailbox['\"]")
-        self.assertRegex(html, r"<input[^>]*name=['\"]username['\"][^>]*id=['\"]outlook-mailbox['\"]")
+        self.assertRegex(
+            html,
+            r"<temba-textinput(?=[^>]*id='outlook-mailbox')(?=[^>]*name='username')(?=[^>]*label='Primary mailbox')[^>]*>",
+        )
 
     @microsoft_app
     def test_outlook_rejects_blank_or_non_email(self):
