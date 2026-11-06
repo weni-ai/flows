@@ -183,9 +183,7 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
                         datalake_error,
                     )
                     error_type = "Meta and Datalake Error"
-                    error_msg = (
-                        f"Meta: {_meta_error_safe_message(meta_error)}, Datalake: {datalake_error}"
-                    )
+                    error_msg = f"Meta: {_meta_error_safe_message(meta_error)}, Datalake: {datalake_error}"
                 else:  # Only Datalake failed (Meta wasn't attempted)
                     logger.error(
                         f"[FAILURE] Datalake failed for event {event_type} on channel {channel_uuid}. Error: {datalake_error}"
