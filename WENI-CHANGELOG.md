@@ -1,3 +1,7 @@
+3.110.0
+----------
+* feat: connect an Outlook mailbox from the email claim page with Microsoft consent, creating one email channel for the confirmed address.
+
 3.109.0
 ----------
 * fix: implement purchase value and currency handling for Meta CAPI
