@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
 
 import jwt
+import requests
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from django.conf import settings
@@ -36,10 +37,17 @@ class _JsonResponse:
         return self._payload
 
 
-def _access_token(mailbox=None, claim="upn", audience=outlook.OUTLOOK_AUDIENCE):
+class _BrokenJson:
+    status_code = 200
+
+    def json(self):
+        raise ValueError("not json")
+
+
+def _access_token(mailbox=None, claim="upn", audience=outlook.OUTLOOK_AUDIENCE, issuer=None):
     payload = {
         "aud": audience,
-        "iss": "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0",
+        "iss": issuer or "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0",
         "exp": int(time.time()) + 3600,
     }
     if claim and mailbox:
@@ -126,8 +134,10 @@ class EmailTypeTest(TembaTest):
         self.login(self.admin)
         response = self.client.get(reverse("channels.types.email.claim"))
         html = response.content.decode()
-        self.assertRegex(html, r"<label[^>]*for=['\"]outlook-mailbox['\"]")
-        self.assertRegex(html, r"<input[^>]*name=['\"]username['\"][^>]*id=['\"]outlook-mailbox['\"]")
+        self.assertRegex(
+            html,
+            r"<temba-textinput(?=[^>]*id='outlook-mailbox')(?=[^>]*name='username')(?=[^>]*label='Primary mailbox')[^>]*>",
+        )
 
     @microsoft_app
     def test_outlook_rejects_blank_or_non_email(self):
@@ -146,7 +156,12 @@ class EmailTypeTest(TembaTest):
         self.login(self.admin)
         cases = (
             (" User@Contoso.com ", "user@contoso.com", "upn", "refresh-work"),
-            ("user@outlook.com", "user@outlook.com", "preferred_username", "refresh-outlook"),
+            (
+                "user@outlook.com",
+                "user@outlook.com",
+                "preferred_username",
+                "refresh-outlook",
+            ),
         )
         for typed, address, claim, refresh in cases:
             self._assert_connected(typed, address, claim, refresh)
@@ -211,8 +226,15 @@ class EmailTypeTest(TembaTest):
             query = self._start("user@contoso.com")
             params = dict(params, state=query["state"][0])
             with self.assertLogs("temba.channels.types.email.outlook", level="INFO") as logs:
-                response = self.client.get(reverse("channels.types.email.outlook_callback"), params, follow=True)
-            self.assertContains(response, "https://login.microsoftonline.com/common/adminconsent?client_id=app-id")
+                response = self.client.get(
+                    reverse("channels.types.email.outlook_callback"),
+                    params,
+                    follow=True,
+                )
+            self.assertContains(
+                response,
+                "https://login.microsoftonline.com/common/adminconsent?client_id=app-id",
+            )
             self.assertContains(response, "administrator must approve this app")
             self.assertNotContains(response, "user@contoso.com")
             joined = "\n".join(logs.output)
@@ -228,7 +250,11 @@ class EmailTypeTest(TembaTest):
         with self.assertLogs("temba.channels.types.email.outlook", level="INFO") as logs:
             response = self.client.get(
                 reverse("channels.types.email.outlook_callback"),
-                {"error": "server_error", "error_description": description, "state": query["state"][0]},
+                {
+                    "error": "server_error",
+                    "error_description": description,
+                    "state": query["state"][0],
+                },
                 follow=True,
             )
         self.assertContains(response, description)
@@ -302,7 +328,10 @@ class EmailTypeTest(TembaTest):
 
         query = self._start("user@outlook.com")
         response, posted = self._finish(
-            query, _access_token("user@outlook.com"), refresh="refresh-second", follow=True
+            query,
+            _access_token("user@outlook.com"),
+            refresh="refresh-second",
+            follow=True,
         )
         self.assertContains(response, "This mailbox is already connected.")
         self.assertEqual(1, posted.call_count)
@@ -324,7 +353,10 @@ class EmailTypeTest(TembaTest):
         )
         query = self._start("email@gmail.com")
         response, posted = self._finish(
-            query, _access_token("email@gmail.com"), refresh="refresh-generic", follow=True
+            query,
+            _access_token("email@gmail.com"),
+            refresh="refresh-generic",
+            follow=True,
         )
         self.assertContains(response, "This mailbox is already connected.")
         generic = Channel.objects.get(channel_type="EM", address="email@gmail.com")
@@ -341,7 +373,7 @@ class EmailTypeTest(TembaTest):
         description = "user@contoso.com invalid_grant detail"
         scope = MagicMock()
         scope.__enter__.return_value = scope
-        with patch("temba.channels.types.email.outlook.sentry_sdk.push_scope", return_value=scope), patch(
+        with patch("temba.channels.types.email.outlook.sentry_sdk.push_scope", return_value=scope,), patch(
             "temba.channels.types.email.outlook.sentry_sdk.capture_message"
         ) as captured, self.assertLogs(
             "temba.channels.types.email.outlook", level="INFO"
@@ -372,6 +404,99 @@ class EmailTypeTest(TembaTest):
         self.assertNotIn(description, str(tags))
         self.assertNotIn("auth-code-secret", str(captured.call_args))
         self.assertNotIn("app-secret", str(captured.call_args))
+        self.assertFalse(Channel.objects.filter(channel_type="EM").exists())
+
+    def test_outlook_begin_requires_a_mailbox(self):
+        with self.assertRaises(outlook.ConsentError) as caught:
+            outlook.begin(self.org, self.admin, None, "https://example.com/callback")
+        self.assertEqual("invalid_address", caught.exception.code)
+        self.assertFalse(caught.exception.log)
+
+    @microsoft_app
+    def test_outlook_ignores_an_unsafe_provider_error(self):
+        self.login(self.admin)
+        query = self._start("user@contoso.com")
+        with self.assertLogs("temba.channels.types.email.outlook", level="INFO") as logs:
+            response = self.client.get(
+                reverse("channels.types.email.outlook_callback"),
+                {"error": "not safe", "state": query["state"][0]},
+                follow=True,
+            )
+        self.assertContains(response, "Sign in again to connect the mailbox.")
+        self.assertNotContains(response, "not safe")
+        joined = "\n".join(logs.output)
+        self.assertIn("error=error", joined)
+        self.assertNotIn("not safe", joined)
+        self.assertFalse(Channel.objects.filter(channel_type="EM").exists())
+
+    @microsoft_app
+    def test_outlook_callback_without_state(self):
+        self.login(self.admin)
+        with self.assertLogs("temba.channels.types.email.outlook", level="INFO") as logs:
+            response = self.client.get(
+                reverse("channels.types.email.outlook_callback"),
+                {"code": "auth-code"},
+                follow=True,
+            )
+        self.assertContains(response, "Sign in again to connect the mailbox.")
+        self.assertIn("error=state", "\n".join(logs.output))
+        self.assertNotIn("auth-code", "\n".join(logs.output))
+        self.assertFalse(Channel.objects.filter(channel_type="EM").exists())
+
+    @microsoft_app
+    def test_outlook_token_endpoint_cannot_be_read(self):
+        self.login(self.admin)
+        self.org.proj_uuid = None
+        self.org.save(update_fields=("proj_uuid",))
+        self.assertIsNone(outlook.account_identifier(self.org))
+
+        query = self._start("user@contoso.com")
+        scope = MagicMock()
+        scope.__enter__.return_value = scope
+        with patch("temba.channels.types.email.outlook.sentry_sdk.push_scope", return_value=scope,), patch(
+            "temba.channels.types.email.outlook.sentry_sdk.capture_message"
+        ) as captured, self.assertLogs("temba.channels.types.email.outlook", level="INFO") as logs, patch(
+            "temba.channels.types.email.outlook.requests.post",
+            side_effect=requests.ConnectionError("down"),
+        ):
+            response = self.client.get(
+                reverse("channels.types.email.outlook_callback"),
+                {"code": "auth-code", "state": query["state"][0]},
+                follow=True,
+            )
+        self.assertContains(response, "Microsoft did not complete the sign-in.")
+        self.assertIn("error=token", "\n".join(logs.output))
+        self.assertNotIn("down", "\n".join(logs.output))
+        tags = {call.args[0]: call.args[1] for call in scope.set_tag.call_args_list}
+        self.assertNotIn("account_id", tags)
+        self.assertEqual("token", tags["microsoft_error"])
+        captured.assert_called_once()
+
+        query = self._start("user@contoso.com")
+        with self.assertLogs("temba.channels.types.email.outlook", level="INFO") as logs, patch(
+            "temba.channels.types.email.outlook.requests.post",
+            return_value=_BrokenJson(),
+        ):
+            response = self.client.get(
+                reverse("channels.types.email.outlook_callback"),
+                {"code": "auth-code", "state": query["state"][0]},
+                follow=True,
+            )
+        self.assertContains(response, "Microsoft did not complete the sign-in.")
+        self.assertIn("error=token", "\n".join(logs.output))
+        self.assertFalse(Channel.objects.filter(channel_type="EM").exists())
+
+    @microsoft_app
+    def test_outlook_rejects_a_token_without_the_mailbox(self):
+        self.login(self.admin)
+        for token in (
+            _access_token("user@contoso.com", issuer="https://example.com/v2.0"),
+            _access_token(),
+        ):
+            query = self._start("user@contoso.com")
+            response, posted = self._finish(query, token, follow=True)
+            self.assertContains(response, "Microsoft did not complete the sign-in.")
+            self.assertEqual(1, posted.call_count)
         self.assertFalse(Channel.objects.filter(channel_type="EM").exists())
 
     @microsoft_app
@@ -546,10 +671,19 @@ class EmailTypeTest(TembaTest):
         self.assertTrue(location.startswith(f"{outlook.AUTHORIZE_URL}?"))
         return parse_qs(urlparse(location).query)
 
-    def _finish(self, query, token, refresh="refresh-token", status=200, payload=None, follow=False):
+    def _finish(
+        self,
+        query,
+        token,
+        refresh="refresh-token",
+        status=200,
+        payload=None,
+        follow=False,
+    ):
         body = payload if payload is not None else {"access_token": token, "refresh_token": refresh}
         with _patch_jwks(), patch(
-            "temba.channels.types.email.outlook.requests.post", return_value=_JsonResponse(status, body)
+            "temba.channels.types.email.outlook.requests.post",
+            return_value=_JsonResponse(status, body),
         ) as posted:
             response = self.client.get(
                 reverse("channels.types.email.outlook_callback"),
