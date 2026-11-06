@@ -1,3 +1,7 @@
+3.107.0
+----------
+* feat: Add channel migration consumer for integrations.channel.migrated events
+
 3.106.1
 ----------
 * feat: persist platform ElevenLabs voice config on new TPH channels

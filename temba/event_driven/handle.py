@@ -1,5 +1,6 @@
 from weni.eda.channels import Channel  # pragma: no cover
 
+from temba.channels.handle import handle_amq_consumers as channels_handle_amq_consumers  # pragma: no cover
 from temba.classifiers.handle import handle_consumers as classifier_handle_consumers  # pragma: no cover
 from temba.features.handle import handle_consumers as feature_handle_consumers  # pragma: no cover
 from temba.projects.handle import handle_consumers as project_handle_consumers  # pragma: no cover
@@ -21,3 +22,4 @@ def handle_template_consumers(channel: Channel) -> None:
 def handle_consumers(channel: Channel) -> None:  # pragma: no cover
     handle_default_consumers(channel)
     handle_template_consumers(channel)
+    channels_handle_amq_consumers(channel)
