@@ -122,6 +122,14 @@ class EmailTypeTest(TembaTest):
         self.assertFalse(Channel.objects.filter(channel_type="EM").exists())
 
     @microsoft_app
+    def test_outlook_mailbox_label_focuses_the_field(self):
+        self.login(self.admin)
+        response = self.client.get(reverse("channels.types.email.claim"))
+        html = response.content.decode()
+        self.assertRegex(html, r"<label[^>]*for=['\"]outlook-mailbox['\"]")
+        self.assertRegex(html, r"<input[^>]*name=['\"]username['\"][^>]*id=['\"]outlook-mailbox['\"]")
+
+    @microsoft_app
     def test_outlook_rejects_blank_or_non_email(self):
         self.login(self.admin)
         start_url = reverse("channels.types.email.outlook_start")
@@ -459,6 +467,7 @@ class EmailTypeTest(TembaTest):
         self.assertGreater(form_start, -1)
         self.assertGreater(form_end, form_at)
         window = html[form_start:form_end]
+        self.assertIn("target='_top'", window)
         for banned in (
             "password",
             "smtp_host",
