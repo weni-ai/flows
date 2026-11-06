@@ -143,7 +143,8 @@ def needs_admin_consent(error, description):
 
 def record_failure(org_id, user_id, error_code, account_id=None, correlation_id=None, report=False):
     code = safe_error_code(error_code)
-    logger.info("outlook consent failed org_id=%s user_id=%s error=%s", org_id, user_id, code)
+    log = logger.warning if report else logger.info
+    log("outlook consent failed org_id=%s user_id=%s error=%s", org_id, user_id, code)
     if not report:
         return
     with sentry_sdk.push_scope() as scope:
@@ -252,6 +253,9 @@ def _exchange_code(code, verifier, redirect_uri):
 
 
 def _mailbox_from_access_token(access_token):
+    if not isinstance(access_token, str) or access_token.count(".") != 2:
+        raise ConsentError("invalid_token", report=True, logged_code="token_not_jwt")
+
     try:
         signing_key = jwt.PyJWKClient(JWKS_URL).get_signing_key_from_jwt(access_token)
         claims = jwt.decode(
@@ -261,16 +265,18 @@ def _mailbox_from_access_token(access_token):
             audience=OUTLOOK_AUDIENCE,
             options={"verify_iss": False},
         )
+    except jwt.InvalidAudienceError:
+        raise ConsentError("invalid_token", report=True, logged_code="token_audience")
     except jwt.PyJWTError:
-        raise ConsentError("invalid_token", report=True)
+        raise ConsentError("invalid_token", report=True, logged_code="token_signature")
 
     issuer = claims.get("iss") or ""
     if not (issuer.startswith(ISSUER_PREFIX) and issuer.endswith("/v2.0")):
-        raise ConsentError("invalid_token", report=True)
+        raise ConsentError("invalid_token", report=True, logged_code="token_issuer")
 
     mailbox = _mailbox_claim(claims)
     if not mailbox:
-        raise ConsentError("invalid_token", report=True)
+        raise ConsentError("invalid_token", report=True, logged_code="token_mailbox")
     return mailbox
 
 
