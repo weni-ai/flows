@@ -737,10 +737,27 @@ class ConversionEventAPITest(TembaTest):
                 self.assertEqual(response.status_code, 500)
                 response_data = response.json()
                 self.assertEqual(response_data["error"], "Meta and Datalake Error")
-                self.assertIn(
-                    "Meta: Error sending to Meta: Network error",
-                    response_data["detail"],
+                self.assertIn("Meta: Meta request failed (Exception)", response_data["detail"])
+                self.assertNotIn("Network error", response_data["detail"])
+                self.assertNotIn("test_token", response_data["detail"])
+
+    def test_meta_error_detail_omits_token_from_exception_message(self):
+        """If str(e) repeats the request URL, do not leak access_token in API responses."""
+        with patch("temba.conversion_events.views.requests.post") as mock_post:
+            mock_post.side_effect = requests.RequestException(
+                "Connection failed for https://graph.test/v1/ds/events?access_token=secret123"
+            )
+            with override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="test_token"):
+                response = self.client.post(
+                    self.endpoint_url,
+                    data=json.dumps(self.valid_payload),
+                    content_type="application/json",
                 )
+            self.assertEqual(response.status_code, 500)
+            detail = response.json()["detail"]
+            self.assertIn("Meta: Meta request failed (RequestException)", detail)
+            self.assertNotIn("secret123", detail)
+            self.assertNotIn("access_token=", detail)
 
     def test_invalid_json_handling(self):
         response = self.client.post(
@@ -944,7 +961,7 @@ class ConversionEventAPITest(TembaTest):
                 success, error = view._send_to_meta({}, "test_dataset")
 
                 self.assertFalse(success)
-                self.assertEqual(error, "Network error sending to Meta: Network timeout")
+                self.assertEqual(error, "Meta request failed (RequestException)")
 
     def test_channel_and_org_not_found_direct(self):
         """Test _send_to_datalake when channel and org are not found"""
