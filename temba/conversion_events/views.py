@@ -1,4 +1,5 @@
 import logging
+import math
 from datetime import datetime, timezone as dt_timezone
 
 import requests
@@ -28,6 +29,26 @@ META_EVENT_NAME_MAP = {"lead": "LeadSubmitted", "purchase": "Purchase"}
 DEFAULT_PURCHASE_CURRENCY = "BRL"
 
 logger = logging.getLogger(__name__)
+
+
+def parse_purchase_value(value):
+    """Parse a purchase payload *value* for Meta custom_data and CTWA Datalake order_value.
+
+    Returns a finite float, or None when the value is missing, unparsable, or non-finite (NaN/inf).
+    """
+    try:
+        parsed = float(value)
+    except (ValueError, TypeError) as exc:
+        logger.warning(
+            "Invalid value format in purchase event: %s",
+            str(exc),
+            extra={"error": str(exc)},
+        )
+        return None
+    if not math.isfinite(parsed):
+        logger.warning("Non-finite value in purchase event")
+        return None
+    return parsed
 
 
 def format_datalake_event_date(dt):
@@ -214,14 +235,8 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
         if value is None:
             return None
 
-        try:
-            parsed_value = float(value)
-        except (ValueError, TypeError) as exc:
-            logger.warning(
-                "Invalid value format in purchase event: %s",
-                str(exc),
-                extra={"error": str(exc)},
-            )
+        parsed_value = parse_purchase_value(value)
+        if parsed_value is None:
             return None
 
         currency = original_payload.get("currency") or DEFAULT_PURCHASE_CURRENCY
@@ -446,11 +461,10 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
         if event_type == "purchase" and payload:
             value = payload.get("value")
             if value is not None:
-                try:
-                    metadata["order_value"] = float(value)
+                parsed = parse_purchase_value(value)
+                if parsed is not None:
+                    metadata["order_value"] = parsed
                     metadata["currency"] = payload.get("currency") or DEFAULT_PURCHASE_CURRENCY
-                except (ValueError, TypeError):
-                    logger.warning("Invalid order_value format in purchase event")
 
         return {
             "event_name": "ctwa",
