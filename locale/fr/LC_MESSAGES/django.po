@@ -7745,3 +7745,9 @@ msgstr "Données dans une feuille de calcul Excel sur les Webhooks du projet:"
 
 msgid "Data in the Excel spreadsheet about project template messages:"
 msgstr "Données dans la feuille de calcul Excel sur les messages du modèle de projet :"
+
+msgid "The Opt-in group cannot be deleted."
+msgstr ""
+
+msgid "The Opt-in group cannot be renamed."
+msgstr ""

@@ -119,7 +119,7 @@ class TestClient(MailroomClient):
         super().__init__(settings.MAILROOM_URL, settings.MAILROOM_AUTH_TOKEN)
 
     @_client_method
-    def contact_create(self, org_id: int, user_id: int, contact: ContactSpec):
+    def contact_create(self, org_id: int, user_id: int, contact: ContactSpec, timeout=None):
         org = Org.objects.get(id=org_id)
         user = User.objects.get(id=user_id)
 

@@ -7724,3 +7724,9 @@ msgstr "Төслийн Webhooks-ийн талаарх Excel хүснэгтийн
 
 msgid "Data in the Excel spreadsheet about project template messages:"
 msgstr "Төслийн загвар мессежүүдийн талаарх Excel хүснэгтийн өгөгдөл:"
+
+msgid "The Opt-in group cannot be deleted."
+msgstr ""
+
+msgid "The Opt-in group cannot be renamed."
+msgstr ""
