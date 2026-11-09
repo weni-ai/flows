@@ -1180,6 +1180,25 @@ class APITest(APIJSONMixin, TembaTest):
 
         self.assertEqual(returned_ids, actual_ids)  # ensure all results were returned and in correct order
 
+    @override_settings(API_GATEWAY_PUBLIC_URL="https://gateway.weni.ai")
+    def test_pagination_links_use_api_gateway_url(self):
+        url = reverse("api.v2.contacts") + ".json?limit=1"
+        self.login(self.admin)
+
+        with self.mockReadOnly():
+            response = self.client.get(url, HTTP_X_FORWARDED_HTTPS="https", HTTP_X_GATEWAY_PATH="/contacts")
+
+        next_link = response.json()["next"]
+        self.assertTrue(next_link.startswith("https://gateway.weni.ai/contacts?"), next_link)
+        self.assertIn("limit=1", next_link)
+        self.assertIn("cursor=", next_link)
+
+        # without the header the request did not come through the gateway, so links stay on the service
+        with self.mockReadOnly():
+            response = self.client.get(url, HTTP_X_FORWARDED_HTTPS="https")
+
+        self.assertIn("://testserver/api/v2/contacts.json?", response.json()["next"])
+
     def test_authenticate(self):
         url = reverse("api.v2.authenticate")
 

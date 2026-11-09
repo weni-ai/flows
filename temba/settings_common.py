@@ -227,6 +227,7 @@ FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 
 MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
+    "weni_commons.kong.middleware.APIGatewayURLMiddleware",
     "django_permissions_policy.PermissionsPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -1550,6 +1551,8 @@ KONG_ADMIN_URL = os.environ.get("KONG_ADMIN_URL", default="http://kong-kong-admi
 KONG_URL_PREFIX = os.environ.get("KONG_URL_PREFIX", default="/flows")
 KONG_SERVICE = os.environ.get("KONG_SERVICE", default="flows-service")
 KONG_SERVICE_URL = os.environ.get("KONG_SERVICE_URL", default="https://flows.weni.ai")
+# Public gateway URL used by APIGatewayURLMiddleware to build pagination links; empty disables it.
+API_GATEWAY_PUBLIC_URL = os.environ.get("API_GATEWAY_PUBLIC_URL", default="")
 
 
 FLOW_PATH_RECENT_RUN_BATCH_SIZE = os.environ.get("FLOW_PATH_RECENT_RUN_BATCH_SIZE", default=50)
