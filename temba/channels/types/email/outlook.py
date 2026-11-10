@@ -218,7 +218,7 @@ def _complete(org, user, code, state, redirect_uri):
 
     access_token, refresh_token = _exchange_code(code, attempt["code_verifier"], redirect_uri)
     mailbox = _mailbox_from_access_token(access_token)
-    if mailbox != attempt["username"]:
+    if mailbox is not None and mailbox != attempt["username"]:
         raise ConsentError("mailbox_mismatch")
     return _save_channel(org, user, attempt["username"], access_token, refresh_token)
 
@@ -253,8 +253,11 @@ def _exchange_code(code, verifier, redirect_uri):
 
 
 def _mailbox_from_access_token(access_token):
+    # Personal Microsoft accounts receive an opaque (non-JWT) access token for
+    # the Outlook resource, so the mailbox cannot be read from it. The caller
+    # then trusts the address the admin confirmed before the redirect.
     if not isinstance(access_token, str) or access_token.count(".") != 2:
-        raise ConsentError("invalid_token", report=True, logged_code="token_not_jwt")
+        return None
 
     try:
         signing_key = jwt.PyJWKClient(JWKS_URL).get_signing_key_from_jwt(access_token)
