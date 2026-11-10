@@ -1,6 +1,10 @@
+3.115.2
+----------
+* feat: (security) update_contacts_fields accepts internal OIDC callers with can_communicate_internally, alongside JWT and Lambda, and auto-creates the back_in_stock_sku contact field.
+
 3.115.1
 ----------
-* fix: feat: Return default topic of generic ticketer in get departments endpoints
+* feat: Return default topic of generic ticketer in get departments endpoints
 
 3.115.0
 ----------
