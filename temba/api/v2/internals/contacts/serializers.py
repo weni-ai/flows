@@ -29,6 +29,7 @@ FALLBACK_AUTO_CREATE_CONTACT_FIELD_KEYS = frozenset(
         "whatsapp_username",
         "instagram_username",
         "ctwa_clid",
+        "back_in_stock_sku",
     }
 )
 FALLBACK_AUTO_CREATE_CONTACT_FIELD_LABELS = {
@@ -41,13 +42,14 @@ FALLBACK_AUTO_CREATE_CONTACT_FIELD_LABELS = {
     "whatsapp_username": "whatsapp_username",
     "instagram_username": "instagram_username",
     "ctwa_clid": "ctwa_clid",
+    "back_in_stock_sku": "back_in_stock_sku",
 }
 
 
 def _resolve_contact_field_for_update(org, user, raw_key):
     """
     Resolve a ContactField for PATCH update_contacts_fields. Unknown keys are ignored unless they are
-    segment, orderform, email, session, vtex_account, marketing_opt_in, whatsapp_username, instagram_username or ctwa_clid: then we create a text field if missing and the org is under its field limit.
+    segment, orderform, email, session, vtex_account, marketing_opt_in, whatsapp_username, instagram_username, ctwa_clid or back_in_stock_sku: then we create a text field if missing and the org is under its field limit.
     """
     canonical = raw_key.lower()
     field = ContactField.user_fields.active_for_org(org=org).filter(key=raw_key).first()

@@ -4,8 +4,8 @@ CUSTOM_DATA_MAX_SERIALIZED_BYTES = 16384
 CUSTOM_DATA_MAX_DEPTH = 32
 
 CUSTOM_DATA_ERR_NOT_OBJECT = "custom_data must be an object"
-CUSTOM_DATA_ERR_TOO_LARGE = "custom_data must be at most 16384 bytes when serialized"
-CUSTOM_DATA_ERR_TOO_DEEP = "custom_data must have at most 32 levels of nesting"
+CUSTOM_DATA_ERR_TOO_LARGE = f"custom_data must be at most {CUSTOM_DATA_MAX_SERIALIZED_BYTES} bytes when serialized"
+CUSTOM_DATA_ERR_TOO_DEEP = f"custom_data must have at most {CUSTOM_DATA_MAX_DEPTH} levels of nesting"
 CUSTOM_DATA_ERR_FORBIDDEN_KEY = "custom_data keys must not start with '$' or contain '.'"
 
 
@@ -15,7 +15,10 @@ def validate_custom_data(value):
 
     _walk_custom_data(value, depth=1)
 
-    serialized = json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    try:
+        serialized = json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    except UnicodeEncodeError:
+        raise ValueError(CUSTOM_DATA_ERR_NOT_OBJECT)
     if len(serialized) > CUSTOM_DATA_MAX_SERIALIZED_BYTES:
         raise ValueError(CUSTOM_DATA_ERR_TOO_LARGE)
 

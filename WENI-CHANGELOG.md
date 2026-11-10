@@ -1,6 +1,23 @@
+3.110.0
+----------
+* feat: (security) `update_contacts_fields` accepts internal OIDC callers with `can_communicate_internally`, alongside JWT and Lambda, and auto-creates the `back_in_stock_sku` contact field.
+* feat: connect an Outlook mailbox from the email claim page with Microsoft consent, creating one email channel for the confirmed address.
+
+3.109.0
+----------
+* fix: implement purchase value and currency handling for Meta CAPI
+* Update version of weni-rp-apps to 2.13.2
+
+3.108.0
+----------
+* feat: add public `/api/v2/broadcasts_statistics.json` endpoint, a new externally reachable read API authenticated by API key, session or JWT, readable by every workspace role through the new `msgs.broadcast_statistics_api` permission
+* Update constitution to 3.1.0
+* feat: Updated CanDownloadOrgMedia permission class to include Viewer role alongside Administrator, Editor, and Agent roles.
+* chore: update weni rapid pro apps to version 2.13.1
+
 3.107.0
 ----------
-* feat: Add channel migration consumer for integrations.channel.migrated events
+* feat: implement custom_data validation for WhatsApp broadcasts
 
 3.106.1
 ----------
