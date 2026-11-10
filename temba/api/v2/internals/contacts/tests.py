@@ -7,11 +7,13 @@ from unittest.mock import MagicMock, patch
 
 from openpyxl import load_workbook
 from rest_framework import status
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework.test import APIClient
 from weni.internal.models import Project
 
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
@@ -43,6 +45,15 @@ CONTACT_FIELDS_ENDPOINT_PATH = "temba.api.v2.internals.contacts.views.InternalCo
 CONTACTS_IMPORT_UPLOAD_PATH = "temba.api.v2.internals.contacts.views.ContactsImportUploadView"
 CONTACTS_IMPORT_CONFIRM_PATH = "temba.api.v2.internals.contacts.views.ContactsImportConfirmView"
 GROUPS_CONTACT_FIELDS_PATH = "temba.api.v2.internals.contacts.views.GroupsContactFieldsView"
+
+OIDC_TEST_SETTINGS = dict(
+    OIDC_OP_TOKEN_ENDPOINT="https://example.com/token",
+    OIDC_OP_USER_ENDPOINT="https://example.com/user",
+    OIDC_RP_CLIENT_ID="test-client-id",
+    OIDC_RP_CLIENT_SECRET="test-client-secret",
+)
+OIDC_AUTHENTICATE_PATH = "weni.internal.authenticators.InternalOIDCAuthentication.authenticate"
+LAMBDA_STS_URL_PREFIX = "https://sts.amazonaws.com/"
 
 
 def skip_authentication(endpoint_path: str):
@@ -605,6 +616,7 @@ class ListContactFieldsEndpointTest(TembaTest):
         self.assertEqual(data.get("results"), expected_result)
 
 
+@override_settings(**OIDC_TEST_SETTINGS)
 class UpdateContactFieldsViewTest(TembaTest):
     @patch.object(LambdaURLValidator, "protected_resource")
     def test_request_without_body(self, mock_protected_resource):
@@ -1091,6 +1103,180 @@ class UpdateContactFieldsViewTest(TembaTest):
         # No field mods apply when fallback is skipped at limit, so mailroom is not invoked.
         self.assertEqual(mr_mocks.calls["contact_modify"], [])
 
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_fallback_creates_back_in_stock_sku_when_missing(self, mr_mocks, mock_protected_resource):
+        contact = self.create_contact("Back In Stock Test", urns=["twitterid:56565"])
+        self.assertFalse(ContactField.user_fields.filter(org=self.org, key="back_in_stock_sku").exists())
+
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/update_contacts_fields"
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "twitterid:56565",
+            "contact_fields": {"Back_In_Stock_SKU": "SKU-123"},
+        }
+
+        response = self.client.patch(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        field = ContactField.get_by_key(self.org, "back_in_stock_sku")
+        self.assertIsNotNone(field)
+        self.assertEqual(field.label, "back_in_stock_sku")
+        self.assertEqual(field.value_type, ContactField.TYPE_TEXT)
+
+        contact.refresh_from_db()
+        self.assertEqual(contact.get_field_display(field), "SKU-123")
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_back_in_stock_sku_reuses_existing_field(self, mr_mocks, mock_protected_resource):
+        contact = self.create_contact("Back In Stock Reuse", urns=["twitterid:56566"])
+        existing = self.create_field("back_in_stock_sku", "Back in stock SKU")
+        count = ContactField.user_fields.count_active_for_org(org=self.org)
+
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        url = "/api/v2/internals/update_contacts_fields"
+        body = {
+            "project": self.org.proj_uuid,
+            "contact_urn": "twitterid:56566",
+            "contact_fields": {"back_in_stock_sku": "SKU-456"},
+        }
+
+        response = self.client.patch(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ContactField.user_fields.count_active_for_org(org=self.org), count)
+        self.assertEqual(ContactField.get_by_key(self.org, "back_in_stock_sku").id, existing.id)
+
+        contact.refresh_from_db()
+        self.assertEqual(contact.get_field_display(existing), "SKU-456")
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_back_in_stock_sku_skipped_when_org_at_field_limit(self, mr_mocks, mock_protected_resource):
+        self.create_contact("Back In Stock Limit", urns=["twitterid:56567"])
+        self.create_field("filler_for_limit", "Filler For Limit")
+        count = ContactField.user_fields.count_active_for_org(org=self.org)
+
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+        url = "/api/v2/internals/update_contacts_fields"
+
+        with self.assertLogs("temba.api.v2.internals.contacts.serializers", level="WARNING") as log_cm:
+            with override_settings(ORG_LIMIT_DEFAULTS={"fields": count}):
+                body = {
+                    "project": self.org.proj_uuid,
+                    "contact_urn": "twitterid:56567",
+                    "contact_fields": {"back_in_stock_sku": "SKU-789"},
+                }
+                response = self.client.patch(url, data=body, content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(ContactField.get_by_key(self.org, "back_in_stock_sku"))
+        joined = "\n".join(log_cm.output)
+        self.assertIn("field limit reached", joined)
+        self.assertIn("back_in_stock_sku", joined)
+
+
+@override_settings(**OIDC_TEST_SETTINGS)
+class UpdateContactFieldsViewInternalAuthTest(TembaTest):
+    url = "/api/v2/internals/update_contacts_fields"
+
+    def setUp(self):
+        super().setUp()
+        content_type = ContentType.objects.get_for_model(User)
+        self.internal_user = self.create_user("internal-service@weni.ai")
+        self.internal_user.user_permissions.create(codename="can_communicate_internally", content_type=content_type)
+        self.plain_user = self.create_user("plain-oidc-user@weni.ai")
+
+        self.contact = self.create_contact("Internal Auth", urns=["twitterid:90909"])
+        self.nickname = self.create_field("nickname", "Apelido")
+        self.body = {
+            "project": str(self.org.proj_uuid),
+            "contact_urn": "twitterid:90909",
+            "contact_fields": {"nickname": "Felix"},
+        }
+
+    def _patch(self, headers=None):
+        return self.client.patch(self.url, data=self.body, content_type="application/json", **(headers or {}))
+
+    def _assert_contact_unchanged(self, mr_mocks):
+        # DRF marks the test transaction for rollback on error responses, so check mailroom instead of the DB.
+        self.assertEqual(mr_mocks.calls["contact_modify"], [])
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com")
+    def test_internal_user_with_permission_updates_fields(self, mr_mocks):
+        with patch(OIDC_AUTHENTICATE_PATH, return_value=(self.internal_user, "oidc-token")):
+            response = self._patch({"HTTP_AUTHORIZATION": "Bearer oidc-token"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Contact fields updated successfully"})
+        self.contact.refresh_from_db()
+        self.assertEqual(self.contact.get_field_display(self.nickname), "Felix")
+
+    @mock_mailroom
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_oidc_user_without_permission_is_forbidden(self, mr_mocks, mock_protected_resource):
+        with patch(OIDC_AUTHENTICATE_PATH, return_value=(self.plain_user, "oidc-token")):
+            response = self._patch({"HTTP_AUTHORIZATION": "Bearer oidc-token"})
+
+        self.assertEqual(response.status_code, 403)
+        mock_protected_resource.assert_not_called()
+        self._assert_contact_unchanged(mr_mocks)
+
+    @mock_mailroom
+    def test_rejected_oidc_token_is_unauthorized(self, mr_mocks):
+        with patch(OIDC_AUTHENTICATE_PATH, side_effect=AuthenticationFailed("Invalid token")):
+            response = self._patch({"HTTP_AUTHORIZATION": "Bearer bad-token"})
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json(), {"detail": "Invalid token"})
+        self._assert_contact_unchanged(mr_mocks)
+
+    @mock_mailroom
+    @override_settings(INTERNAL_USER_EMAIL="super@user.com", LAMBDA_VALIDATION_URL=[LAMBDA_STS_URL_PREFIX])
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_lambda_sts_bearer_skips_oidc(self, mr_mocks, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+        sts_url = f"{LAMBDA_STS_URL_PREFIX}?Action=GetCallerIdentity&Version=2011-06-15"
+
+        with patch(OIDC_AUTHENTICATE_PATH) as mock_oidc_authenticate:
+            response = self._patch({"HTTP_AUTHORIZATION": f"Bearer {sts_url}"})
+
+        self.assertEqual(response.status_code, 200)
+        mock_oidc_authenticate.assert_not_called()
+        mock_protected_resource.assert_called_once()
+        self.contact.refresh_from_db()
+        self.assertEqual(self.contact.get_field_display(self.nickname), "Felix")
+
+    @mock_mailroom
+    @override_settings(LAMBDA_VALIDATION_URL=[LAMBDA_STS_URL_PREFIX])
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_lambda_rejected_identity_keeps_validator_response(self, mr_mocks, mock_protected_resource):
+        mock_protected_resource.return_value = Response(
+            {"message": "Invalid arn"}, status=status.HTTP_401_UNAUTHORIZED
+        )
+
+        response = self._patch({"HTTP_AUTHORIZATION": f"Bearer {LAMBDA_STS_URL_PREFIX}?Action=GetCallerIdentity"})
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json(), {"message": "Invalid arn"})
+        self._assert_contact_unchanged(mr_mocks)
+
+    @mock_mailroom
+    def test_request_without_credentials_is_rejected(self, mr_mocks):
+        response = self._patch()
+
+        # LambdaURLValidator answers a missing Authorization header with 500, as it did before it became a permission.
+        self.assertEqual(response.status_code, 500)
+        self._assert_contact_unchanged(mr_mocks)
+
 
 class PatchedJWTAuthMixin(JWTAuthMockMixin):
     def _mock_jwt_authenticate(self, request, *args, **kwargs):
@@ -1324,6 +1510,7 @@ class CleanContactFieldsServiceTest(TembaTest):
         self.assertEqual(str(ctx.exception), "['No user available to clear contact fields']")
 
 
+@override_settings(**OIDC_TEST_SETTINGS)
 class UpdateContactFieldsViewJWTTest(PatchedJWTAuthMixin, TembaTest):
     jwt_patch_target = "temba.api.auth.jwt.OptionalJWTAuthentication.authenticate"
 

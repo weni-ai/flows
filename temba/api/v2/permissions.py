@@ -1,8 +1,11 @@
+from rest_framework import status
+from rest_framework.exceptions import APIException
 from rest_framework.permissions import BasePermission
 
 from django.contrib.auth import get_user_model
 from django.core import exceptions as django_exceptions
 
+from temba.api.v2.validators import LambdaURLValidator
 from temba.orgs.models import Org, OrgRole
 
 
@@ -121,3 +124,27 @@ class HasValidJWT(BasePermission):
 
     def has_permission(self, request, view):
         return getattr(request, "jwt_payload", None) is not None
+
+
+class LambdaIdentityRejected(APIException):
+    def __init__(self, response):
+        self.status_code = response.status_code
+        super().__init__(detail=response.data)
+
+
+class HasValidLambdaIdentity(BasePermission):
+    """
+    Grants permission to AWS Lambda callers whose `Authorization: Bearer <sts_url>` resolves, through STS,
+    to a role in settings.LAMBDA_ALLOWED_ROLES. A rejected identity raises with the validator's own status
+    and body so Lambda callers keep receiving the responses they got before this check became a permission.
+    """
+
+    def has_permission(self, request, view):
+        # A user authenticated by another backend is not a Lambda caller; deny instead of probing STS.
+        if getattr(request.user, "is_authenticated", False):
+            return False
+
+        response = LambdaURLValidator().protected_resource(request)
+        if response.status_code == status.HTTP_200_OK:
+            return True
+        raise LambdaIdentityRejected(response)

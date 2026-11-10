@@ -31,6 +31,7 @@ from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.decorators import method_decorator
 
 from temba.api.auth.jwt import BaseJWTAuthentication, OptionalJWTAuthentication, RequiredJWTAuthentication
+from temba.api.auth.oidc import InternalOIDCExceptLambdaAuthentication
 from temba.api.v2.internals.contacts.serializers import (
     CleanContactFieldsSerializer,
     ContactWithMessagesListSerializer,
@@ -40,13 +41,12 @@ from temba.api.v2.internals.contacts.serializers import (
 from temba.api.v2.internals.contacts.services import CleanContactFieldsService, ContactImportDeduplicationService
 from temba.api.v2.internals.helpers import get_object_or_404
 from temba.api.v2.internals.views import APIViewMixin
-from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
+from temba.api.v2.permissions import HasValidJWT, HasValidLambdaIdentity, IsUserInOrg
 from temba.api.v2.serializers import (
     ContactFieldReadSerializer,
     ContactFieldWriteSerializer,
     ContactGroupWriteSerializer,
 )
-from temba.api.v2.validators import LambdaURLValidator
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
 from temba.channels.models import Channel
 from temba.contacts.models import Contact, ContactField, ContactGroup, ContactImport, ContactURN, ExportContactsTask
@@ -190,21 +190,17 @@ class InternalContactFieldsEndpoint(APIViewMixin, APIView):
 
 
 @method_decorator(transaction.non_atomic_requests, name="dispatch")
-class UpdateContactFieldsView(APIViewMixin, APIView, LambdaURLValidator):
+class UpdateContactFieldsView(APIViewMixin, APIView):
     """
     Runs outside ATOMIC_REQUESTS so ContactField rows created in the same request (e.g. segment/orderform
     fallback) are committed before mailroom's contact_modify reads the DB.
     """
 
-    authentication_classes = [OptionalJWTAuthentication]
+    authentication_classes = [OptionalJWTAuthentication, InternalOIDCExceptLambdaAuthentication]
+    permission_classes = [HasValidJWT | CanCommunicateInternally | HasValidLambdaIdentity]
     renderer_classes = [JSONRenderer]
 
     def patch(self, request, *args, **kwargs):
-        if not getattr(request, "jwt_payload", None):
-            validation_response = self.protected_resource(request)  # pragma: no cover
-            if validation_response.status_code != 200:  # pragma: no cover
-                return validation_response
-
         project_uuid = (
             request.data.get("project_uuid") or request.data.get("project") or getattr(request, "project_uuid", None)
         )

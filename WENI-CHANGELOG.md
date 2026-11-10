@@ -1,5 +1,6 @@
 3.110.0
 ----------
+* feat: (security) `update_contacts_fields` accepts internal OIDC callers with `can_communicate_internally`, alongside JWT and Lambda, and auto-creates the `back_in_stock_sku` contact field.
 * feat: connect an Outlook mailbox from the email claim page with Microsoft consent, creating one email channel for the confirmed address.
 
 3.109.0
