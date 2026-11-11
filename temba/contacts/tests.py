@@ -2329,6 +2329,7 @@ class ContactTest(TembaTest):
             created_on=timezone.now(),
             attachments=[
                 "audio/mp3:http://blah/file.mp3",
+                "audio/mpeg:http://blah/preview.mp3",
                 "video/mp4:http://blah/file.mp4",
                 "geo:47.5414799,-122.6359908",
             ],
@@ -2485,6 +2486,7 @@ class ContactTest(TembaTest):
 
         self.assertContains(response, "<audio ")
         self.assertContains(response, '<source type="audio/mp3" src="http://blah/file.mp3" />')
+        self.assertContains(response, '<source type="audio/mpeg" src="http://blah/preview.mp3" />')
         self.assertContains(response, "<video ")
         self.assertContains(response, '<source type="video/mp4" src="http://blah/file.mp4" />')
         self.assertContains(
@@ -2633,6 +2635,20 @@ class ContactTest(TembaTest):
         # can't view history of contact in other org
         response = self.client.get(reverse("contacts.contact_history", args=[self.other_org_contact.uuid]))
         self.assertLoginRedirect(response)
+
+    def test_history_mpeg_attachment_uses_overlay(self):
+        self.create_incoming_msg(
+            self.joe,
+            "Preview audio",
+            attachments=["audio/mpeg:http://blah/preview.mp3"],
+        )
+        self.login(self.admin)
+        response = self.client.get(reverse("contacts.contact_history", args=[self.joe.uuid]))
+
+        self.assertEqual(200, response.status_code)
+        self.assertContains(response, "data-featherlight")
+        self.assertContains(response, "<audio ")
+        self.assertContains(response, '<source type="audio/mpeg" src="http://blah/preview.mp3" />')
 
     def test_history_session_events(self):
         flow = self.get_flow("color_v13")
