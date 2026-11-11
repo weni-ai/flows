@@ -155,3 +155,65 @@ class TestSMSTagLibrary(TembaTest):
         self.assertRegex(rendered, new_tab_link % (r"doc\.pdf", "attachment-preview"))
         self.assertRegex(rendered, new_tab_link % (r"doc\.pdf", "attachment-download"))
         self.assertNotIn("goto(", rendered)
+
+    def test_attachment_button_mpeg_uses_overlay_player(self):
+        self.assertEqual(
+            {
+                "content_type": "audio/mpeg",
+                "category": "audio",
+                "preview": "MPEG",
+                "url": "https://example.com/preview.mp3",
+                "download_url": "https://example.com/preview.mp3",
+                "is_playable": True,
+                "is_external": True,
+            },
+            attachment_button("audio/mpeg:https://example.com/preview.mp3"),
+        )
+
+        rendered = Template(
+            """{% load sms %}{% attachment_button 'audio/mpeg:https://example.com/preview.mp3' %}"""
+        ).render(Context())
+
+        self.assertIn("data-featherlight", rendered)
+        self.assertIn('<audio style="width: 360px" controls>', rendered)
+        self.assertIn('<source type="audio/mpeg" src="https://example.com/preview.mp3" />', rendered)
+        self.assertIn("href='#'", rendered)
+        self.assertNotIn("goto(", rendered)
+
+        rendered = Template(
+            """{% load sms %}{% attachment_button 'audio/mpeg:https://example.com/preview.mp3?token=1' %}"""
+        ).render(Context())
+        self.assertIn('<source type="audio/mpeg" src="https://example.com/preview.mp3?token=1" />', rendered)
+        self.assertNotIn("goto(", rendered)
+
+        self.assertEqual(
+            {
+                "content_type": "audio/mp3",
+                "category": "audio",
+                "preview": "MP3",
+                "url": "https://example.com/voice.mp3",
+                "download_url": "https://example.com/voice.mp3",
+                "is_playable": True,
+                "is_external": True,
+            },
+            attachment_button("application/octet-stream:https://example.com/voice.mp3"),
+        )
+        self.assertEqual(
+            {
+                "content_type": "audio/mp3",
+                "category": "audio",
+                "preview": "MP3",
+                "url": "https://example.com/voice.mpeg?token=123",
+                "download_url": "https://example.com/voice.mpeg?token=123",
+                "is_playable": True,
+                "is_external": True,
+            },
+            attachment_button("application/octet-stream:https://example.com/voice.mpeg?token=123"),
+        )
+
+        rendered = Template(
+            """{% load sms %}{% attachment_button 'application/octet-stream:https://example.com/voice.mp3' %}"""
+        ).render(Context())
+        self.assertIn("data-featherlight", rendered)
+        self.assertIn('<source type="audio/mp3" src="https://example.com/voice.mp3" />', rendered)
+        self.assertNotIn("goto(", rendered)
