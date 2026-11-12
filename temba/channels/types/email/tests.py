@@ -169,6 +169,22 @@ class EmailTypeTest(TembaTest):
         self.assertEqual(2, Channel.objects.filter(channel_type="EM").count())
 
     @microsoft_app
+    def test_outlook_personal_account_opaque_token_trusts_typed_address(self):
+        self.login(self.admin)
+        query = self._start("user@outlook.com")
+        opaque = "M.C550_BAY.2.U.MsaArtifacts.DtEBX0t8j6bo"  # not a JWT
+        response, posted = self._finish(query, opaque, refresh="refresh-personal")
+        channel = Channel.objects.get(channel_type="EM", address="user@outlook.com")
+        self.assertRedirect(response, reverse("channels.channel_read", args=[channel.uuid]))
+        self.assertEqual(1, posted.call_count)
+        self.assertEqual(opaque, channel.config["access_token"])
+        self.assertEqual("refresh-personal", channel.config["refresh_token"])
+        self.assertEqual(outlook.OAUTH_PROVIDER_MICROSOFT, channel.config["oauth_provider"])
+        self.assertEqual(outlook.OAUTH_STATUS_ACTIVE, channel.config["oauth_status"])
+        self.assertEqual(outlook.SMTP_HOST_PERSONAL, channel.config["smtp_host"])
+        self.assertEqual(outlook.IMAP_HOST, channel.config["imap_host"])
+
+    @microsoft_app
     def test_outlook_rejects_a_different_mailbox(self):
         self.login(self.admin)
         query = self._start("user@contoso.com")
@@ -533,6 +549,7 @@ class EmailTypeTest(TembaTest):
         self.assertEqual(token, channel.config["access_token"])
         self.assertEqual("new-refresh", channel.config["refresh_token"])
         self.assertEqual("active", channel.config["oauth_status"])
+        self.assertEqual(outlook.SMTP_HOST, channel.config["smtp_host"])
         read = self.client.get(reverse("channels.channel_read", args=[channel.uuid]))
         self.assertNotContains(read, token)
         self.assertNotContains(read, "new-refresh")
