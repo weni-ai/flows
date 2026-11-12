@@ -1,5 +1,7 @@
 from weni.eda.channels import Channel
 
+from temba.channels.handle import handle_amq_consumers as channels_handle_amq_consumers  # pragma: no cover
+
 from .consumers import (  # pragma: no cover
     ProjectConsumer,
     ProjectEventConsumer,
@@ -18,3 +20,4 @@ def handle_consumers(channel: Channel):
 
 def handle_amq_consumers(channel: Channel):  # pragma: no cover
     channel.basic_consume("flows.projects.queue", callback=ProjectConsumer().handle)
+    channels_handle_amq_consumers(channel)

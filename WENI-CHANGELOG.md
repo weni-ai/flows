@@ -1,3 +1,7 @@
+3.112.0
+----------
+* feat: Add channel migration consumer for integrations.channel.migrated events
+
 3.111.0
 ----------
 * fix: mpeg audio support on studio
