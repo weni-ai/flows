@@ -1,5 +1,4 @@
 import logging
-from typing import Optional, Union
 from uuid import UUID
 
 import requests
@@ -23,9 +22,9 @@ class IntegrationsInternalClient(BaseInternalClient):
 
     def report_app_migration_status(
         self,
-        event_id: Union[UUID, str],
+        event_id: UUID | str,
         status: str,
-        error: Optional[str] = None,
+        error: str | None = None,
     ) -> None:
         if not self.base_url:
             logger.warning("INTEGRATIONS_BASE_URL is not configured; skipping app migration status callback")
