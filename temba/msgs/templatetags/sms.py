@@ -14,6 +14,8 @@ PLAYABLE_CONTENT_TYPES = {
     "audio/vnd.wav",
     "audio/ogg",
     "audio/mp3",
+    # Preview stores the browser type for MP3. The upload path is intentionally unchanged.
+    "audio/mpeg",
     "audio/mp4",
     "audio/m4a",
     "audio/x-m4a",
@@ -110,9 +112,13 @@ def render(parser, token):
 def attachment_button(attachment: str) -> dict:
     content_type, delim, url = attachment.partition(":")
 
-    # some OGG/OGA attachments may have wrong content type
+    # OGG/OGA and MP3/MPEG are sometimes stored as octet-stream. Classify them as the
+    # playable types this screen already uses. Preview stores browser audio/mpeg and that
+    # upload path is intentionally unchanged (it only rewrites m4a to audio/mp4).
     if content_type == "application/octet-stream" and urlparse(url).path.endswith((".ogg", ".oga")):
         content_type = "audio/ogg"
+    elif content_type == "application/octet-stream" and urlparse(url).path.endswith((".mp3", ".mpeg")):
+        content_type = "audio/mp3"
 
     # parse the MIME content type
     if "/" in content_type:

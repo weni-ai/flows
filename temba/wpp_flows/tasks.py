@@ -202,8 +202,8 @@ def get_whatsapp_flow_by_id(flow_id):
             return []
 
         return resp.json()
-    except requests.RequestException as e:
-        logger.error("error getting whatsapp flow by id", e)
+    except requests.RequestException:
+        logger.exception("error getting whatsapp flow by id")
         return []
 
 

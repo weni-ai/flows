@@ -227,6 +227,7 @@ FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 
 MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
+    "weni_commons.kong.middleware.APIGatewayURLMiddleware",
     "django_permissions_policy.PermissionsPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -374,6 +375,8 @@ LOGGING = {
         "django.security.DisallowedHost": {"handlers": ["null"], "propagate": False},
         "django.db.backends": {"level": "ERROR", "handlers": ["console"], "propagate": False},
         "temba.formax": {"level": "DEBUG" if DEBUG else "ERROR", "handlers": ["console"], "propagate": False},
+        # Enables temba.conversion_events.* loggers under disable_existing_loggers=True (see assertLogs in tests).
+        "temba.conversion_events": {"level": "INFO", "handlers": ["console"], "propagate": False},
     },
 }
 
@@ -571,7 +574,7 @@ PERMISSIONS = {
         "sent",
         "update",
     ),
-    "msgs.broadcast": ("api", "detail", "schedule", "schedule_list", "schedule_read", "send"),
+    "msgs.broadcast": ("api", "detail", "schedule", "schedule_list", "schedule_read", "send", "statistics_api"),
     "msgs.label": ("api", "create_folder", "delete_folder"),
     "orgs.topup": ("manage",),
     "policies.policy": ("admin", "history", "give_consent"),
@@ -600,6 +603,7 @@ GROUP_PERMISSIONS = {
         "orgs.org_api",
         "orgs.org_spa",
         "orgs.org_surveyor",
+        "msgs.broadcast_statistics_api",
         "msgs.msg_api",
     ),
     "Granters": ("orgs.org_grant",),
@@ -972,6 +976,7 @@ GROUP_PERMISSIONS = {
         "contacts.contactgroup_read",
         "contacts.contactimport_read",
         "globals.global_api",
+        "msgs.broadcast_statistics_api",
         "locations.adminboundary_boundaries",
         "locations.adminboundary_geometry",
         "locations.adminboundary_alias",
@@ -1042,6 +1047,7 @@ GROUP_PERMISSIONS = {
         "contacts.contactgroup_api",
         "globals.global_api",
         "msgs.broadcast_api",
+        "msgs.broadcast_statistics_api",
         "notifications.notification_list",
         "tickets.ticket_api",
         "tickets.ticket_assign",
@@ -1405,6 +1411,11 @@ FACEBOOK_APPLICATION_ID = os.environ.get("FACEBOOK_APPLICATION_ID", "")
 FACEBOOK_APPLICATION_SECRET = os.environ.get("FACEBOOK_APPLICATION_SECRET", "")
 FACEBOOK_WEBHOOK_SECRET = os.environ.get("FACEBOOK_WEBHOOK_SECRET", "")
 
+# Outlook mailbox consent. Leave the client id empty until email-proxy can refresh
+# Microsoft tokens. The secret is used only for the code exchange.
+APP_MICROSOFT_CLIENT_ID = os.environ.get("APP_MICROSOFT_CLIENT_ID", "")
+APP_MICROSOFT_CLIENT_SECRET = os.environ.get("APP_MICROSOFT_CLIENT_SECRET", "")
+
 WHATSAPP_ADMIN_SYSTEM_USER_ID = os.environ.get("WHATSAPP_ADMIN_SYSTEM_USER_ID", "")
 WHATSAPP_ADMIN_SYSTEM_USER_TOKEN = os.environ.get("WHATSAPP_ADMIN_SYSTEM_USER_TOKEN", "")
 WHATSAPP_FACEBOOK_BUSINESS_ID = os.environ.get("WHATSAPP_FACEBOOK_BUSINESS_ID", "")
@@ -1530,6 +1541,7 @@ KONG_ADMIN_URL = os.environ.get("KONG_ADMIN_URL", default="http://kong-kong-admi
 KONG_URL_PREFIX = os.environ.get("KONG_URL_PREFIX", default="/flows")
 KONG_SERVICE = os.environ.get("KONG_SERVICE", default="flows-service")
 KONG_SERVICE_URL = os.environ.get("KONG_SERVICE_URL", default="https://flows.weni.ai")
+API_GATEWAY_PUBLIC_URL = os.environ.get("API_GATEWAY_PUBLIC_URL", default="http://kong-ee5ced57e497e24a.elb.us-east-1.amazonaws.com")
 
 
 FLOW_PATH_RECENT_RUN_BATCH_SIZE = os.environ.get("FLOW_PATH_RECENT_RUN_BATCH_SIZE", default=50)

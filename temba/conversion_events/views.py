@@ -1,4 +1,6 @@
 import logging
+import math
+import re
 from datetime import datetime, timezone as dt_timezone
 
 import requests
@@ -22,7 +24,43 @@ CTWA_DATALAKE_VALUE_MAP = {
     "purchase": "purchase_completed",
 }
 
+META_EVENT_NAME_MAP = {"lead": "LeadSubmitted", "purchase": "Purchase"}
+
+# Keeps today's conversion behaviour; channel wa_currency is a later cut.
+DEFAULT_PURCHASE_CURRENCY = "BRL"
+
 logger = logging.getLogger(__name__)
+
+_ACCESS_TOKEN_IN_MESSAGE = re.compile(r"access_token\s*=", re.IGNORECASE)
+
+
+def _meta_error_safe_message(meta_error):
+    """Strip secrets from a Meta error string for logs/API responses (e.g. URL query from str(e))."""
+    if not meta_error:
+        return "Meta request failed"
+    if _ACCESS_TOKEN_IN_MESSAGE.search(meta_error):
+        return "Meta request failed"
+    return meta_error
+
+
+def parse_purchase_value(value):
+    """Parse a purchase payload *value* for Meta custom_data and CTWA Datalake order_value.
+
+    Returns a finite float, or None when the value is missing, unparsable, or non-finite (NaN/inf).
+    """
+    try:
+        parsed = float(value)
+    except (ValueError, TypeError) as exc:
+        logger.warning(
+            "Invalid value format in purchase event: %s",
+            str(exc),
+            extra={"error": str(exc)},
+        )
+        return None
+    if not math.isfinite(parsed):
+        logger.warning("Non-finite value in purchase event")
+        return None
+    return parsed
 
 
 def format_datalake_event_date(dt):
@@ -119,7 +157,10 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
             elif datalake_success:  # If Datalake succeeds but Meta failed or wasn't attempted
                 if ctwa_data and ctwa_data.ctwa_clid and dataset_id:  # Meta was attempted but failed
                     logger.warning(
-                        f"[PARTIAL] Datalake succeeded but Meta failed for event {event_type} on channel {channel_uuid}. Meta error: {meta_error}"
+                        "[PARTIAL] Datalake succeeded but Meta failed for event %s on channel %s. Meta error: %s",
+                        event_type,
+                        channel_uuid,
+                        _meta_error_safe_message(meta_error),
                     )
                 else:  # Meta wasn't attempted (no CTWA or dataset_id)
                     logger.warning(
@@ -135,11 +176,14 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
             else:  # Datalake failed
                 if ctwa_data and ctwa_data.ctwa_clid and dataset_id:  # Both services failed
                     logger.error(
-                        f"[FAILURE] Both services failed for event {event_type} on channel {channel_uuid}. "
-                        f"Meta error: {meta_error}, Datalake error: {datalake_error}"
+                        "[FAILURE] Both services failed for event %s on channel %s. Meta error: %s Datalake error: %s",
+                        event_type,
+                        channel_uuid,
+                        _meta_error_safe_message(meta_error),
+                        datalake_error,
                     )
                     error_type = "Meta and Datalake Error"
-                    error_msg = f"Meta: {meta_error}, Datalake: {datalake_error}"
+                    error_msg = f"Meta: {_meta_error_safe_message(meta_error)}, Datalake: {datalake_error}"
                 else:  # Only Datalake failed (Meta wasn't attempted)
                     logger.error(
                         f"[FAILURE] Datalake failed for event {event_type} on channel {channel_uuid}. Error: {datalake_error}"
@@ -196,16 +240,32 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
             logger.error(f"Error fetching channel dataset_id: {str(e)}")
             return None
 
+    def _purchase_custom_data(self, original_payload):
+        """Return Meta custom_data for a purchase, or None when value is absent or invalid.
+
+        Zero is a valid amount (check is not None, not truthiness). Currency omitted or empty
+        stays DEFAULT_PURCHASE_CURRENCY so Meta always receives the value/currency pair.
+        """
+        if not original_payload or "value" not in original_payload:
+            return None
+
+        value = original_payload.get("value")
+        if value is None:
+            return None
+
+        parsed_value = parse_purchase_value(value)
+        if parsed_value is None:
+            return None
+
+        currency = original_payload.get("currency") or DEFAULT_PURCHASE_CURRENCY
+        return {"value": parsed_value, "currency": currency}
+
     def _build_meta_payload(self, event_type, ctwa_data, original_payload):
         """Build payload for Meta Conversion API"""
         event_time = int(datetime.now().timestamp())
 
-        # Map event types for Meta
-        event_name_map = {"lead": "LeadSubmitted", "purchase": "Purchase"}
-
-        # Payload following the specified format for Meta
         meta_event = {
-            "event_name": event_name_map.get(event_type, "LeadSubmitted"),
+            "event_name": META_EVENT_NAME_MAP.get(event_type, "LeadSubmitted"),
             "event_time": event_time,
             "action_source": "business_messaging",
             "messaging_channel": "whatsapp",
@@ -215,18 +275,10 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
             },
         }
 
-        # Add value and currency only for purchase events
         if event_type == "purchase":
-            value = original_payload.get("value")
-            currency = original_payload.get("currency", "BRL")  # Default to BRL if not provided
-            if value:
-                try:
-                    # Convert value to float and keep it as float
-                    value = float(value)
-                    meta_event["value"] = value
-                    meta_event["currency"] = currency
-                except (ValueError, TypeError):
-                    logger.warning(f"Invalid value format in purchase event: {value}")
+            custom_data = self._purchase_custom_data(original_payload)
+            if custom_data is not None:
+                meta_event["custom_data"] = custom_data
 
         return {
             "data": [meta_event],
@@ -235,34 +287,70 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
 
     def _send_to_meta(self, payload, dataset_id):
         """Send event to Meta Conversion API"""
+        first_event = (payload.get("data") or [{}])[0]
+        log_extra_base = {
+            "event_name": first_event.get("event_name"),
+            "dataset_id": dataset_id,
+            "has_custom_data": "custom_data" in first_event,
+        }
+
+        # Use global configuration for access token
+        access_token = getattr(settings, "WHATSAPP_ADMIN_SYSTEM_USER_TOKEN", "")
+
+        if not access_token:
+            return False, "Meta access token not configured"
+
+        if not dataset_id:
+            return False, "Meta dataset ID not configured"
+
+        # Meta Conversion API URL as specified
+        url = f"{settings.WHATSAPP_API_URL}/{dataset_id}/events?access_token={access_token}"
+
+        headers = {"Content-Type": "application/json"}
+
         try:
-            # Use global configuration for access token
-            access_token = getattr(settings, "WHATSAPP_ADMIN_SYSTEM_USER_TOKEN", "")
-
-            if not access_token:
-                return False, "Meta access token not configured"
-
-            if not dataset_id:
-                return False, "Meta dataset ID not configured"
-
-            # Meta Conversion API URL as specified
-            url = f"{settings.WHATSAPP_API_URL}/{dataset_id}/events?access_token={access_token}"
-
-            # Headers
-            headers = {"Content-Type": "application/json"}
-
             response = requests.post(url, json=payload, headers=headers, timeout=30)
-
-            if response.status_code == 200:
-                return True, "Success"
-            else:
-                error_detail = response.json()
-                return False, str(error_detail)
-
-        except requests.RequestException as e:
-            return False, f"Network error sending to Meta: {str(e)}"
         except Exception as e:
-            return False, f"Error sending to Meta: {str(e)}"
+            log_extra = {**log_extra_base, "error_class": type(e).__name__, "http_status": None}
+            logger.warning(
+                "Meta CAPI event request failed event_name=%s dataset_id=%s error_class=%s has_custom_data=%s",
+                log_extra["event_name"],
+                log_extra["dataset_id"],
+                log_extra["error_class"],
+                log_extra["has_custom_data"],
+                extra=log_extra,
+            )
+            return False, f"Meta request failed ({type(e).__name__})"
+
+        log_extra = {
+            **log_extra_base,
+            "http_status": response.status_code,
+        }
+
+        if response.status_code == 200:
+            logger.info(
+                "Meta CAPI event accepted event_name=%s dataset_id=%s http_status=%s has_custom_data=%s",
+                log_extra["event_name"],
+                log_extra["dataset_id"],
+                log_extra["http_status"],
+                log_extra["has_custom_data"],
+                extra=log_extra,
+            )
+            return True, "Success"
+
+        logger.warning(
+            "Meta CAPI event rejected event_name=%s dataset_id=%s http_status=%s has_custom_data=%s",
+            log_extra["event_name"],
+            log_extra["dataset_id"],
+            log_extra["http_status"],
+            log_extra["has_custom_data"],
+            extra=log_extra,
+        )
+        try:
+            error_detail = response.json()
+        except ValueError:
+            return False, "Meta API rejected the event"
+        return False, str(error_detail)
 
     def _get_channel_and_org(self, channel_uuid):
         from temba.channels.models import Channel
@@ -403,10 +491,10 @@ class ConversionEventView(ConversionEventAuthMixin, viewsets.ModelViewSet):
         if event_type == "purchase" and payload:
             value = payload.get("value")
             if value is not None:
-                try:
-                    metadata["order_value"] = float(value)
-                except (ValueError, TypeError):
-                    logger.warning(f"Invalid order_value format in purchase event: {value}")
+                parsed = parse_purchase_value(value)
+                if parsed is not None:
+                    metadata["order_value"] = parsed
+                    metadata["currency"] = payload.get("currency") or DEFAULT_PURCHASE_CURRENCY
 
         return {
             "event_name": "ctwa",

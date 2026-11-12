@@ -27,6 +27,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 
 from temba.api.models import APIToken, Resthook, ResthookSubscriber, WebHookEvent
+from temba.api.v2.broadcasts_statistics.views import BroadcastsStatisticsEndpoint
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
 from temba.api.v2.pagination import FlowsPagination
 from temba.api.v2.views_base import (
@@ -242,6 +243,7 @@ class RootView(views.APIView):
                 "boundaries": reverse("api.v2.boundaries", request=request),
                 "broadcasts": reverse("api.v2.broadcasts", request=request),
                 "whastapp_broadcasts": reverse("api.v2.whatsapp_broadcasts", request=request),
+                "broadcasts_statistics": reverse("api.v2.broadcasts_statistics", request=request),
                 "campaigns": reverse("api.v2.campaigns", request=request),
                 "campaign_events": reverse("api.v2.campaign_events", request=request),
                 "channels": reverse("api.v2.channels", request=request),
@@ -293,6 +295,7 @@ class ExplorerView(SmartTemplateView):
             BroadcastsEndpoint.get_write_explorer(),
             WhatsappBroadcastsEndpoint.get_read_explorer(),
             WhatsappBroadcastsEndpoint.get_write_explorer(),
+            BroadcastsStatisticsEndpoint.get_read_explorer(),
             CampaignsEndpoint.get_read_explorer(),
             CampaignsEndpoint.get_write_explorer(),
             CampaignEventsEndpoint.get_read_explorer(),
@@ -709,6 +712,7 @@ class BroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
 
 
 @method_decorator(transaction.non_atomic_requests, name="dispatch")
+@api_gateway_expose(alias="broadcasts", methods=["GET", "POST"])
 class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     """
     This endpoint allows you to send new whatsapp message broadcasts and list existing broadcasts in your account.
@@ -743,6 +747,10 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                     "created_on": "2013-03-02T17:28:12.123456Z".
                     "metadata": {
                         "text": "This is a test message for @contact.name",
+                        "custom_data": {
+                            "order_id": "1234567890-01",
+                            "coupon": {"code": "BLACKFRIDAY10"}
+                        },
                         "header": {
                             "type": "text",
                             "text": "Hello @contact.name"
@@ -759,7 +767,7 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
       * **contacts** - the UUIDs of contacts to send to (array of up to 1000 strings, optional)
       * **groups** - the UUIDs of contact groups to send to (array of up to 100 strings, optional)
       * **trigger_flow_uuid** - the UUID of the messaging or voice flow to start when a recipient replies (string, optional)
-      * **msg** - the template, text and attachments that will be send to contacts
+      * **msg** - the template, text, attachments and optional custom_data that will be send to contacts
 
 
     Example:
@@ -773,6 +781,10 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
             "trigger_flow_uuid": "f14e4ff0-724d-43fe-a953-1d16aefd1c00",
             "msg": {
                 "text": "This is a test message for @contact.name",
+                "custom_data": {
+                    "order_id": "1234567890-01",
+                    "coupon": {"code": "BLACKFRIDAY10"}
+                },
                 "template":{
                     "uuid":"c3e129a2-5802-4248-a5f0-620566ef4345",
                     "variables": ["@contact.name"],
@@ -1166,8 +1178,16 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                 {
                     "name": "msg",
                     "required": True,
-                    "help": "The template, text and attachments that will be sent to contact",
+                    "help": "The template, text, attachments and optional custom_data that will be sent to contact",
                     "fields": [
+                        {
+                            "name": "custom_data",
+                            "required": False,
+                            "help": (
+                                "Optional JSON object sent with the message. Max 16384 compact UTF-8 bytes and 32 "
+                                "nesting levels. Keys must not start with '$' or contain '.'. {} is treated as omitted."
+                            ),
+                        },
                         {
                             "name": "template",
                             "required": False,
@@ -1539,7 +1559,6 @@ class CampaignEventsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAP
         }
 
 
-@api_gateway_expose(alias="channels")
 class ChannelsEndpoint(ListAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list channels in your account.
@@ -1891,7 +1910,7 @@ class ClassifiersEndpoint(ListAPIMixin, BaseAPIView):
         }
 
 
-@api_gateway_expose(alias="contacts")
+@api_gateway_expose(alias="contacts", methods=["GET", "POST", "DELETE"])
 class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list, create, update and delete contacts in your account.
@@ -3053,6 +3072,7 @@ class DefinitionsEndpoint(BaseAPIView):
         }
 
 
+@api_gateway_expose(alias="contact-fields", methods=["GET", "POST"])
 class FieldsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list custom contact fields in your account.
@@ -3176,6 +3196,7 @@ class FieldsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
         }
 
 
+@api_gateway_expose(alias="automation-flows", methods=["GET"])
 class FlowsEndpoint(ListAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list flows in your account.
@@ -3887,6 +3908,7 @@ class MediaEndpoint(BaseAPIView):
         return Response(dict(), status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_gateway_expose(alias="messages", methods=["GET"])
 class MessagesEndpoint(ListAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list messages in your account.
@@ -4444,6 +4466,7 @@ class ResthookEventsEndpoint(ListAPIMixin, BaseAPIView):
         }
 
 
+@api_gateway_expose(alias="automation-flow-runs", methods=["GET"])
 class RunsEndpoint(ListAPIMixin, BaseAPIView):
     """
     This endpoint allows you to fetch flow runs. A run represents a single contact's path through a flow and is created
@@ -4607,6 +4630,7 @@ class RunsEndpoint(ListAPIMixin, BaseAPIView):
         }
 
 
+@api_gateway_expose(alias="automation-flow-starts", methods=["GET", "POST"])
 class FlowStartsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     """
     This endpoint allows you to list manual flow starts in your account, and add or start contacts in a flow.
@@ -5630,6 +5654,7 @@ class EventsEndpoint(BaseAPIView):
         }
 
 
+@api_gateway_expose(alias="events", methods=["GET"])
 class EventsV2Endpoint(BaseAPIView):
     permission = "orgs.org_api"
 
