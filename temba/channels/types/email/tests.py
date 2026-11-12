@@ -181,6 +181,8 @@ class EmailTypeTest(TembaTest):
         self.assertEqual("refresh-personal", channel.config["refresh_token"])
         self.assertEqual(outlook.OAUTH_PROVIDER_MICROSOFT, channel.config["oauth_provider"])
         self.assertEqual(outlook.OAUTH_STATUS_ACTIVE, channel.config["oauth_status"])
+        self.assertEqual(outlook.SMTP_HOST_PERSONAL, channel.config["smtp_host"])
+        self.assertEqual(outlook.IMAP_HOST, channel.config["imap_host"])
 
     @microsoft_app
     def test_outlook_rejects_a_different_mailbox(self):
@@ -547,6 +549,7 @@ class EmailTypeTest(TembaTest):
         self.assertEqual(token, channel.config["access_token"])
         self.assertEqual("new-refresh", channel.config["refresh_token"])
         self.assertEqual("active", channel.config["oauth_status"])
+        self.assertEqual(outlook.SMTP_HOST, channel.config["smtp_host"])
         read = self.client.get(reverse("channels.channel_read", args=[channel.uuid]))
         self.assertNotContains(read, token)
         self.assertNotContains(read, "new-refresh")

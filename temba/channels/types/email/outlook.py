@@ -27,6 +27,7 @@ OAUTH_STATUS_NEEDS_RECONNECT = "needs_reconnect"
 IMAP_HOST = "outlook.office365.com"
 IMAP_PORT = 993
 SMTP_HOST = "smtp.office365.com"
+SMTP_HOST_PERSONAL = "smtp-mail.outlook.com"
 SMTP_PORT = 587
 
 SCOPES = (
@@ -220,7 +221,9 @@ def _complete(org, user, code, state, redirect_uri):
     mailbox = _mailbox_from_access_token(access_token)
     if mailbox is not None and mailbox != attempt["username"]:
         raise ConsentError("mailbox_mismatch")
-    return _save_channel(org, user, attempt["username"], access_token, refresh_token)
+    return _save_channel(
+        org, user, attempt["username"], access_token, refresh_token, _smtp_host(access_token)
+    )
 
 
 def _exchange_code(code, verifier, redirect_uri):
@@ -252,11 +255,21 @@ def _exchange_code(code, verifier, redirect_uri):
     return access_token, refresh_token
 
 
+def _is_jwt(access_token):
+    return isinstance(access_token, str) and access_token.count(".") == 2
+
+
+def _smtp_host(access_token):
+    if _is_jwt(access_token):
+        return SMTP_HOST
+    return SMTP_HOST_PERSONAL
+
+
 def _mailbox_from_access_token(access_token):
     # Personal Microsoft accounts receive an opaque (non-JWT) access token for
     # the Outlook resource, so the mailbox cannot be read from it. The caller
     # then trusts the address the admin confirmed before the redirect.
-    if not isinstance(access_token, str) or access_token.count(".") != 2:
+    if not _is_jwt(access_token):
         return None
 
     try:
@@ -291,7 +304,7 @@ def _mailbox_claim(claims):
     return None
 
 
-def _save_channel(org, user, username, access_token, refresh_token):
+def _save_channel(org, user, username, access_token, refresh_token, smtp_host):
     with transaction.atomic():
         _lock_mailbox(org.id, username)
         existing = (
@@ -307,6 +320,7 @@ def _save_channel(org, user, username, access_token, refresh_token):
             ):
                 config["access_token"] = access_token
                 config["refresh_token"] = refresh_token
+                config["smtp_host"] = smtp_host
                 config["oauth_status"] = OAUTH_STATUS_ACTIVE
                 config["password"] = ""
                 existing.config = config
@@ -323,15 +337,15 @@ def _save_channel(org, user, username, access_token, refresh_token):
             "EM",
             name=username,
             address=username,
-            config=_channel_config(username, access_token, refresh_token),
+            config=_channel_config(username, access_token, refresh_token, smtp_host),
         )
 
 
-def _channel_config(username, access_token, refresh_token):
+def _channel_config(username, access_token, refresh_token, smtp_host):
     return {
         "username": username,
         "password": "",
-        "smtp_host": SMTP_HOST,
+        "smtp_host": smtp_host,
         "smtp_port": SMTP_PORT,
         "imap_host": IMAP_HOST,
         "imap_port": IMAP_PORT,
