@@ -1,3 +1,9 @@
+3.111.0
+----------
+* fix: mpeg audio support on studio
+* feat: implement api gateway on v2 .json endpoints, and updating weni-commons
+to version 1.8.0
+
 3.110.0
 ----------
 * feat: connect an Outlook mailbox from the email claim page with Microsoft consent, creating one email channel for the confirmed address.
