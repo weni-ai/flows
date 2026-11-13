@@ -1,3 +1,7 @@
+3.112.1
+----------
+* fix: update weni-rp-apps back to 2.13.2
+
 3.112.0
 ----------
 * feat: Add channel migration consumer for integrations.channel.migrated events
