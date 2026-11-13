@@ -4809,14 +4809,14 @@ requests = ">=2.25.0,<3.0"
 
 [[package]]
 name = "weni-rp-apps"
-version = "2.11.1"
+version = "2.13.2"
 description = "Weni apps for Rapidpro Platform"
 optional = false
 python-versions = "<3.13,>=3.10"
 groups = ["main"]
 files = [
-    {file = "weni_rp_apps-2.11.1-py3-none-any.whl", hash = "sha256:7f50b434b13f27714f02e3a3af765854befa6c8c2de3acba876eae046858d265"},
-    {file = "weni_rp_apps-2.11.1.tar.gz", hash = "sha256:1f965010b114c76857b0184e5747c489b027e86001cd7f5dfa1c079df5c7c252"},
+    {file = "weni_rp_apps-2.13.2-py3-none-any.whl", hash = "sha256:201de1a0f25ff0664234a56c4c720a72251f0437f2246d35f6798f3961b40a9c"},
+    {file = "weni_rp_apps-2.13.2.tar.gz", hash = "sha256:dd1ea630e557259b9504c451f360bb05802d4fc6a814bc0cdaca207d9c641b81"},
 ]
 
 [package.dependencies]
@@ -4831,6 +4831,7 @@ grpcio = ">=1.71.0,<2.0.0"
 mozilla-django-oidc = ">=2.0.0,<3.0.0"
 pre-commit = ">=2.20.0,<3.0.0"
 protobuf = ">=6.30.0,<7.0.0"
+weni-commons = ">=1.7.0"
 
 [[package]]
 name = "werkzeug"
@@ -5143,4 +5144,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.12"
-content-hash = "4b1020acd29fefab394cee2a87ec0abae6e4e967d8b167f2587e55079dd479c4"
+content-hash = "f55f84951c3b716055db15b35e0265891f63669d854c2733ffbe86344d0ba6d6"
