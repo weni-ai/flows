@@ -30,20 +30,34 @@ SMTP_HOST = "smtp.office365.com"
 SMTP_HOST_PERSONAL = "smtp-mail.outlook.com"
 SMTP_PORT = 587
 
-SCOPES = (
+OUTLOOK_SCOPES = (
     "offline_access",
+    "openid",
+    "email",
+    "profile",
     "https://outlook.office.com/IMAP.AccessAsUser.All",
     "https://outlook.office.com/SMTP.Send",
+)
+GRAPH_SCOPES = (
+    "offline_access",
+    "https://graph.microsoft.com/Mail.Send",
+    "https://graph.microsoft.com/Mail.ReadWrite",
+    "https://graph.microsoft.com/User.Read",
 )
 
 AUTHORIZE_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
 TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 JWKS_URL = "https://login.microsoftonline.com/common/discovery/v2.0/keys"
 OUTLOOK_AUDIENCE = "https://outlook.office.com"
+GRAPH_AUDIENCE = "https://graph.microsoft.com"
+GRAPH_APP_ID = "00000003-0000-0000-c000-000000000000"
 ADMIN_CONSENT_URL = "https://login.microsoftonline.com/common/adminconsent"
 ATTEMPT_KEY_PREFIX = "outlook-email-consent:"
 ISSUER_PREFIX = "https://login.microsoftonline.com/"
 MAILBOX_CLAIMS = ("upn", "preferred_username", "unique_name")
+ID_TOKEN_CLAIMS = ("email", "preferred_username", "upn", "unique_name")
+PHASE_OUTLOOK = "outlook"
+PHASE_GRAPH = "graph"
 _SAFE_ERROR_CODE = re.compile(r"[A-Za-z0-9_.-]{1,80}")
 
 
@@ -89,18 +103,22 @@ def normalize_mailbox(value):
     return mailbox
 
 
-def put_attempt(org_id, user_id, username, code_verifier):
+class ConsentNext:
+    def __init__(self, url):
+        self.url = url
+
+
+def put_attempt(org_id, user_id, username, code_verifier, **extra):
     state = secrets.token_urlsafe(32)
-    cache.set(
-        attempt_key(state),
-        {
-            "org_id": org_id,
-            "user_id": user_id,
-            "username": username,
-            "code_verifier": code_verifier,
-        },
-        CONSENT_ATTEMPT_TTL_SECONDS,
-    )
+    payload = {
+        "org_id": org_id,
+        "user_id": user_id,
+        "username": username,
+        "code_verifier": code_verifier,
+        "phase": PHASE_OUTLOOK,
+    }
+    payload.update(extra)
+    cache.set(attempt_key(state), payload, CONSENT_ATTEMPT_TTL_SECONDS)
     return state
 
 
@@ -165,7 +183,7 @@ def begin(org, user, username, redirect_uri):
         raise ConsentError("invalid_address", log=False)
     verifier = secrets.token_urlsafe(64)
     state = put_attempt(org.id, user.id, mailbox, verifier)
-    return _authorize_url(redirect_uri, state, code_challenge_for(verifier))
+    return _authorize_url(redirect_uri, state, code_challenge_for(verifier), OUTLOOK_SCOPES, "select_account")
 
 
 def rejection_from_provider(error, description):
@@ -193,21 +211,21 @@ def complete(org, user, code, state, redirect_uri, account_id=None, correlation_
         raise
 
 
-def _authorize_url(redirect_uri, state, challenge):
-    query = urlencode(
-        {
-            "client_id": settings.APP_MICROSOFT_CLIENT_ID,
-            "response_type": "code",
-            "redirect_uri": redirect_uri,
-            "response_mode": "query",
-            "scope": " ".join(SCOPES),
-            "state": state,
-            "prompt": "select_account",
-            "code_challenge": challenge,
-            "code_challenge_method": "S256",
-        }
-    )
-    return f"{AUTHORIZE_URL}?{query}"
+def _authorize_url(redirect_uri, state, challenge, scopes, prompt, login_hint=None):
+    params = {
+        "client_id": settings.APP_MICROSOFT_CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri": redirect_uri,
+        "response_mode": "query",
+        "scope": " ".join(scopes),
+        "state": state,
+        "prompt": prompt,
+        "code_challenge": challenge,
+        "code_challenge_method": "S256",
+    }
+    if login_hint:
+        params["login_hint"] = login_hint
+    return f"{AUTHORIZE_URL}?{urlencode(params)}"
 
 
 def _complete(org, user, code, state, redirect_uri):
@@ -217,12 +235,56 @@ def _complete(org, user, code, state, redirect_uri):
     if attempt["org_id"] != org.id or attempt["user_id"] != user.id:
         raise ConsentError("state")
 
-    access_token, refresh_token = _exchange_code(code, attempt["code_verifier"], redirect_uri)
-    mailbox = _mailbox_from_access_token(access_token)
-    if mailbox is not None and mailbox != attempt["username"]:
+    if attempt.get("phase") == PHASE_GRAPH:
+        return _complete_graph(org, user, code, attempt, redirect_uri)
+    return _complete_outlook(attempt, code, redirect_uri)
+
+
+def _complete_outlook(attempt, code, redirect_uri):
+    payload = _exchange_code(code, attempt["code_verifier"], redirect_uri)
+    access_token = payload["access_token"]
+    mailbox = _confirmed_mailbox(access_token, payload.get("id_token"))
+    if mailbox != attempt["username"]:
         raise ConsentError("mailbox_mismatch")
+
+    verifier = secrets.token_urlsafe(64)
+    state = put_attempt(
+        attempt["org_id"],
+        attempt["user_id"],
+        attempt["username"],
+        verifier,
+        phase=PHASE_GRAPH,
+        outlook_access_token=access_token,
+        outlook_refresh_token=payload["refresh_token"],
+    )
+    return ConsentNext(
+        _authorize_url(
+            redirect_uri,
+            state,
+            code_challenge_for(verifier),
+            GRAPH_SCOPES,
+            "consent",
+            login_hint=attempt["username"],
+        )
+    )
+
+
+def _complete_graph(org, user, code, attempt, redirect_uri):
+    access_token = attempt.get("outlook_access_token")
+    refresh_token = attempt.get("outlook_refresh_token")
+    if not access_token or not refresh_token:
+        raise ConsentError("state")
+    payload = _exchange_code(code, attempt["code_verifier"], redirect_uri)
+    _assert_graph_token(payload["access_token"])
     return _save_channel(
-        org, user, attempt["username"], access_token, refresh_token, _smtp_host(access_token)
+        org,
+        user,
+        attempt["username"],
+        access_token,
+        refresh_token,
+        _smtp_host(access_token),
+        payload["access_token"],
+        payload["refresh_token"],
     )
 
 
@@ -252,7 +314,7 @@ def _exchange_code(code, verifier, redirect_uri):
     refresh_token = payload.get("refresh_token")
     if response.status_code != 200 or not access_token or not refresh_token:
         raise ConsentError("token", report=True, logged_code=safe_error_code(payload.get("error") or "token"))
-    return access_token, refresh_token
+    return payload
 
 
 def _is_jwt(access_token):
@@ -265,20 +327,44 @@ def _smtp_host(access_token):
     return SMTP_HOST_PERSONAL
 
 
-def _mailbox_from_access_token(access_token):
-    # Personal Microsoft accounts receive an opaque (non-JWT) access token for
-    # the Outlook resource, so the mailbox cannot be read from it. The caller
-    # then trusts the address the admin confirmed before the redirect.
-    if not _is_jwt(access_token):
-        return None
+def _confirmed_mailbox(access_token, id_token):
+    if _is_jwt(access_token):
+        return _mailbox_from_access_token(access_token)
+    mailbox = _mailbox_from_id_token(id_token)
+    if not mailbox:
+        raise ConsentError("invalid_token", report=True, logged_code="token_mailbox")
+    return mailbox
 
+
+def _mailbox_from_access_token(access_token):
+    claims = _verified_claims(access_token, OUTLOOK_AUDIENCE)
+    mailbox = _mailbox_claim(claims, MAILBOX_CLAIMS)
+    if not mailbox:
+        raise ConsentError("invalid_token", report=True, logged_code="token_mailbox")
+    return mailbox
+
+
+def _mailbox_from_id_token(id_token):
+    if not _is_jwt(id_token):
+        return None
+    claims = _verified_claims(id_token, settings.APP_MICROSOFT_CLIENT_ID)
+    return _mailbox_claim(claims, ID_TOKEN_CLAIMS)
+
+
+def _assert_graph_token(access_token):
+    if not _is_jwt(access_token):
+        raise ConsentError("invalid_token", report=True, logged_code="graph_token")
+    _verified_claims(access_token, [GRAPH_AUDIENCE, GRAPH_APP_ID])
+
+
+def _verified_claims(token, audience):
     try:
-        signing_key = jwt.PyJWKClient(JWKS_URL).get_signing_key_from_jwt(access_token)
+        signing_key = jwt.PyJWKClient(JWKS_URL).get_signing_key_from_jwt(token)
         claims = jwt.decode(
-            access_token,
+            token,
             signing_key.key,
             algorithms=["RS256"],
-            audience=OUTLOOK_AUDIENCE,
+            audience=audience,
             options={"verify_iss": False},
         )
     except jwt.InvalidAudienceError:
@@ -289,22 +375,18 @@ def _mailbox_from_access_token(access_token):
     issuer = claims.get("iss") or ""
     if not (issuer.startswith(ISSUER_PREFIX) and issuer.endswith("/v2.0")):
         raise ConsentError("invalid_token", report=True, logged_code="token_issuer")
-
-    mailbox = _mailbox_claim(claims)
-    if not mailbox:
-        raise ConsentError("invalid_token", report=True, logged_code="token_mailbox")
-    return mailbox
+    return claims
 
 
-def _mailbox_claim(claims):
-    for key in MAILBOX_CLAIMS:
+def _mailbox_claim(claims, keys):
+    for key in keys:
         value = claims.get(key)
         if isinstance(value, str) and "@" in value:
             return value.strip().lower()
     return None
 
 
-def _save_channel(org, user, username, access_token, refresh_token, smtp_host):
+def _save_channel(org, user, username, access_token, refresh_token, smtp_host, graph_access_token, graph_refresh_token):
     with transaction.atomic():
         _lock_mailbox(org.id, username)
         existing = (
@@ -320,6 +402,8 @@ def _save_channel(org, user, username, access_token, refresh_token, smtp_host):
             ):
                 config["access_token"] = access_token
                 config["refresh_token"] = refresh_token
+                config["graph_send_access_token"] = graph_access_token
+                config["graph_send_refresh_token"] = graph_refresh_token
                 config["smtp_host"] = smtp_host
                 config["oauth_status"] = OAUTH_STATUS_ACTIVE
                 config["password"] = ""
@@ -337,11 +421,13 @@ def _save_channel(org, user, username, access_token, refresh_token, smtp_host):
             "EM",
             name=username,
             address=username,
-            config=_channel_config(username, access_token, refresh_token, smtp_host),
+            config=_channel_config(
+                username, access_token, refresh_token, smtp_host, graph_access_token, graph_refresh_token
+            ),
         )
 
 
-def _channel_config(username, access_token, refresh_token, smtp_host):
+def _channel_config(username, access_token, refresh_token, smtp_host, graph_access_token, graph_refresh_token):
     return {
         "username": username,
         "password": "",
@@ -351,6 +437,8 @@ def _channel_config(username, access_token, refresh_token, smtp_host):
         "imap_port": IMAP_PORT,
         "access_token": access_token,
         "refresh_token": refresh_token,
+        "graph_send_access_token": graph_access_token,
+        "graph_send_refresh_token": graph_refresh_token,
         "oauth_provider": OAUTH_PROVIDER_MICROSOFT,
         "oauth_status": OAUTH_STATUS_ACTIVE,
         "callback_domain": settings.HOSTNAME,

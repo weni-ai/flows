@@ -173,12 +173,23 @@ class EmailTypeTest(TembaTest):
         self.login(self.admin)
         query = self._start("user@outlook.com")
         opaque = "M.C550_BAY.2.U.MsaArtifacts.DtEBX0t8j6bo"  # not a JWT
-        response, posted = self._finish(query, opaque, refresh="refresh-personal")
+        response, posted = self._finish(
+            query,
+            opaque,
+            refresh="refresh-personal",
+            payload={
+                "access_token": opaque,
+                "refresh_token": "refresh-personal",
+                "id_token": _access_token("user@outlook.com", claim="email", audience="app-id"),
+            },
+        )
         channel = Channel.objects.get(channel_type="EM", address="user@outlook.com")
         self.assertRedirect(response, reverse("channels.channel_read", args=[channel.uuid]))
-        self.assertEqual(1, posted.call_count)
+        self.assertEqual(2, posted.call_count)
         self.assertEqual(opaque, channel.config["access_token"])
         self.assertEqual("refresh-personal", channel.config["refresh_token"])
+        self.assertEqual(response.graph_token, channel.config["graph_send_access_token"])
+        self.assertEqual("graph-refresh", channel.config["graph_send_refresh_token"])
         self.assertEqual(outlook.OAUTH_PROVIDER_MICROSOFT, channel.config["oauth_provider"])
         self.assertEqual(outlook.OAUTH_STATUS_ACTIVE, channel.config["oauth_status"])
         self.assertEqual(outlook.SMTP_HOST_PERSONAL, channel.config["smtp_host"])
@@ -350,7 +361,7 @@ class EmailTypeTest(TembaTest):
             follow=True,
         )
         self.assertContains(response, "This mailbox is already connected.")
-        self.assertEqual(1, posted.call_count)
+        self.assertEqual(2, posted.call_count)
         self.assertEqual(1, Channel.objects.filter(channel_type="EM").count())
         original.refresh_from_db()
         self.assertEqual("refresh-first", original.config["refresh_token"])
@@ -544,10 +555,12 @@ class EmailTypeTest(TembaTest):
         response, posted = self._finish(query, token, refresh="new-refresh")
         channel.refresh_from_db()
         self.assertRedirect(response, reverse("channels.channel_read", args=[channel.uuid]))
-        self.assertEqual(1, posted.call_count)
+        self.assertEqual(2, posted.call_count)
         self.assertEqual(1, Channel.objects.filter(channel_type="EM").count())
         self.assertEqual(token, channel.config["access_token"])
         self.assertEqual("new-refresh", channel.config["refresh_token"])
+        self.assertEqual(response.graph_token, channel.config["graph_send_access_token"])
+        self.assertEqual("graph-refresh", channel.config["graph_send_refresh_token"])
         self.assertEqual("active", channel.config["oauth_status"])
         self.assertEqual(outlook.SMTP_HOST, channel.config["smtp_host"])
         read = self.client.get(reverse("channels.channel_read", args=[channel.uuid]))
@@ -567,6 +580,8 @@ class EmailTypeTest(TembaTest):
                 "username": "user@outlook.com",
                 "access_token": "old-access",
                 "refresh_token": "old-refresh",
+                "graph_send_access_token": "old-graph-access",
+                "graph_send_refresh_token": "old-graph-refresh",
                 "oauth_provider": "microsoft",
             },
         )
@@ -575,6 +590,8 @@ class EmailTypeTest(TembaTest):
         self.assertFalse(channel.is_active)
         self.assertNotIn("access_token", channel.config)
         self.assertNotIn("refresh_token", channel.config)
+        self.assertNotIn("graph_send_access_token", channel.config)
+        self.assertNotIn("graph_send_refresh_token", channel.config)
 
     def test_outlook_reconnect_notice(self):
         self.login(self.admin)
@@ -626,7 +643,7 @@ class EmailTypeTest(TembaTest):
         self.assertEqual(query["code_challenge_method"][0], "S256")
         self.assertEqual(query["client_id"][0], "app-id")
         self.assertEqual(
-            "offline_access https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send",
+            "offline_access openid email profile https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send",
             query["scope"][0],
         )
         self.assertNotIn("client_secret", query)
@@ -640,15 +657,18 @@ class EmailTypeTest(TembaTest):
         response, posted = self._finish(query, token, refresh=refresh)
         channel = Channel.objects.get(channel_type="EM", address=address)
         self.assertRedirect(response, reverse("channels.channel_read", args=[channel.uuid]))
-        self.assertEqual(1, posted.call_count)
+        self.assertEqual(2, posted.call_count)
         self.assertEqual(outlook.TOKEN_URL, posted.call_args.args[0])
         self.assertEqual(outlook.MICROSOFT_HTTP_TIMEOUT_SECONDS, posted.call_args.kwargs["timeout"])
-        body = posted.call_args.kwargs["data"]
+        body = posted.call_args_list[0].kwargs["data"]
         self.assertEqual("app-secret", body["client_secret"])
         self.assertEqual("auth-code", body["code"])
         self.assertEqual(query["redirect_uri"][0], body["redirect_uri"])
         self.assertEqual(attempt["code_verifier"], body["code_verifier"])
         self.assertEqual("authorization_code", body["grant_type"])
+        graph_body = posted.call_args_list[1].kwargs["data"]
+        self.assertEqual("graph-code", graph_body["code"])
+        self.assertEqual("authorization_code", graph_body["grant_type"])
         self.assertIsNone(cache.get(outlook.attempt_key(query["state"][0])))
 
         self.assertEqual(address, channel.name)
@@ -663,6 +683,8 @@ class EmailTypeTest(TembaTest):
                 "imap_port": 993,
                 "access_token": token,
                 "refresh_token": refresh,
+                "graph_send_access_token": response.graph_token,
+                "graph_send_refresh_token": "graph-refresh",
                 "oauth_provider": "microsoft",
                 "oauth_status": "active",
                 "callback_domain": settings.HOSTNAME,
@@ -672,6 +694,8 @@ class EmailTypeTest(TembaTest):
         read = self.client.get(reverse("channels.channel_read", args=[channel.uuid]))
         self.assertNotContains(read, token)
         self.assertNotContains(read, refresh)
+        self.assertNotContains(read, response.graph_token)
+        self.assertNotContains(read, "graph-refresh")
 
         again = self.client.get(
             reverse("channels.types.email.outlook_callback"),
@@ -698,15 +722,37 @@ class EmailTypeTest(TembaTest):
         follow=False,
     ):
         body = payload if payload is not None else {"access_token": token, "refresh_token": refresh}
+        graph_token = _access_token(audience=outlook.GRAPH_AUDIENCE)
+        responses = [
+            _JsonResponse(status, body),
+            _JsonResponse(200, {"access_token": graph_token, "refresh_token": "graph-refresh"}),
+        ]
+
+        def post(*args, **kwargs):
+            return responses.pop(0)
+
         with _patch_jwks(), patch(
             "temba.channels.types.email.outlook.requests.post",
-            return_value=_JsonResponse(status, body),
+            side_effect=post,
         ) as posted:
             response = self.client.get(
                 reverse("channels.types.email.outlook_callback"),
                 {"code": "auth-code", "state": query["state"][0]},
-                follow=follow,
             )
+            location = response.get("Location") or ""
+            if location.startswith(f"{outlook.AUTHORIZE_URL}?"):
+                graph_query = parse_qs(urlparse(location).query)
+                self.assertEqual(" ".join(outlook.GRAPH_SCOPES), graph_query["scope"][0])
+                self.assertEqual("consent", graph_query["prompt"][0])
+                self.assertIn("login_hint", graph_query)
+                response = self.client.get(
+                    reverse("channels.types.email.outlook_callback"),
+                    {"code": "graph-code", "state": graph_query["state"][0]},
+                    follow=follow,
+                )
+            elif follow and response.status_code == 302:
+                response = self.client.get(location, follow=True)
+        response.graph_token = graph_token
         return response, posted
 
 
@@ -720,8 +766,20 @@ class OutlookConsentRaceTest(TembaNonAtomicTest):
         address = "shared@outlook.com"
         org_id = self.org.id
         user_id = self.admin.id
-        states = [outlook.put_attempt(org_id, user_id, address, f"verifier-{index}") for index in (0, 1)]
-        tokens = {f"code-{index}": _access_token(address) for index in (0, 1)}
+        outlook_token = _access_token(address)
+        states = [
+            outlook.put_attempt(
+                org_id,
+                user_id,
+                address,
+                f"verifier-{index}",
+                phase=outlook.PHASE_GRAPH,
+                outlook_access_token=outlook_token,
+                outlook_refresh_token=f"refresh-{index}",
+            )
+            for index in (0, 1)
+        ]
+        tokens = {f"code-{index}": _access_token(audience=outlook.GRAPH_AUDIENCE) for index in (0, 1)}
 
         def post(url, data=None, timeout=None):
             self.assertEqual(outlook.TOKEN_URL, url)
