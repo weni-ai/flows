@@ -51,6 +51,8 @@
           -trans "Error"
         -else
           {{ object.msg.get_status_display }}
+        -if object.msg and object.msg.failed_reason == "H"
+          {{ object.msg.get_failed_reason_display }}
 
   -block log-entries
     -for log in object.log_group

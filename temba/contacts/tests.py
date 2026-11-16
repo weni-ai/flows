@@ -21,7 +21,7 @@ from django.http import Http404
 from django.test import RequestFactory
 from django.test.utils import override_settings
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import timezone, translation
 
 from temba.airtime.models import AirtimeTransfer
 from temba.campaigns.models import Campaign, CampaignEvent, EventFire
@@ -2604,6 +2604,29 @@ class ContactTest(TembaTest):
         # can't view history of contact in other org
         response = self.client.get(reverse("contacts.contact_history", args=[self.other_org_contact.uuid]))
         self.assertLoginRedirect(response)
+
+        owned = self.create_outgoing_msg(self.joe, "Owned thread text", status="F")
+        owned.failed_reason = Msg.FAILED_OTHER_OWNER
+        owned.save(update_fields=("failed_reason",))
+
+        response = self.client.get(url)
+        self.assertContains(response, "Owned thread text")
+        self.assertContains(response, "Another service has the conversation")
+
+        with translation.override("pt-br"):
+            response = self.client.get(url)
+            self.assertContains(response, "Outro atendimento está com a conversa")
+
+        other = self.create_contact("Older Reasons", phone="+250788000099")
+        for reason in ("S", "L", "E", "O", "D"):
+            msg = self.create_outgoing_msg(other, f"older reason {reason}", status="F")
+            msg.failed_reason = reason
+            msg.save(update_fields=("failed_reason",))
+
+        response = self.client.get(reverse("contacts.contact_history", args=[other.uuid]))
+        self.assertNotContains(response, "Another service has the conversation")
+        for reason in ("S", "L", "E", "O", "D"):
+            self.assertContains(response, f"older reason {reason}")
 
     def test_history_mpeg_attachment_uses_overlay(self):
         self.create_incoming_msg(

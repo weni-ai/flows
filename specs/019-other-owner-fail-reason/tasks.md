@@ -21,7 +21,7 @@ Paths are from the repository root, as listed in plan.md. Application code lives
 
 **Purpose**: Confirm the migration leaf before adding a choices-only migration
 
-- [ ] T001 Confirm `temba/msgs/migrations/0175_merge_20260910_2109.py` is still the leaf of `temba/msgs/migrations/` (it merges `0174_auto_20260910_2044` and `0174_managedtriggergroup`). Stop if a newer msgs migration exists and point the new migration at that leaf instead.
+- [x] T001 Confirm `temba/msgs/migrations/0175_merge_20260910_2109.py` is still the leaf of `temba/msgs/migrations/` (it merges `0174_auto_20260910_2044` and `0174_managedtriggergroup`). Stop if a newer msgs migration exists and point the new migration at that leaf instead.
 
 ---
 
@@ -31,12 +31,12 @@ Paths are from the repository root, as listed in plan.md. Application code lives
 
 **⚠️ CRITICAL**: No user story work starts until this phase is complete.
 
-- [ ] T002 Add `FAILED_OTHER_OWNER = "H"` and include it in `FAILED_CHOICES` in `temba/msgs/models.py`. The label is the lazy English string `Another service has the conversation`. Leave the existing labels for `S`, `L`, `E`, `O`, and `D` as plain strings. Keep `failed_reason` nullable with `max_length=1`.
-- [ ] T003 [P] Depends on T002. Generate `temba/msgs/migrations/0176_alter_msg_failed_reason.py` with `AlterField` on `failed_reason` only. Depend on `msgs.0175_merge_20260910_2109` (or the leaf found in T001). Keep `null=True` and `max_length=1`. Do not add a `CheckConstraint` or any other operation. Do not start this until T002 has added the choice.
-- [ ] T004 [P] Depends on T002. Add msgid `Another service has the conversation` with msgstr `Otro servicio tiene la conversación` in `locale/es/LC_MESSAGES/django.po`. Do not start this until T002 has fixed the English source.
-- [ ] T005 [P] Depends on T002. Add msgid `Another service has the conversation` with msgstr `Outro atendimento está com a conversa` in `locale/pt_BR/LC_MESSAGES/django.po`. Do not start this until T002 has fixed the English source.
-- [ ] T006 [P] Depends on T002. Add msgid `Another service has the conversation` with msgstr `Alt serviciu are conversația` in `locale/ro/LC_MESSAGES/django.po`. Do not start this until T002 has fixed the English source.
-- [ ] T023 Depends on T003. In `temba/msgs/tests.py`, save outgoing messages with `failed_reason` `NULL`, `S`, `L`, `E`, `O`, `D`, and `H`, reload them, and assert each stored value. Load the new migration module and assert its only operation is `AlterField` on `failed_reason` with `null=True`, and that it contains no `CheckConstraint` and no `AddConstraint`. Finish T023 before any later task edits `temba/msgs/tests.py`.
+- [x] T002 Add `FAILED_OTHER_OWNER = "H"` and include it in `FAILED_CHOICES` in `temba/msgs/models.py`. The label is the lazy English string `Another service has the conversation`. Leave the existing labels for `S`, `L`, `E`, `O`, and `D` as plain strings. Keep `failed_reason` nullable with `max_length=1`.
+- [x] T003 [P] Depends on T002. Generate `temba/msgs/migrations/0176_alter_msg_failed_reason.py` with `AlterField` on `failed_reason` only. Depend on `msgs.0175_merge_20260910_2109` (or the leaf found in T001). Keep `null=True` and `max_length=1`. Do not add a `CheckConstraint` or any other operation. Do not start this until T002 has added the choice.
+- [x] T004 [P] Depends on T002. Add msgid `Another service has the conversation` with msgstr `Otro servicio tiene la conversación` in `locale/es/LC_MESSAGES/django.po`. Do not start this until T002 has fixed the English source.
+- [x] T005 [P] Depends on T002. Add msgid `Another service has the conversation` with msgstr `Outro atendimento está com a conversa` in `locale/pt_BR/LC_MESSAGES/django.po`. Do not start this until T002 has fixed the English source.
+- [x] T006 [P] Depends on T002. Add msgid `Another service has the conversation` with msgstr `Alt serviciu are conversația` in `locale/ro/LC_MESSAGES/django.po`. Do not start this until T002 has fixed the English source.
+- [x] T023 Depends on T003. In `temba/msgs/tests.py`, save outgoing messages with `failed_reason` `NULL`, `S`, `L`, `E`, `O`, `D`, and `H`, reload them, and assert each stored value. Load the new migration module and assert its only operation is `AlterField` on `failed_reason` with `null=True`, and that it contains no `CheckConstraint` and no `AddConstraint`. Finish T023 before any later task edits `temba/msgs/tests.py`.
 
 **Checkpoint**: A message can be saved with reason `H`, empty reason, and each existing code. The migration leaves the column optional. Other catalogs fall back to English.
 
@@ -50,13 +50,13 @@ Paths are from the repository root, as listed in plan.md. Application code lives
 
 ### Tests for User Story 1
 
-- [ ] T007 [P] [US1] Extend `EventTest.test_from_msg` in `temba/mailroom/tests.py` so an outgoing message with status `F` and reason `H` includes `failed_reason_display` plus the existing status, text, and keys. Existing equality cases for other statuses stay unchanged and do not require that key.
-- [ ] T008 [P] [US1] Extend `ContactTest.test_history` in `temba/contacts/tests.py` so the history response for a stored outgoing `F` + `H` message contains the English sentence and the message text. Under `translation.override("pt-br")` the response contains exactly `Outro atendimento está com a conversa`.
+- [x] T007 [P] [US1] Extend `EventTest.test_from_msg` in `temba/mailroom/tests.py` so an outgoing message with status `F` and reason `H` includes `failed_reason_display` plus the existing status, text, and keys. Existing equality cases for other statuses stay unchanged and do not require that key.
+- [x] T008 [P] [US1] Extend `ContactTest.test_history` in `temba/contacts/tests.py` so the history response for a stored outgoing `F` + `H` message contains the English sentence and the message text. Under `translation.override("pt-br")` the response contains exactly `Outro atendimento está com a conversa`.
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] In `temba/mailroom/events.py`, set `failed_reason_display` from `get_failed_reason_display()` on outbound `Event.from_msg` results (`msg_created`, `broadcast_created`, `product_sent`, `ivr_created`) only when `failed_reason` is `H`. Omit the key otherwise. Leave `msg_received` unchanged.
-- [ ] T010 [US1] In `templates/contacts/contact_history.haml`, render `event.failed_reason_display` on the broadcast row and on the `msg_created` / `ivr_created` / `product_sent` row when that value is present. Keep the message text.
+- [x] T009 [US1] In `temba/mailroom/events.py`, set `failed_reason_display` from `get_failed_reason_display()` on outbound `Event.from_msg` results (`msg_created`, `broadcast_created`, `product_sent`, `ivr_created`) only when `failed_reason` is `H`. Omit the key otherwise. Leave `msg_received` unchanged.
+- [x] T010 [US1] In `templates/contacts/contact_history.haml`, render `event.failed_reason_display` on the broadcast row and on the `msg_created` / `ivr_created` / `product_sent` row when that value is present. Keep the message text.
 
 **Checkpoint**: User Story 1 is testable on its own. History for other reasons still has no ownership sentence.
 
@@ -70,13 +70,13 @@ Paths are from the repository root, as listed in plan.md. Application code lives
 
 ### Tests for User Story 2
 
-- [ ] T011 [P] [US2] Extend `MsgCRUDLTest.test_failed` in `temba/msgs/tests.py` so the failed-list response contains the English ownership sentence for a message with reason `H`.
-- [ ] T012 [P] [US2] Add cases on `ChannelLogTest` in `temba/channels/tests.py`. A channel log with `is_error=True` whose message is failed with reason `H` renders `Another service has the conversation` in the status area. A channel log whose message is failed with reason `E` does not contain that sentence.
+- [x] T011 [P] [US2] Extend `MsgCRUDLTest.test_failed` in `temba/msgs/tests.py` so the failed-list response contains the English ownership sentence for a message with reason `H`.
+- [x] T012 [P] [US2] Add cases on `ChannelLogTest` in `temba/channels/tests.py`. A channel log with `is_error=True` whose message is failed with reason `H` renders `Another service has the conversation` in the status area. A channel log whose message is failed with reason `E` does not contain that sentence.
 
 ### Implementation for User Story 2
 
-- [ ] T013 [P] [US2] In `templates/msgs/message_box.haml`, show `object.get_failed_reason_display` on the message row only when `object.failed_reason` is `H`. This row is what `templates/msgs/msg_failed.haml` and `templates/msgs/message_box_spa.haml` already use.
-- [ ] T014 [P] [US2] In `templates/channels/channellog_read.haml`, show the ownership sentence in the status block when `object.msg` exists and `object.msg.failed_reason` is `H`, including when `object.is_error` is true. Leave the existing Error or status word in place beside that sentence.
+- [x] T013 [P] [US2] In `templates/msgs/message_box.haml`, show `object.get_failed_reason_display` on the message row only when `object.failed_reason` is `H`. This row is what `templates/msgs/msg_failed.haml` and `templates/msgs/message_box_spa.haml` already use.
+- [x] T014 [P] [US2] In `templates/channels/channellog_read.haml`, show the ownership sentence in the status block when `object.msg` exists and `object.msg.failed_reason` is `H`, including when `object.is_error` is true. Leave the existing Error or status word in place beside that sentence.
 
 **Checkpoint**: List and log show the sentence for reason `H` only.
 
@@ -90,9 +90,9 @@ Paths are from the repository root, as listed in plan.md. Application code lives
 
 ### Tests for User Story 3
 
-- [ ] T015 [P] [US3] In `temba/contacts/tests.py`, assert contact history for failed messages with reasons `S`, `L`, `E`, `O`, and `D` does not contain `Another service has the conversation`.
-- [ ] T016 [US3] In `temba/msgs/tests.py`, assert the failed list for those same five reasons does not contain the ownership sentence, and extend `MsgTasksTest.test_fail_channel_outgoing_messages_task` so a message already failed with reason `H` stays status `F` and reason `H` after `fail_channel_outgoing_messages`.
-- [ ] T017 [US3] Add a test in `temba/msgs/tests.py` that calls `Msg.fail_old_messages`. An outgoing message already `F` + `H` and older than a week stays `F` + `H`. A queued outgoing message older than a week still becomes `F` with reason `O`. Assert the model index named `msgs_next_attempt_out_errored` still filters outgoing messages with status `E` and `next_attempt` set, and does not include status `F`. An outgoing message with status `E`, a set `next_attempt`, and `created_on` inside the last week stays status `E` with that `next_attempt` after the call, so it remains eligible for that index. Remove `# pragma: needs cover` from `Msg.fail_old_messages` in `temba/msgs/models.py` because this test executes it. Leave the pragma on the Celery wrapper in `temba/msgs/tasks.py`.
+- [x] T015 [P] [US3] In `temba/contacts/tests.py`, assert contact history for failed messages with reasons `S`, `L`, `E`, `O`, and `D` does not contain `Another service has the conversation`.
+- [x] T016 [US3] In `temba/msgs/tests.py`, assert the failed list for those same five reasons does not contain the ownership sentence, and extend `MsgTasksTest.test_fail_channel_outgoing_messages_task` so a message already failed with reason `H` stays status `F` and reason `H` after `fail_channel_outgoing_messages`.
+- [x] T017 [US3] Add a test in `temba/msgs/tests.py` that calls `Msg.fail_old_messages`. An outgoing message already `F` + `H` and older than a week stays `F` + `H`. A queued outgoing message older than a week still becomes `F` with reason `O`. Assert the model index named `msgs_next_attempt_out_errored` still filters outgoing messages with status `E` and `next_attempt` set, and does not include status `F`. An outgoing message with status `E`, a set `next_attempt`, and `created_on` inside the last week stays status `E` with that `next_attempt` after the call, so it remains eligible for that index. Remove `# pragma: needs cover` from `Msg.fail_old_messages` in `temba/msgs/models.py` because this test executes it. Leave the pragma on the Celery wrapper in `temba/msgs/tasks.py`.
 
 **Checkpoint**: Older reasons and the errored retry index are unchanged. `msgs_next_attempt_out_errored` still requires status `E`.
 
@@ -106,11 +106,11 @@ Paths are from the repository root, as listed in plan.md. Application code lives
 
 ### Tests for User Story 5
 
-- [ ] T018 [US5] Extend `MsgCRUDLTest.test_failed` in `temba/msgs/tests.py`. Resend of only reason `H` does not call `MailroomClient.msg_resend`. A mixed selection calls it with the other ids only. An empty reason and reasons `S`, `L`, `E`, `O`, and `D` are included. After the action, each `H` message is still status `F` with reason `H`. The existing resend of a failed message without reason `H` stays green.
+- [x] T018 [US5] Extend `MsgCRUDLTest.test_failed` in `temba/msgs/tests.py`. Resend of only reason `H` does not call `MailroomClient.msg_resend`. A mixed selection calls it with the other ids only. An empty reason and reasons `S`, `L`, `E`, `O`, and `D` are included. After the action, each `H` message is still status `F` with reason `H`. The existing resend of a failed message without reason `H` stays green.
 
 ### Implementation for User Story 5
 
-- [ ] T019 [US5] In `Msg.apply_action_resend` in `temba/msgs/models.py`, keep messages whose `failed_reason` is `NULL` or any code other than `FAILED_OTHER_OWNER`. Drop reason `H`. Call `mailroom.get_client().msg_resend` only when at least one id remains, using that message's org id. Do not use `exclude(failed_reason="H")`, because SQL inequality drops `NULL`. Do not read Redis or change `temba/mailroom/client.py`.
+- [x] T019 [US5] In `Msg.apply_action_resend` in `temba/msgs/models.py`, keep messages whose `failed_reason` is `NULL` or any code other than `FAILED_OTHER_OWNER`. Drop reason `H`. Call `mailroom.get_client().msg_resend` only when at least one id remains, using that message's org id. Do not use `exclude(failed_reason="H")`, because SQL inequality drops `NULL`. Do not read Redis or change `temba/mailroom/client.py`.
 
 **Checkpoint**: Resend no longer forwards reason `H`. The `msg/resend` payload is still `org_id` plus `msg_ids`.
 
@@ -124,7 +124,7 @@ Paths are from the repository root, as listed in plan.md. Application code lives
 
 ### Tests for User Story 4
 
-- [ ] T020 [US4] In `temba/api/v2/tests.py` `test_messages`, read one outgoing message stored as status `F` and reason `H` from `api.v2.messages`. The status value stays `failed`, and the JSON keys stay the current `MsgReadSerializer` fields, with no `failed_reason` key. In `temba/msgs/tests.py` `test_message_export`, export a set that includes that same kind of message. The status cell stays `failed`, and the header stays `Date`, `Contact UUID`, `Name`, `URN` or `ID`, `URN Type`, `Direction`, `Text`, `Attachments`, `Status`, `Channel`, `Labels`. Do not add `failed_reason` to `MsgReadSerializer` in `temba/api/v2/serializers.py` or to `ExportMessagesTask` / `Msg.as_archive_json` in `temba/msgs/models.py`. Existing failed-message assertions in both files stay green.
+- [x] T020 [US4] In `temba/api/v2/tests.py` `test_messages`, read one outgoing message stored as status `F` and reason `H` from `api.v2.messages`. The status value stays `failed`, and the JSON keys stay the current `MsgReadSerializer` fields, with no `failed_reason` key. In `temba/msgs/tests.py` `test_message_export`, export a set that includes that same kind of message. The status cell stays `failed`, and the header stays `Date`, `Contact UUID`, `Name`, `URN` or `ID`, `URN Type`, `Direction`, `Text`, `Attachments`, `Status`, `Channel`, `Labels`. Do not add `failed_reason` to `MsgReadSerializer` in `temba/api/v2/serializers.py` or to `ExportMessagesTask` / `Msg.as_archive_json` in `temba/msgs/models.py`. Existing failed-message assertions in both files stay green.
 
 **Checkpoint**: Public reads and exports match the contract in `contracts/other-owner-failure.md`.
 
@@ -134,8 +134,8 @@ Paths are from the repository root, as listed in plan.md. Application code lives
 
 **Purpose**: Release note and the quickstart gate
 
-- [ ] T021 [P] Add a `feat:` bullet in `WENI-CHANGELOG.md` for the operator sentence and for Resend leaving reason `H` on the list. Do not edit `CHANGELOG.md`. Do not append the bullet under `3.112.1`. Do not invent the next number. Evidence for the heading is missing: `WENI-CHANGELOG.md` has no empty or `Unreleased` heading, and its top heading `3.112.1` already contains a bullet. `README.md` documents the upstream RapidPro train (`v7`/`v8`), not the Weni `3.x.y` heading this file uses. Stop before writing the bullet and record that the release heading is unknown, unless the person running the release names the heading that will ship this change.
-- [ ] T022 Run the commands in `specs/019-other-owner-fail-reason/quickstart.md`, including `./code_check.py`. No new `# pragma: no cover`.
+- [ ] T021 [P] Add a `feat:` bullet in `WENI-CHANGELOG.md` for the operator sentence and for Resend leaving reason `H` on the list. Do not edit `CHANGELOG.md`. Do not append the bullet under `3.112.1`. Do not invent the next number. Evidence for the heading is missing: `WENI-CHANGELOG.md` has no empty or `Unreleased` heading, and its top heading `3.112.1` already contains a bullet. `README.md` documents the upstream RapidPro train (`v7`/`v8`), not the Weni `3.x.y` heading this file uses. Stop before writing the bullet and record that the release heading is unknown, unless the person running the release names the heading that will ship this change. Stopped: the release heading is unknown. No bullet was written.
+- [ ] T022 Run the commands in `specs/019-other-owner-fail-reason/quickstart.md`, including `./code_check.py`. No new `# pragma: no cover`. Not run: the project environment does not import Django (`requests` is missing from the Poetry env) and local Postgres rejects user `temba`.
 
 ---
 
