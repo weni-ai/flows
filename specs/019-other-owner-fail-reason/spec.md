@@ -93,7 +93,7 @@ Inspected in this repository. These are findings, not assumptions.
 
 **Courier.** Already writes status `F` and reason `H` when its flag is on. It keeps the letter `H`. It does not render the sentence. No Courier change comes from this spec.
 
-**Mailroom.** No code change. This repository’s retry index and failure jobs already treat status failed as terminal. The send-retry loop itself lives in Mailroom. If that loop selects only status errored, matching the index above, Mailroom needs no patch and no new feature. A test that a message failed with reason `H` is left out of that loop belongs in the Mailroom repository, next to the query that claims messages. It is not added here, because the loop is not here. Resend is filtered in this repository before `msg/resend`: ids with reason `H` are not in the payload. The payload shape stays the workspace id plus the remaining message ids.
+**Mailroom.** No code change and no release. Confirmed in the Mailroom source: `failed_reason` is a free string, and `H` is not one of its named reasons (`S`, `L`, `E`, `O`, `D`, `T`, `M`). Courier writes `F` + `H` on the message row. The retry index and the failure jobs in this repository already treat status failed as terminal, and Mailroom’s claim loop selects errored messages. Mailroom’s resend path would clear `failed_reason`, so this repository drops reason `H` before `msg/resend`. The payload stays the workspace id plus the remaining message ids. When every selected id is `H`, Mailroom is not called.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -204,7 +204,7 @@ An operator selects failed outgoing messages and chooses Resend. Messages failed
 - **FR-008**: The failure-reason column MUST stay optional. The migration MUST leave empty reasons and the existing reason codes valid. It MUST NOT add a database rule that rejects `H` or any single character the column can already store.
 - **FR-009**: Jobs in this repository that fail old messages or fail a channel’s queued messages MUST leave a message that is already failed, including reason `H`, unchanged. Errored messages MUST remain the ones eligible for the existing retry index.
 - **FR-010**: This repository MUST NOT add a switch for the ownership block, MUST NOT call the Thread Control API, and MUST NOT decide which WhatsApp Cloud messages Courier sends.
-- **FR-011**: The next unreleased version notes MUST record the new operator sentence and that Resend leaves a message failed with reason `H` in place.
+- **FR-011**: Version notes under heading `3.113.0` MUST record the new operator sentence and that Resend leaves a message failed with reason `H` in place.
 - **FR-012**: Resend MUST ask Mailroom only for selected messages whose failure reason is not `H`. A message with an empty reason MUST still be included. When every selected message has reason `H`, Mailroom MUST NOT be called. Each omitted message MUST stay failed with reason `H`.
 
 ### Key Entities
@@ -247,8 +247,8 @@ An operator selects failed outgoing messages and chooses Resend. Messages failed
 | AC-F4 API and export | Existing public message API assertions for a failed message stay on status `failed` with the current field set. Existing export header and status-column assertions stay green. No new serializer field and no new spreadsheet column. |
 | AC-F5 optional column, no new check | Migration test or model save: a message with reason `H`, a message with each existing reason, and a message with an empty reason all persist. The new migration does not add a check constraint and does not set the column non-null. |
 | AC-F6 Resend skips reason `H` | `temba/msgs/tests.py` `test_failed`: resend of a message failed with reason `H` does not call `msg_resend`. A mixed selection calls `msg_resend` with the other ids only. An empty reason and an existing reason still produce a call that includes those ids. A selection that is only `H` does not call Mailroom. After the action, each `H` message is still status failed with reason `H`. The existing resend of a failed message with no reason `H` stays green. |
-| AC-M no Mailroom feature | `msg/resend` still sends the workspace id and message ids. No new Mailroom endpoint and no change to the retry index. `fail_old_messages` and `fail_channel_outgoing_messages` tests: a message already failed with reason `H` is not selected and stays `F` + `H`. The errored retry index condition remains status errored only. Documented verification stands in for a Mailroom worker test, which this repository cannot host. |
-| Changelog | Pull request adds a `feat:` bullet under the next unreleased heading in `WENI-CHANGELOG.md`. `CHANGELOG.md` is not rewritten. |
+| AC-M no Mailroom feature | Confirmed against the Mailroom source: no `H` reason constant, claim stays on status errored, and resend would clear the reason if called. `msg/resend` still sends the workspace id and message ids. No Mailroom release. `fail_old_messages` and `fail_channel_outgoing_messages` tests: a message already failed with reason `H` stays `F` + `H`. |
+| Changelog | `feat:` bullet under heading `3.113.0` in `WENI-CHANGELOG.md`. `CHANGELOG.md` is not rewritten. |
 
 **Flow coverage** (Principle XIV): one test loads contact history the way an operator does, with a stored outgoing message failed with reason `H`, and asserts the sentence in the response. One test loads the failed-messages list and one opens the message log for the same kind of message. One test posts Resend the way the operator does, including a selection that is only reason `H` and a mixed selection. Those are the complete operator paths. The event assertion covers the history payload. Isolated checks cover the other reason codes, the empty reason, the public API field set, and the failure jobs leaving `F` + `H` untouched.
 
@@ -274,7 +274,7 @@ An operator selects failed outgoing messages and chooses Resend. Messages failed
 | V. Specification Traceability | Opens with `## Origin Without Product Spec`. Each acceptance criterion maps to a check in Test Strategy. | none |
 | VI. No Silent Divergence | Not applicable: no Product Spec. | none |
 | VII. Commit Messages | Atomic Conventional Commits, imperative descriptions of 50 characters or fewer. | none |
-| VIII. Changelog Maintenance | `feat:` bullet in `WENI-CHANGELOG.md` under the next unreleased version heading. `CHANGELOG.md` is not rewritten. | none |
+| VIII. Changelog Maintenance | `feat:` bullet in `WENI-CHANGELOG.md` under heading `3.113.0`. `CHANGELOG.md` is not rewritten. | none |
 | IX. Never Trust the Client | The reason is stored by Courier and displayed from the database. The screens do not accept a reason string from the browser. | none |
 | X. Fail Gracefully | No new outbound call. Existing Mailroom resend timeouts stay as they are. | none |
 | XI. Bounded Retry Over REST | No new REST propagation. Automatic retry eligibility stays on errored messages only. | none |

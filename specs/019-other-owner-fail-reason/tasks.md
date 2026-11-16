@@ -134,7 +134,7 @@ Paths are from the repository root, as listed in plan.md. Application code lives
 
 **Purpose**: Release note and the quickstart gate
 
-- [ ] T021 [P] Add a `feat:` bullet in `WENI-CHANGELOG.md` for the operator sentence and for Resend leaving reason `H` on the list. Do not edit `CHANGELOG.md`. Do not append the bullet under `3.112.1`. Do not invent the next number. Evidence for the heading is missing: `WENI-CHANGELOG.md` has no empty or `Unreleased` heading, and its top heading `3.112.1` already contains a bullet. `README.md` documents the upstream RapidPro train (`v7`/`v8`), not the Weni `3.x.y` heading this file uses. Stop before writing the bullet and record that the release heading is unknown, unless the person running the release names the heading that will ship this change. Stopped: the release heading is unknown. No bullet was written.
+- [x] T021 [P] Add a `feat:` bullet in `WENI-CHANGELOG.md` for the operator sentence and for Resend leaving reason `H` on the list. Heading is `3.113.0`, the next minor after `3.112.1`. Do not edit `CHANGELOG.md`.
 - [ ] T022 Run the commands in `specs/019-other-owner-fail-reason/quickstart.md`, including `./code_check.py`. No new `# pragma: no cover`. Not run: the project environment does not import Django (`requests` is missing from the Poetry env) and local Postgres rejects user `temba`.
 
 ---
@@ -232,4 +232,5 @@ Ship Phases 1 through 6 and Phase 8 together. User Story 5 closes Resend. User S
 - Do not edit `temba/mailroom/client.py`. The Resend payload stays `org_id` and `msg_ids`.
 - Empty `failed_reason` is not `H` and still resends.
 - The unrelated empty file `temba/orgs/migrations/0094_ensure_org_marketing_table.py` is outside this feature. Do not revive it or give it a number in the msgs app.
-- Changelog heading is unresolved. T021 must not guess a `3.x.y` number and must not append the bullet to `3.112.1`.
+- Changelog heading is `3.113.0`. The bullet is not appended to `3.112.1`.
+- Mailroom needs no release. `failed_reason` there is a free string and has no `H` constant. Courier writes `F` + `H`. Flows drops `H` before `msg_resend`.

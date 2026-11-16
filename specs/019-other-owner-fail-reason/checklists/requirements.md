@@ -37,5 +37,5 @@
 - Origin, Current State, Test Strategy, and Constitution Alignment name the stored code `H`, the Courier contract, and the screens already in the product. Those sections are required by the Flows constitution (Principle V, Test Strategy, Constitution Alignment) and by the request to record what the code actually does. They are not a second product spec.
 - Letter check: failure reasons in this fork are `S`, `L`, `E`, `O`, and `D`. `H` is free on the failure reason. Courier keeps `H`. No clarification was needed.
 - Public API and spreadsheet do not expose a failure reason today. AC-F4 is “leave them unchanged”, which is backward compatible. No clarification was needed.
-- Mailroom has no feature in this spec. The retry loop is not in this repository; the verification is recorded under AC-M and Other repositories. Resend is filtered here, before `msg/resend`.
+- Mailroom has no feature and no release. Source check: `failed_reason` is a free string and `H` is not a named reason there. Courier writes the letter. Resend is filtered here, before `msg/resend`.
 - Ready for `/speckit-plan`. `/speckit-clarify` is not required.

@@ -34,8 +34,8 @@ All spec decisions are confirmed against the code. Nothing is left as NEEDS CLAR
 
 ## Decision: No Mailroom code in this change
 
-- **Rationale**: Index `msgs_next_attempt_out_errored` is outgoing + status `E` + `next_attempt` set. `fail_old_messages` and `fail_channel_outgoing_messages` select queued, pending, and errored only. The send-claim loop is not in this repository. `MailroomClient` does not read `failed_reason`.
-- **Alternatives considered**: A Flows test that pretends to be the Mailroom worker. Rejected. Extend the channel-release task test and add a `Msg.fail_old_messages` case that an existing `F`+`H` row stays `F`+`H`. The worker test belongs in Mailroom.
+- **Rationale**: Confirmed in the Mailroom tree. `failed_reason` is a free string. The named reasons are `S`, `L`, `E`, `O`, `D`, `T`, and `M`. There is no `H`. Courier writes `F` + `H` on `msgs_msg`. Index `msgs_next_attempt_out_errored` is outgoing + status `E` + `next_attempt` set. `fail_old_messages` and `fail_channel_outgoing_messages` select queued, pending, and errored only. `ResendMessages` would clear `failed_reason` and set status pending, which is why Flows drops `H` before `msg_resend`. `MailroomClient` does not read `failed_reason`. No Mailroom release.
+- **Alternatives considered**: Add `H` to Mailroom’s reason constants or a worker test here. Rejected. The letter does not need to be known there, and this repository cannot host the worker loop.
 
 ## Decision: Screens
 
