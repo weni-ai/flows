@@ -1,3 +1,8 @@
+3.115.0
+----------
+* feat: accept media files inline (multipart) on WhatsApp broadcasts, public and internal endpoints
+* feat: added feature to validate Shopping Assistant components and support Idempotency-Key on internal messages stream endpoint.
+
 3.114.0
 ----------
 * feat: implement 'Other-owner failure reason' feature, showing "Another service has the conversation" for failure reason H and keeping Resend from sending those messages

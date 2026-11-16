@@ -72,6 +72,20 @@ def compute_body_hash(request) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def compute_media_body_hash(payload, file_sha256s) -> str:
+    """
+    Like compute_body_hash, for a multipart request: it hashes the parsed payload and the SHA-256 of each file, in the
+    order they were sent. Changing the bytes of any file, or the order of the files, changes the hash, and so does
+    changing the payload. compute_body_hash is still what hashes a JSON body, so keys stored for those keep replaying.
+    """
+    body = {"payload": payload, "files": list(file_sha256s)}
+    try:
+        serialized = json.dumps(body, sort_keys=True)
+    except (TypeError, ValueError):
+        serialized = repr(body)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
 def idempotency_lookup(project_uuid, key: str, body_hash: str) -> tuple[str, dict | None]:
     """
     Atomically claims the idempotency slot or reports the existing entry.
