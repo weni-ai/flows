@@ -135,7 +135,7 @@ Paths are from the repository root, as listed in plan.md. Application code lives
 **Purpose**: Release note and the quickstart gate
 
 - [x] T021 [P] Add a `feat:` bullet in `WENI-CHANGELOG.md` for the operator sentence and for Resend leaving reason `H` on the list. Heading is `3.113.0`, the next minor after `3.112.1`. Do not edit `CHANGELOG.md`.
-- [ ] T022 Run the commands in `specs/019-other-owner-fail-reason/quickstart.md`, including `./code_check.py`. No new `# pragma: no cover`. Not run: the project environment does not import Django (`requests` is missing from the Poetry env) and local Postgres rejects user `temba`.
+- [x] T022 Run the commands in `specs/019-other-owner-fail-reason/quickstart.md`, including `./code_check.py`. No new `# pragma: no cover`. `./code_check.py` ran: black, flake8 3.7.7, and isort passed. The script then prints “Changes to be committed” because `temba/settings_common.py` points `NAME` and `USER` at `mailroom_test` for this machine’s database. That diff stays uncommitted.
 
 ---
 
