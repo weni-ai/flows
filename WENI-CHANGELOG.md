@@ -1,3 +1,7 @@
+3.113.0
+----------
+* feat: accept media files inline (multipart) on WhatsApp broadcasts, public and internal endpoints
+
 3.112.1
 ----------
 * fix: update weni-rp-apps back to 2.13.2
