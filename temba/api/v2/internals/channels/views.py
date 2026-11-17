@@ -16,12 +16,21 @@ from temba.api.v2.internals.channels.serializers import (
     ChannelElevenLabsApiKeySerializer,
     ChannelMarketingTagsSerializer,
     ChannelProjectSerializer,
+    ChannelSIPSerializer,
     ChannelWabaMigrationSerializer,
 )
-from temba.api.v2.internals.channels.usecases import GetChannelMarketingTagsUseCase, GetElevenLabsApiKeyUseCase
+from temba.api.v2.internals.channels.usecases import (
+    GetChannelMarketingTagsUseCase,
+    GetElevenLabsApiKeyUseCase,
+    GetSIPConnectionUseCase,
+    IssueSIPCredentialsUseCase,
+    SIPChannelNotFoundError,
+    SIPNotProvisionedError,
+)
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
 from temba.channels.models import Channel
+from temba.channels.types.telephony import provisioning
 from temba.channels.types.whatsapp_cloud.usecases import UpdateWhatsAppCloudWabaUseCase, WabaChannelNotFound
 from temba.orgs.models import Org
 
@@ -178,3 +187,69 @@ class ChannelWabaMigrationView(APIViewMixin, APIView):
             )
 
         return Response({"results": results})
+
+
+class _SIPViewMixin(APIViewMixin):
+    """
+    Shared by the two TPH SIP endpoints: same authentication as ``InternalChannelView``, validated identifiers, and
+    error answers that never carry anything from the cluster (spec 019, contracts/internals-sip-endpoints.md).
+    """
+
+    authentication_classes = [WeniAuthentication, InternalOIDCAuthentication]
+    permission_classes = [CanCommunicateInternally | (IsAuthenticated & IsUserInOrg)]
+
+    @staticmethod
+    def _error(message, http_status, **headers):
+        response = Response({"error": message}, status=http_status)
+        for name, value in headers.items():
+            response[name.replace("_", "-")] = str(value)
+        return response
+
+    def _run(self, request, data, action, *, no_store):
+        serializer = ChannelSIPSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            body = action(
+                str(serializer.validated_data["channel_uuid"]), str(serializer.validated_data["project_uuid"])
+            )
+        except SIPChannelNotFoundError:
+            return self._error("Channel not found", status.HTTP_404_NOT_FOUND)
+        except SIPNotProvisionedError:
+            return self._error("SIP provisioning not available for this channel", status.HTTP_409_CONFLICT)
+        except provisioning.SIPRateLimitError as e:
+            return self._error(
+                "Too many password requests", status.HTTP_429_TOO_MANY_REQUESTS, Retry_After=e.retry_after
+            )
+        except provisioning.SIPProvisioningError as e:
+            provisioning.report(
+                e.__cause__ or e,
+                event="sip_endpoint",
+                channel_uuid=serializer.validated_data["channel_uuid"],
+                user_id=getattr(getattr(request, "user", None), "id", None),
+            )
+            return self._error("Service unavailable", status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        response = Response(body)
+        if no_store:
+            response["Cache-Control"] = "no-store"
+            response["Pragma"] = "no-cache"
+        return response
+
+
+class ChannelSIPConnectionView(_SIPViewMixin, APIView):
+    def get(self, request: Request):
+        return self._run(request, request.query_params, GetSIPConnectionUseCase().execute, no_store=False)
+
+
+class ChannelSIPCredentialsView(_SIPViewMixin, APIView):
+    def post(self, request: Request):
+        actor_id = getattr(getattr(request, "user", None), "id", None)
+        return self._run(
+            request,
+            request.data,
+            lambda channel_uuid, project_uuid: IssueSIPCredentialsUseCase().execute(
+                channel_uuid, project_uuid, actor_id=actor_id
+            ),
+            no_store=True,
+        )
