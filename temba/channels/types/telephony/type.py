@@ -3,6 +3,7 @@ from django.utils.translation import ugettext_lazy as _
 from temba.contacts.models import URN
 
 from ...models import ChannelType
+from . import provisioning
 from .views import ClaimView
 
 MAX_MESSAGE_LENGTH = 4096
@@ -45,3 +46,20 @@ class TelephonyPSTNType(ChannelType):
             "description": _("Gateway endpoint for inbound voice turns (POST JSON)."),
         },
     )
+
+    def activate(self, channel):
+        """
+        Creates the SIP credential of the channel in KubeVoIP when provisioning is enabled. An error propagates so that
+        ``Channel.create`` releases the channel: a TPH channel is never left half provisioned.
+        """
+        if not provisioning.is_enabled():
+            return
+
+        provisioning.provision_channel(channel)
+
+    def deactivate(self, channel):
+        """
+        Revokes the SIP credential. It runs even when provisioning is disabled, so that turning the feature off never
+        leaves a credential that cannot be revoked. Failures are reported inside and never block the release.
+        """
+        provisioning.deprovision_channel(channel)
