@@ -139,3 +139,13 @@ def track_org_channel_counts(now=None):
         for org in org_counts:
             if org.administrators.all():
                 track(org.administrators.all()[0], stat["key"], dict(count=org.count))
+
+
+@nonoverlapping_task(track_started=True, name="reconcile_tph_sip_task", lock_key="reconcile_tph_sip", lock_timeout=600)
+def reconcile_tph_sip_task():
+    """
+    Removes the KubeVoIP objects of TPH channels that no longer exist and recreates the ones that went missing.
+    """
+    from temba.channels.types.telephony.reconciliation import run_reconciliation
+
+    run_reconciliation()
