@@ -1,3 +1,7 @@
+3.113.0
+----------
+* feat: Add Channellog errors in messages endpoint
+
 3.112.1
 ----------
 * fix: update weni-rp-apps back to 2.13.2
