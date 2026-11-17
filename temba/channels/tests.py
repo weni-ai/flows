@@ -2155,6 +2155,33 @@ class ChannelLogTest(TembaTest):
             )
             self.assertContains(response, "30 seconds")
 
+    def test_other_owner_failure_sentence(self):
+        contact = self.create_contact("Ada Lovelace", phone="+12067799192")
+        owned = self.create_outgoing_msg(contact, "blocked send", status="F")
+        owned.failed_reason = "H"
+        owned.save(update_fields=("failed_reason",))
+        owned_log = ChannelLog.objects.create(
+            channel=owned.channel, msg=owned, is_error=True, description="Blocked by owner"
+        )
+
+        limited = self.create_outgoing_msg(contact, "error limit send", status="F")
+        limited.failed_reason = "E"
+        limited.save(update_fields=("failed_reason",))
+        limited_log = ChannelLog.objects.create(
+            channel=limited.channel, msg=limited, is_error=True, description="Error limit"
+        )
+
+        self.login(self.admin)
+        response = self.client.get(reverse("channels.channellog_read", args=[owned_log.channel.uuid, owned_log.id]))
+        self.assertContains(response, "Error")
+        self.assertContains(response, "Another service has the conversation")
+
+        response = self.client.get(
+            reverse("channels.channellog_read", args=[limited_log.channel.uuid, limited_log.id])
+        )
+        self.assertContains(response, "Error")
+        self.assertNotContains(response, "Another service has the conversation")
+
     def test_channellog_connection_anonymous(self):
         url = reverse("channels.channellog_connection", args=(1,))
 

@@ -8400,3 +8400,6 @@ msgstr ""
 
 msgid "The Opt-in group cannot be renamed."
 msgstr ""
+
+msgid "Another service has the conversation"
+msgstr "Otro servicio tiene la conversación"

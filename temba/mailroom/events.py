@@ -98,7 +98,7 @@ class Event:
                 "logs_url": logs_url,
             }
         elif obj.broadcast and obj.broadcast.get_message_count() > 1:
-            return {
+            event = {
                 "type": cls.TYPE_BROADCAST_CREATED,
                 "created_on": get_event_time(obj).isoformat(),
                 "translations": obj.broadcast.text,
@@ -109,8 +109,10 @@ class Event:
                 "recipient_count": obj.broadcast.get_message_count(),
                 "logs_url": logs_url,
             }
+            _add_other_owner_display(event, obj)
+            return event
         elif obj.metadata and "products" in obj.metadata:
-            return {
+            event = {
                 "type": cls.TYPE_PRODUCT_SENT,
                 "created_on": get_event_time(obj).isoformat(),
                 # additional properties
@@ -118,6 +120,8 @@ class Event:
                 "status": obj.status,
                 "logs_url": logs_url,
             }
+            _add_other_owner_display(event, obj)
+            return event
         else:
             msg_event = {
                 "type": cls.TYPE_IVR_CREATED if obj.msg_type == Msg.TYPE_IVR else cls.TYPE_MSG_CREATED,
@@ -127,6 +131,7 @@ class Event:
                 "status": obj.status,
                 "logs_url": logs_url,
             }
+            _add_other_owner_display(msg_event, obj)
 
             if obj.broadcast and obj.broadcast.created_by:
                 user = obj.broadcast.created_by
@@ -259,6 +264,12 @@ def _msg_in(obj) -> dict:
         d["external_id"] = obj.external_id
 
     return d
+
+
+def _add_other_owner_display(event: dict, obj: Msg) -> None:
+    """Attach the operator sentence only for reason H. Other reasons stay unlabeled."""
+    if obj.failed_reason == Msg.FAILED_OTHER_OWNER:
+        event["failed_reason_display"] = obj.get_failed_reason_display()
 
 
 def _msg_out(obj) -> dict:

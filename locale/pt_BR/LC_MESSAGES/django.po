@@ -8403,3 +8403,6 @@ msgstr ""
 
 msgid "The Opt-in group cannot be renamed."
 msgstr ""
+
+msgid "Another service has the conversation"
+msgstr "Outro atendimento está com a conversa"

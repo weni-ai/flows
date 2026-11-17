@@ -8463,3 +8463,6 @@ msgstr ""
 
 msgid "The Opt-in group cannot be renamed."
 msgstr ""
+
+msgid "Another service has the conversation"
+msgstr "Alt serviciu are conversația"

@@ -552,12 +552,14 @@ class Msg(models.Model):
     FAILED_ERROR_LIMIT = "E"  # courier tried to send the message but we reached error limit
     FAILED_TOO_OLD = "O"  # message has been queued for too long and too late to send message
     FAILED_NO_DESTINATION = "D"  # no compatible channel + URN destination found
+    FAILED_OTHER_OWNER = "H"  # another service owns the WhatsApp thread; Courier writes this letter
     FAILED_CHOICES = (
         (FAILED_SUSPENDED, "Suspended"),
         (FAILED_LOOPING, "Looping"),
         (FAILED_ERROR_LIMIT, "Error Limit"),
         (FAILED_TOO_OLD, "Too Old"),
         (FAILED_NO_DESTINATION, "No Destination"),
+        (FAILED_OTHER_OWNER, _("Another service has the conversation")),
     )
 
     MEDIA_GPS = "geo"
@@ -643,7 +645,7 @@ class Msg(models.Model):
         return messages
 
     @classmethod
-    def fail_old_messages(cls):  # pragma: needs cover
+    def fail_old_messages(cls):
         """
         Looks for any errored or queued messages more than a week old and fails them. Messages that old would
         probably be confusing to go out.
@@ -912,8 +914,10 @@ class Msg(models.Model):
 
     @classmethod
     def apply_action_resend(cls, user, msgs):
-        if msgs:
-            mailroom.get_client().msg_resend(msgs[0].org.id, [m.id for m in msgs])
+        # Empty reason is not H. A SQL exclude on the letter drops NULL, so compare in Python.
+        eligible = [msg for msg in msgs if msg.failed_reason != cls.FAILED_OTHER_OWNER]
+        if eligible:
+            mailroom.get_client().msg_resend(eligible[0].org.id, [msg.id for msg in eligible])
 
     class Meta:
         indexes = [

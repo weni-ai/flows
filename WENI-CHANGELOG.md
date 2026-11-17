@@ -1,6 +1,7 @@
 3.113.0
 ----------
 * feat: accept media files inline (multipart) on WhatsApp broadcasts, public and internal endpoints
+* feat: show when another service has the WhatsApp conversation, and keep Resend from retrying those messages
 
 3.112.1
 ----------

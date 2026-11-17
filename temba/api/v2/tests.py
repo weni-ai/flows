@@ -5074,6 +5074,37 @@ class APITest(APIJSONMixin, TembaTest):
             response = self.fetchJSON(url, "id=%d" % joe_msg3.pk)
             self.assertIsNone(response.json()["results"][0]["urn"])
 
+        owned = self.create_outgoing_msg(self.joe, "Owned thread", status="F")
+        owned.failed_reason = Msg.FAILED_OTHER_OWNER
+        owned.save(update_fields=("failed_reason",))
+
+        response = self.fetchJSON(url, "id=%d" % owned.pk)
+        row = response.json()["results"][0]
+        self.assertEqual("failed", row["status"])
+        self.assertNotIn("failed_reason", row)
+        self.assertEqual(
+            {
+                "id",
+                "broadcast",
+                "contact",
+                "urn",
+                "channel",
+                "direction",
+                "type",
+                "status",
+                "archived",
+                "visibility",
+                "text",
+                "labels",
+                "attachments",
+                "created_on",
+                "sent_on",
+                "modified_on",
+                "media",
+            },
+            set(row.keys()),
+        )
+
     def test_messages_error_logs(self):
         self.login(self.admin)
         url = reverse("api.v2.messages")

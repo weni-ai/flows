@@ -138,6 +138,9 @@
             -if event.msg.text
               .text(style="{% if msg.attachments %}margin-bottom:10px{% endif %}")
                 {{ event.msg.text }}
+            -if event.failed_reason_display
+              .text
+                {{ event.failed_reason_display }}
             -for attachment in event.msg.attachments
               {% attachment_button attachment %}
 
@@ -147,6 +150,9 @@
             -if event.msg.text
               .text(style="{% if msg.attachments %}margin-bottom:10px{% endif %}")
                 {{ event.msg.text }}
+            -if event.failed_reason_display
+              .text
+                {{ event.failed_reason_display }}
             -for attachment in event.msg.attachments
               {% attachment_button attachment %}
 
