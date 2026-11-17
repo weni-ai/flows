@@ -169,20 +169,25 @@ class EmailTypeTest(TembaTest):
         self.assertEqual(2, Channel.objects.filter(channel_type="EM").count())
 
     @microsoft_app
-    def test_outlook_personal_account_opaque_token_trusts_typed_address(self):
+    def test_outlook_personal_account_reads_mailbox_from_id_token(self):
         self.login(self.admin)
         query = self._start("user@outlook.com")
-        opaque = "M.C550_BAY.2.U.MsaArtifacts.DtEBX0t8j6bo"
+        opaque_graph = "EwBwA8l6BAAUO9chh8cJscQLmU+LSWpbnr0vmwX"  # personal Graph tokens are opaque
+        opaque_outlook = "M.C550_BAY.2.U.MsaArtifacts.DtEBX0t8j6bo"
+        id_token = _access_token("user@outlook.com", claim="preferred_username", audience="app-id")
         response, posted = self._finish(
-            query, opaque, refresh="refresh-personal", graph_mailbox="user@outlook.com"
+            query,
+            opaque_outlook,
+            refresh="refresh-outlook",
+            payload={"access_token": opaque_graph, "refresh_token": "refresh-graph", "id_token": id_token},
         )
         channel = Channel.objects.get(channel_type="EM", address="user@outlook.com")
         self.assertRedirect(response, reverse("channels.channel_read", args=[channel.uuid]))
         self.assertEqual(2, posted.call_count)
-        self.assertEqual(opaque, channel.config["access_token"])
-        self.assertEqual("refresh-personal", channel.config["refresh_token"])
-        self.assertEqual(response.graph_token, channel.config["graph_send_access_token"])
-        self.assertEqual("refresh-personal", channel.config["graph_send_refresh_token"])
+        self.assertEqual(opaque_outlook, channel.config["access_token"])
+        self.assertEqual("refresh-outlook", channel.config["refresh_token"])
+        self.assertEqual(opaque_graph, channel.config["graph_send_access_token"])
+        self.assertEqual("refresh-outlook", channel.config["graph_send_refresh_token"])
         self.assertEqual(outlook.OAUTH_PROVIDER_MICROSOFT, channel.config["oauth_provider"])
         self.assertEqual(outlook.OAUTH_STATUS_ACTIVE, channel.config["oauth_status"])
         self.assertEqual(outlook.SMTP_HOST_PERSONAL, channel.config["smtp_host"])
@@ -642,7 +647,7 @@ class EmailTypeTest(TembaTest):
         self.assertEqual(query["code_challenge_method"][0], "S256")
         self.assertEqual(query["client_id"][0], "app-id")
         self.assertEqual(
-            "offline_access https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/User.Read https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send",
+            "offline_access openid email profile https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/User.Read https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send",
             query["scope"][0],
         )
         self.assertNotIn("client_secret", query)

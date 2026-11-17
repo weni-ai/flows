@@ -30,8 +30,13 @@ SMTP_HOST = "smtp.office365.com"
 SMTP_HOST_PERSONAL = "smtp-mail.outlook.com"
 SMTP_PORT = 587
 
+# openid, email and profile make Microsoft return an id_token. Personal accounts get
+# opaque Graph and IMAP tokens, so the id_token is where the mailbox is read from.
 GRAPH_SCOPES = (
     "offline_access",
+    "openid",
+    "email",
+    "profile",
     "https://graph.microsoft.com/Mail.Send",
     "https://graph.microsoft.com/Mail.ReadWrite",
     "https://graph.microsoft.com/User.Read",
@@ -42,10 +47,7 @@ OUTLOOK_SCOPES = (
     "https://outlook.office.com/SMTP.Send",
 )
 CONSENT_SCOPES = (
-    "offline_access",
-    "https://graph.microsoft.com/Mail.Send",
-    "https://graph.microsoft.com/Mail.ReadWrite",
-    "https://graph.microsoft.com/User.Read",
+    *GRAPH_SCOPES,
     "https://outlook.office.com/IMAP.AccessAsUser.All",
     "https://outlook.office.com/SMTP.Send",
 )
@@ -234,7 +236,7 @@ def _complete(org, user, code, state, redirect_uri):
         raise ConsentError("state")
 
     graph = _exchange_code(code, attempt["code_verifier"], redirect_uri)
-    mailbox = _mailbox_from_graph_token(graph["access_token"])
+    mailbox = _mailbox_from_graph(graph)
     if mailbox != attempt["username"]:
         raise ConsentError("mailbox_mismatch")
 
@@ -309,11 +311,16 @@ def _smtp_host(access_token):
     return SMTP_HOST_PERSONAL
 
 
-def _mailbox_from_graph_token(access_token):
-    if not _is_jwt(access_token):
-        raise ConsentError("invalid_token", report=True, logged_code="graph_token")
-    claims = _verified_claims(access_token, [GRAPH_AUDIENCE, GRAPH_APP_ID])
-    mailbox = _mailbox_claim(claims)
+def _mailbox_from_graph(graph):
+    # Work accounts: the Graph access token is a JWT that carries the mailbox.
+    # Personal accounts: the Graph token is opaque, so the mailbox comes from the id_token.
+    mailbox = None
+    if _is_jwt(graph["access_token"]):
+        claims = _verified_claims(graph["access_token"], [GRAPH_AUDIENCE, GRAPH_APP_ID])
+        mailbox = _mailbox_claim(claims)
+    if not mailbox and _is_jwt(graph.get("id_token")):
+        claims = _verified_claims(graph["id_token"], settings.APP_MICROSOFT_CLIENT_ID)
+        mailbox = _mailbox_claim(claims)
     if not mailbox:
         raise ConsentError("invalid_token", report=True, logged_code="token_mailbox")
     return mailbox
