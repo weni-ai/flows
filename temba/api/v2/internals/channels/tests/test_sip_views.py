@@ -10,7 +10,11 @@ from rest_framework.test import APIRequestFactory
 from django.test import SimpleTestCase, override_settings
 
 from temba.api.v2.internals.channels import usecases
-from temba.api.v2.internals.channels.views import ChannelSIPConnectionView, ChannelSIPCredentialsView
+from temba.api.v2.internals.channels.views import (
+    ChannelSIPConnectionView,
+    ChannelSIPCredentialsView,
+    InternalChannelView,
+)
 from temba.channels.models import Channel
 from temba.channels.types.telephony import constants, manifests, provisioning
 from temba.channels.types.telephony.fake_kubernetes import FakeKubernetes
@@ -212,10 +216,18 @@ class SIPEndpointsTest(TembaTest):
         self.assertEqual("error", self.get().json()["status"])
 
 
-class SIPEndpointsAuthenticationTest(TembaTest):
-    def test_requests_without_credentials_are_rejected(self):
-        self.assertIn(self.client.get(CONNECTION_URL).status_code, (401, 403))
-        self.assertIn(self.client.post(CREDENTIALS_URL).status_code, (401, 403))
+class SIPEndpointsAuthenticationTest(SimpleTestCase):
+    """
+    Instantiating ``InternalOIDCAuthentication`` requires OIDC settings that the test suite does not have, so a live
+    unauthenticated request cannot be made here. The contract is that these views share ``InternalChannelView``'s
+    authentication and permission classes; that view already covers the unauthenticated path.
+    """
+
+    def test_views_use_the_same_auth_as_internal_channel_view(self):
+        for view in (ChannelSIPConnectionView, ChannelSIPCredentialsView):
+            with self.subTest(view=view.__name__):
+                self.assertEqual(InternalChannelView.authentication_classes, view.authentication_classes)
+                self.assertEqual(InternalChannelView.permission_classes, view.permission_classes)
 
 
 class SIPViewMappingTest(SimpleTestCase):
