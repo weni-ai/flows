@@ -47,6 +47,7 @@ from temba.api.v2.views_base import (
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
+from temba.channels.usecases.message_error_logs import load_error_logs_by_message_id
 from temba.classifiers.models import Classifier
 from temba.contacts.models import URN, Contact, ContactField, ContactGroup, ContactGroupCount, ContactURN
 from temba.externals.models import ExternalService
@@ -3926,6 +3927,8 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
      * **direction** - the direction of the message (one of "incoming" or "outgoing").
      * **type** - the type of the message (one of "inbox", "flow", "ivr").
      * **status** - the status of the message (one of "initializing", "queued", "wired", "sent", "delivered", "handled", "errored", "failed", "resent").
+     * **failed_reason** - why the platform stopped the message before or outside the provider exchange (`suspended`, `looping`, `error_limit`, `too_old`, `no_destination`), or `null`. This value does not expire.
+     * **error_logs** - present only when `error_logs=true`. A list of channel logs for this message, newest first, when the message has at least one error log or its status is `failed` or `errored`. Otherwise `[]`. Logs are only available within the channel log retention window. Each item has `created_on`, `description`, `is_error`, `method`, `url`, `request`, `response`, `response_status`, and `elapsed_ms`. `Authorization` header values are replaced with `********`.
      * **visibility** - the visibility of the message (one of "visible", "archived" or "deleted")
      * **text** - the text of the message received (string). Note this is the logical view and the message may have been received as multiple physical messages.
      * **attachments** - the attachments on the message (array of objects).
@@ -3936,6 +3939,8 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
 
     You can also filter by `folder` where folder is one of `inbox`, `flows`, `archived`, `outbox`, `incoming`, `failed` or `sent`.
     Note that you cannot filter by more than one of `contact`, `folder`, `label` or `broadcast` at the same time.
+
+    Pass `error_logs=true` to include channel logs for messages that failed, errored, or have an error log. The default is off, and any value other than a recognized true (`true`, `1`, `yes`, `y`) leaves it off. With the parameter on, prefer a smaller page via `limit` because each log includes the raw request and response. Without the parameter the response is unchanged apart from `failed_reason`, and no channel logs are read.
 
     Without any parameters this endpoint will return all incoming and outgoing messages ordered by creation date.
 
@@ -3968,7 +3973,8 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
                 "labels": [{"name": "Important", "uuid": "5a4eb79e-1b1f-4ae3-8700-09384cca385f"}],
                 "created_on": "2016-01-06T15:33:00.813162Z",
                 "sent_on": "2016-01-06T15:35:03.675716Z",
-                "modified_on": "2016-01-06T15:35:03.675716Z"
+                "modified_on": "2016-01-06T15:35:03.675716Z",
+                "failed_reason": null
             },
             ...
         }
@@ -4075,6 +4081,20 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
         else:
             return self.filter_before_after(queryset, "created_on")
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        include_error_logs = str_to_bool(self.request.query_params.get("error_logs", "false"))
+        context["include_error_logs"] = include_error_logs
+        if include_error_logs:
+            context["error_logs_by_message_id"] = getattr(self, "_error_logs_by_message_id", {})
+        return context
+
+    def prepare_for_serialization(self, page, using: str):
+        if not str_to_bool(self.request.query_params.get("error_logs", "false")):
+            return
+
+        self._error_logs_by_message_id = load_error_logs_by_message_id(page, self.request.user, self.get_org(), using)
+
     @classmethod
     def get_read_explorer(cls):
         return {
@@ -4101,6 +4121,14 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
                     "help": "A folder name to filter by, one of: inbox, flows, archived, outbox, sent, incoming",
                 },
                 {"name": "label", "required": False, "help": "A label name or UUID to filter by, ex: Spam"},
+                {
+                    "name": "error_logs",
+                    "required": False,
+                    "help": (
+                        "Set to true to include channel logs for messages that failed, errored, or have an error "
+                        "log. Logs are only available within the channel log retention window. Prefer a smaller limit."
+                    ),
+                },
                 {
                     "name": "before",
                     "required": False,
