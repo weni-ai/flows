@@ -16,3 +16,10 @@ class ChannelMarketingTagsSerializer(serializers.Serializer):
 class ChannelWabaMigrationSerializer(serializers.Serializer):
     old_waba_id = serializers.CharField(required=True, max_length=64)
     new_waba_id = serializers.CharField(required=True, max_length=64)
+
+
+class ChannelSIPSerializer(serializers.Serializer):
+    """Both identifiers must be UUIDs, so nothing else ever reaches a query or a cluster object name."""
+
+    channel_uuid = serializers.UUIDField(required=True)
+    project_uuid = serializers.UUIDField(required=True)

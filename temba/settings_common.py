@@ -1150,6 +1150,8 @@ CELERY_BEAT_SCHEDULE = {
     "interrupt-flow-sessions": {"task": "interrupt_flow_sessions", "schedule": crontab(hour=22, minute=15)},
     "fail-old-messages": {"task": "fail_old_messages", "schedule": crontab(hour=0, minute=0)},
     "resolve-twitter-ids-task": {"task": "resolve_twitter_ids_task", "schedule": timedelta(seconds=900)},
+    # keep in step with RECONCILE_INTERVAL_SECS in temba/channels/types/telephony/constants.py
+    "reconcile-tph-sip": {"task": "reconcile_tph_sip_task", "schedule": timedelta(seconds=900)},
     "refresh-jiochat-access-tokens": {"task": "refresh_jiochat_access_tokens", "schedule": timedelta(seconds=3600)},
     "refresh-wechat-access-tokens": {"task": "refresh_wechat_access_tokens", "schedule": timedelta(seconds=3600)},
     "refresh-whatsapp-tokens": {"task": "refresh_whatsapp_tokens", "schedule": crontab(hour=6, minute=0)},
@@ -1589,6 +1591,36 @@ WENI_WEBCHAT_ALLOWED_DOMAINS = [
 ]
 
 SOCKET_BASE_URL = os.environ.get("SOCKET_BASE_URL", default="")
+
+# -----------------------------------------------------------------------------------
+# TPH (PSTN telephony) SIP credential provisioning in KubeVoIP
+# -----------------------------------------------------------------------------------
+
+
+def _csv_env(name, default=""):
+    return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
+
+
+# Off by default: the cluster permissions and policies it depends on are delivered separately.
+TPH_SIP_PROVISIONING_ENABLED = os.environ.get("TPH_SIP_PROVISIONING_ENABLED", "false").lower() in ("true", "1", "yes")
+TPH_SIP_K8S_NAMESPACE = os.environ.get("TPH_SIP_K8S_NAMESPACE", "kubevoip")
+TPH_SIP_GATEWAY_NAME = os.environ.get("TPH_SIP_GATEWAY_NAME", "voice-mode")
+TPH_SIP_ASTERISK_POOL = os.environ.get("TPH_SIP_ASTERISK_POOL", "voice-mode")
+# extension of the Asterisk pool that opens the voice session for an inbound call
+TPH_SIP_ASTERISK_EXTENSION = os.environ.get("TPH_SIP_ASTERISK_EXTENSION", "100")
+TPH_SIP_CREDENTIALS_SECRET = os.environ.get("TPH_SIP_CREDENTIALS_SECRET", "voice-mode-tph-credentials")
+TPH_SIP_EXTENSION_PREFIX = os.environ.get("TPH_SIP_EXTENSION_PREFIX", "9")
+TPH_SIP_K8S_TIMEOUT_SECS = float(os.environ.get("TPH_SIP_K8S_TIMEOUT_SECS", "5"))
+TPH_SIP_ISSUE_MAX_PER_WINDOW = int(os.environ.get("TPH_SIP_ISSUE_MAX_PER_WINDOW", "5"))
+
+# connection data returned to the customer PBX (entries of TPH_SIP_TRANSPORTS are "protocol:port")
+TPH_SIP_DOMAIN = os.environ.get("TPH_SIP_DOMAIN", "")
+TPH_SIP_TRANSPORTS = _csv_env("TPH_SIP_TRANSPORTS", "tls:5061,udp:5060,tcp:5060")
+TPH_SIP_SIGNALING_IPS = _csv_env("TPH_SIP_SIGNALING_IPS")
+TPH_SIP_MEDIA_IPS = _csv_env("TPH_SIP_MEDIA_IPS")
+TPH_SIP_RTP_PORT_RANGE = os.environ.get("TPH_SIP_RTP_PORT_RANGE", "10000-10035")
+TPH_SIP_CODECS = _csv_env("TPH_SIP_CODECS", "PCMA,PCMU")
+TPH_SIP_DTMF_MODE = os.environ.get("TPH_SIP_DTMF_MODE", "rfc4733")
 
 # -----------------------------------------------------------------------------------
 # Event Driven Architecture configurations

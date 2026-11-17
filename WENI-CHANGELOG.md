@@ -1,3 +1,7 @@
+3.114.0
+----------
+* feat(security): provision SIP credentials in KubeVoIP for TPH channels. Creating a TPH channel creates its own scope, dial policy, route and SIP user through the Kubernetes API, and releasing it revokes them. Two internals endpoints return the connection data and issue a one-time password. Behind TPH_SIP_PROVISIONING_ENABLED (off by default). Needs the flows Role in the kubevoip namespace before enabling.
+
 3.112.1
 ----------
 * fix: update weni-rp-apps back to 2.13.2

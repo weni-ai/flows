@@ -3,14 +3,17 @@ from smartmin.views import SmartFormView
 
 from django import forms
 from django.conf import settings
+from django.db import transaction
 from django.utils.translation import ugettext_lazy as _
 
 from temba.contacts.models import URN
 
 from ...models import Channel
 from ...views import ALL_COUNTRIES, ClaimViewMixin
+from .provisioning import SIPProvisioningError
 
 INVALID_PHONE_NUMBER = _("Invalid phone number")
+SIP_SETUP_FAILED = _("We could not set up the SIP connection for this number. Please try again in a few minutes.")
 CHANNEL_NAME_MAX_LENGTH = 64
 VOICE_MODE_ENABLED = True
 
@@ -67,14 +70,20 @@ class ClaimView(ClaimViewMixin, SmartFormView):
         org = self.request.user.get_org()
         data = form.cleaned_data
 
-        self.object = Channel.create(
-            org,
-            self.request.user,
-            data["country"],
-            self.channel_type,
-            config={"voice_mode": build_default_voice_mode_config()},
-            name=data["name"],
-            address=data["phone_number"],
-        )
+        try:
+            # a savepoint, so a channel released because provisioning failed does not stay behind as an inactive row
+            with transaction.atomic():
+                self.object = Channel.create(
+                    org,
+                    self.request.user,
+                    data["country"],
+                    self.channel_type,
+                    config={"voice_mode": build_default_voice_mode_config()},
+                    name=data["name"],
+                    address=data["phone_number"],
+                )
+        except SIPProvisioningError:
+            form.add_error("phone_number", SIP_SETUP_FAILED)
+            return self.form_invalid(form)
 
         return super().form_valid(form)
