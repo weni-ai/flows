@@ -1,3 +1,21 @@
+3.113.0
+----------
+* feat: accept media files inline (multipart) on WhatsApp broadcasts, public and internal endpoints
+
+3.112.1
+----------
+* fix: update weni-rp-apps back to 2.13.2
+
+3.112.0
+----------
+* feat: Add channel migration consumer for integrations.channel.migrated events
+
+3.111.0
+----------
+* fix: mpeg audio support on studio
+* feat: implement api gateway on v2 .json endpoints, and updating weni-commons
+to version 1.8.0
+
 3.110.0
 ----------
 * feat: (security) `update_contacts_fields` accepts internal OIDC callers with `can_communicate_internally`, alongside JWT and Lambda, and auto-creates the `back_in_stock_sku` contact field.

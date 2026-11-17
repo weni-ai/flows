@@ -23,7 +23,7 @@ class ChannelWithoutOrgError(ChannelMigrationError):
 class ChannelOrgMismatchError(ChannelMigrationError):
     def __init__(self, channel_uuid, expected_project_uuid, actual_project_uuid):
         super().__init__(
-            f"Channel {channel_uuid} belongs to project {actual_project_uuid}, " f"expected {expected_project_uuid}"
+            f"Channel {channel_uuid} belongs to project {actual_project_uuid}, expected {expected_project_uuid}"
         )
         self.channel_uuid = channel_uuid
         self.expected_project_uuid = expected_project_uuid

@@ -1,4 +1,3 @@
-from typing import Optional, Union
 from uuid import UUID
 
 from django.db import transaction
@@ -24,9 +23,9 @@ class MigrateChannelUseCase:
 
     def execute(
         self,
-        channel_uuid: Union[UUID, str],
-        project_to: Union[UUID, str],
-        project_from: Optional[Union[UUID, str]] = None,
+        channel_uuid: UUID | str,
+        project_to: UUID | str,
+        project_from: UUID | str | None = None,
     ) -> Channel:
         channel_uuid_str = str(channel_uuid)
         project_to_str = str(project_to)
