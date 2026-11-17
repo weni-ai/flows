@@ -21,7 +21,7 @@ from django.http import Http404
 from django.test import RequestFactory
 from django.test.utils import override_settings
 from django.urls import reverse
-from django.utils import timezone, translation
+from django.utils import timezone
 
 from temba.airtime.models import AirtimeTransfer
 from temba.campaigns.models import Campaign, CampaignEvent, EventFire
@@ -2613,9 +2613,11 @@ class ContactTest(TembaTest):
         self.assertContains(response, "Owned thread text")
         self.assertContains(response, "Another service has the conversation")
 
-        with translation.override("pt-br"):
-            response = self.client.get(url)
-            self.assertContains(response, "Outro atendimento está com a conversa")
+        user_settings = self.admin.get_settings()
+        user_settings.language = "pt-br"
+        user_settings.save(update_fields=("language",))
+        response = self.client.get(url)
+        self.assertContains(response, "Outro atendimento está com a conversa")
 
         other = self.create_contact("Older Reasons", phone="+250788000099")
         for reason in ("S", "L", "E", "O", "D"):
