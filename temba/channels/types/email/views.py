@@ -147,6 +147,4 @@ class OutlookCallback(_OutlookView):
             self._tell(request, exc)
             return HttpResponseRedirect(claim_url)
 
-        if isinstance(channel, outlook.ConsentNext):
-            return HttpResponseRedirect(channel.url)
         return HttpResponseRedirect(reverse("channels.channel_read", args=[channel.uuid]))
