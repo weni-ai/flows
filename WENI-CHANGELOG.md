@@ -2,6 +2,7 @@
 ----------
 * feat: accept media files inline (multipart) on WhatsApp broadcasts, public and internal endpoints
 * feat: show when another service has the WhatsApp conversation, and keep Resend from retrying those messages
+* feat: delete WhatsApp handover context every 15 minutes once it is consumed or 24 hours after its last write
 
 3.112.1
 ----------
