@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase, override_settings
 
@@ -144,3 +145,35 @@ class ReconcileTest(SimpleTestCase):
         later = datetime.now(timezone.utc).replace(year=datetime.now().year + 1)
 
         self.assertEqual(1, self.run_reconcile([], now=later)["deleted"])
+
+    def test_objects_without_a_timestamp_are_old_enough_to_delete(self):
+        self.provision(OTHER_UUID, 99)
+        for bodies in self.fake.resources.values():
+            for body in bodies.values():
+                body["metadata"].pop("creationTimestamp", None)
+
+        self.assertEqual(1, self.run_reconcile([])["deleted"])
+
+    def test_a_recreate_failure_is_counted_and_does_not_stop_the_run(self):
+        channel = make_channel()
+        self.fake.fail("create", KubernetesTransientError("down"), times=20)
+
+        summary = self.run_reconcile([channel])
+
+        self.assertEqual(1, summary["errors"])
+        self.assertEqual(0, summary["recreated"])
+        self.assertEqual([], self.fake.names(constants.KIND_SIP_USER))
+
+    def test_celery_task_runs_reconciliation(self):
+        from temba.channels.tasks import reconcile_tph_sip_task
+
+        redis = MagicMock()
+        redis.get.return_value = None
+        redis.lock.return_value.__enter__.return_value = True
+        redis.lock.return_value.__exit__.return_value = False
+
+        with patch("temba.utils.celery.get_redis_connection", return_value=redis):
+            with patch("temba.channels.types.telephony.reconciliation.run_reconciliation") as run:
+                reconcile_tph_sip_task()
+
+        run.assert_called_once_with()

@@ -9,7 +9,13 @@ from django.test import SimpleTestCase, override_settings
 from . import constants, manifests, provisioning
 from .connection import build_connection_data, parse_transports
 from .fake_kubernetes import FakeKubernetes
-from .kubernetes_client import KubernetesForbidden, KubernetesTransientError
+from .kubernetes_client import (
+    KubernetesClient,
+    KubernetesConfigurationError,
+    KubernetesForbidden,
+    KubernetesNotFound,
+    KubernetesTransientError,
+)
 from .provisioning import SIPProvisioner, SIPProvisioningError, SIPRateLimitError
 
 SECRET_NAME = "voice-mode-tph-credentials"
@@ -305,6 +311,11 @@ class SIPProvisionerTest(SimpleTestCase):
         stranger["metadata"]["name"] = "voice-mode-internal"
         stranger["metadata"]["labels"] = {"team": "cloud"}
         self.fake.create_resource(constants.KIND_CALL_SCOPE, stranger)
+        # listed because it has the Flows label, then skipped because it has no channel uuid
+        unlabeled = manifests.build_call_scope(CHANNEL_UUID)
+        unlabeled["metadata"]["name"] = "tph-unlabeled"
+        unlabeled["metadata"]["labels"] = {constants.MANAGED_BY_LABEL: constants.MANAGED_BY_VALUE}
+        self.fake.create_resource(constants.KIND_CALL_SCOPE, unlabeled)
 
         found = self.provisioner.list_managed()
 
@@ -312,6 +323,40 @@ class SIPProvisionerTest(SimpleTestCase):
         self.assertEqual(set(constants.CUSTOM_RESOURCE_KINDS), set(found[str(CHANNEL_UUID)]["kinds"]))
         self.assertEqual(self.fake.now.strftime("%Y-%m-%dT%H:%M:%SZ"), found[str(CHANNEL_UUID)]["newest"])
         self.assertNotIn("voice-mode-internal", str(found))
+        self.assertNotIn("tph-unlabeled", str(found))
+
+    def test_rollback_tolerates_objects_that_are_already_gone_or_cannot_be_deleted(self):
+        self.fake.fail("create", KubernetesForbidden("denied", status=403), kind=constants.KIND_SIP_USER)
+        self.fake.fail("delete", KubernetesNotFound("gone", status=404), times=2)
+        self.fake.fail("delete", KubernetesTransientError("down"), times=2)
+
+        with self.assertRaises(SIPProvisioningError):
+            self._provision()
+
+        # the password entry is rolled back even when some deletes fail
+        self.assertNotIn(NAME, self.fake.secret_keys())
+
+    def test_has_password_entry_treats_a_missing_secret_as_no_and_surfaces_other_errors(self):
+        del self.fake.secrets[SECRET_NAME]
+        self.assertFalse(self.provisioner.has_password_entry(NAME))
+
+        self.fake.secrets[SECRET_NAME] = {}
+        self.fake.fail("get_secret", KubernetesTransientError("down"))
+        with self.assertRaises(SIPProvisioningError) as ctx:
+            self.provisioner.has_password_entry(NAME)
+        self.assertEqual(provisioning.ERROR_UNAVAILABLE, ctx.exception.code)
+
+    def test_build_client_uses_the_configured_namespace(self):
+        client = provisioning.build_client()
+        self.assertIsInstance(client, KubernetesClient)
+        self.assertEqual("kubevoip", client.namespace)
+
+    def test_configuration_errors_are_misconfigured(self):
+        self.assertEqual(provisioning.ERROR_MISCONFIGURED, provisioning._code_for(KubernetesConfigurationError("x")))
+
+    def test_patching_a_secret_that_does_not_exist_is_not_found(self):
+        with self.assertRaises(KubernetesNotFound):
+            self.fake.patch_secret_data("missing", {NAME: "x"})
 
 
 @override_settings(**SETTINGS)
@@ -423,3 +468,12 @@ class IssueRateLimitTest(SimpleTestCase):
 
         # another channel has its own counter
         provisioning.check_issue_rate(OTHER_UUID, redis=redis)
+
+    def test_a_missing_ttl_uses_the_full_window(self):
+        redis = FakeRedis()
+        redis.counters[constants.SIP_CREDENTIALS_RATE_KEY % CHANNEL_UUID] = 5
+
+        with self.assertRaises(SIPRateLimitError) as ctx:
+            provisioning.check_issue_rate(CHANNEL_UUID, redis=redis)
+
+        self.assertEqual(constants.SIP_CREDENTIALS_WINDOW_SECS, ctx.exception.retry_after)

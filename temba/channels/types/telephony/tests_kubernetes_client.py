@@ -124,6 +124,12 @@ class KubernetesClientTest(SimpleTestCase):
         self.assertEqual("application/merge-patch+json", request["headers"]["Content-Type"])
         self.assertEqual({"data": {"tph-a": "c2VjcmV0", "tph-b": None}}, json.loads(request["data"]))
 
+    def test_get_secret(self):
+        session = StubSession(StubResponse(200, {"data": {"tph-a": "c2VjcmV0"}}))
+
+        self.assertEqual({"data": {"tph-a": "c2VjcmV0"}}, self._client(session).get_secret("creds"))
+        self.assertTrue(session.requests[0]["url"].endswith("/api/v1/namespaces/kubevoip/secrets/creds"))
+
     def test_delete_with_empty_body(self):
         session = StubSession(StubResponse(200, None))
 
@@ -203,3 +209,25 @@ class KubernetesClientTest(SimpleTestCase):
             os.environ.pop("KUBERNETES_SERVICE_HOST")
             with self.assertRaises(KubernetesConfigurationError):
                 self._client(StubSession()).get_resource(constants.KIND_SIP_USER, "tph-a")
+
+    def test_ipv6_host_is_bracketed(self):
+        with patch.dict(os.environ, {"KUBERNETES_SERVICE_HOST": "2001:db8::1", "KUBERNETES_SERVICE_PORT": "443"}):
+            session = StubSession(StubResponse(200, {}))
+            self._client(session).get_resource(constants.KIND_SIP_USER, "tph-a")
+
+        self.assertTrue(session.requests[0]["url"].startswith("https://[2001:db8::1]:443/"))
+
+    def test_non_json_success_body_is_ignored(self):
+        response = StubResponse(200)
+        response.content = b"not-json"
+        session = StubSession(response)
+
+        self.assertEqual({}, self._client(session).delete_resource(constants.KIND_CALL_SCOPE, "tph-a"))
+
+    def test_error_body_that_is_not_json_has_no_reason(self):
+        session = StubSession(StubResponse(422))
+
+        with self.assertRaises(KubernetesRequestError) as ctx:
+            self._client(session).get_resource(constants.KIND_SIP_USER, "tph-a")
+
+        self.assertIsNone(ctx.exception.reason)
