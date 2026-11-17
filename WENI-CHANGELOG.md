@@ -1,3 +1,7 @@
+3.113.0
+----------
+* feat: delete WhatsApp handover context every 15 minutes once it is consumed or 24 hours after its last write
+
 3.112.1
 ----------
 * fix: update weni-rp-apps back to 2.13.2

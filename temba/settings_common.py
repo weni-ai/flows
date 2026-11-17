@@ -1176,6 +1176,10 @@ CELERY_BEAT_SCHEDULE = {
     "trim-http-logs": {"task": "trim_http_logs_task", "schedule": crontab(hour=3, minute=0)},
     "trim-sync-events": {"task": "trim_sync_events_task", "schedule": crontab(hour=3, minute=0)},
     "trim-webhook-event": {"task": "trim_webhook_event_task", "schedule": crontab(hour=3, minute=0)},
+    "trim-wa-conversation-handovers": {
+        "task": "trim_wa_conversation_handovers_task",
+        "schedule": timedelta(minutes=15),
+    },
     "update-org-activity": {"task": "update_org_activity_task", "schedule": crontab(hour=3, minute=5)},
     "update-unique-contact-counts": {"task": "update_unique_contact_counts", "schedule": crontab(hour=8, minute=0)},
     "validate-datalake-layers": {"task": "validate_datalake_layers_task", "schedule": crontab(minute=30)},
@@ -1474,6 +1478,7 @@ RETENTION_PERIODS = {
     "syncevent": timedelta(days=7),
     "webhookevent": timedelta(hours=48),
     "all_flowstart": timedelta(days=60),
+    "wa_conversation_handover": timedelta(hours=24),  # WhatsApp thread-idle window, same TTL as Courier's wac:* keys
 }
 
 # -----------------------------------------------------------------------------------
