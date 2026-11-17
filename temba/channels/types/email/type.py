@@ -36,4 +36,6 @@ class EmailType(ChannelType):
         config = dict(channel.config or {})
         config.pop("access_token", None)
         config.pop("refresh_token", None)
+        config.pop("graph_send_access_token", None)
+        config.pop("graph_send_refresh_token", None)
         channel.config = config

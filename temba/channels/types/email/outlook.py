@@ -27,10 +27,25 @@ OAUTH_STATUS_NEEDS_RECONNECT = "needs_reconnect"
 IMAP_HOST = "outlook.office365.com"
 IMAP_PORT = 993
 SMTP_HOST = "smtp.office365.com"
+SMTP_HOST_PERSONAL = "smtp-mail.outlook.com"
 SMTP_PORT = 587
 
-SCOPES = (
+GRAPH_SCOPES = (
     "offline_access",
+    "https://graph.microsoft.com/Mail.Send",
+    "https://graph.microsoft.com/Mail.ReadWrite",
+    "https://graph.microsoft.com/User.Read",
+)
+OUTLOOK_SCOPES = (
+    "offline_access",
+    "https://outlook.office.com/IMAP.AccessAsUser.All",
+    "https://outlook.office.com/SMTP.Send",
+)
+CONSENT_SCOPES = (
+    "offline_access",
+    "https://graph.microsoft.com/Mail.Send",
+    "https://graph.microsoft.com/Mail.ReadWrite",
+    "https://graph.microsoft.com/User.Read",
     "https://outlook.office.com/IMAP.AccessAsUser.All",
     "https://outlook.office.com/SMTP.Send",
 )
@@ -39,10 +54,12 @@ AUTHORIZE_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
 TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 JWKS_URL = "https://login.microsoftonline.com/common/discovery/v2.0/keys"
 OUTLOOK_AUDIENCE = "https://outlook.office.com"
+GRAPH_AUDIENCE = "https://graph.microsoft.com"
+GRAPH_APP_ID = "00000003-0000-0000-c000-000000000000"
 ADMIN_CONSENT_URL = "https://login.microsoftonline.com/common/adminconsent"
 ATTEMPT_KEY_PREFIX = "outlook-email-consent:"
 ISSUER_PREFIX = "https://login.microsoftonline.com/"
-MAILBOX_CLAIMS = ("upn", "preferred_username", "unique_name")
+MAILBOX_CLAIMS = ("preferred_username", "upn", "email", "unique_name")
 _SAFE_ERROR_CODE = re.compile(r"[A-Za-z0-9_.-]{1,80}")
 
 
@@ -164,7 +181,7 @@ def begin(org, user, username, redirect_uri):
         raise ConsentError("invalid_address", log=False)
     verifier = secrets.token_urlsafe(64)
     state = put_attempt(org.id, user.id, mailbox, verifier)
-    return _authorize_url(redirect_uri, state, code_challenge_for(verifier))
+    return _authorize_url(redirect_uri, state, code_challenge_for(verifier), CONSENT_SCOPES, "select_account")
 
 
 def rejection_from_provider(error, description):
@@ -192,16 +209,16 @@ def complete(org, user, code, state, redirect_uri, account_id=None, correlation_
         raise
 
 
-def _authorize_url(redirect_uri, state, challenge):
+def _authorize_url(redirect_uri, state, challenge, scopes, prompt):
     query = urlencode(
         {
             "client_id": settings.APP_MICROSOFT_CLIENT_ID,
             "response_type": "code",
             "redirect_uri": redirect_uri,
             "response_mode": "query",
-            "scope": " ".join(SCOPES),
+            "scope": " ".join(scopes),
             "state": state,
-            "prompt": "select_account",
+            "prompt": prompt,
             "code_challenge": challenge,
             "code_challenge_method": "S256",
         }
@@ -216,27 +233,31 @@ def _complete(org, user, code, state, redirect_uri):
     if attempt["org_id"] != org.id or attempt["user_id"] != user.id:
         raise ConsentError("state")
 
-    access_token, refresh_token = _exchange_code(code, attempt["code_verifier"], redirect_uri)
-    mailbox = _mailbox_from_access_token(access_token)
-    if mailbox is not None and mailbox != attempt["username"]:
+    graph = _exchange_code(code, attempt["code_verifier"], redirect_uri)
+    mailbox = _mailbox_from_graph_token(graph["access_token"])
+    if mailbox != attempt["username"]:
         raise ConsentError("mailbox_mismatch")
-    return _save_channel(org, user, attempt["username"], access_token, refresh_token)
+
+    outlook = _exchange_refresh(graph["refresh_token"])
+    outlook_access = outlook["access_token"]
+    if _is_jwt(outlook_access):
+        _verified_claims(outlook_access, OUTLOOK_AUDIENCE)
+    refresh_token = outlook.get("refresh_token") or graph["refresh_token"]
+    return _save_channel(
+        org,
+        user,
+        attempt["username"],
+        outlook_access,
+        refresh_token,
+        _smtp_host(outlook_access),
+        graph["access_token"],
+        refresh_token,
+    )
 
 
-def _exchange_code(code, verifier, redirect_uri):
+def _token_request(data, require_refresh=False):
     try:
-        response = requests.post(
-            TOKEN_URL,
-            data={
-                "client_id": settings.APP_MICROSOFT_CLIENT_ID,
-                "client_secret": settings.APP_MICROSOFT_CLIENT_SECRET,
-                "code": code,
-                "redirect_uri": redirect_uri,
-                "grant_type": "authorization_code",
-                "code_verifier": verifier,
-            },
-            timeout=MICROSOFT_HTTP_TIMEOUT_SECONDS,
-        )
+        response = requests.post(TOKEN_URL, data=data, timeout=MICROSOFT_HTTP_TIMEOUT_SECONDS)
     except requests.RequestException:
         raise ConsentError("token", report=True)
 
@@ -246,26 +267,66 @@ def _exchange_code(code, verifier, redirect_uri):
         raise ConsentError("token", report=True)
 
     access_token = payload.get("access_token")
-    refresh_token = payload.get("refresh_token")
-    if response.status_code != 200 or not access_token or not refresh_token:
+    if response.status_code != 200 or not access_token or (require_refresh and not payload.get("refresh_token")):
         raise ConsentError("token", report=True, logged_code=safe_error_code(payload.get("error") or "token"))
-    return access_token, refresh_token
+    return payload
 
 
-def _mailbox_from_access_token(access_token):
-    # Personal Microsoft accounts receive an opaque (non-JWT) access token for
-    # the Outlook resource, so the mailbox cannot be read from it. The caller
-    # then trusts the address the admin confirmed before the redirect.
-    if not isinstance(access_token, str) or access_token.count(".") != 2:
-        return None
+def _exchange_code(code, verifier, redirect_uri):
+    return _token_request(
+        {
+            "client_id": settings.APP_MICROSOFT_CLIENT_ID,
+            "client_secret": settings.APP_MICROSOFT_CLIENT_SECRET,
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+            "code_verifier": verifier,
+            "scope": " ".join(GRAPH_SCOPES),
+        },
+        require_refresh=True,
+    )
 
+
+def _exchange_refresh(refresh_token):
+    return _token_request(
+        {
+            "client_id": settings.APP_MICROSOFT_CLIENT_ID,
+            "client_secret": settings.APP_MICROSOFT_CLIENT_SECRET,
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "scope": " ".join(OUTLOOK_SCOPES),
+        }
+    )
+
+
+def _is_jwt(access_token):
+    return isinstance(access_token, str) and access_token.count(".") == 2
+
+
+def _smtp_host(access_token):
+    if _is_jwt(access_token):
+        return SMTP_HOST
+    return SMTP_HOST_PERSONAL
+
+
+def _mailbox_from_graph_token(access_token):
+    if not _is_jwt(access_token):
+        raise ConsentError("invalid_token", report=True, logged_code="graph_token")
+    claims = _verified_claims(access_token, [GRAPH_AUDIENCE, GRAPH_APP_ID])
+    mailbox = _mailbox_claim(claims)
+    if not mailbox:
+        raise ConsentError("invalid_token", report=True, logged_code="token_mailbox")
+    return mailbox
+
+
+def _verified_claims(token, audience):
     try:
-        signing_key = jwt.PyJWKClient(JWKS_URL).get_signing_key_from_jwt(access_token)
+        signing_key = jwt.PyJWKClient(JWKS_URL).get_signing_key_from_jwt(token)
         claims = jwt.decode(
-            access_token,
+            token,
             signing_key.key,
             algorithms=["RS256"],
-            audience=OUTLOOK_AUDIENCE,
+            audience=audience,
             options={"verify_iss": False},
         )
     except jwt.InvalidAudienceError:
@@ -276,11 +337,7 @@ def _mailbox_from_access_token(access_token):
     issuer = claims.get("iss") or ""
     if not (issuer.startswith(ISSUER_PREFIX) and issuer.endswith("/v2.0")):
         raise ConsentError("invalid_token", report=True, logged_code="token_issuer")
-
-    mailbox = _mailbox_claim(claims)
-    if not mailbox:
-        raise ConsentError("invalid_token", report=True, logged_code="token_mailbox")
-    return mailbox
+    return claims
 
 
 def _mailbox_claim(claims):
@@ -291,7 +348,7 @@ def _mailbox_claim(claims):
     return None
 
 
-def _save_channel(org, user, username, access_token, refresh_token):
+def _save_channel(org, user, username, access_token, refresh_token, smtp_host, graph_access_token, graph_refresh_token):
     with transaction.atomic():
         _lock_mailbox(org.id, username)
         existing = (
@@ -307,6 +364,9 @@ def _save_channel(org, user, username, access_token, refresh_token):
             ):
                 config["access_token"] = access_token
                 config["refresh_token"] = refresh_token
+                config["graph_send_access_token"] = graph_access_token
+                config["graph_send_refresh_token"] = graph_refresh_token
+                config["smtp_host"] = smtp_host
                 config["oauth_status"] = OAUTH_STATUS_ACTIVE
                 config["password"] = ""
                 existing.config = config
@@ -323,20 +383,24 @@ def _save_channel(org, user, username, access_token, refresh_token):
             "EM",
             name=username,
             address=username,
-            config=_channel_config(username, access_token, refresh_token),
+            config=_channel_config(
+                username, access_token, refresh_token, smtp_host, graph_access_token, graph_refresh_token
+            ),
         )
 
 
-def _channel_config(username, access_token, refresh_token):
+def _channel_config(username, access_token, refresh_token, smtp_host, graph_access_token, graph_refresh_token):
     return {
         "username": username,
         "password": "",
-        "smtp_host": SMTP_HOST,
+        "smtp_host": smtp_host,
         "smtp_port": SMTP_PORT,
         "imap_host": IMAP_HOST,
         "imap_port": IMAP_PORT,
         "access_token": access_token,
         "refresh_token": refresh_token,
+        "graph_send_access_token": graph_access_token,
+        "graph_send_refresh_token": graph_refresh_token,
         "oauth_provider": OAUTH_PROVIDER_MICROSOFT,
         "oauth_status": OAUTH_STATUS_ACTIVE,
         "callback_domain": settings.HOSTNAME,
