@@ -1,5 +1,3 @@
-from enum import StrEnum
-
 from sentry_sdk import capture_exception
 from weni.eda.django.consumers import EDAConsumer
 from weni.eda.messages import Message
@@ -9,18 +7,7 @@ from temba.projects.usecases.project_status_update import update_project_status
 from temba.projects.usecases.project_type_update import update_project_type
 from temba.projects.usecases.project_update import update_project_config
 
-
-class EventAction(StrEnum):
-    DELETED = "deleted"
-    UPDATED = "updated"
-    STATUS_UPDATED = "status_updated"
-    PROJECT_TYPE_UPDATED = "project_type_update"
-
-
-class ProjectStatus(StrEnum):
-    ACTIVE = "ACTIVE"
-    IN_TEST = "IN_TEST"
-    INACTIVE = "INACTIVE"
+from .project_events import EventAction, ProjectStatus
 
 
 class ProjectEventConsumer(EDAConsumer):
