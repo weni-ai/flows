@@ -156,6 +156,24 @@ class TestUpdateProjectType(TembaTest):
         self.assertEqual(reloaded_org.modified_by, new_user)
         self.assertTrue(reloaded_org.config["is_multi_agents"])
 
+    def test_logs_have_no_email_nor_org_name(self):
+        with self.assertLogs("temba.projects", level="INFO") as logs:
+            update_project_type(self.project_uuid, True, self.user.email)
+            update_project_type(self.project_uuid, True, self.user.email)
+
+        output = "\n".join(logs.output)
+        self.assertNotIn(self.user.email, output)
+        self.assertNotIn(self.test_org.name, output)
+        self.assertEqual(
+            logs.output,
+            [
+                "INFO:temba.projects.usecases.project_type_update:project_type_updated "
+                f"project_uuid={self.project_uuid} org_id={self.test_org.id} is_multi_agents=True",
+                "INFO:temba.projects.usecases.project_type_update:project_type_unchanged "
+                f"project_uuid={self.project_uuid} org_id={self.test_org.id} is_multi_agents=True",
+            ],
+        )
+
     def test_nonexistent_project_returns_none(self):
         """Test that updating a non-existent project returns None"""
         fake_uuid = str(uuid.uuid4())

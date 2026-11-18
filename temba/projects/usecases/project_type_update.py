@@ -41,7 +41,10 @@ def update_project_type(project_uuid: str, is_multi_agents: bool, user_email: st
 
     if org.config.get("is_multi_agents") == is_multi_agents:
         logger.info(
-            f"Project '{org.name}' ({project_uuid}) already has is_multi_agents={is_multi_agents}, no update needed"
+            "project_type_unchanged project_uuid=%s org_id=%s is_multi_agents=%s",
+            project_uuid,
+            org.id,
+            is_multi_agents,
         )
         return org
 
@@ -53,6 +56,8 @@ def update_project_type(project_uuid: str, is_multi_agents: bool, user_email: st
 
     org.save(update_fields=["config", "modified_by", "modified_on"])
 
-    logger.info(f"Project '{org.name}' ({project_uuid}) is_multi_agents set to {is_multi_agents} by {user_email}")
+    logger.info(
+        "project_type_updated project_uuid=%s org_id=%s is_multi_agents=%s", project_uuid, org.id, is_multi_agents
+    )
 
     return org

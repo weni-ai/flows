@@ -1,9 +1,31 @@
 from unittest.mock import Mock
 
-from django.test import TestCase
+from django.conf import settings
+from django.test import TestCase, override_settings
 
+from temba.projects.checks import project_events_legacy_actions
+from temba.projects.consumers.project_events import EventAction
 from temba.projects.usecases.exceptions import InvalidTemplateTypeData
 from temba.projects.usecases.flow_setup_handler import FlowSetupHandlerUseCase
+
+
+class ProjectEventsLegacyActionsCheckTest(TestCase):
+    def test_default_lists_every_action(self):
+        self.assertCountEqual(settings.PROJECT_EVENTS_LEGACY_ACTIONS, [action.value for action in EventAction])
+        self.assertEqual(project_events_legacy_actions(None), [])
+
+    @override_settings(PROJECT_EVENTS_LEGACY_ACTIONS=[])
+    def test_empty_list_is_valid(self):
+        self.assertEqual(project_events_legacy_actions(None), [])
+
+    @override_settings(PROJECT_EVENTS_LEGACY_ACTIONS=["deleted", "bogus"])
+    def test_unknown_action_is_an_error(self):
+        errors = project_events_legacy_actions(None)
+
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0].id, "projects.E001")
+        self.assertIn("bogus", errors[0].msg)
+        self.assertNotIn("deleted", errors[0].msg)
 
 
 class TestFlowSetupHandler(TestCase):

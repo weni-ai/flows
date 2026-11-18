@@ -65,13 +65,19 @@ def update_project_status(project_uuid: str, status: str, user_email: str) -> Op
         org.save(update_fields=["is_suspended", "modified_by", "modified_on"])
 
         logger.info(
-            f"Project '{org.name}' ({project_uuid}) status updated to {status} "
-            f"(is_suspended={new_is_suspended}) by {user_email}"
+            "project_status_updated project_uuid=%s org_id=%s status=%s is_suspended=%s",
+            project_uuid,
+            org.id,
+            status,
+            new_is_suspended,
         )
     else:
         logger.info(
-            f"Project '{org.name}' ({project_uuid}) already has status {status} "
-            f"(is_suspended={new_is_suspended}), no update needed"
+            "project_status_unchanged project_uuid=%s org_id=%s status=%s is_suspended=%s",
+            project_uuid,
+            org.id,
+            status,
+            new_is_suspended,
         )
 
     return org

@@ -379,6 +379,7 @@ LOGGING = {
         "temba.formax": {"level": "DEBUG" if DEBUG else "ERROR", "handlers": ["console"], "propagate": False},
         # Enables temba.conversion_events.* loggers under disable_existing_loggers=True (see assertLogs in tests).
         "temba.conversion_events": {"level": "INFO", "handlers": ["console"], "propagate": False},
+        "temba.projects": {"level": "INFO", "handlers": ["console"], "propagate": False},
     },
 }
 
@@ -1616,6 +1617,16 @@ SOCKET_BASE_URL = os.environ.get("SOCKET_BASE_URL", default="")
 # -----------------------------------------------------------------------------------
 
 USE_EDA = os.environ.get("USE_EDA", "false").lower() in ("true", "1", "yes")
+
+# Project actions still applied by the legacy flows.project-events consumer; the AmazonMQ consumer applies the rest.
+# Validated against EventAction by the projects.E001 system check.
+PROJECT_EVENTS_LEGACY_ACTIONS = [
+    action.strip()
+    for action in os.environ.get(
+        "PROJECT_EVENTS_LEGACY_ACTIONS", "updated,status_updated,project_type_update,deleted"
+    ).split(",")
+    if action.strip()
+]
 
 if USE_EDA:
     _eda_connection_backend = os.environ.get("EDA_CONNECTION_BACKEND")
