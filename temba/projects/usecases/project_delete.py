@@ -2,6 +2,7 @@ import logging
 from typing import Optional
 
 from django.contrib.auth import get_user_model
+from django.db import transaction
 
 from temba.orgs.models import Org
 
@@ -29,6 +30,8 @@ def delete_project(project_uuid: str, user_email: str) -> Optional[Org]:
     - Releases all channels
     - Removes all org users
 
+    An org that is already released is returned unchanged, so a repeated deletion does not move released_on.
+
     Args:
         project_uuid: UUID of the project to delete
         user_email: Email of the user performing the deletion
@@ -42,10 +45,17 @@ def delete_project(project_uuid: str, user_email: str) -> Optional[Org]:
         logger.warning(f"Project with uuid {project_uuid} not found for deletion")
         return None
 
+    if not org.is_active:
+        logger.info("project_already_released project_uuid=%s org_id=%s", project_uuid, org.id)
+        return org
+
     user, _ = get_or_create_user_by_email(user_email)
 
-    org.release(user)
+    # Org.release deactivates the org before releasing its channels, and a redelivery of an inactive org is skipped,
+    # so a failure part way through must leave the org active.
+    with transaction.atomic():
+        org.release(user)
 
-    logger.info(f"Project '{org.name}' ({project_uuid}) released by {user_email}")
+    logger.info("project_released project_uuid=%s org_id=%s", project_uuid, org.id)
 
     return org

@@ -1,4 +1,5 @@
 import uuid
+from unittest.mock import patch
 
 import pytz
 
@@ -75,24 +76,57 @@ class TestDeleteProject(TembaTest):
         self.assertIsNone(result)
 
     def test_delete_already_deleted_project(self):
-        """Test deleting a project that was already deleted"""
-        # First deletion
+        """A second deletion leaves the released org untouched and creates no user"""
         delete_project(
             project_uuid=self.project_uuid,
             user_email=self.user.email,
         )
+        released = Org.objects.get(proj_uuid=self.project_uuid)
+        users_before = User.objects.count()
+
+        with self.assertLogs("temba.projects", level="INFO") as logs:
+            deleted_org = delete_project(
+                project_uuid=self.project_uuid,
+                user_email="another@example.com",
+            )
 
         reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertEqual(deleted_org, reloaded_org)
         self.assertFalse(reloaded_org.is_active)
-
-        # Second deletion - should still work
-        deleted_org = delete_project(
-            project_uuid=self.project_uuid,
-            user_email="another@example.com",
+        self.assertEqual(reloaded_org.released_on, released.released_on)
+        self.assertEqual(reloaded_org.modified_by, self.user)
+        self.assertEqual(User.objects.count(), users_before)
+        self.assertEqual(
+            logs.output,
+            [
+                "INFO:temba.projects.usecases.project_delete:project_already_released "
+                f"project_uuid={self.project_uuid} org_id={self.test_org.id}"
+            ],
         )
 
-        self.assertIsNotNone(deleted_org)
-        self.assertFalse(deleted_org.is_active)
+    def test_failed_release_leaves_org_active(self):
+        """A channel that fails to release rolls the whole release back"""
+        channel = self.create_channel("A", "Failing", "+250785551212", org=self.test_org)
+
+        with patch("temba.channels.models.Channel.release", side_effect=RuntimeError("provider down")):
+            with self.assertRaises(RuntimeError):
+                delete_project(project_uuid=self.project_uuid, user_email=self.user.email)
+
+        reloaded_org = Org.objects.get(proj_uuid=self.project_uuid)
+        self.assertTrue(reloaded_org.is_active)
+        self.assertIsNone(reloaded_org.released_on)
+        channel.refresh_from_db()
+        self.assertTrue(channel.is_active)
+
+    def test_logs_have_no_email_nor_org_name(self):
+        with self.assertLogs("temba.projects", level="INFO") as logs:
+            delete_project(project_uuid=self.project_uuid, user_email=self.user.email)
+            delete_project(project_uuid=self.project_uuid, user_email=self.user.email)
+
+        output = "\n".join(logs.output)
+        self.assertNotIn(self.user.email, output)
+        self.assertNotIn(self.test_org.name, output)
+        self.assertIn(f"project_released project_uuid={self.project_uuid} org_id={self.test_org.id}", logs.output[0])
 
     def test_delete_project_removes_org_users(self):
         """Test that deleting a project removes org users"""
