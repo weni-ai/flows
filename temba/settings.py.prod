@@ -281,6 +281,7 @@ LOGGING = {
         "pycountry": {"level": "ERROR", "handlers": ["console"], "propagate": False},
         "pika": {"level": "CRITICAL", "handlers": ["console"], "propagate": False},
         "django.security.DisallowedHost": {"handlers": ["null"], "propagate": False},
+        "temba.projects": {"level": "INFO", "handlers": ["console"], "propagate": False},
         # OIDC
         "mozilla_django_oidc": {"level": "DEBUG", "handlers": ["console"], "propagate": False},
         "weni_django_oidc": {"level": "DEBUG", "handlers": ["console"], "propagate": False},
