@@ -1379,7 +1379,7 @@ class MsgTest(TembaTest):
             msg.refresh_from_db()
             self.assertEqual(reason, msg.failed_reason)
 
-        migration = importlib.import_module("temba.msgs.migrations.0176_alter_msg_failed_reason")
+        migration = importlib.import_module("temba.msgs.migrations.0180_alter_msg_failed_reason")
         self.assertEqual(1, len(migration.Migration.operations))
         operation = migration.Migration.operations[0]
         self.assertIsInstance(operation, migrations.AlterField)

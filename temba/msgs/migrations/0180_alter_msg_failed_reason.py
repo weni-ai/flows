@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("msgs", "0175_merge_20260910_2109"),
+        ("msgs", "0179_protocol_db_defaults"),
     ]
 
     operations = [
