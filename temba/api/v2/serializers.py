@@ -18,6 +18,7 @@ from temba.api.models import Resthook, ResthookSubscriber, WebHookEvent
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
+from temba.channels.usecases.message_error_logs import failed_reason_for_api
 from temba.classifiers.models import Classifier
 from temba.contacts.models import Contact, ContactField, ContactGroup
 from temba.contacts.validators import clean_contact_name
@@ -1790,6 +1791,7 @@ class MsgReadSerializer(ReadSerializer):
     type = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
+    failed_reason = serializers.SerializerMethodField()
     archived = serializers.SerializerMethodField()
     visibility = serializers.SerializerMethodField()
     labels = fields.LabelField(many=True)
@@ -1797,6 +1799,7 @@ class MsgReadSerializer(ReadSerializer):
     created_on = serializers.DateTimeField(default_timezone=pytz.UTC)
     modified_on = serializers.DateTimeField(default_timezone=pytz.UTC)
     sent_on = serializers.DateTimeField(default_timezone=pytz.UTC)
+    error_logs = serializers.SerializerMethodField()
 
     def get_broadcast(self, obj):
         return obj.broadcast_id
@@ -1810,6 +1813,15 @@ class MsgReadSerializer(ReadSerializer):
     def get_status(self, obj):
         return self.STATUSES.get(obj.status)
 
+    def get_failed_reason(self, obj):
+        return failed_reason_for_api(obj)
+
+    def get_error_logs(self, obj):
+        logs = self.context.get("error_logs_by_message_id")
+        if not logs:
+            return []
+        return logs.get(obj.id, [])
+
     def get_attachments(self, obj):
         return [Attachment.parse(presign_attachment(a)).as_json() for a in obj.attachments or []]
 
@@ -1822,6 +1834,12 @@ class MsgReadSerializer(ReadSerializer):
     def get_visibility(self, obj):
         return self.VISIBILITIES.get(obj.visibility)
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not self.context.get("include_error_logs"):
+            data.pop("error_logs", None)
+        return data
+
     class Meta:
         model = Msg
         fields = (
@@ -1833,6 +1851,7 @@ class MsgReadSerializer(ReadSerializer):
             "direction",
             "type",
             "status",
+            "failed_reason",
             "archived",
             "visibility",
             "text",
@@ -1842,6 +1861,7 @@ class MsgReadSerializer(ReadSerializer):
             "sent_on",
             "modified_on",
             "media",
+            "error_logs",
         )
 
 
