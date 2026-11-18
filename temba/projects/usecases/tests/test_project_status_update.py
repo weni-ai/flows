@@ -210,6 +210,24 @@ class TestUpdateProjectStatus(TembaTest):
         self.assertTrue(self.test_org.is_suspended)
         self.assertTrue(self.test_org.is_active)
 
+    def test_logs_have_no_email_nor_org_name(self):
+        with self.assertLogs("temba.projects", level="INFO") as logs:
+            update_project_status(self.project_uuid, "INACTIVE", self.user.email)
+            update_project_status(self.project_uuid, "INACTIVE", self.user.email)
+
+        output = "\n".join(logs.output)
+        self.assertNotIn(self.user.email, output)
+        self.assertNotIn(self.test_org.name, output)
+        self.assertEqual(
+            logs.output,
+            [
+                "INFO:temba.projects.usecases.project_status_update:project_status_updated "
+                f"project_uuid={self.project_uuid} org_id={self.test_org.id} status=INACTIVE is_suspended=True",
+                "INFO:temba.projects.usecases.project_status_update:project_status_unchanged "
+                f"project_uuid={self.project_uuid} org_id={self.test_org.id} status=INACTIVE is_suspended=True",
+            ],
+        )
+
     def test_update_status_does_not_change_is_active(self):
         """Test that status updates never modify is_active (reserved for org release)"""
         self.test_org.is_active = False
