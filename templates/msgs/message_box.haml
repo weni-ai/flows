@@ -193,6 +193,9 @@
                         .flex.flex-wrap.flex-end.items-center.justify-end
                           .flex-grow.inline
                             {% get_value object 'text' %}
+                            -if object.failed_reason == "H"
+                              .failed-reason
+                                {{ object.get_failed_reason_display }}
                           .labels.flex.items-center.flex-wrap
                             -if 'label' in actions
                               -for label in object.labels.all

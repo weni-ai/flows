@@ -8394,3 +8394,6 @@ msgstr ""
 
 msgid "Refresh page"
 msgstr "Actualizar página"
+
+msgid "Another service has the conversation"
+msgstr "Otro servicio tiene la conversación"

@@ -8457,3 +8457,6 @@ msgstr ""
 
 msgid "Refresh page"
 msgstr "Reîncarcă pagina"
+
+msgid "Another service has the conversation"
+msgstr "Alt serviciu are conversația"

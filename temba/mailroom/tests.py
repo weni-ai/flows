@@ -1013,6 +1013,20 @@ class EventTest(TembaTest):
             Event.from_msg(self.org, self.admin, msg_out3),
         )
 
+        owned = self.create_outgoing_msg(contact1, "Owned", channel=self.channel, status="F")
+        owned.failed_reason = Msg.FAILED_OTHER_OWNER
+        owned.save(update_fields=("failed_reason",))
+
+        owned_event = Event.from_msg(self.org, self.admin, owned)
+        self.assertEqual("msg_created", owned_event["type"])
+        self.assertEqual("F", owned_event["status"])
+        self.assertEqual("Owned", owned_event["msg"]["text"])
+        self.assertEqual("Another service has the conversation", owned_event["failed_reason_display"])
+        self.assertIsNone(owned_event["logs_url"])
+
+        self.assertNotIn("failed_reason_display", Event.from_msg(self.org, self.admin, msg_in))
+        self.assertNotIn("failed_reason_display", Event.from_msg(self.org, self.admin, msg_out))
+
     @override_settings(**S3_SIGNING_SETTINGS)
     def test_from_msg_presigns_s3_attachments(self):
         contact = self.create_contact("Jim", phone="0979111111")

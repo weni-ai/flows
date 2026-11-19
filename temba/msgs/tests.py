@@ -1,3 +1,5 @@
+import importlib
+import inspect
 from datetime import datetime, timedelta
 from decimal import Decimal
 from unittest.mock import PropertyMock, patch
@@ -6,6 +8,8 @@ import pytz
 from openpyxl import load_workbook
 
 from django.conf import settings
+from django.db import migrations
+from django.db.models import Q
 from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -1307,6 +1311,39 @@ class MsgTest(TembaTest):
         self.assertEqual(302, response.status_code)
         self.assertEqual("/msg/inbox/", response.url)
 
+        owned = self.create_outgoing_msg(self.joe, "owned conversation", status=Msg.STATUS_FAILED)
+        owned.failed_reason = Msg.FAILED_OTHER_OWNER
+        owned.save(update_fields=("failed_reason",))
+
+        owned_export = ExportMessagesTask.create(self.org, self.admin, system_label=SystemLabel.TYPE_FAILED)
+        with self.mockReadOnly(assert_models={Msg}):
+            owned_export.perform()
+
+        filename = "%s/test_orgs/%d/message_exports/%s.xlsx" % (settings.MEDIA_ROOT, self.org.id, owned_export.uuid)
+        sheet = load_workbook(filename=filename).worksheets[0]
+        header = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
+        self.assertEqual(
+            [
+                "Date",
+                "Contact UUID",
+                "Name",
+                "URN",
+                "URN Type",
+                "Direction",
+                "Text",
+                "Attachments",
+                "Status",
+                "Channel",
+                "Labels",
+            ],
+            header,
+        )
+        self.assertNotIn("failed_reason", header)
+
+        owned_rows = [row for row in sheet.iter_rows(min_row=2, values_only=True) if row[6] == "owned conversation"]
+        self.assertEqual(1, len(owned_rows))
+        self.assertEqual("failed", owned_rows[0][8])
+
     def test_big_ids(self):
         # create an incoming message with big id
         msg = Msg.objects.create(
@@ -1325,6 +1362,64 @@ class MsgTest(TembaTest):
         ChannelLog.objects.create(id=3_000_000_000, channel=msg.channel, msg=msg, is_error=True, description="Boom")
         spam = Label.get_or_create(self.org, self.admin, "Spam")
         msg.labels.add(spam)
+
+    def test_failed_reason_codes_persist(self):
+        contact = self.create_contact("Reason Codes", phone="+250788000221")
+        stored = {None: None}
+        for reason in ("S", "L", "E", "O", "D", "H"):
+            msg = self.create_outgoing_msg(contact, f"reason {reason}", status="F")
+            msg.failed_reason = reason
+            msg.save(update_fields=("failed_reason",))
+            stored[reason] = msg
+
+        empty = self.create_outgoing_msg(contact, "reason empty", status="F")
+        stored[None] = empty
+
+        for reason, msg in stored.items():
+            msg.refresh_from_db()
+            self.assertEqual(reason, msg.failed_reason)
+
+        migration = importlib.import_module("temba.msgs.migrations.0180_alter_msg_failed_reason")
+        self.assertEqual(1, len(migration.Migration.operations))
+        operation = migration.Migration.operations[0]
+        self.assertIsInstance(operation, migrations.AlterField)
+        self.assertEqual("msg", operation.model_name)
+        self.assertEqual("failed_reason", operation.name)
+        self.assertTrue(operation.field.null)
+        self.assertEqual(1, operation.field.max_length)
+        self.assertFalse(any(isinstance(op, migrations.AddConstraint) for op in migration.Migration.operations))
+        self.assertNotIn("CheckConstraint", inspect.getsource(migration))
+
+    def test_fail_old_messages_keeps_other_owner(self):
+        contact = self.create_contact("Old Messages", phone="+250788000222")
+        week_ago = timezone.now() - timedelta(days=8)
+        owned = self.create_outgoing_msg(contact, "owned old", status="F", created_on=week_ago)
+        owned.failed_reason = Msg.FAILED_OTHER_OWNER
+        owned.save(update_fields=("failed_reason",))
+
+        queued = self.create_outgoing_msg(contact, "queued old", status="Q", created_on=week_ago)
+        next_try = timezone.now() + timedelta(hours=1)
+        recent = timezone.now() - timedelta(days=1)
+        errored = self.create_outgoing_msg(
+            contact, "still retrying", status="E", created_on=recent, next_attempt=next_try
+        )
+
+        Msg.fail_old_messages()
+
+        owned.refresh_from_db()
+        self.assertEqual(Msg.STATUS_FAILED, owned.status)
+        self.assertEqual(Msg.FAILED_OTHER_OWNER, owned.failed_reason)
+
+        queued.refresh_from_db()
+        self.assertEqual(Msg.STATUS_FAILED, queued.status)
+        self.assertEqual(Msg.FAILED_TOO_OLD, queued.failed_reason)
+
+        errored.refresh_from_db()
+        self.assertEqual(Msg.STATUS_ERRORED, errored.status)
+        self.assertEqual(next_try, errored.next_attempt)
+
+        index = next(item for item in Msg._meta.indexes if item.name == "msgs_next_attempt_out_errored")
+        self.assertEqual(Q(direction="O", status="E", next_attempt__isnull=False), index.condition)
 
 
 class MsgCRUDLTest(TembaTest, CRUDLTestMixin):
@@ -1597,6 +1692,46 @@ class MsgCRUDLTest(TembaTest, CRUDLTestMixin):
 
         response = self.client.get(failed_url)
         self.assertNotIn("resend", response.context["actions"])
+
+        self.org.is_suspended = False
+        self.org.save(update_fields=("is_suspended",))
+
+        owned = self.create_outgoing_msg(contact1, "owned by other service", status="F")
+        owned.failed_reason = Msg.FAILED_OTHER_OWNER
+        owned.save(update_fields=("failed_reason",))
+
+        older = {}
+        for reason in ("S", "L", "E", "O", "D"):
+            msg = self.create_outgoing_msg(contact1, f"older reason {reason}", status="F")
+            msg.failed_reason = reason
+            msg.save(update_fields=("failed_reason",))
+            older[reason] = msg
+
+        empty = self.create_outgoing_msg(contact1, "empty reason", status="F")
+
+        response = self.client.get(failed_url)
+        self.assertContains(response, "owned by other service")
+        self.assertEqual(1, response.content.decode().count("Another service has the conversation"))
+        for reason in ("S", "L", "E", "O", "D"):
+            self.assertContains(response, f"older reason {reason}")
+
+        mock_msg_resend.reset_mock()
+        self.client.post(failed_url, {"action": "resend", "objects": [owned.id]})
+        mock_msg_resend.assert_not_called()
+        owned.refresh_from_db()
+        self.assertEqual(Msg.STATUS_FAILED, owned.status)
+        self.assertEqual(Msg.FAILED_OTHER_OWNER, owned.failed_reason)
+
+        mock_msg_resend.reset_mock()
+        selected = [owned.id, empty.id] + [older[reason].id for reason in ("S", "L", "E", "O", "D")]
+        self.client.post(failed_url, {"action": "resend", "objects": selected})
+        mock_msg_resend.assert_called_once()
+        called_org, called_ids = mock_msg_resend.call_args[0]
+        self.assertEqual(self.org.id, called_org)
+        self.assertCountEqual(called_ids, [empty.id] + [older[reason].id for reason in ("S", "L", "E", "O", "D")])
+        owned.refresh_from_db()
+        self.assertEqual(Msg.STATUS_FAILED, owned.status)
+        self.assertEqual(Msg.FAILED_OTHER_OWNER, owned.failed_reason)
 
     def test_filter(self):
         joe = self.create_contact("Joe Blow", phone="+250788000001")
@@ -3178,3 +3313,13 @@ class MsgTasksTest(TembaTest):
         self.assertEqual(Msg.objects.get(id=m_s.id).status, Msg.STATUS_SENT)
         self.assertEqual(Msg.objects.get(id=m_in.id).status, Msg.STATUS_HANDLED)
         self.assertEqual(Msg.objects.get(id=m_other.id).status, Msg.STATUS_PENDING)
+
+        owned = self.create_outgoing_msg(contact, "already owned", channel=self.channel, status=Msg.STATUS_FAILED)
+        owned.failed_reason = Msg.FAILED_OTHER_OWNER
+        owned.save(update_fields=("failed_reason",))
+
+        fail_channel_outgoing_messages(self.channel.id)
+
+        owned.refresh_from_db()
+        self.assertEqual(Msg.STATUS_FAILED, owned.status)
+        self.assertEqual(Msg.FAILED_OTHER_OWNER, owned.failed_reason)
