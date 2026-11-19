@@ -1,3 +1,7 @@
+3.114.0
+----------
+* feat: show "Another service has the conversation" for failure reason H, and keep Resend from sending those messages
+
 3.113.0
 ----------
 * feat: Add Channellog errors in messages endpoint

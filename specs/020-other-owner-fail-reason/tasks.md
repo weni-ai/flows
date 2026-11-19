@@ -134,7 +134,7 @@ Paths are from the repository root, as listed in plan.md. Application code lives
 
 **Purpose**: Release note and the quickstart gate
 
-- [x] T021 [P] Add a `feat:` bullet in `WENI-CHANGELOG.md` for the operator sentence and for Resend leaving reason `H` on the list. Heading is `3.113.0`, the next minor after `3.112.1`. Do not edit `CHANGELOG.md`.
+- [x] T021 [P] Add a `feat:` bullet in `WENI-CHANGELOG.md` for the operator sentence and for Resend leaving reason `H` on the list. Heading is `3.114.0`, the next minor after `3.113.0`. Do not edit `CHANGELOG.md`.
 - [x] T022 Run the commands in `specs/020-other-owner-fail-reason/quickstart.md`, including `./code_check.py`. No new `# pragma: no cover`. `./code_check.py` ran: black, flake8 3.7.7, and isort passed. The script then prints “Changes to be committed” because `temba/settings_common.py` points `NAME` and `USER` at `mailroom_test` for this machine’s database. That diff stays uncommitted.
 
 ---
@@ -232,5 +232,5 @@ Ship Phases 1 through 6 and Phase 8 together. User Story 5 closes Resend. User S
 - Do not edit `temba/mailroom/client.py`. The Resend payload stays `org_id` and `msg_ids`.
 - Empty `failed_reason` is not `H` and still resends.
 - The unrelated empty file `temba/orgs/migrations/0094_ensure_org_marketing_table.py` is outside this feature. Do not revive it or give it a number in the msgs app.
-- Changelog heading is `3.113.0`. The bullet is not appended to `3.112.1`.
+- Changelog heading is `3.114.0`. The bullet is not appended to `3.113.0`.
 - Mailroom needs no release. `failed_reason` there is a free string and has no `H` constant. Courier writes `F` + `H`. Flows drops `H` before `msg_resend`.
