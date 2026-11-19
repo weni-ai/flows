@@ -1,8 +1,8 @@
 # Implementation Plan: Other-owner failure reason
 
-**Branch**: `019-other-owner-fail-reason` | **Date**: 2026-11-13 | **Spec**: [spec.md](./spec.md)
+**Branch**: `020-other-owner-fail-reason` | **Date**: 2026-11-13 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `specs/019-other-owner-fail-reason/spec.md`
+**Input**: Feature specification from `specs/020-other-owner-fail-reason/spec.md`
 
 ## Summary
 
@@ -59,7 +59,7 @@ Accept Courier’s stored failure `status=F` + `failed_reason=H` on `msgs_msg`, 
 ### Documentation (this feature)
 
 ```text
-specs/019-other-owner-fail-reason/
+specs/020-other-owner-fail-reason/
 ├── spec.md
 ├── plan.md
 ├── research.md
