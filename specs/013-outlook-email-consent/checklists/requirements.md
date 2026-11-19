@@ -2,6 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-11-04
+**Revalidated**: 2026-11-19
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,7 +32,7 @@
 
 ## Notes
 
-- Validation iteration 1 passed. No `[NEEDS CLARIFICATION]` markers. Unspecified choices are recorded as assumptions: signed-in mailbox only, both Outlook.com and Microsoft 365, per-org uniqueness, 15-minute attempt lifetime, and no change to the generic email setup.
-- User scenarios, requirements, and success criteria stay on the admin outcome. SMTP and IMAP are named only as the settings this path does not ask the admin to type, because those are the fields on the current email setup.
+- Validation iteration 1 passed on 2026-11-04. Revalidated on 2026-11-19 after the single sign-in, the two stored permissions, the personal-account identity, the send host, and the top-page Microsoft redirect. No `[NEEDS CLARIFICATION]` markers. Unspecified choices are recorded as assumptions: signed-in mailbox only, both Outlook.com and Microsoft 365, per-org uniqueness, 15-minute attempt lifetime, and no change to the generic email setup.
+- User scenarios, requirements, and success criteria stay on the admin outcome. The permission names in FR-003 are the approval the admin sees. SMTP and IMAP hosts stay out of those sections except as settings this path does not ask the admin to type. The host choice for work versus personal accounts is an assumption, not a step the admin takes.
 - This repository has no product-spec preset installed. Origin Without Product Spec, Peak Load, Test Strategy, and Constitution Alignment are required by the Flows constitution and are intentionally technical. They are excluded from the "no implementation details" items above.
-- Cycle is SDD Full because the change alters email-channel creation and how mailbox credentials are obtained. Next step is `/speckit-plan`, not implementation.
+- Cycle is SDD Full because the change alters email-channel creation and how mailbox credentials are obtained. Planning artifacts in this directory were updated with the spec on 2026-11-19.

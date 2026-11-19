@@ -27,7 +27,7 @@ The callback reads the key, checks org and user, then deletes it before any chan
 | `address` | mailbox address | unchanged |
 | `config` | shape below | unchanged |
 
-The channel address is the `username` stored on the attempt. It is used only when it equals the access-token mailbox. It is not taken from the callback query.
+The channel address is the `username` stored on the attempt. It is used only when it equals the mailbox read from the Graph access token, or from the `id_token` when that access token is opaque or has no mailbox claim. It is not taken from the callback query.
 
 ### `config` for an Outlook channel
 
@@ -35,12 +35,14 @@ The channel address is the `username` stored on the attempt. It is used only whe
 |---|---|---|
 | `username` | string | same mailbox address |
 | `password` | string | empty |
-| `smtp_host` | string | `smtp.office365.com` |
+| `smtp_host` | string | `smtp.office365.com` when the Outlook access token is a JWT; `smtp-mail.outlook.com` when it is opaque |
 | `smtp_port` | int | `587` |
 | `imap_host` | string | `outlook.office365.com` |
 | `imap_port` | int | `993` |
-| `access_token` | string | from the token response; never rendered |
-| `refresh_token` | string | from the token response; never rendered |
+| `access_token` | string | Outlook access token from the refresh-token grant; never rendered |
+| `refresh_token` | string | refresh token from that grant, or the Graph refresh token when Microsoft does not rotate it; never rendered |
+| `graph_send_access_token` | string | Graph access token from the code exchange; never rendered |
+| `graph_send_refresh_token` | string | the same value as `refresh_token`; never rendered |
 | `oauth_provider` | string | `microsoft` |
 | `oauth_status` | string | `active` or `needs_reconnect` |
 | `callback_domain` | string | `settings.HOSTNAME` |
@@ -50,10 +52,11 @@ Generic claim rows do not gain `oauth_provider` or `oauth_status`.
 ## Validation rules
 
 - The callback creates or updates a channel only when the signed-in user still has `channels.channel_claim` on the org stored in the attempt.
-- The confirmed address is empty, is not an email address, or differs from the access-token mailbox (`upn`, then `preferred_username`, then `unique_name`): no channel.
+- The confirmed address is empty, is not an email address, or differs from the mailbox claim: no channel. The claim is the first of `preferred_username`, `upn`, `email`, and `unique_name` that contains `@`. It is read from the Graph access token when that token is a JWT and has such a claim, and otherwise from the `id_token`.
 - Microsoft `error` query parameter, including `access_denied`, `consent_required`, and a description that contains `AADSTS65001`: no channel. The page explains the case. `error_description` is shown for any other `error` and is not logged.
-- Access token fails `aud`, `iss`, `exp`, or signature: no channel.
-- Token response has no `access_token` or no `refresh_token`: no channel.
+- A JWT Graph token, id token, or Outlook token fails `aud`, `iss`, `exp`, or signature: no channel. An opaque Graph token is not a failure by itself. An opaque Outlook token is stored after the mailbox has already been accepted.
+- Neither the Graph token nor the id token yields a mailbox: no channel. The log code is `token_mailbox`.
+- The code exchange has no `access_token` or no `refresh_token`: no channel. The Outlook grant has no `access_token`: no channel. It may omit `refresh_token`; the Graph refresh token is kept in that case.
 - Active `EM` channel in the same org with the same address, and it is not a Microsoft channel in `needs_reconnect`: no new channel.
 - Active `EM` channel in another org with the same address: allowed. Each org has its own row and its own grant.
 
@@ -66,11 +69,11 @@ Generic claim rows do not gain `oauth_provider` or `oauth_status`.
 EM active, oauth_status=active
     -- consent again for the same address --> no write; admin is told it is already connected
     -- email-proxy sees invalid_grant --> oauth_status=needs_reconnect (proxy write, not Flows)
-    -- admin releases the channel --> is_active=false, access_token and refresh_token removed
+    -- admin releases the channel --> is_active=false, both grants removed
 
 EM active, oauth_status=needs_reconnect
-    -- successful consent for the same address --> same row, new tokens, oauth_status=active
-    -- admin releases the channel --> is_active=false, tokens removed
+    -- successful consent for the same address --> same row, both grants replaced, smtp_host replaced, oauth_status=active
+    -- admin releases the channel --> is_active=false, both grants removed
 
 EM inactive
     -- not a target. A later consent creates a new active row and requires a new Microsoft approval
@@ -82,7 +85,7 @@ The duplicate check and the insert-or-update run in one transaction after `pg_ad
 
 | Writer | Writes |
 |---|---|
-| Flows consent callback | new row, or token replacement on `needs_reconnect` |
-| Flows `EmailType.deactivate` | removes `access_token` and `refresh_token` during release |
-| email-proxy (companion change) | refreshed `access_token`, and `oauth_status=needs_reconnect` on `invalid_grant` |
+| Flows consent callback | new row, or replacement of both grants and `smtp_host` on `needs_reconnect` |
+| Flows `EmailType.deactivate` | removes `access_token`, `refresh_token`, `graph_send_access_token`, and `graph_send_refresh_token` during release |
+| email-proxy (companion change) | refreshed Outlook and Graph access tokens, the newest refresh token written to both refresh keys, and `oauth_status=needs_reconnect` on `invalid_grant` |
 | Generic email claim | unchanged; does not set `oauth_provider` |
