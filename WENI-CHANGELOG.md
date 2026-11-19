@@ -1,6 +1,7 @@
 3.114.0
 ----------
 * feat: show "Another service has the conversation" for failure reason H, and keep Resend from sending those messages
+* feat: implement periodic cleanup for WhatsApp handover context
 
 3.113.0
 ----------
