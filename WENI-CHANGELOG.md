@@ -1,6 +1,6 @@
 3.113.0
 ----------
-* feat: delete WhatsApp handover context every 15 minutes once it is consumed or 24 hours after its last write
+* feat: Add Channellog errors in messages endpoint
 
 3.112.1
 ----------
