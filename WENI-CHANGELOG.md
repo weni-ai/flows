@@ -1,3 +1,9 @@
+3.114.0
+----------
+* feat: implement 'Other-owner failure reason' feature, showing "Another service has the conversation" for failure reason H and keeping Resend from sending those messages
+* feat: implement periodic cleanup for WhatsApp handover context
+* feat: support dual Graph and IMAP tokens in Outlook email consent flow
+
 3.113.0
 ----------
 * feat: Add Channellog errors in messages endpoint
