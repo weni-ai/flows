@@ -151,7 +151,21 @@ class FormatReportTest(TembaTest):
 
         self.assertIn("Projects checked: 1 | With problems: 1", text)
         self.assertIn("*Acme* (`1a2b`) | 2026-10-07 (America/Sao_Paulo)", text)
-        self.assertIn("• conversation_classification: bronze=91 silver=0 (-91) DIVERGENT", text)
+        self.assertIn("_conversation_classification_\n• Silver: 0\n• Bronze: 91\n• Difference: -91 DIVERGENT", text)
+
+    def test_matching_counts_show_zero_difference(self):
+        report = ProjectReport(
+            org_name="Acme",
+            project_uuid="1a2b",
+            timezone="America/Sao_Paulo",
+            day=date(2026, 10, 7),
+            results=[TableResult("conversation_classification", bronze=115, silver=115)],
+        )
+
+        text = format_report([report])
+
+        self.assertIn("• Difference: 0 OK", text)
+        self.assertIn("With problems: 0", text)
 
     def test_format_report_includes_error_line(self):
         report = ProjectReport(
@@ -164,7 +178,7 @@ class FormatReportTest(TembaTest):
 
         text = format_report([report])
 
-        self.assertIn("• conversation_classification: ERROR", text)
+        self.assertIn("_conversation_classification_\n• ERROR", text)
         self.assertIn("With problems: 1", text)
 
 
