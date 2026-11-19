@@ -378,6 +378,8 @@ LOGGING = {
         # Enables temba.conversion_events.* loggers under disable_existing_loggers=True (see assertLogs in tests).
         "temba.conversion_events": {"level": "INFO", "handlers": ["console"], "propagate": False},
         "temba.projects": {"level": "INFO", "handlers": ["console"], "propagate": False},
+        # temba.fastapi_app re-runs django.setup() on import, which would otherwise disable this logger mid-run.
+        "weni.eda": {"level": "WARNING"},
     },
 }
 
