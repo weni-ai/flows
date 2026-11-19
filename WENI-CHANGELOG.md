@@ -1,6 +1,6 @@
 3.113.0
 ----------
-* feat: show when another service has the WhatsApp conversation, and keep Resend from retrying those messages
+* feat: Add Channellog errors in messages endpoint
 
 3.112.1
 ----------

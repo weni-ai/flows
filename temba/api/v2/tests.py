@@ -2,7 +2,7 @@ import base64
 import time
 import uuid
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -15,12 +15,13 @@ from rest_framework.test import APIClient, APIRequestFactory
 from weni_commons.auth import SessionContext, SessionUser
 
 from django.conf import settings
-from django.contrib.auth.models import AnonymousUser, Group, User
+from django.contrib.auth.models import AnonymousUser, Group, Permission, User
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.test import Client, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -43,13 +44,14 @@ from temba.api.v2.views import (
 from temba.api.v2.views_base import BaseAPIView
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
-from temba.channels.models import Channel, ChannelEvent
+from temba.channels.models import Channel, ChannelEvent, ChannelLog
 from temba.channels.types.whatsapp.type import (
     CONFIG_FB_ACCESS_TOKEN,
     CONFIG_FB_BUSINESS_ID,
     CONFIG_FB_NAMESPACE,
     CONFIG_FB_TEMPLATE_LIST_DOMAIN,
 )
+from temba.channels.usecases.message_error_logs import failed_reason_for_api
 from temba.classifiers.models import Classifier
 from temba.classifiers.types.luis import LuisType
 from temba.classifiers.types.wit import WitType
@@ -4856,6 +4858,7 @@ class APITest(APIJSONMixin, TembaTest):
                 "sent_on": format_datetime(msg.sent_on),
                 "modified_on": format_datetime(msg.modified_on),
                 "media": msg.attachments[0] if msg.attachments else None,
+                "failed_reason": failed_reason_for_api(msg),
             },
         )
 
@@ -5026,7 +5029,7 @@ class APITest(APIJSONMixin, TembaTest):
         response = self.fetchJSON(url, "id=%d" % owned.pk)
         row = response.json()["results"][0]
         self.assertEqual("failed", row["status"])
-        self.assertNotIn("failed_reason", row)
+        self.assertIsNone(row["failed_reason"])
         self.assertEqual(
             {
                 "id",
@@ -5046,9 +5049,310 @@ class APITest(APIJSONMixin, TembaTest):
                 "sent_on",
                 "modified_on",
                 "media",
+                "failed_reason",
             },
             set(row.keys()),
         )
+
+    def test_messages_error_logs(self):
+        self.login(self.admin)
+        url = reverse("api.v2.messages")
+
+        def make_log(msg, **kwargs):
+            values = dict(
+                channel=msg.channel,
+                msg=msg,
+                description="Message Sent",
+                is_error=False,
+                url="https://graph.facebook.com/v17.0/1/messages",
+                method="POST",
+                request="POST /v17.0/1/messages HTTP/1.1\r\nHost: graph.facebook.com\r\n\r\n{}",
+                response="{}",
+                response_status=200,
+                request_time=10,
+            )
+            values.update(kwargs)
+            return ChannelLog.objects.create(**values)
+
+        def listed(msg, query):
+            response = self.fetchJSON(url, query)
+            self.assertEqual(response.status_code, 200)
+            results = response.json()["results"]
+            self.assertEqual(len(results), 1)
+            return results[0]
+
+        reasons = (
+            (Msg.FAILED_SUSPENDED, "suspended"),
+            (Msg.FAILED_LOOPING, "looping"),
+            (Msg.FAILED_ERROR_LIMIT, "error_limit"),
+            (Msg.FAILED_TOO_OLD, "too_old"),
+            (Msg.FAILED_NO_DESTINATION, "no_destination"),
+        )
+        for code, api_value in reasons:
+            msg = self.create_outgoing_msg(self.joe, api_value, status=Msg.STATUS_FAILED)
+            msg.failed_reason = code
+            msg.save(update_fields=["failed_reason"])
+            for query in (f"id={msg.id}", f"id={msg.id}&error_logs=true"):
+                result = listed(msg, query)
+                self.assertEqual(result["failed_reason"], api_value)
+            if code == Msg.FAILED_NO_DESTINATION:
+                result = listed(msg, f"id={msg.id}&error_logs=true")
+                self.assertEqual(result["error_logs"], [])
+            archived = msg.as_archive_json()
+            self.assertNotIn("failed_reason", archived)
+            self.assertNotIn("error_logs", archived)
+
+        plain = self.create_outgoing_msg(self.joe, "delivered", status=Msg.STATUS_DELIVERED)
+        result = listed(plain, f"id={plain.id}")
+        self.assertIsNone(result["failed_reason"])
+        self.assertNotIn("error_logs", result)
+
+        untouched = self.create_outgoing_msg(self.frank, "untouched", status=Msg.STATUS_FAILED)
+        off_counts = []
+        for query in (
+            f"id={untouched.id}",
+            f"id={untouched.id}&error_logs=false",
+            f"id={untouched.id}&error_logs=abc",
+        ):
+            with CaptureQueriesContext(connection) as captured:
+                result = listed(untouched, query)
+            self.assertNotIn("error_logs", result)
+            self.assertIsNone(result["failed_reason"])
+            sql = " ".join(item["sql"] for item in captured.captured_queries)
+            self.assertNotIn("channels_channellog", sql)
+            off_counts.append(len(captured.captured_queries))
+        self.assertEqual(off_counts[0], off_counts[1])
+        self.assertEqual(off_counts[0], off_counts[2])
+
+        # Delivered message with only success logs does not qualify.
+        delivered = self.create_outgoing_msg(self.joe, "ok", status=Msg.STATUS_DELIVERED)
+        make_log(delivered, description="Message Sent")
+        make_log(delivered, description="Status Updated", created_on=timezone.now())
+        result = listed(delivered, f"id={delivered.id}&error_logs=true")
+        self.assertEqual(result["error_logs"], [])
+        self.assertIsNone(result["failed_reason"])
+
+        # No logs at all.
+        bare = self.create_outgoing_msg(self.joe, "bare", status=Msg.STATUS_SENT)
+        result = listed(bare, f"id={bare.id}&error_logs=true")
+        self.assertEqual(result["error_logs"], [])
+
+        failed_without_logs = self.create_outgoing_msg(self.joe, "internal", status=Msg.STATUS_FAILED)
+        result = listed(failed_without_logs, f"id={failed_without_logs.id}&error_logs=true")
+        self.assertEqual(result["error_logs"], [])
+
+        # One error log among success logs: every log, newest first.
+        mixed = self.create_outgoing_msg(self.joe, "mixed", status=Msg.STATUS_SENT)
+        older = timezone.now() - timedelta(minutes=2)
+        middle = timezone.now() - timedelta(minutes=1)
+        newest = timezone.now()
+        make_log(mixed, description="Message Sent", created_on=older, is_error=False)
+        make_log(mixed, description="Message Send Error", created_on=middle, is_error=True, response_status=400)
+        make_log(mixed, description="Status Updated", created_on=newest, is_error=False)
+        result = listed(mixed, f"id={mixed.id}&error_logs=true")
+        self.assertEqual(
+            [item["description"] for item in result["error_logs"]],
+            ["Status Updated", "Message Send Error", "Message Sent"],
+        )
+        self.assertEqual([item["is_error"] for item in result["error_logs"]], [False, True, False])
+
+        # Same timestamp: the most recently recorded log comes first.
+        tied = self.create_outgoing_msg(self.joe, "tied", status=Msg.STATUS_FAILED)
+        stamp = timezone.now()
+        first = make_log(tied, description="first", created_on=stamp)
+        second = make_log(tied, description="second", created_on=stamp)
+        result = listed(tied, f"id={tied.id}&error_logs=true")
+        self.assertGreater(second.id, first.id)
+        self.assertEqual([item["description"] for item in result["error_logs"]], ["second", "first"])
+
+        # Send-time provider failure.
+        send_failed = self.create_outgoing_msg(self.joe, "template", status=Msg.STATUS_FAILED)
+        send_log = make_log(
+            send_failed,
+            description="Message Send Error",
+            is_error=True,
+            response_status=404,
+            request_time=312,
+            response='{"error":{"code":132001}}',
+            created_on=timezone.now(),
+        )
+        result = listed(send_failed, f"id={send_failed.id}&error_logs=true")
+        self.assertIsNone(result["failed_reason"])
+        self.assertEqual(len(result["error_logs"]), 1)
+        item = result["error_logs"][0]
+        self.assertEqual(
+            set(item.keys()),
+            {
+                "created_on",
+                "description",
+                "is_error",
+                "method",
+                "url",
+                "request",
+                "response",
+                "response_status",
+                "elapsed_ms",
+            },
+        )
+        self.assertEqual(item["description"], "Message Send Error")
+        self.assertTrue(item["is_error"])
+        self.assertIn("132001", item["response"])
+        self.assertEqual(item["response_status"], 404)
+        self.assertEqual(item["elapsed_ms"], 312)
+        self.assertEqual(item["created_on"], format_datetime(send_log.created_on))
+
+        # Asynchronous provider failure: status log is not flagged as an error, but the message is failed.
+        async_failed = self.create_outgoing_msg(self.joe, "async", status=Msg.STATUS_FAILED)
+        sent_on = timezone.now() - timedelta(seconds=5)
+        status_on = timezone.now()
+        make_log(async_failed, description="Message Sent", is_error=False, response_status=200, created_on=sent_on)
+        make_log(
+            async_failed,
+            description="Status Updated",
+            is_error=False,
+            response_status=200,
+            request='{"statuses":[{"errors":[{"code":131049}]}]}',
+            response='{"message":"Events Handled"}',
+            created_on=status_on,
+        )
+        result = listed(async_failed, f"id={async_failed.id}&error_logs=true")
+        self.assertEqual([item["description"] for item in result["error_logs"]], ["Status Updated", "Message Sent"])
+        self.assertEqual([item["is_error"] for item in result["error_logs"]], [False, False])
+        self.assertIn("131049", result["error_logs"][0]["request"])
+        self.assertIsNone(result["failed_reason"])
+
+        # Errored messages qualify by status even when every log succeeded.
+        errored = self.create_outgoing_msg(self.joe, "retry", status=Msg.STATUS_ERRORED)
+        make_log(errored, description="Message Sent", is_error=False)
+        result = listed(errored, f"id={errored.id}&error_logs=true")
+        self.assertEqual([item["description"] for item in result["error_logs"]], ["Message Sent"])
+
+        # Missing HTTP metadata stays null.
+        incomplete = self.create_outgoing_msg(self.joe, "incomplete", status=Msg.STATUS_FAILED)
+        make_log(incomplete, response_status=None, request_time=None, response=None)
+        result = listed(incomplete, f"id={incomplete.id}&error_logs=true")
+        self.assertIsNone(result["error_logs"][0]["response_status"])
+        self.assertIsNone(result["error_logs"][0]["elapsed_ms"])
+        self.assertIsNone(result["error_logs"][0]["response"])
+
+        # Letter case and the documented maximum page size.
+        result = listed(send_failed, f"id={send_failed.id}&error_logs=TRUE")
+        self.assertIn("error_logs", result)
+        result = listed(send_failed, f"id={send_failed.id}&error_logs=True")
+        self.assertEqual(len(result["error_logs"]), 1)
+        response = self.fetchJSON(url, "error_logs=true&limit=1000")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("error_logs", response.json()["results"][0])
+
+        # error_logs does not change which messages a broadcast filter returns.
+        broadcast = self.create_broadcast(self.user, "batch", contacts=[self.joe])
+        without = {row["id"] for row in self.fetchJSON(url, f"broadcast={broadcast.id}").json()["results"]}
+        with_logs = self.fetchJSON(url, f"broadcast={broadcast.id}&error_logs=true").json()["results"]
+        self.assertEqual(without, {row["id"] for row in with_logs})
+        self.assertTrue(all("error_logs" in row for row in with_logs))
+        self.assertTrue(all("failed_reason" in row for row in with_logs))
+
+        # Redaction: Authorization in either case, in request and response, and the system-user token.
+        secret = "secret-token"
+        path = send_failed.contact_urn.path
+        redacted = self.create_outgoing_msg(self.joe, "redact", status=Msg.STATUS_FAILED)
+        make_log(
+            redacted,
+            url=f"https://example.com/send?to={path}",
+            request=(
+                f"POST /send HTTP/1.1\r\nAuthorization: Bearer {secret}\r\n\r\n"
+                f'{{"to":"{path}","token":"{secret}"}}'
+            ),
+            response=f"HTTP/1.1 400\r\nauthorization: Bearer {secret}\r\n\r\n{path}",
+        )
+        result = listed(redacted, f"id={redacted.id}&error_logs=true")
+        blob = json.dumps(result["error_logs"])
+        self.assertNotIn(secret, blob)
+        self.assertIn("Authorization: ********", result["error_logs"][0]["request"])
+        self.assertIn("authorization: ********", result["error_logs"][0]["response"])
+        self.assertIn(path, blob)
+
+        with override_settings(WHATSAPP_ADMIN_SYSTEM_USER_TOKEN="WA_ADMIN_TOKEN"):
+            token_msg = self.create_outgoing_msg(self.joe, "token", status=Msg.STATUS_FAILED)
+            make_log(
+                token_msg,
+                url="https://example.com/send?access_token=WA_ADMIN_TOKEN",
+                request="POST /send HTTP/1.1\r\n\r\naccess_token=WA_ADMIN_TOKEN",
+                response="WA_ADMIN_TOKEN",
+            )
+            result = listed(token_msg, f"id={token_msg.id}&error_logs=true")
+            self.assertNotIn("WA_ADMIN_TOKEN", json.dumps(result["error_logs"]))
+
+        with AnonymousOrg(self.org):
+            anon_msg = self.create_outgoing_msg(self.joe, "anon", status=Msg.STATUS_FAILED)
+            anon_path = anon_msg.contact_urn.path
+            make_log(
+                anon_msg,
+                url=f"https://example.com/send?to={anon_path}",
+                request=f"POST /send HTTP/1.1\r\nAuthorization: Bearer {secret}\r\n\r\nto={anon_path}",
+                response=f"body {anon_path}",
+            )
+            result = listed(anon_msg, f"id={anon_msg.id}&error_logs=true")
+            blob = json.dumps(result["error_logs"])
+            self.assertNotIn(secret, blob)
+            self.assertNotIn(anon_path, blob)
+
+            permission = Permission.objects.get(content_type__app_label="contacts", codename="contact_break_anon")
+            self.admin.user_permissions.add(permission)
+            result = listed(anon_msg, f"id={anon_msg.id}&error_logs=true")
+            blob = json.dumps(result["error_logs"])
+            self.assertNotIn(secret, blob)
+            self.assertIn(anon_path, blob)
+            self.assertIn("Authorization: ********", result["error_logs"][0]["request"])
+
+        # Another org's logs are not readable, and no parameter selects them.
+        other = self.create_outgoing_msg(self.hans, "other", status=Msg.STATUS_FAILED, channel=self.org2channel)
+        ChannelLog.objects.create(
+            channel=other.channel,
+            msg=other,
+            description="Other Org",
+            is_error=True,
+            method="POST",
+            url="https://example.com/other",
+            request="ORG2-ONLY-MARKER",
+            response="ORG2-ONLY-MARKER",
+            response_status=400,
+            request_time=1,
+        )
+        response = self.fetchJSON(url, "error_logs=true&limit=1000")
+        self.assertNotIn("ORG2-ONLY-MARKER", response.content.decode())
+        self.assertNotIn(other.id, [row["id"] for row in response.json()["results"]])
+
+        # Query count stays the same when the page grows and the qualification mix stays the same.
+        def count_queries(query):
+            with CaptureQueriesContext(connection) as captured:
+                response = self.fetchJSON(url, query)
+            self.assertEqual(response.status_code, 200)
+            return len(captured.captured_queries)
+
+        failed_after = timezone.now()
+        for index in range(4):
+            msg = self.create_outgoing_msg(
+                self.joe,
+                f"failed-page-{index}",
+                status=Msg.STATUS_FAILED,
+                created_on=failed_after + timedelta(seconds=index + 1),
+            )
+            make_log(msg, is_error=True, description="Message Send Error")
+        failed_filter = "error_logs=true&after=%s" % format_datetime(failed_after)
+        self.assertEqual(count_queries(failed_filter + "&limit=1"), count_queries(failed_filter + "&limit=4"))
+
+        delivered_after = failed_after + timedelta(hours=1)
+        for index in range(4):
+            msg = self.create_outgoing_msg(
+                self.joe,
+                f"delivered-page-{index}",
+                status=Msg.STATUS_DELIVERED,
+                created_on=delivered_after + timedelta(seconds=index + 1),
+            )
+            make_log(msg, is_error=False, description="Message Sent")
+        delivered_filter = "error_logs=true&after=%s" % format_datetime(delivered_after)
+        self.assertEqual(count_queries(delivered_filter + "&limit=1"), count_queries(delivered_filter + "&limit=4"))
 
     def test_workspace(self):
         url = reverse("api.v2.workspace")
