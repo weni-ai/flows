@@ -2657,7 +2657,7 @@ class ContactTest(TembaTest):
             msg.save(update_fields=("failed_reason",))
 
         response = self.client.get(reverse("contacts.contact_history", args=[other.uuid]))
-        self.assertNotContains(response, "Another service has the conversation")
+        self.assertNotContains(response, "Outro atendimento está com a conversa")
         for reason in ("S", "L", "E", "O", "D"):
             self.assertContains(response, f"older reason {reason}")
 

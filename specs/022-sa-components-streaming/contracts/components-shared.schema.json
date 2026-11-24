@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://weni.ai/contracts/019-sa-components-streaming/1.0.0/components-shared.schema.json",
+  "title": "Shopping Assistant Streaming Components — Shared Definitions",
+  "description": "Shared wire-format definitions for Shopping Assistant streaming components (quick replies, list message, CTA) across nexus-ai, flows, weni-webchat-socket, and webchat-service.",
+  "type": "object",
+  "$defs": {
+    "componentType": {
+      "type": "string",
+      "enum": ["quick_replies", "list_message", "cta_message"],
+      "description": "Component kind in scope for Shopping Assistant streaming (BD-009)."
+    },
+    "quickReplies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Ordered quick reply button labels displayed below the assistant bubble."
+    },
+    "listItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uuid", "title"],
+      "properties": {
+        "uuid": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier for the list item."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Item title shown in the list view and sent as shopper message on submit."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional item description."
+        }
+      }
+    },
+    "listMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["button_text", "list_items"],
+      "properties": {
+        "button_text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Label rendered on the list trigger button (e.g. 'Ver 9 ofertas' or 'Ver receitas')."
+        },
+        "list_items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/listItem"
+          }
+        },
+        "item_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Known item count surfaced to the shopper (FR-019, FR-038). Omitted when the count is unknown or not surfaced in the button label."
+        }
+      }
+    },
+    "ctaMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["display_text", "url"],
+      "properties": {
+        "display_text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "CTA button label (also used in screen-reader announcement; never the URL)."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://.+",
+          "description": "Complete absolute http(s) URL. Must never be emitted partially (BD-004, FR-018)."
+        }
+      }
+    },
+    "componentHintWire": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component_type"],
+      "description": "Early component hint payload sent on gRPC and WebSocket. Must never carry a CTA URL (BD-004, Privacy).",
+      "properties": {
+        "component_type": {
+          "$ref": "#/$defs/componentType"
+        },
+        "labels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Optional button labels used to size skeleton placeholders without layout shift (FR-006, NFR-003). Omit when labels are not yet known."
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional number of skeleton placeholders to reserve when labels are omitted. Defaults to labels.length when labels are present, otherwise 1."
+        },
+        "item_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional known item count for list_message (FR-019). Ignored for other component types."
+        }
+      }
+    },
+    "componentsBundleWire": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "description": "Authoritative final component payload(s) attached to a completed streamed response. Multiple component types may coexist (BD-006, FR-026).",
+      "properties": {
+        "quick_replies": {
+          "$ref": "#/$defs/quickReplies"
+        },
+        "list_message": {
+          "$ref": "#/$defs/listMessage"
+        },
+        "cta_message": {
+          "$ref": "#/$defs/ctaMessage"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "component_type": "quick_replies",
+      "labels": ["Expressa · até 2h", "Agendada · 18h–20h", "Retirar na loja"],
+      "count": 3
+    },
+    {
+      "list_message": {
+        "button_text": "Ver 9 ofertas",
+        "item_count": 9,
+        "list_items": [
+          {
+            "uuid": "8c5d9f42-1f4e-4b72-a1a2-0e4a1a1d0001",
+            "title": "Café em grãos 500g",
+            "description": "R$ 34,90 no Clube Aurora"
+          }
+        ]
+      },
+      "cta_message": {
+        "display_text": "Acompanhar pedido",
+        "url": "https://loja.example/pedidos/48213/rastreio"
+      }
+    }
+  ]
+}

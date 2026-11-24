@@ -24,6 +24,8 @@ BREAK_ANON_PERMISSION = "contacts.contact_break_anon"
 # Header name is matched case-insensitively. The whole value, including a scheme such as "Bearer", is replaced.
 _AUTHORIZATION_HEADER = re.compile(r"(?im)^([ \t]*authorization[ \t]*:[ \t]*)([^\r\n]*)")
 _REDACTED_HEADER_VALUE = "********"
+# Shorter header values are masked on the header line only. Copying them through the body would hide ordinary words.
+_MIN_SECRET_LENGTH_TO_REDACT = 8
 
 
 def failed_reason_for_api(msg) -> str | None:
@@ -56,7 +58,7 @@ def redact_authorization_headers(value):
 
     redacted = _AUTHORIZATION_HEADER.sub(_mask, value)
     for secret in sorted(set(secrets), key=len, reverse=True):
-        if len(secret) >= 8 and secret != _REDACTED_HEADER_VALUE:
+        if len(secret) >= _MIN_SECRET_LENGTH_TO_REDACT and secret != _REDACTED_HEADER_VALUE:
             redacted = redacted.replace(secret, _REDACTED_HEADER_VALUE)
     return redacted
 
@@ -95,6 +97,23 @@ def load_error_logs_by_message_id(messages, user, org, using: str) -> dict:
         ChannelLog.objects.using(using)
         .filter(msg_id__in=qualifying_ids)
         .select_related("channel", "msg", "msg__contact_urn")
+        .only(
+            "id",
+            "created_on",
+            "description",
+            "is_error",
+            "method",
+            "url",
+            "request",
+            "response",
+            "response_status",
+            "request_time",
+            "msg_id",
+            "channel_id",
+            "channel__channel_type",
+            "msg__contact_urn",
+            "msg__contact_urn__path",
+        )
         .order_by("-created_on", "-id")
     )
     reveal_urns = _can_reveal_urns(user, org)

@@ -41,4 +41,4 @@ Then:
 
 ## Release note
 
-The release note is the `feat:` bullet under heading `3.113.0` in `WENI-CHANGELOG.md`: the operator sentence, and that Resend leaves a message failed with reason `H` on the list. Do not edit `CHANGELOG.md`.
+The release note is the `feat:` bullet under heading `3.114.0` in `WENI-CHANGELOG.md`: the operator sentence, and that Resend leaves a message failed with reason `H` on the list. Do not edit `CHANGELOG.md`.

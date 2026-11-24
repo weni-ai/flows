@@ -355,7 +355,9 @@ def _mailbox_claim(claims):
     return None
 
 
-def _save_channel(org, user, username, access_token, refresh_token, smtp_host, graph_access_token, graph_refresh_token):
+def _save_channel(
+    org, user, username, access_token, refresh_token, smtp_host, graph_access_token, graph_refresh_token
+):
     with transaction.atomic():
         _lock_mailbox(org.id, username)
         existing = (

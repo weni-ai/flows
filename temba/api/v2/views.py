@@ -4160,19 +4160,22 @@ class MessagesEndpoint(ListAPIMixin, BaseAPIView):
         else:
             return self.filter_before_after(queryset, "created_on")
 
+    @property
+    def include_error_logs(self) -> bool:
+        return str_to_bool(self.request.query_params.get("error_logs", "false"))
+
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        include_error_logs = str_to_bool(self.request.query_params.get("error_logs", "false"))
-        context["include_error_logs"] = include_error_logs
-        if include_error_logs:
+        context["include_error_logs"] = self.include_error_logs
+        if self.include_error_logs:
             context["error_logs_by_message_id"] = getattr(self, "_error_logs_by_message_id", {})
         return context
 
     def prepare_for_serialization(self, page, using: str):
-        if not str_to_bool(self.request.query_params.get("error_logs", "false")):
-            return
-
-        self._error_logs_by_message_id = load_error_logs_by_message_id(page, self.request.user, self.get_org(), using)
+        if self.include_error_logs:
+            self._error_logs_by_message_id = load_error_logs_by_message_id(
+                page, self.request.user, self.get_org(), using
+            )
 
     @classmethod
     def get_read_explorer(cls):

@@ -2,6 +2,8 @@
 
 **Input**: Design documents from `/specs/013-outlook-email-consent/`
 
+**Revised**: 2026-11-19. The consent is one Microsoft sign-in. It stores a Graph grant and an Outlook grant. A personal account is addressed from the sign-in identity, and its send host is `smtp-mail.outlook.com`. T002, T003, T004, T007, T011, T012, and T013 describe that behavior. Phase 7 is the adjustment record; those items are already done.
+
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md), [research.md](./research.md), [data-model.md](./data-model.md), [contracts/outlook-email-channel.md](./contracts/outlook-email-channel.md), [quickstart.md](./quickstart.md)
 
 **Tests**: Included. The spec Test Strategy and constitution XIV require flow tests from the admin action to the channel row. Write each story's tests first and confirm they fail before that story's implementation.
@@ -35,7 +37,7 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [x] T002 Add named constants and the Redis consent-attempt helpers in `temba/channels/types/email/outlook.py`: `CONSENT_ATTEMPT_TTL_SECONDS` 900, `MICROSOFT_HTTP_TIMEOUT_SECONDS` 10, IMAP host `outlook.office365.com` port 993, SMTP host `smtp.office365.com` port 587, scopes in order `offline_access`, `https://outlook.office.com/IMAP.AccessAsUser.All`, and `https://outlook.office.com/SMTP.Send`, `oauth_provider` `microsoft`, statuses `active` and `needs_reconnect`. `put_attempt` stores org id, user id, the confirmed primary address, and the PKCE verifier under `outlook-email-consent:{state}` with that TTL. `pop_attempt` returns the payload once and deletes the key. No Microsoft call and no channel write in this task.
+- [x] T002 Add named constants and the Redis consent-attempt helpers in `temba/channels/types/email/outlook.py`: `CONSENT_ATTEMPT_TTL_SECONDS` 900, `MICROSOFT_HTTP_TIMEOUT_SECONDS` 10, IMAP host `outlook.office365.com` port 993, SMTP host `smtp.office365.com` and personal SMTP host `smtp-mail.outlook.com` port 587, `GRAPH_SCOPES` (`offline_access`, `openid`, `email`, `profile`, `https://graph.microsoft.com/Mail.Send`, `https://graph.microsoft.com/Mail.ReadWrite`, `https://graph.microsoft.com/User.Read`), `OUTLOOK_SCOPES` (`offline_access`, `https://outlook.office.com/IMAP.AccessAsUser.All`, `https://outlook.office.com/SMTP.Send`), and `CONSENT_SCOPES` (`GRAPH_SCOPES` plus the two Outlook scopes), `oauth_provider` `microsoft`, statuses `active` and `needs_reconnect`. `put_attempt` stores org id, user id, the confirmed primary address, and the PKCE verifier under `outlook-email-consent:{state}` with that TTL. `pop_attempt` returns the payload once and deletes the key. No Microsoft call and no channel write in this task.
 
 **Checkpoint**: Settings and the attempt store exist. User stories can start.
 
@@ -45,18 +47,18 @@
 
 **Goal**: An org admin confirms a primary mailbox address, approves Microsoft for that same address, and gets exactly one `EM` channel, without typing a password or mail-server settings.
 
-**Independent Test**: `poetry run coverage run manage.py test temba.channels.types.email.EmailTypeTest` posts a primary address and an approved consent for that mailbox. The channel address is that address. The response HTML does not contain either token.
+**Independent Test**: `poetry run coverage run manage.py test temba.channels.types.email.EmailTypeTest` posts a primary address and an approved consent for that mailbox. The channel address is that address. The response HTML does not contain either grant.
 
 ### Tests for User Story 1
 
-- [x] T003 [US1] Add failing flow tests in `temba/channels/types/email/tests.py` that mock the token endpoint and JWKS and never call `login.microsoftonline.com`. Assert: empty `APP_MICROSOFT_CLIENT_ID` does not show the primary-address form and does not redirect; a blank address or one without `@` does not redirect and does not store an attempt; posting a primary address redirects with the scopes from T002 in that order and with PKCE; an approved consent whose token mailbox equals that address creates one `EM` channel for a work mailbox and for an Outlook.com mailbox, including a refresh token; a different token mailbox creates none; config matches `specs/013-outlook-email-consent/data-model.md`; the HTML does not contain `access_token` or `refresh_token`; the start form does not submit a password or server fields. Do not assert an IMAP or SMTP send.
+- [x] T003 [US1] Add failing flow tests in `temba/channels/types/email/tests.py` that mock the token endpoint and JWKS and never call `login.microsoftonline.com`. The token mock returns the Graph response first and the Outlook refresh response second. Assert: empty `APP_MICROSOFT_CLIENT_ID` does not show the primary-address form and does not redirect; a blank address or one without `@` does not redirect and does not store an attempt; posting a primary address redirects with `CONSENT_SCOPES` in that order, PKCE, and `target="_top"`; the code exchange requests `GRAPH_SCOPES` only; an approved consent whose mailbox equals that address creates one `EM` channel for a work mailbox (Graph JWT, SMTP `smtp.office365.com`) and for an Outlook.com mailbox (opaque Graph token, mailbox from `id_token`, opaque Outlook token, SMTP `smtp-mail.outlook.com`), including both grants; a different mailbox creates none; a return with neither a signed Graph token nor a signed id token creates none; config matches `specs/013-outlook-email-consent/data-model.md`; the HTML does not contain `access_token`, `refresh_token`, `graph_send_access_token`, or `graph_send_refresh_token`; the start form does not submit a password or server fields. Do not assert an IMAP or SMTP send.
 
 ### Implementation for User Story 1
 
-- [x] T004 [US1] Implement the authorize URL (`prompt=select_account`, PKCE S256, scopes from T002), the single 10-second code exchange with `APP_MICROSOFT_CLIENT_SECRET` and no retry, access-token verification (`aud` `https://outlook.office.com`, v2 issuer, `exp`, RS256 against the Microsoft JWKS), and create-under-`pg_advisory_xact_lock` only when the token mailbox equals the stored address, in `temba/channels/types/email/outlook.py`
+- [x] T004 [US1] Implement the authorize URL (`prompt=select_account`, PKCE S256, `CONSENT_SCOPES`), the 10-second code exchange for `GRAPH_SCOPES` with `APP_MICROSOFT_CLIENT_SECRET` and no retry, the 10-second `refresh_token` grant for `OUTLOOK_SCOPES` with no retry, mailbox resolution (Graph JWT audience `https://graph.microsoft.com` or `00000003-0000-0000-c000-000000000000`, otherwise `id_token` audience `APP_MICROSOFT_CLIENT_ID`; claims `preferred_username`, `upn`, `email`, `unique_name`), Outlook JWT verification (`aud` `https://outlook.office.com`) only when that token is a JWT, `smtp_host` from the Outlook token shape, and create-under-`pg_advisory_xact_lock` only when the mailbox equals the stored address, in `temba/channels/types/email/outlook.py`
 - [x] T005 [US1] Add a start view that accepts the primary address and redirects, and a callback view that calls `outlook.py` on the happy path, in `temba/channels/types/email/views.py`. A blank address or one without `@` is rejected on the form and does not redirect. Leave `ClaimView.form_valid` unchanged.
 - [x] T006 [US1] Register `outlook_start` and `outlook_callback` beside the existing claim URL in `EmailType.get_urls` in `temba/channels/types/email/type.py`
-- [x] T007 [US1] Add the primary-address form, rendered only when `APP_MICROSOFT_CLIENT_ID` is non-empty, and keep the generic credential form, in `templates/channels/types/email/claim.haml`
+- [x] T007 [US1] Add the primary-address form, rendered only when `APP_MICROSOFT_CLIENT_ID` is non-empty, posting to `outlook_start` with `target="_top"`, and keep the generic credential form, in `templates/channels/types/email/claim.haml`
 
 **Checkpoint**: User Story 1 is testable on its own. A successful consent creates one email channel. The generic form still posts as it does today.
 
@@ -85,19 +87,19 @@
 
 **Goal**: A Microsoft channel already marked `needs_reconnect` is updated in place. Releasing the channel drops the tokens. The channel page shows that reconnect state and never the grant.
 
-**Independent Test**: A `needs_reconnect` consent keeps the same channel id and sets `oauth_status=active`. Release leaves `is_active` false and both tokens absent. The channel read page shows the reconnect notice and not the tokens.
+**Independent Test**: A `needs_reconnect` consent keeps the same channel id, replaces both grants and `smtp_host`, and sets `oauth_status=active`. Release leaves `is_active` false and all four token keys absent. The channel read page shows the reconnect notice and not the grants.
 
 ### Tests for User Story 3
 
-- [x] T011 [US3] Add failing tests in `temba/channels/types/email/tests.py` for in-place token replacement when `oauth_status` is `needs_reconnect`, for `EmailType.deactivate` clearing `access_token` and `refresh_token` on release, and for the reconnect notice on the channel read page. Assert the notice and the page do not contain either token.
+- [x] T011 [US3] Add failing tests in `temba/channels/types/email/tests.py` for in-place replacement of both grants and `smtp_host` when `oauth_status` is `needs_reconnect`, for `EmailType.deactivate` clearing `access_token`, `refresh_token`, `graph_send_access_token`, and `graph_send_refresh_token` on release, and for the reconnect notice on the channel read page. Assert the notice and the page do not contain any token.
 
 ### Implementation for User Story 3
 
-- [x] T012 [US3] After T009, on consent for an existing Microsoft channel with `oauth_status=needs_reconnect`, replace the tokens and set `oauth_status` to `active` on that same row in `temba/channels/types/email/outlook.py`
-- [x] T013 [P] [US3] Remove `access_token` and `refresh_token` in `EmailType.deactivate` in `temba/channels/types/email/type.py` so `Channel.release` saves the row without them
+- [x] T012 [US3] After T009, on consent for an existing Microsoft channel with `oauth_status=needs_reconnect`, replace both grants and `smtp_host`, clear the password, and set `oauth_status` to `active` on that same row in `temba/channels/types/email/outlook.py`
+- [x] T013 [P] [US3] Remove `access_token`, `refresh_token`, `graph_send_access_token`, and `graph_send_refresh_token` in `EmailType.deactivate` in `temba/channels/types/email/type.py` so `Channel.release` saves the row without them
 - [x] T014 [P] [US3] Show a reconnect notice when `oauth_provider` is `microsoft` and `oauth_status` is `needs_reconnect`, with no token output, in `templates/channels/channel_read.haml`
 
-**Checkpoint**: All three stories work. Removal stops use of the grant. A later connect needs a new consent.
+**Checkpoint**: All three stories work. Removal stops use of both grants. A later connect needs a new consent.
 
 ---
 
@@ -111,6 +113,20 @@
 
 ---
 
+## Phase 7: Single sign-in, two grants, personal mailboxes
+
+**Purpose**: Record the adjustments that replaced the three-scope Outlook-only consent. The behavior lives in the tasks above. These items are done.
+
+- [x] T018 [US1] One authorize request lists `CONSENT_SCOPES`. The code exchange requests `GRAPH_SCOPES` only. A second `refresh_token` grant requests `OUTLOOK_SCOPES`. Store `graph_send_access_token` and `graph_send_refresh_token`. Both refresh keys hold the refresh token from the Outlook grant, or the Graph refresh token when that grant does not rotate it.
+- [x] T019 [US1] Read the mailbox from a signed Graph token, and from `id_token` when the Graph token is opaque or has no mailbox claim. A missing mailbox logs `token_mailbox` and creates no channel. Do not reject a personal account only because the Graph token is opaque.
+- [x] T020 [US1] Set `smtp_host` to `smtp.office365.com` when the Outlook access token is a JWT, and to `smtp-mail.outlook.com` when it is opaque. Verify a JWT Outlook token. Store an opaque Outlook token after the mailbox has been accepted.
+- [x] T021 [US1] Post the Connect Outlook form with `target="_top"` so Microsoft is not opened inside a frame.
+- [x] T022 [US3] On reconnect, replace both grants and `smtp_host`. On release, remove all four token keys.
+
+**Checkpoint**: `temba.channels.types.email` covers the work JWT path, the personal id-token path, the scope list, the top-level form, reconnect, and release.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -121,6 +137,7 @@
 - **User Story 2 (Phase 4)**: Depends on Phase 3, because the failure tests extend the callback and the same test module.
 - **User Story 3 (Phase 5)**: T011, T013, and T014 depend on Phase 3. T012 edits `outlook.py` and starts after T009.
 - **Polish (Phase 6)**: Depends on the stories being implemented. T017 is last.
+- **Adjustments (Phase 7)**: Done. They revise User Stories 1 and 3; they do not add a story.
 
 ### User Story Dependencies
 

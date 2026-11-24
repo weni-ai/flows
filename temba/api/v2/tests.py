@@ -5081,7 +5081,7 @@ class APITest(APIJSONMixin, TembaTest):
         response = self.fetchJSON(url, "id=%d" % owned.pk)
         row = response.json()["results"][0]
         self.assertEqual("failed", row["status"])
-        self.assertNotIn("failed_reason", row)
+        self.assertIsNone(row["failed_reason"])
         self.assertEqual(
             {
                 "id",
@@ -5101,6 +5101,7 @@ class APITest(APIJSONMixin, TembaTest):
                 "sent_on",
                 "modified_on",
                 "media",
+                "failed_reason",
             },
             set(row.keys()),
         )
