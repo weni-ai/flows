@@ -1,3 +1,8 @@
+import uuid
+
+import sentry_sdk
+from redis.exceptions import RedisError
+from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated, PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -5,10 +10,28 @@ from rest_framework.views import APIView
 from weni.internal.authenticators import InternalOIDCAuthentication
 from weni.internal.permissions import CanCommunicateInternally
 
+from django.db import transaction
 from django.db.models import F, Min, Prefetch
 
 from temba.api.auth.jwt import JWTAuthMixinRequired
 from temba.api.support import InvalidQueryError
+from temba.api.v2.internals.msgs import idempotency
+from temba.api.v2.internals.msgs.observability import (
+    OUTCOME_CONFLICT,
+    OUTCOME_CREATED,
+    OUTCOME_ERROR,
+    OUTCOME_PROJECT_NOT_FOUND,
+    OUTCOME_REJECTED_AUTH,
+    OUTCOME_REJECTED_TENANT,
+    OUTCOME_REJECTED_VALIDATION,
+    OUTCOME_REPLAYED,
+    REASON_DEDUPE_UNAVAILABLE,
+    REASON_UNEXPECTED,
+    bind_request_scope,
+    extract_correlation_id,
+    log_outcome,
+)
+from temba.api.v2.internals.msgs.permissions import ModuleJWTProjectScope
 from temba.api.v2.internals.msgs.serializers import InternalMsgReadSerializer, MsgStreamSerializer
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.views_base import CreatedOnCursorPagination
@@ -144,15 +167,97 @@ class InternalMessagesView(APIViewMixin, APIView):
 
 
 class MsgStreamView(JWTAuthMixinRequired, APIViewMixin, APIView):
+    permission_classes = [ModuleJWTProjectScope]
+
+    def get_authenticate_header(self, request):
+        # AD-004 rule 4: every JWT failure on this endpoint is 403. Returning no
+        # challenge stops DRF from rewriting that failure to 401, including if the
+        # shared authenticator later starts advertising WWW-Authenticate.
+        return None
+
+    def handle_exception(self, exc):
+        project_uuid, channel_uuid, correlation_id = self._request_ids(self.request)
+        if isinstance(exc, (AuthenticationFailed, NotAuthenticated)):
+            self._log(OUTCOME_REJECTED_AUTH, 403, project_uuid, channel_uuid, correlation_id, False)
+        elif isinstance(exc, PermissionDenied):
+            self._log(OUTCOME_REJECTED_TENANT, 403, project_uuid, channel_uuid, correlation_id, False)
+        return super().handle_exception(exc)
+
     def post(self, request, *args, **kwargs):
+        project_uuid, channel_uuid, correlation_id = self._request_ids(request)
+        bind_request_scope(project_uuid=project_uuid, channel_uuid=channel_uuid, correlation_id=correlation_id)
+
+        key = idempotency.extract_key(request)
+        normalized_project = self._normalize_uuid(project_uuid)
+        reserved = False
+        body_hash = None
+        if key and normalized_project:
+            body_hash = idempotency.body_hash(request)
+            try:
+                state, replay_ids = idempotency.claim(normalized_project, key, body_hash)
+            except RedisError:
+                self._log(
+                    OUTCOME_ERROR,
+                    503,
+                    normalized_project,
+                    channel_uuid,
+                    correlation_id,
+                    True,
+                    reason=REASON_DEDUPE_UNAVAILABLE,
+                )
+                return Response({"error": idempotency.SERVICE_UNAVAILABLE_ERROR}, status=503)
+            if state == idempotency.CLAIM_HIT:
+                self._log(OUTCOME_REPLAYED, 200, normalized_project, channel_uuid, correlation_id, True)
+                return Response({"ids": replay_ids}, status=200)
+            if state == idempotency.CLAIM_CONFLICT:
+                self._log(
+                    OUTCOME_CONFLICT,
+                    409,
+                    normalized_project,
+                    channel_uuid,
+                    correlation_id,
+                    True,
+                    reason=idempotency.CODE_IDEMPOTENCY_CONFLICT,
+                )
+                return Response(
+                    {"code": idempotency.CODE_IDEMPOTENCY_CONFLICT, "error": idempotency.CONFLICT_ERROR},
+                    status=409,
+                )
+            if state == idempotency.CLAIM_IN_PROGRESS:
+                self._log(
+                    OUTCOME_CONFLICT,
+                    409,
+                    normalized_project,
+                    channel_uuid,
+                    correlation_id,
+                    True,
+                    reason=idempotency.CODE_IDEMPOTENCY_IN_PROGRESS,
+                )
+                return Response(
+                    {"code": idempotency.CODE_IDEMPOTENCY_IN_PROGRESS, "error": idempotency.IN_PROGRESS_ERROR},
+                    status=409,
+                )
+            reserved = True
+
         serializer = MsgStreamSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            self._release(normalized_project, key, reserved)
+            self._log(
+                OUTCOME_REJECTED_VALIDATION,
+                400,
+                normalized_project or project_uuid,
+                channel_uuid,
+                correlation_id,
+                bool(key),
+            )
+            return Response(serializer.errors, status=400)
 
         data = serializer.validated_data
-        project_uuid = data["project_uuid"]
         try:
-            org = Org.objects.get(proj_uuid=project_uuid)
+            org = Org.objects.get(proj_uuid=data["project_uuid"])
         except Org.DoesNotExist:
+            self._release(normalized_project, key, reserved)
+            self._log(OUTCOME_PROJECT_NOT_FOUND, 404, normalized_project, channel_uuid, correlation_id, bool(key))
             return Response({"error": "Project not found"}, status=404)
 
         # pick content field
@@ -165,9 +270,10 @@ class MsgStreamView(JWTAuthMixinRequired, APIViewMixin, APIView):
 
         contact_uuid = str(data.get("contact_uuid")) if data.get("contact_uuid") else None
         urns = data.get("urns") or [None]
+        channel_for_msg = str(data.get("channel_uuid")) if data.get("channel_uuid") else None
 
-        created_ids = []
-        try:
+        def create_ids():
+            created_ids = []
             for urn in urns:
                 msg = create_message_db_only(
                     org=org,
@@ -175,7 +281,7 @@ class MsgStreamView(JWTAuthMixinRequired, APIViewMixin, APIView):
                     text=text,
                     contact_uuid=contact_uuid,
                     urn=urn,
-                    channel_uuid=str(data.get("channel_uuid")) if data.get("channel_uuid") else None,
+                    channel_uuid=channel_for_msg,
                     status=data.get("status"),
                     created_on=data.get("created_on"),
                     sent_on=data.get("sent_on"),
@@ -186,10 +292,76 @@ class MsgStreamView(JWTAuthMixinRequired, APIViewMixin, APIView):
                     metadata=msg_data,
                 )
                 created_ids.append(msg.id)
-        except ValueError as e:
-            return Response({"error": str(e)}, status=400)
+            return created_ids
 
+        try:
+            if reserved:
+                with transaction.atomic():
+                    created_ids = create_ids()
+                    idempotency.store_success(normalized_project, key, body_hash, created_ids)
+            else:
+                created_ids = create_ids()
+        except ValueError as exc:
+            self._release(normalized_project, key, reserved)
+            self._log(OUTCOME_REJECTED_VALIDATION, 400, normalized_project, channel_uuid, correlation_id, bool(key))
+            return Response({"error": str(exc)}, status=400)
+        except RedisError:
+            self._release(normalized_project, key, reserved)
+            self._log(
+                OUTCOME_ERROR,
+                503,
+                normalized_project,
+                channel_uuid,
+                correlation_id,
+                True,
+                reason=REASON_DEDUPE_UNAVAILABLE,
+            )
+            return Response({"error": idempotency.SERVICE_UNAVAILABLE_ERROR}, status=503)
+        except Exception:
+            self._release(normalized_project, key, reserved)
+            self._log(
+                OUTCOME_ERROR,
+                500,
+                normalized_project,
+                channel_uuid,
+                correlation_id,
+                bool(key),
+                reason=REASON_UNEXPECTED,
+            )
+            sentry_sdk.capture_exception()
+            raise
+
+        self._log(OUTCOME_CREATED, 201, normalized_project or project_uuid, channel_uuid, correlation_id, bool(key))
         return Response({"ids": created_ids}, status=201)
+
+    def _request_ids(self, request):
+        data = request.data if isinstance(getattr(request, "data", None), dict) else {}
+        project_uuid = data.get("project_uuid") if isinstance(data.get("project_uuid"), str) else None
+        channel_uuid = data.get("channel_uuid") if isinstance(data.get("channel_uuid"), str) else None
+        return project_uuid, channel_uuid, extract_correlation_id(request)
+
+    def _normalize_uuid(self, value):
+        if not value:
+            return None
+        try:
+            return str(uuid.UUID(value))
+        except ValueError:
+            return None
+
+    def _release(self, project_uuid, key, reserved):
+        if reserved:
+            idempotency.release(project_uuid, key)
+
+    def _log(self, outcome, status, project_uuid, channel_uuid, correlation_id, key_present, reason=None):
+        log_outcome(
+            outcome,
+            status=status,
+            project_uuid=project_uuid,
+            channel_uuid=channel_uuid,
+            correlation_id=correlation_id,
+            idempotency_key_present=key_present,
+            reason=reason,
+        )
 
 
 class FirstContactsPagination(LimitOffsetPagination):

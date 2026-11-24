@@ -1,3 +1,8 @@
+3.115.0
+----------
+* feat: validate Shopping Assistant components and support Idempotency-Key on internal messages stream endpoint
+* fix: security — scope internal messages stream to the module JWT project and declare an explicit permission (SEC-03)
+
 3.114.0
 ----------
 * feat: implement 'Other-owner failure reason' feature, showing "Another service has the conversation" for failure reason H and keeping Resend from sending those messages
