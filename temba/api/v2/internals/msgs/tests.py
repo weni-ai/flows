@@ -4,6 +4,7 @@ import uuid
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
+from wsgiref.util import setup_testing_defaults
 
 import jwt
 import sentry_sdk
@@ -13,6 +14,7 @@ from django_redis import get_redis_connection
 from redis.exceptions import ConnectionError as RedisConnectionError, RedisError
 from rest_framework import serializers
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -32,7 +34,7 @@ from temba.api.v2.internals.msgs.idempotency import (
     get_client,
     release,
 )
-from temba.api.v2.internals.msgs.observability import scrub_stream_event
+from temba.api.v2.internals.msgs.observability import bind_request_scope, scrub_stream_event
 from temba.api.v2.internals.msgs.permissions import ModuleJWTProjectScope
 from temba.api.v2.internals.msgs.serializers import (
     HeaderSerializer,
@@ -1507,6 +1509,64 @@ class _MemoryTransport(sentry_sdk.transport.Transport):
             self.events.append(json.loads(raw))
 
 
+STREAM_SCOPE_TAGS = ("caller", "account_id", "user_id", "project_uuid", "channel_uuid", "correlation_id")
+
+
+def _event_tags(event):
+    tags = event.get("tags") or {}
+    return dict(tags) if isinstance(tags, list) else tags
+
+
+class TestStreamSentryProductionScope(SimpleTestCase):
+    """
+    bind_request_scope writes on the current scope and relies on DjangoIntegration giving each production request its
+    own: the integration runs WSGIHandler inside SentryWsgiMiddleware, which handles the request on a copy of the hub.
+    """
+
+    def test_wsgi_request_scope_is_discarded(self):
+        marker = "ZXWSGI" + uuid4().hex
+        transport = _MemoryTransport()
+        client = sentry_sdk.Client(
+            dsn="http://public@example.invalid/1",
+            transport=transport,
+            default_integrations=False,
+            auto_session_tracking=False,
+        )
+
+        def stream_app(environ, start_response):
+            bind_request_scope(project_uuid="project-1", channel_uuid="channel-1", correlation_id="corr-1")
+            sentry_sdk.capture_event({"message": "inside the request", "request": {"data": {"text": marker}}})
+            start_response("201 Created", [])
+            return [b""]
+
+        environ = {}
+        setup_testing_defaults(environ)
+
+        with sentry_sdk.Hub(client) as hub:
+            list(SentryWsgiMiddleware(stream_app)(environ, lambda status, headers: None))
+            outside_tags = dict(hub.scope._tags)
+            outside_processors = list(hub.scope._event_processors)
+
+        # the event raised in the request has the stream tags and went through the scrubbing
+        self.assertEqual(1, len(transport.events))
+        self.assertNotIn(marker, json.dumps(transport.events))
+        self.assertEqual(
+            {
+                "caller": "module_jwt",
+                "account_id": "none",
+                "user_id": "none",
+                "project_uuid": "project-1",
+                "channel_uuid": "channel-1",
+                "correlation_id": "corr-1",
+            },
+            {tag: _event_tags(transport.events[0]).get(tag) for tag in STREAM_SCOPE_TAGS},
+        )
+
+        # and nothing of it is left on the scope once the request is over
+        self.assertEqual({}, outside_tags)
+        self.assertNotIn(scrub_stream_event, outside_processors)
+
+
 class TestMsgStreamObservability(ModuleJWTTestMixin, TembaTest):
     def setUp(self):
         super().setUp()
@@ -1558,6 +1618,39 @@ class TestMsgStreamObservability(ModuleJWTTestMixin, TembaTest):
         self.assertEqual(tags.get("caller"), "module_jwt")
         self.assertEqual(tags.get("account_id"), "none")
         self.assertEqual(tags.get("user_id"), "none")
+
+    def test_stream_request_scope_does_not_leak(self):
+        hub = sentry_sdk.Hub.current
+        scope = hub.scope
+        tags_before = dict(scope._tags)
+        processors_before = list(scope._event_processors)
+        self.addCleanup(self._restore_scope, scope, tags_before, processors_before)
+
+        client = sentry_sdk.Client(
+            dsn="http://public@example.invalid/1", transport=_MemoryTransport(), default_integrations=False
+        )
+        previous = hub.client
+        hub.bind_client(client)
+        headers = self.jwt_headers(self.org.proj_uuid)
+        headers["HTTP_X_CORRELATION_ID"] = "corr-leak"
+        try:
+            response = self.post_stream(
+                self.payload_for(self.component_msg(), channel_uuid=str(self.channel.uuid)), headers
+            )
+        finally:
+            hub.bind_client(previous)
+
+        self.assertEqual(response.status_code, 201, response.content)
+        for tag in STREAM_SCOPE_TAGS:
+            self.assertNotIn(tag, scope._tags)
+        self.assertNotIn(scrub_stream_event, scope._event_processors)
+        self.assertEqual(tags_before, dict(scope._tags))
+        self.assertEqual(processors_before, list(scope._event_processors))
+
+    def _restore_scope(self, scope, tags, processors):
+        # puts back what this test found, so a failing run neither leaks into nor cleans up after other tests
+        scope._tags = dict(tags)
+        scope._event_processors = list(processors)
 
     def test_each_outcome_is_logged_without_content(self):
         marker = "ZXLOG" + uuid4().hex

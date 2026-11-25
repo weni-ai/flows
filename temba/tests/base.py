@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytz
 import redis
+import sentry_sdk
 from smartmin.tests import SmartminTest, SmartminTestMixin
 from weni.internal.models import Project
 
@@ -14,7 +15,7 @@ from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.test import TransactionTestCase
+from django.test import Client, TransactionTestCase
 from django.utils import timezone
 
 from temba.archives.models import Archive
@@ -37,8 +38,21 @@ def add_testing_flag_to_context(*args):
     return dict(testing=settings.TESTING)
 
 
+class SentryScopedClient(Client):
+    """
+    Test client that handles each request on its own copy of the Sentry hub, as DjangoIntegration does in production.
+    The integration installs that per-request hub on WSGIHandler, which the test client never goes through, so without
+    it whatever a view puts on the Sentry scope would outlive the request and end up in the events of later tests.
+    """
+
+    def request(self, **request):
+        with sentry_sdk.Hub(sentry_sdk.Hub.current):
+            return super().request(**request)
+
+
 class TembaTestMixin:
     databases = ("default", "readonly")
+    client_class = SentryScopedClient
 
     def setUpOrgs(self):
         # make sure we start off without any service users

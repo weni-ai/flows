@@ -1,4 +1,6 @@
+import importlib
 import json
+import logging
 import uuid
 from unittest.mock import patch
 
@@ -6,6 +8,9 @@ import jwt as pyjwt
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from django.test import SimpleTestCase
+
+import temba.fastapi_app
 from temba.fastapi_app.auth import verify_jwt
 from temba.fastapi_app.broadcasts import app, post_internal_whatsapp_broadcast
 from temba.msgs.custom_data import CUSTOM_DATA_MAX_DEPTH
@@ -15,6 +20,29 @@ from temba.tests.base import TembaTest
 
 def _parse(resp) -> tuple[int, dict]:
     return resp.status_code, json.loads(resp.body or b"{}")
+
+
+class TestPackageImport(SimpleTestCase):
+    def test_import_with_django_configured_keeps_existing_loggers(self):
+        logger = logging.getLogger("temba.fastapi_app.tests.import_probe")
+        enabled = [
+            existing
+            for existing in logging.Logger.manager.loggerDict.values()
+            if isinstance(existing, logging.Logger) and not existing.disabled
+        ]
+        self.addCleanup(self._enable, enabled)
+
+        importlib.reload(temba.fastapi_app)
+
+        self.assertFalse(logger.disabled)
+        with self.assertLogs(logger.name, level="WARNING") as captured:
+            logger.warning("still enabled")
+        self.assertEqual(["still enabled"], [record.getMessage() for record in captured.records])
+
+    def _enable(self, loggers):
+        # a failing run must not leave the loggers of every later test disabled
+        for existing in loggers:
+            existing.disabled = False
 
 
 class TestHealthEndpoint(TembaTest):

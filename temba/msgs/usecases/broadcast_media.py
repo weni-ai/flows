@@ -5,11 +5,13 @@ The type of every file is detected from its bytes, never from the client's file 
 """
 
 import hashlib
+import io
 import json
 import os
 import struct
 import threading
 import time
+import zipfile
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -82,6 +84,17 @@ LIBMAGIC_MIME_ALIASES = {
 
 # what libmagic reports for ISO BMFF files that are checked for having no video
 ISO_BMFF_VIDEO_TYPES = {"video/mp4", "video/3gpp"}
+
+# Older libmagic builds (e.g. the ones shipped by Debian bookworm and Ubuntu) don't always recognize Office Open XML
+# files and report them as one of these. Such files are opened as ZIP archives to find out which document they are.
+OOXML_UNRECOGNIZED_TYPES = {"application/zip", "application/octet-stream"}
+ZIP_LOCAL_FILE_SIGNATURE = b"PK\x03\x04"
+OOXML_CONTENT_TYPES_PART = "[Content_Types].xml"
+OOXML_PART_PREFIXES = (
+    ("word/", f"{_OFFICE}.wordprocessingml.document"),
+    ("xl/", f"{_OFFICE}.spreadsheetml.sheet"),
+    ("ppt/", f"{_OFFICE}.presentationml.presentation"),
+)
 
 
 def _mp4_boxes(file, start: int, end: int) -> Iterator[tuple[bytes, int, int]]:
@@ -157,6 +170,26 @@ def _is_audio_only_mp4(file) -> bool:
     return bool(handlers) and b"vide" not in handlers
 
 
+def _ooxml_type(archive_file) -> str | None:
+    """
+    Returns the Office Open XML type of a ZIP archive from the names of its parts, or None if it isn't one.
+    Only the central directory is read, never the contents of the parts.
+    """
+    try:
+        with zipfile.ZipFile(archive_file) as archive:
+            names = archive.namelist()
+    except (zipfile.BadZipFile, OSError, ValueError, EOFError):
+        return None
+
+    if OOXML_CONTENT_TYPES_PART not in names:
+        return None
+
+    for prefix, mime in OOXML_PART_PREFIXES:
+        if any(name.startswith(prefix) for name in names):
+            return mime
+    return None
+
+
 def detect_media_type(head: bytes, file=None) -> str:
     """
     Detects the type of a file from its first MEDIA_SNIFF_BYTES, returning a normalized mime type. The result is not
@@ -164,7 +197,11 @@ def detect_media_type(head: bytes, file=None) -> str:
 
     libmagic reports every ISO BMFF file with a video brand as a video, even if it only has audio. When the file is
     given and libmagic reports MP4 or 3GPP video, its track headers (which are usually past the bytes in head) are read
-    to find out whether it has any video track, and it is audio/mp4 if not. The file position is left at the start.
+    to find out whether it has any video track, and it is audio/mp4 if not.
+
+    Older libmagic builds report some Office Open XML files as a plain ZIP or as unknown data. When the bytes start a
+    ZIP archive, its part names are read (from the file when given, since the ZIP directory is at the end of it) to
+    find out whether it is a Word, Excel or PowerPoint document. The file position is left at the start.
     """
     import magic  # imported here so that machines without libmagic can still load Django and run unrelated tests
 
@@ -178,6 +215,15 @@ def detect_media_type(head: bytes, file=None) -> str:
                 mime = "audio/mp4"
         finally:
             file.seek(0)
+
+    if mime in OOXML_UNRECOGNIZED_TYPES and head.startswith(ZIP_LOCAL_FILE_SIGNATURE):
+        if file is None:
+            mime = _ooxml_type(io.BytesIO(head)) or mime
+        else:
+            try:
+                mime = _ooxml_type(file) or mime
+            finally:
+                file.seek(0)
 
     return mime
 
