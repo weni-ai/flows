@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import time
 import uuid
 from collections import OrderedDict
@@ -10,7 +11,12 @@ from urllib.parse import quote_plus
 
 import iso8601
 import pytz
+from boto3.exceptions import S3UploadFailedError
+from botocore.exceptions import ClientError, ConnectTimeoutError, ReadTimeoutError
+from redis.exceptions import ConnectionError as RedisConnectionError, TimeoutError as RedisTimeoutError
 from rest_framework import serializers
+from rest_framework.exceptions import ParseError
+from rest_framework.request import Request
 from rest_framework.test import APIClient, APIRequestFactory
 from weni_commons.auth import SessionContext, SessionUser
 
@@ -19,6 +25,7 @@ from django.contrib.auth.models import AnonymousUser, Group, Permission, User
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import Client, override_settings
 from django.test.utils import CaptureQueriesContext
@@ -27,7 +34,14 @@ from django.utils import timezone
 
 from temba.api.auth.jwt import OptionalJWTAuthentication
 from temba.api.models import APIPermission, APIToken, Resthook, WebHookEvent
-from temba.api.support import InvalidQueryError
+from temba.api.support import InvalidQueryError, temba_exception_handler
+from temba.api.v2.broadcast_media import (
+    MAX_BROADCAST_MULTIPART_BYTES,
+    MEDIA_STORAGE_UNAVAILABLE_MESSAGE,
+    MULTIPART_OVERHEAD_BYTES,
+    BroadcastMultiPartParser,
+    MediaStorageUnavailable,
+)
 from temba.api.v2.views import (
     ContactsTemplatesEndpoint,
     ContactsTemplatesEndpointNew,
@@ -39,6 +53,7 @@ from temba.api.v2.views import (
     FlowsLabelsEndpoint,
     ProductsEndpoint,
     TemplatesEndpoint,
+    WhatsappBroadcastsEndpoint,
     WhatsappFlowsEndpoint,
 )
 from temba.api.v2.views_base import BaseAPIView
@@ -61,29 +76,47 @@ from temba.flows.models import Flow, FlowLabel, FlowRun, FlowStart
 from temba.globals.models import Global
 from temba.locations.models import AdminBoundary, BoundaryAlias
 from temba.msgs.models import Broadcast, Label, ManagedTriggerGroup, Msg
+from temba.msgs.usecases.broadcast_media import (
+    ALLOWED_BROADCAST_MEDIA,
+    BROADCAST_MEDIA_DEDUP_TTL_SECONDS,
+    MAX_AUDIO_BYTES,
+    MAX_BROADCAST_FILES,
+    MAX_BROADCAST_FILES_TOTAL_BYTES,
+    MAX_DOCUMENT_BYTES,
+    MAX_IMAGE_BYTES,
+    MAX_STICKER_BYTES,
+    MAX_VIDEO_BYTES,
+    AllowedMedia,
+    _dedup_redis,
+)
 from temba.orgs.models import Org
 from temba.templates.models import Template, TemplateTranslation
 from temba.tests import AnonymousOrg, TembaTest, matchers, mock_mailroom
 from temba.tests.engine import MockSessionWriter
+from temba.tests.media import audio_only_mp4_bytes, capture_sentry_events, read_test_media
 from temba.tests.s3 import S3_SIGNING_SETTINGS
 from temba.tickets.models import Ticket, Ticketer, Topic
 from temba.tickets.types.mailgun import MailgunType
 from temba.tickets.types.zendesk import ZendeskType
 from temba.triggers.models import Trigger
 from temba.utils import json
+from temba.utils.s3 import private_file_storage
 from temba.wpp_flows.models import WhatsappFlow
 from temba.wpp_products.models import Catalog, Product
 
-from . import fields
+from . import fields, serializers as api_serializers
 from .serializers import (
     ContactReadSerializer,
     ExternalServicesReadSerializer,
     ProductReadSerializer,
+    WhatsappBroadcastWriteSerializer,
     format_datetime,
     normalize_extra,
 )
 
 NUM_BASE_REQUEST_QUERIES = 6  # number of db queries required for any API request
+
+GIF_BYTES = b"GIF89a\x01\x00\x01\x00\x00\x00\x00;"
 
 
 def _nested_custom_data(depth):
@@ -6973,6 +7006,822 @@ class APITest(APIJSONMixin, TembaTest):
         response = self.fetchJSON(endpoint_url, "role=caretaker&role=editor")
         resp_json = response.json()
         self.assertEqual(["Editor@nyaruka.com"], [u["email"] for u in resp_json["results"]])
+
+
+class WhatsappBroadcastsMultipartGlueTest(TembaTest):
+    """
+    The API side of multipart broadcasts: what the parser does with oversize requests, and the error for an outage of
+    the media storage. The use case behind it is tested in temba.msgs.usecases.
+    """
+
+    def multipart_request(self, fields: dict, files=(), **extra) -> Request:
+        data = dict(fields)
+        if files:
+            data["files"] = list(files)
+
+        request = APIRequestFactory().post("/api/v2/whatsapp_broadcasts.json", data, format="multipart", **extra)
+        return Request(request, parsers=[BroadcastMultiPartParser()])
+
+    def test_limits(self):
+        self.assertEqual(512 * 1024, MULTIPART_OVERHEAD_BYTES)
+        self.assertEqual(
+            MAX_BROADCAST_FILES_TOTAL_BYTES + settings.DATA_UPLOAD_MAX_MEMORY_SIZE + MULTIPART_OVERHEAD_BYTES,
+            MAX_BROADCAST_MULTIPART_BYTES,
+        )
+
+        # room for the files of a full request and for a payload as large as Django lets it be
+        self.assertGreater(MAX_BROADCAST_MULTIPART_BYTES, 100 * 1024 * 1024 + 2_500_000)
+
+    def test_valid_request_is_parsed(self):
+        jpeg = SimpleUploadedFile("a.jpg", b"jpeg bytes", "image/jpeg")
+        request = self.multipart_request({"payload": '{"msg": {"text": "Hi"}}'}, [jpeg])
+
+        self.assertEqual(['{"msg": {"text": "Hi"}}'], request.POST.getlist("payload"))
+        self.assertEqual(["a.jpg"], [f.name for f in request.FILES.getlist("files")])
+        self.assertEqual(b"jpeg bytes", request.FILES["files"].read())
+
+    def test_content_length_over_the_limit_is_rejected_before_parsing(self):
+        request = self.multipart_request({"payload": "{}"}, CONTENT_LENGTH=str(MAX_BROADCAST_MULTIPART_BYTES + 1))
+
+        with patch("rest_framework.parsers.DjangoMultiPartParser") as django_parser:
+            with self.assertRaises(ParseError) as cm:
+                request.data
+
+        self.assertEqual({"files": ["The request is too large."]}, cm.exception.detail)
+        self.assertEqual(400, cm.exception.status_code)
+
+        # nothing was read from the request
+        django_parser.assert_not_called()
+
+    def test_content_length_at_the_limit_is_parsed(self):
+        # the body is not that large, so what is checked is that the parsing is reached
+        for content_length in (MAX_BROADCAST_MULTIPART_BYTES, 0, "", "not a number"):
+            with self.subTest(content_length=content_length):
+                request = self.multipart_request({"payload": "{}"}, CONTENT_LENGTH=str(content_length))
+
+                with patch("rest_framework.parsers.MultiPartParser.parse", return_value="parsed") as parse:
+                    result = BroadcastMultiPartParser().parse(None, "multipart/form-data", {"request": request})
+
+                self.assertEqual("parsed", result)
+                parse.assert_called_once()
+
+    def test_payload_over_the_memory_limit(self):
+        with override_settings(DATA_UPLOAD_MAX_MEMORY_SIZE=100):
+            request = self.multipart_request({"payload": "x" * 200})
+
+            with self.assertRaises(ParseError) as cm:
+                request.data
+
+        self.assertEqual({"payload": ["Payload is too large."]}, cm.exception.detail)
+
+    def test_payload_at_the_memory_limit(self):
+        # Django counts the name of the field and 2 more bytes (as for "&=" in a urlencoded form) against the limit too
+        room = 100 - len("payload") - 2
+
+        with override_settings(DATA_UPLOAD_MAX_MEMORY_SIZE=100):
+            request = self.multipart_request({"payload": "x" * room})
+            self.assertEqual(["x" * room], request.POST.getlist("payload"))
+
+            request = self.multipart_request({"payload": "x" * (room + 1)})
+            with self.assertRaises(ParseError):
+                request.data
+
+    def test_files_do_not_count_for_the_memory_limit(self):
+        with override_settings(DATA_UPLOAD_MAX_MEMORY_SIZE=100):
+            jpeg = SimpleUploadedFile("a.jpg", b"x" * 5000, "image/jpeg")
+            request = self.multipart_request({"payload": "{}"}, [jpeg])
+
+            self.assertEqual(5000, request.FILES["files"].size)
+
+    def test_too_many_fields(self):
+        with override_settings(DATA_UPLOAD_MAX_NUMBER_FIELDS=2):
+            request = self.multipart_request({"payload": "{}", "a": "1", "b": "2"})
+
+            with self.assertRaises(ParseError) as cm:
+                request.data
+
+        self.assertEqual({"payload": ["The request has too many fields."]}, cm.exception.detail)
+
+    def test_media_storage_unavailable(self):
+        exc = MediaStorageUnavailable()
+
+        self.assertEqual(503, exc.status_code)
+        self.assertEqual("Media storage temporarily unavailable", MEDIA_STORAGE_UNAVAILABLE_MESSAGE)
+        self.assertEqual(MEDIA_STORAGE_UNAVAILABLE_MESSAGE, str(exc.detail))
+
+        # as the API renders it: a generic detail, with nothing about what failed
+        response = temba_exception_handler(exc, {})
+
+        self.assertEqual(503, response.status_code)
+        self.assertEqual({"detail": MEDIA_STORAGE_UNAVAILABLE_MESSAGE}, response.data)
+        self.assertNotIn("Traceback", json.dumps(response.data))
+
+        # even when it was raised because of another error
+        try:
+            try:
+                raise OSError("/secret/path/attachments/1/broadcasts/abc.jpg")
+            except OSError as e:
+                raise MediaStorageUnavailable() from e
+        except MediaStorageUnavailable as e:
+            response = temba_exception_handler(e, {})
+
+        self.assertEqual({"detail": MEDIA_STORAGE_UNAVAILABLE_MESSAGE}, response.data)
+
+
+class WhatsappBroadcastsInlineMediaTest(APIJSONMixin, TembaTest):
+    """
+    Media files sent with a broadcast to POST /api/v2/whatsapp_broadcasts.json as multipart/form-data. S3 is stubbed
+    where the files are saved, and Redis is the real one.
+    """
+
+    PAYLOAD = {"urns": ["whatsapp:5561912345678"], "msg": {"text": "Black Friday"}}
+
+    def setUp(self):
+        super().setUp()
+
+        # this is needed to prevent REST framework from rolling back transaction created around each unit test
+        connection.settings_dict["ATOMIC_REQUESTS"] = False
+
+        self.url = reverse("api.v2.whatsapp_broadcasts") + ".json"
+        self.jpeg = read_test_media("steve.marten.jpg")
+        self.jpeg_sha256 = hashlib.sha256(self.jpeg).hexdigest()
+        self.mp4 = read_test_media("snow.mp4")
+        self.audio = audio_only_mp4_bytes()
+
+        _dedup_redis.cache_clear()
+
+        patcher = patch("temba.mailroom.queue_broadcast")
+        self.queue = patcher.start()
+        self.addCleanup(patcher.stop)
+
+        patcher = patch.object(private_file_storage, "save", return_value="saved")
+        self.save = patcher.start()
+        self.addCleanup(patcher.stop)
+
+        self.login(self.admin)
+
+    def tearDown(self):
+        _dedup_redis.cache_clear()
+        connection.settings_dict["ATOMIC_REQUESTS"] = True
+
+        super().tearDown()
+
+    def key(self, org, sha256: str, extension: str) -> str:
+        return f"attachments/{org.id}/broadcasts/{sha256}.{extension}"
+
+    def attachment(self, org, sha256: str, mime: str, extension: str) -> str:
+        return f"{mime}:{settings.STORAGE_URL}/{self.key(org, sha256, extension)}"
+
+    def jpeg_attachment(self, org=None) -> str:
+        return self.attachment(org or self.org, self.jpeg_sha256, "image/jpeg", "jpg")
+
+    def upload(self, data: bytes, name: str = "file.bin", content_type: str = "application/octet-stream"):
+        return SimpleUploadedFile(name, data, content_type)
+
+    def post_form(self, fields: dict, **extra):
+        return self.client.post(self.url, fields, HTTP_X_FORWARDED_HTTPS="https", **extra)
+
+    def post_multipart(self, payload=None, files=(), **extra):
+        """
+        Posts the payload (a dict, or text as it is) and files, each file as bytes or as an upload
+        """
+        payload = self.PAYLOAD if payload is None else payload
+        fields = {"payload": payload if isinstance(payload, str) else json.dumps(payload)}
+        if files:
+            fields["files"] = [f if isinstance(f, SimpleUploadedFile) else self.upload(f) for f in files]
+
+        return self.post_form(fields, **extra)
+
+    def spy_serializers(self):
+        """
+        Patches is_valid of the broadcast serializer, and of the ones that extend it, to record their class
+        """
+        seen = []
+        original = WhatsappBroadcastWriteSerializer.is_valid
+
+        def is_valid(serializer, *args, **kwargs):
+            seen.append(type(serializer))
+            return original(serializer, *args, **kwargs)
+
+        patcher = patch.object(WhatsappBroadcastWriteSerializer, "is_valid", autospec=True, side_effect=is_valid)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return seen
+
+    def last_broadcast(self) -> Broadcast:
+        return Broadcast.objects.order_by("-id").first()
+
+    # --- US1: one image in a single request (AC-1, AC-2)
+
+    def test_json_request_is_unchanged(self):
+        seen = self.spy_serializers()
+
+        response = self.postJSON(reverse("api.v2.whatsapp_broadcasts"), None, self.PAYLOAD)
+
+        self.assertEqual(201, response.status_code)
+        self.assertEqual([WhatsappBroadcastWriteSerializer], seen)
+        self.assertEqual({"text": "Black Friday"}, response.json()["metadata"])
+        self.assertEqual({"text": "Black Friday"}, self.last_broadcast().metadata)
+        self.assertEqual(["whatsapp:5561912345678"], response.json()["urns"])
+
+        # nothing is stored or looked up for JSON
+        self.save.assert_not_called()
+        self.assertEqual([], _dedup_redis().keys("broadcast_media:*"))
+        self.queue.assert_called_once_with(self.last_broadcast())
+
+    def test_single_image(self):
+        seen = self.spy_serializers()
+
+        response = self.post_multipart(files=[self.upload(self.jpeg, "promo.jpg", "image/jpeg")])
+
+        self.assertEqual(201, response.status_code)
+        self.assertEqual([api_serializers.WhatsappBroadcastWithMediaWriteSerializer], seen)
+
+        expected = self.jpeg_attachment()
+        self.assertEqual(
+            f"image/jpeg:{settings.STORAGE_URL}/attachments/{self.org.id}/broadcasts/{self.jpeg_sha256}.jpg", expected
+        )
+        self.assertEqual({"text": "Black Friday", "attachments": [expected]}, response.json()["metadata"])
+        self.assertEqual({"text": "Black Friday", "attachments": [expected]}, self.last_broadcast().metadata)
+
+        # the stored URL is the canonical one, which Courier signs when it sends
+        self.assertNotIn("X-Amz-", expected)
+        self.assertNotIn("?", expected)
+
+        # the file went to the bucket under that key, as the type it is
+        self.save.assert_called_once()
+        key, file = self.save.call_args.args
+        self.assertEqual(self.key(self.org, self.jpeg_sha256, "jpg"), key)
+        self.assertEqual("image/jpeg", file.content_type)
+        self.queue.assert_called_once_with(self.last_broadcast())
+
+    def test_client_type_and_name_are_ignored(self):
+        response = self.post_multipart(files=[self.upload(self.jpeg, "photo.bin", "application/octet-stream")])
+
+        self.assertEqual(201, response.status_code)
+        self.assertEqual([self.jpeg_attachment()], response.json()["metadata"]["attachments"])
+
+        key, file = self.save.call_args.args
+        self.assertTrue(key.endswith(f"/{self.jpeg_sha256}.jpg"))
+        self.assertEqual("image/jpeg", file.content_type)
+
+        # and one that claims to be something else
+        self.save.reset_mock()
+        response = self.post_multipart(files=[self.upload(self.mp4, "photo.jpg", "image/jpeg")])
+
+        self.assertEqual(201, response.status_code)
+        self.assertEqual("video/mp4", response.json()["metadata"]["attachments"][0].split(":")[0])
+        self.assertTrue(response.json()["metadata"]["attachments"][0].endswith(".mp4"))
+
+    def test_template_header_uses_the_first_file(self):
+        template = Template.objects.create(name="Template1", uuid="0ca51332-8c61-49a0-a4a8-c52c0bf57729", org=self.org)
+        payload = {
+            "urns": ["whatsapp:5561912345678"],
+            "msg": {"template": {"uuid": template.uuid}, "text": "Send a message"},
+        }
+
+        response = self.post_multipart(payload, files=[self.jpeg])
+
+        self.assertEqual(201, response.status_code)
+        metadata = self.last_broadcast().metadata
+        self.assertEqual([self.jpeg_attachment()], metadata["attachments"])
+        self.assertEqual(template.uuid, metadata["template"]["uuid"])
+
+    def test_multipart_without_files_is_like_json(self):
+        json_response = self.postJSON(reverse("api.v2.whatsapp_broadcasts"), None, self.PAYLOAD)
+        self.assertEqual(201, json_response.status_code)
+
+        seen = self.spy_serializers()
+        response = self.post_multipart()
+
+        # the same broadcast, made by the serializer of multipart requests
+        self.assertEqual(201, response.status_code)
+        self.assertEqual([api_serializers.WhatsappBroadcastWithMediaWriteSerializer], seen)
+        self.assertEqual(json_response.json()["metadata"], response.json()["metadata"])
+        self.assertEqual(json_response.json()["urns"], response.json()["urns"])
+        self.assertEqual({"text": "Black Friday"}, response.json()["metadata"])
+
+        self.save.assert_not_called()
+        self.assertEqual([], _dedup_redis().keys("broadcast_media:*"))
+
+    # --- US1: who may send (AC-8, public endpoint)
+
+    def test_api_key(self):
+        token = APIToken.get_or_create(self.org, self.admin, Group.objects.get(name="Administrators"))
+        self.client.logout()
+
+        response = self.post_multipart(files=[self.jpeg], HTTP_AUTHORIZATION=f"Token {token.key}")
+
+        self.assertEqual(201, response.status_code)
+        self.assertEqual([self.jpeg_attachment()], response.json()["metadata"]["attachments"])
+        self.save.assert_called_once()
+
+    @patch("temba.api.auth.jwt.settings")
+    @patch("temba.api.auth.jwt.jwt.decode")
+    def test_jwt_with_project_claims(self, mock_decode, mock_settings):
+        mock_settings.JWT_PUBLIC_KEY = "dummy"
+        mock_decode.return_value = {"project_uuid": str(self.org.proj_uuid)}
+        self.client.logout()
+
+        response = self.post_multipart(files=[self.jpeg], HTTP_AUTHORIZATION="Bearer token")
+
+        self.assertEqual(201, response.status_code)
+        self.assertEqual([self.jpeg_attachment()], response.json()["metadata"]["attachments"])
+        self.save.assert_called_once()
+
+        # the org is the one in the token
+        self.assertEqual(self.org, self.last_broadcast().org)
+
+    def test_unauthenticated_and_not_allowed_are_as_for_json(self):
+        json_url = reverse("api.v2.whatsapp_broadcasts")
+
+        # no credentials
+        self.client.logout()
+        json_response = self.postJSON(json_url, None, self.PAYLOAD)
+        response = self.post_multipart(files=[self.jpeg])
+        self.assertEqual(403, json_response.status_code)
+        self.assertEqual(json_response.status_code, response.status_code)
+        self.assertEqual(json_response.json(), response.json())
+
+        # a token that is not valid
+        json_response = self.postJSON(json_url, None, self.PAYLOAD, HTTP_AUTHORIZATION="Token 1234567890")
+        response = self.post_multipart(files=[self.jpeg], HTTP_AUTHORIZATION="Token 1234567890")
+        self.assertEqual(403, json_response.status_code)
+        self.assertEqual(json_response.json(), response.json())
+
+        # a user who may not send broadcasts
+        self.login(self.user)
+        json_response = self.postJSON(json_url, None, self.PAYLOAD)
+        response = self.post_multipart(files=[self.jpeg])
+        self.assertEqual(403, json_response.status_code)
+        self.assertEqual(json_response.json(), response.json())
+
+        self.save.assert_not_called()
+        self.assertEqual(0, Broadcast.objects.count())
+
+    # --- US2: order (AC-3)
+
+    def test_files_go_after_the_urls_in_the_payload(self):
+        payload = {
+            "urns": ["whatsapp:5561912345678"],
+            "msg": {
+                "text": "Hi",
+                "attachments": ["image/png:https://example.com/a.png", "application/pdf:https://example.com/b.pdf"],
+            },
+        }
+
+        response = self.post_multipart(payload, files=[self.jpeg, self.mp4, self.audio])
+
+        self.assertEqual(201, response.status_code)
+        attachments = response.json()["metadata"]["attachments"]
+        self.assertEqual(
+            [
+                "image/png:https://example.com/a.png",
+                "application/pdf:https://example.com/b.pdf",
+                self.jpeg_attachment(),
+                self.attachment(self.org, hashlib.sha256(self.mp4).hexdigest(), "video/mp4", "mp4"),
+                self.attachment(self.org, hashlib.sha256(self.audio).hexdigest(), "audio/mp4", "m4a"),
+            ],
+            attachments,
+        )
+
+        # in the same order in the stored broadcast
+        self.assertEqual(attachments, self.last_broadcast().metadata["attachments"])
+        self.assertEqual(3, self.save.call_count)
+
+    def test_same_file_twice_in_one_request(self):
+        response = self.post_multipart(files=[self.jpeg, self.mp4, self.jpeg])
+
+        self.assertEqual(201, response.status_code)
+        attachments = response.json()["metadata"]["attachments"]
+        self.assertEqual(3, len(attachments))
+        self.assertEqual(attachments[0], attachments[2])
+        self.assertNotEqual(attachments[0], attachments[1])
+
+        # each content is stored once
+        self.assertEqual(
+            [
+                self.key(self.org, self.jpeg_sha256, "jpg"),
+                self.key(self.org, hashlib.sha256(self.mp4).hexdigest(), "mp4"),
+            ],
+            [c.args[0] for c in self.save.call_args_list],
+        )
+
+    # --- US3: the same file again (AC-4)
+
+    def test_same_file_in_two_requests_is_stored_once(self):
+        first = self.post_multipart(files=[self.jpeg])
+        second = self.post_multipart(files=[self.jpeg])
+
+        self.assertEqual(201, first.status_code)
+        self.assertEqual(201, second.status_code)
+        self.save.assert_called_once()
+
+        # two broadcasts that share the file
+        self.assertNotEqual(first.json()["id"], second.json()["id"])
+        self.assertEqual([self.jpeg_attachment()], first.json()["metadata"]["attachments"])
+        self.assertEqual(first.json()["metadata"]["attachments"], second.json()["metadata"]["attachments"])
+
+        # and an entry that expires, which is what made the second one skip the upload
+        cache_key = f"broadcast_media:{self.org.id}:{self.jpeg_sha256}"
+        self.assertEqual(self.jpeg_attachment().encode(), _dedup_redis().get(cache_key))
+        self.assertAlmostEqual(BROADCAST_MEDIA_DEDUP_TTL_SECONDS, _dedup_redis().ttl(cache_key), delta=10)
+
+    def test_same_file_for_another_org_is_stored_again(self):
+        self.assertEqual(201, self.post_multipart(files=[self.jpeg]).status_code)
+
+        token = APIToken.get_or_create(self.org2, self.admin2, Group.objects.get(name="Administrators"))
+        self.client.logout()
+        response = self.post_multipart(files=[self.jpeg], HTTP_AUTHORIZATION=f"Token {token.key}")
+
+        self.assertEqual(201, response.status_code)
+        self.assertEqual([self.jpeg_attachment(self.org2)], response.json()["metadata"]["attachments"])
+
+        # under its own prefix, and with its own entry
+        self.assertEqual(2, self.save.call_count)
+        self.assertEqual(self.key(self.org2, self.jpeg_sha256, "jpg"), self.save.call_args.args[0])
+        self.assertIsNotNone(_dedup_redis().get(f"broadcast_media:{self.org.id}:{self.jpeg_sha256}"))
+        self.assertIsNotNone(_dedup_redis().get(f"broadcast_media:{self.org2.id}:{self.jpeg_sha256}"))
+
+    # --- US5: invalid requests (AC-5)
+
+    def test_rejections(self):
+        no_recipients = {"msg": {"text": "Hi"}}
+        too_large_message = "File is too large for {}: the limit is {}."
+
+        def padded(data: bytes, size: int) -> bytes:
+            return data + b"\x00" * (size - len(data))
+
+        # a payload of its own for the cases that need one
+        cases = [
+            ("payload missing", {"files": [self.upload(self.jpeg)]}, {"payload": ["This field is required."]}),
+            (
+                "payload twice",
+                {"payload": ["{}", "{}"], "files": [self.upload(self.jpeg)]},
+                {"payload": ["Only one payload field is accepted."]},
+            ),
+            (
+                "payload not json",
+                {"payload": "{not json", "files": [self.upload(self.jpeg)]},
+                {"payload": ["Payload must be valid JSON."]},
+            ),
+            (
+                "payload is an array",
+                {"payload": json.dumps([self.PAYLOAD]), "files": [self.upload(self.jpeg)]},
+                {"payload": ["Payload must be a JSON object."]},
+            ),
+            (
+                "payload fails today's rules",
+                {"payload": json.dumps(no_recipients), "files": [self.upload(self.jpeg)]},
+                {"payload": {"non_field_errors": ["Must provide either urns, contacts or groups"]}},
+            ),
+            (
+                "payload without msg",
+                {"payload": json.dumps({"urns": ["whatsapp:5561912345678"]}), "files": [self.upload(self.jpeg)]},
+                {"payload": {"msg": ["This field is required."]}},
+            ),
+            (
+                "attachments is not a list",
+                {
+                    "payload": json.dumps({"urns": ["whatsapp:5561912345678"], "msg": {"attachments": "x"}}),
+                    "files": [self.upload(self.jpeg)],
+                },
+                {"payload": {"msg": {"attachments": ["Expected a list of items."]}}},
+            ),
+            (
+                "unknown field",
+                {"payload": json.dumps(self.PAYLOAD), "file": self.upload(self.jpeg)},
+                {"payload": ["Unexpected field 'file'. Only 'payload' and 'files' are accepted."]},
+            ),
+            (
+                "empty file",
+                {"payload": json.dumps(self.PAYLOAD), "files": [self.upload(b"")]},
+                {"files": {"0": ["The submitted file is empty."]}},
+            ),
+            (
+                "gif",
+                {"payload": json.dumps(self.PAYLOAD), "files": [self.upload(self.jpeg), self.upload(GIF_BYTES)]},
+                {"files": {"1": ["Unsupported file type: image/gif."]}},
+            ),
+            (
+                "html",
+                {"payload": json.dumps(self.PAYLOAD), "files": [self.upload(b"<!DOCTYPE html><html>hi</html>")]},
+                {"files": {"0": ["Unsupported file type: text/html."]}},
+            ),
+            (
+                "wav",
+                {"payload": json.dumps(self.PAYLOAD), "files": [self.upload(read_test_media("allo.wav"))]},
+                {"files": {"0": ["Unsupported file type: audio/x-wav."]}},
+            ),
+            (
+                "6 MB jpeg",
+                {"payload": json.dumps(self.PAYLOAD), "files": [self.upload(padded(self.jpeg, 6 * 1024 * 1024))]},
+                {"files": {"0": [too_large_message.format("image/jpeg", "5 MiB")]}},
+            ),
+            (
+                "17 MB mp4",
+                {"payload": json.dumps(self.PAYLOAD), "files": [self.upload(padded(self.mp4, 17 * 1024 * 1024))]},
+                {"files": {"0": [too_large_message.format("video/mp4", "16 MiB")]}},
+            ),
+            (
+                "11 files",
+                {"payload": json.dumps(self.PAYLOAD), "files": [self.upload(self.jpeg) for _ in range(11)]},
+                {"files": {"10": ["At most 10 files can be sent."]}},
+            ),
+        ]
+
+        for name, form, expected in cases:
+            with self.subTest(name):
+                response = self.post_form(form)
+
+                self.assertEqual(400, response.status_code, response.content)
+                self.assertEqual(expected, response.json())
+                self.save.assert_not_called()
+                self.assertEqual(0, Broadcast.objects.count())
+                self.assertEqual([], _dedup_redis().keys("broadcast_media:*"))
+                self.queue.assert_not_called()
+
+        # one more with each of the errors in the request
+        response = self.post_multipart(
+            "{broken", files=[self.upload(GIF_BYTES), self.upload(self.jpeg), self.upload(b"")]
+        )
+        self.assertEqual(
+            {
+                "payload": ["Payload must be valid JSON."],
+                "files": {"0": ["Unsupported file type: image/gif."], "2": ["The submitted file is empty."]},
+            },
+            response.json(),
+        )
+
+    def test_a_document_over_its_limit(self):
+        pdf = b"%PDF-1.4\n" + b"\x00" * 2000
+
+        # at the real limit it would take a hundred megabytes, so this one has a small limit
+        small = AllowedMedia("document", "pdf", 2048)
+        with patch.dict(ALLOWED_BROADCAST_MEDIA, {"application/pdf": small}):
+            response = self.post_multipart(files=[pdf + b"\x00" * 100])
+            self.assertEqual(400, response.status_code)
+            self.assertEqual(
+                {"files": {"0": ["File is too large for application/pdf: the limit is 2 KiB."]}}, response.json()
+            )
+            self.save.assert_not_called()
+            self.assertEqual(0, Broadcast.objects.count())
+
+            # the limit itself is allowed
+            response = self.post_multipart(files=[pdf + b"\x00" * 39])
+            self.assertEqual(201, response.status_code)
+            self.assertEqual(1, Broadcast.objects.count())
+
+        self.assertEqual(100 * 1024 * 1024, ALLOWED_BROADCAST_MEDIA["application/pdf"].max_bytes)
+
+    def test_files_over_the_total(self):
+        # the real total is a hundred megabytes, so this one is small
+        with patch("temba.msgs.usecases.broadcast_media.MAX_BROADCAST_FILES_TOTAL_BYTES", 10 * 1024):
+            # each is under the limit, and the two together are not
+            self.assertLess(len(self.jpeg), 10 * 1024)
+            self.assertGreater(2 * len(self.jpeg), 10 * 1024)
+
+            response = self.post_multipart(files=[self.jpeg, self.jpeg])
+
+        self.assertEqual(400, response.status_code)
+        self.assertEqual({"files": {"1": ["The files add up to more than 10 KiB."]}}, response.json())
+        self.save.assert_not_called()
+        self.assertEqual(0, Broadcast.objects.count())
+
+    def test_request_larger_than_any_valid_one(self):
+        response = self.post_multipart(files=[self.jpeg], CONTENT_LENGTH=str(MAX_BROADCAST_MULTIPART_BYTES + 1))
+
+        self.assertEqual(400, response.status_code)
+        self.assertEqual({"files": ["The request is too large."]}, response.json())
+        self.save.assert_not_called()
+        self.assertEqual(0, Broadcast.objects.count())
+
+    def test_payload_larger_than_a_form_field_may_be(self):
+        with override_settings(DATA_UPLOAD_MAX_MEMORY_SIZE=2000):
+            response = self.post_multipart({"urns": ["whatsapp:1"], "msg": {"text": "x" * 3000}}, files=[self.jpeg])
+
+        self.assertEqual(400, response.status_code)
+        self.assertEqual({"payload": ["Payload is too large."]}, response.json())
+        self.save.assert_not_called()
+        self.assertEqual(0, Broadcast.objects.count())
+
+    # --- US5: outages of S3 and Redis (AC-6, AC-9)
+
+    def assertMediaStorageUnavailable(self, response, events, stage: str, secrets: list[str]):
+        self.assertEqual(503, response.status_code)
+        self.assertEqual({"detail": MEDIA_STORAGE_UNAVAILABLE_MESSAGE}, response.json())
+        self.assertNotIn(b"Traceback", response.content)
+        self.assertEqual(0, Broadcast.objects.count())
+        self.queue.assert_not_called()
+
+        # one event, tagged with who and where
+        self.assertEqual(1, len(events))
+        tags = {k: str(v) for k, v in events[0]["tags"].items()}
+        self.assertEqual(
+            {
+                "org_id": str(self.org.id),
+                "project_uuid": str(self.org.proj_uuid),
+                "user_id": str(self.admin.id),
+                "correlation_id": "req-123",
+                "media_stage": stage,
+            },
+            {k: v for k, v in tags.items() if k != "media_cause"},
+        )
+
+        # and with nothing of the request, whichever way it got in
+        report = json.dumps(events[0])
+        for secret in secrets:
+            self.assertNotIn(secret, report)
+        self.assertNotIn("amazonaws", report)
+        self.assertNotIn("Black Friday", report)
+
+    def secrets(self) -> list[str]:
+        return [
+            "secret-photo.jpg",
+            self.jpeg_sha256,
+            self.key(self.org, self.jpeg_sha256, "jpg"),
+            self.jpeg_attachment(),
+        ]
+
+    def post_with_secrets(self):
+        return self.post_multipart(
+            files=[self.upload(self.jpeg, "secret-photo.jpg", "image/jpeg")], HTTP_X_REQUEST_ID="req-123"
+        )
+
+    def test_s3_failures(self):
+        url = f"https://bucket.s3.amazonaws.com/{self.key(self.org, self.jpeg_sha256, 'jpg')}"
+        errors = [
+            ClientError({"Error": {"Code": "AccessDenied", "Message": f"no access to {url}"}}, "PutObject"),
+            S3UploadFailedError(f"Failed to upload secret-photo.jpg to {url}"),
+            ReadTimeoutError(endpoint_url=url),
+            ConnectTimeoutError(endpoint_url=url),
+            OSError(f"cannot write secret-photo.jpg {url}"),
+        ]
+
+        for error in errors:
+            with self.subTest(type(error).__name__):
+                self.save.reset_mock()
+                self.save.side_effect = error
+                _dedup_redis().delete(f"broadcast_media:{self.org.id}:{self.jpeg_sha256}")
+
+                with capture_sentry_events() as events:
+                    response = self.post_with_secrets()
+
+                self.assertMediaStorageUnavailable(response, events, "upload", self.secrets())
+                self.save.assert_called_once()
+
+                # nothing says the file is stored
+                self.assertEqual([], _dedup_redis().keys("broadcast_media:*"))
+
+        # and once S3 is back, the same request works
+        self.save.side_effect = None
+        response = self.post_with_secrets()
+        self.assertEqual(201, response.status_code)
+
+    def test_redis_failures(self):
+        url = f"https://bucket.s3.amazonaws.com/{self.key(self.org, self.jpeg_sha256, 'jpg')}"
+
+        for command, stage, saves in (("get", "dedup_lookup", 0), ("set", "dedup_record", 1)):
+            for error in (
+                RedisConnectionError(f"Error connecting for secret-photo.jpg {url}"),
+                RedisTimeoutError("Timeout reading from socket"),
+            ):
+                with self.subTest(f"{command} {type(error).__name__}"):
+                    self.save.reset_mock()
+
+                    with patch.object(_dedup_redis(), command, side_effect=error):
+                        with capture_sentry_events() as events:
+                            response = self.post_with_secrets()
+
+                    self.assertMediaStorageUnavailable(response, events, stage, self.secrets())
+
+                    # when the lookup fails nothing is uploaded, and when the record fails the file is already stored
+                    self.assertEqual(saves, self.save.call_count)
+
+    def test_sentry_is_scrubbed_for_multipart_requests_only(self):
+        # whatever Sentry reports while a multipart request is handled has no body and no frame variables
+        target = "temba.api.v2.broadcast_media.scrub_events_for_current_request"
+
+        with patch(target) as scrub:
+            self.assertEqual(201, self.postJSON(reverse("api.v2.whatsapp_broadcasts"), None, self.PAYLOAD).status_code)
+            scrub.assert_not_called()
+
+            self.assertEqual(201, self.post_multipart(files=[self.jpeg]).status_code)
+            scrub.assert_called_once_with()
+
+            # also when the request is rejected
+            scrub.reset_mock()
+            self.assertEqual(400, self.post_multipart("{broken", files=[self.jpeg]).status_code)
+            scrub.assert_called_once_with()
+
+
+class WhatsappBroadcastsMediaDocsTest(APIJSONMixin, TembaTest):
+    """
+    The documentation of the endpoint, in its docstring and in the API explorer, describes the multipart variant
+    """
+
+    def explorer_fields(self) -> dict:
+        explorer = WhatsappBroadcastsEndpoint.get_write_explorer()
+        return {field["name"]: field for field in explorer["fields"]}
+
+    def test_explorer_lists_the_files(self):
+        fields = self.explorer_fields()
+
+        # the fields that were there are still there
+        for name in ("urns", "contacts", "groups", "trigger_flow_uuid", "msg"):
+            self.assertIn(name, fields)
+
+        self.assertIn("files", fields)
+        files = fields["files"]
+        self.assertFalse(files["required"])
+        self.assertIn("multipart/form-data", files["help"])
+        self.assertIn("payload", files["help"])
+        self.assertIn("10", files["help"])
+        self.assertIn("explorer sends JSON", files["help"])
+
+        # and attachments say where the files go
+        attachments = {f["name"]: f for f in fields["msg"]["fields"]}["attachments"]
+        self.assertIn('["image/png:https://example.com/image.png"]', attachments["help"])
+        self.assertIn("files", attachments["help"])
+        self.assertIn("after", attachments["help"])
+
+    def test_docstring_describes_the_multipart_variant(self):
+        doc = WhatsappBroadcastsEndpoint.__doc__
+
+        self.assertIn("Sending media files", doc)
+        self.assertIn("multipart/form-data", doc)
+
+        # the shape of the request
+        self.assertIn("payload", doc)
+        self.assertIn("files", doc)
+        self.assertIn("at most 10 files", doc)
+
+        # the order, which matters for templates and carousels
+        self.assertIn("in the order", doc)
+        self.assertIn("after", doc)
+        self.assertIn("attachments[0]", doc)
+
+        # the types and their sizes
+        for text in (
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "video/mp4",
+            "video/3gpp",
+            "audio/aac",
+            "audio/amr",
+            "audio/mpeg",
+            "audio/mp4",
+            "audio/ogg",
+            "application/pdf",
+            "text/plain",
+            "5 MiB",
+            "500 KiB",
+            "16 MiB",
+            "100 MiB",
+        ):
+            self.assertIn(text, doc)
+
+        # that the type is that of the bytes, and where the files are stored
+        self.assertIn("detected from the bytes", doc)
+        self.assertIn("unsigned", doc)
+
+        # errors, and an example
+        for status in ("400", "503"):
+            self.assertIn(status, doc)
+        self.assertIn("curl", doc)
+        self.assertIn("-F", doc)
+        self.assertIn("files=@", doc)
+
+    def test_limits_in_the_docs_are_the_ones_in_the_code(self):
+        doc = WhatsappBroadcastsEndpoint.__doc__
+
+        self.assertIn(f"at most {MAX_BROADCAST_FILES} files", doc)
+        self.assertEqual(10, MAX_BROADCAST_FILES)
+        self.assertEqual("5 MiB", f"{MAX_IMAGE_BYTES // (1024 * 1024)} MiB")
+        self.assertEqual("500 KiB", f"{MAX_STICKER_BYTES // 1024} KiB")
+        self.assertEqual("16 MiB", f"{MAX_VIDEO_BYTES // (1024 * 1024)} MiB")
+        self.assertEqual("16 MiB", f"{MAX_AUDIO_BYTES // (1024 * 1024)} MiB")
+        self.assertEqual("100 MiB", f"{MAX_DOCUMENT_BYTES // (1024 * 1024)} MiB")
+        self.assertEqual("100 MiB", f"{MAX_BROADCAST_FILES_TOTAL_BYTES // (1024 * 1024)} MiB")
+
+        # every type that is accepted is in the docs
+        for mime in ALLOWED_BROADCAST_MEDIA:
+            if not mime.startswith("application/vnd."):
+                self.assertIn(mime, doc)
+
+    def test_docs_page_renders(self):
+        self.login(self.admin)
+
+        response = self.fetchHTML(reverse("api.v2.whatsapp_broadcasts"))
+
+        self.assertEqual(200, response.status_code)
+        self.assertContains(response, "multipart/form-data")
+        self.assertContains(response, "Sending media files")
+
+        # and the explorer page that lists the fields
+        response = self.client.get(reverse("api.v2.explorer"), HTTP_X_FORWARDED_HTTPS="https")
+        self.assertEqual(200, response.status_code)
 
 
 class ExternalServicesEndpointTestCase(TembaTest):

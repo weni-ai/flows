@@ -21,6 +21,7 @@ ARG RUNTIME_DEPS="\
   curl \
   gosu \
   gdal-bin \
+  libmagic1 \
   npm"
 #libmariadb3 \
 

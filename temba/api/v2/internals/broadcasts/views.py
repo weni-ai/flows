@@ -3,6 +3,7 @@ import logging
 from rest_framework import status
 from rest_framework.exceptions import ParseError
 from rest_framework.mixins import CreateModelMixin
+from rest_framework.parsers import FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -17,10 +18,21 @@ from django.utils.decorators import method_decorator
 
 from temba.api.auth.fixed_token import require_fixed_query_token
 from temba.api.auth.jwt import OptionalJWTAuthentication
+from temba.api.v2.broadcast_media import (
+    MEDIA_STORAGE_UNAVAILABLE_MESSAGE,
+    BroadcastMultiPartParser,
+    MediaStorageUnavailable,
+    payload_with_media,
+    prepare_broadcast_request,
+)
 from temba.api.v2.internals.broadcasts.context import ProjectMismatch, resolve_org_and_user_internal_whatsapp
 from temba.api.v2.internals.views import APIViewMixin
 from temba.api.v2.permissions import HasValidJWT, IsUserInOrg
-from temba.api.v2.serializers import WhatsappBroadcastReadSerializer, WhatsappBroadcastWriteSerializer
+from temba.api.v2.serializers import (
+    WhatsappBroadcastReadSerializer,
+    WhatsappBroadcastWithMediaWriteSerializer,
+    WhatsappBroadcastWriteSerializer,
+)
 from temba.api.v2.views_base import DefaultLimitOffsetPagination
 from temba.contacts.models import ContactGroup
 from temba.msgs.models import Broadcast, BroadcastStatistics
@@ -31,6 +43,7 @@ from .idempotency import (
     LOOKUP_HIT,
     LOOKUP_INFLIGHT,
     compute_body_hash,
+    compute_media_body_hash,
     extract_idempotency_key,
     idempotency_lookup,
     idempotency_release,
@@ -70,12 +83,42 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
     authentication_classes = [OptionalJWTAuthentication, InternalOIDCAuthentication]
     permission_classes = [(IsAuthenticated & (CanCommunicateInternally | IsUserInOrg)) | HasValidJWT]
 
+    # the defaults of REST framework, with a multipart parser that rejects oversize requests with a 400
+    parser_classes = (JSONParser, FormParser, BroadcastMultiPartParser)
+
+    def check_permissions_for_payload_project(self, request, data):
+        """
+        IsUserInOrg checks that the user is of the project that is in the body of the request, but a multipart body
+        has the project inside its payload, which it can't see. So when the request has not been given a project yet,
+        the one in the payload is given to it and the permissions of the endpoint are checked again. They then decide as
+        they do for the same request as JSON: the same classes, the same project, nothing new.
+        """
+        payload_project = data.get("project") or data.get("project_uuid")
+        if payload_project and not getattr(request, "project_uuid", None):
+            request.project_uuid = str(payload_project)
+            self.check_permissions(request)
+
     def post(self, request, *args, **kwargs):
-        data = dict(request.data)
+        # a multipart request is read and validated here, before any key is claimed. The files are only stored by the
+        # serializer, once the payload is valid.
+        prepared = prepare_broadcast_request(request)
+        is_multipart = prepared.is_multipart
+
+        data = dict(prepared.payload)
+        if is_multipart:
+            self.check_permissions_for_payload_project(request, data)
+
         project_uuid = getattr(request, "project_uuid", None) or data.get("project")
 
         idem_key = extract_idempotency_key(request)
-        body_hash = compute_body_hash(request) if idem_key else None
+        if idem_key:
+            body_hash = (
+                compute_media_body_hash(prepared.payload, prepared.file_sha256s)
+                if is_multipart
+                else compute_body_hash(request)
+            )
+        else:
+            body_hash = None
 
         if idem_key and project_uuid:
             lookup_state, cached = idempotency_lookup(project_uuid, idem_key, body_hash)
@@ -109,9 +152,13 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
                     logger.warning("Unexpected ValueError in whatsapp broadcast: %s", msg)
                 return Response({"error": msg}, status=401)
 
-            serializer = WhatsappBroadcastWriteSerializer(
-                data=request.data, context={"request": request, "org": org, "user": user}
-            )
+            context = {"request": request, "org": org, "user": user}
+            if is_multipart:
+                serializer = WhatsappBroadcastWithMediaWriteSerializer(
+                    data=payload_with_media(prepared, org), context={**context, "inline_media": prepared.media}
+                )
+            else:
+                serializer = WhatsappBroadcastWriteSerializer(data=request.data, context=context)
 
             if serializer.is_valid():
                 broadcast = serializer.save()
@@ -127,6 +174,11 @@ class InternalWhatsappBroadcastsEndpoint(APIViewMixin, APIView):
             if idem_key and project_uuid:
                 idempotency_release(project_uuid, idem_key)
             return Response(serializer.errors, status=400)
+        except MediaStorageUnavailable:
+            # the media storage is down, not the request that is wrong, so the caller can retry with the same key
+            if idem_key and project_uuid:
+                idempotency_release(project_uuid, idem_key)
+            return Response({"error": MEDIA_STORAGE_UNAVAILABLE_MESSAGE}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         except Exception:
             if idem_key and project_uuid:
                 idempotency_release(project_uuid, idem_key)

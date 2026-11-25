@@ -8,6 +8,7 @@ import pycountry
 import pytz
 import regex
 from rest_framework import serializers
+from rest_framework.utils.serializer_helpers import ReturnDict
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -15,6 +16,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 
 from temba import mailroom
 from temba.api.models import Resthook, ResthookSubscriber, WebHookEvent
+from temba.api.v2.broadcast_media import MediaStorageUnavailable, report_media_storage_failure
 from temba.archives.models import Archive
 from temba.campaigns.models import Campaign, CampaignEvent
 from temba.channels.models import Channel, ChannelEvent
@@ -30,6 +32,7 @@ from temba.mailroom import modifiers
 from temba.mailroom.client import MailroomException
 from temba.msgs.custom_data import normalize_custom_data_in_msg, validate_custom_data
 from temba.msgs.models import Attachment, Broadcast, Label, Msg
+from temba.msgs.usecases.broadcast_media import BroadcastMediaUnavailable, store_broadcast_media
 from temba.msgs.usecases.managed_trigger_group import (
     ContactResolutionError,
     GroupQuotaExceeded,
@@ -578,6 +581,36 @@ class WhatsappBroadcastWriteSerializer(WriteSerializer):
         on_transaction_commit(lambda: broadcast.send_async())
 
         return broadcast
+
+
+class WhatsappBroadcastWithMediaWriteSerializer(WhatsappBroadcastWriteSerializer):
+    """
+    The serializer of WhatsApp broadcasts sent as multipart/form-data, with or without files. It validates the same
+    payload by the same rules, which already has the canonical URL of each file in msg.attachments, and nests its errors
+    under "payload". Only save() stores the files, so nothing is uploaded for a request that doesn't validate, and it
+    does so before the broadcast is created, so a failure of the media storage creates no broadcast.
+
+    The files are given as the inline_media of the context. The parent, which the FastAPI bridge uses, is not changed.
+    """
+
+    @property
+    def errors(self):
+        errors = super().errors
+        if not errors:
+            return errors
+
+        return ReturnDict({"payload": dict(errors)}, serializer=self)
+
+    def save(self):
+        org = self.context["org"]
+
+        try:
+            store_broadcast_media(org, self.context.get("inline_media") or [])
+        except BroadcastMediaUnavailable as e:
+            report_media_storage_failure(self.context["request"], org, e, user=self.context.get("user"))
+            raise MediaStorageUnavailable() from e
+
+        return super().save()
 
 
 class ChannelEventReadSerializer(ReadSerializer):

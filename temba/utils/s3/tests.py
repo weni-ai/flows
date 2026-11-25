@@ -4,22 +4,29 @@ from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
 
 import pytz
+from storages.backends.s3 import S3Storage
 
 from django.test import override_settings
 
 from temba.tests import TembaTest
 from temba.tests.s3 import S3_SIGNING_SETTINGS, MockEventStream, MockS3Client
 from temba.utils.s3 import (
+    S3_CLIENT_MAX_RETRY_ATTEMPTS,
+    S3_UPLOAD_CONNECT_TIMEOUT_SECONDS,
+    S3_UPLOAD_MAX_RETRY_ATTEMPTS,
+    S3_UPLOAD_READ_TIMEOUT_SECONDS,
     EventStreamReader,
     S3Location,
     compile_select,
     get_body,
     is_org_object_key,
     matches_where,
+    media_upload_storage,
     parse_s3_url,
     presign_attachment,
     presign_org_url,
     presign_url,
+    private_file_storage,
     regional_client,
     split_url,
 )
@@ -266,6 +273,52 @@ class PresignTest(TembaTest):
             "image/jpeg:https://example.com/a.jpg", presign_attachment("image/jpeg:https://example.com/a.jpg")
         )
         self.assertEqual("image/jpeg", presign_attachment("image/jpeg"))
+
+
+class MediaUploadStorageTest(TembaTest):
+    def setUp(self):
+        super().setUp()
+
+        media_upload_storage.cache_clear()
+
+    def tearDown(self):
+        media_upload_storage.cache_clear()
+
+        super().tearDown()
+
+    def test_filesystem_storage(self):
+        # local and test environments have no S3 client to configure, so the shared storage is used as is
+        self.assertIs(private_file_storage, media_upload_storage())
+
+    @override_settings(DEFAULT_FILE_STORAGE="storages.backends.s3.S3Storage", AWS_S3_ADDRESSING_STYLE="virtual")
+    def test_s3_storage(self):
+        # building the storage must not reach the network
+        with patch("socket.socket.connect", side_effect=AssertionError("unexpected network call")):
+            storage = media_upload_storage()
+
+        self.assertIsInstance(storage, S3Storage)
+        self.assertIsNot(storage, private_file_storage)
+        self.assertTrue(storage.file_overwrite)
+
+        config = storage.client_config
+        self.assertEqual(S3_UPLOAD_CONNECT_TIMEOUT_SECONDS, config.connect_timeout)
+        self.assertEqual(S3_UPLOAD_READ_TIMEOUT_SECONDS, config.read_timeout)
+        self.assertEqual(5, config.connect_timeout)
+        self.assertEqual(30, config.read_timeout)
+        self.assertEqual({"mode": "standard", "max_attempts": S3_UPLOAD_MAX_RETRY_ATTEMPTS}, config.retries)
+        self.assertEqual(2, config.retries["max_attempts"])
+
+        # what django-storages sets by default is kept
+        self.assertEqual({"addressing_style": "virtual"}, config.s3)
+
+        # no client has been created yet, so nothing was sent anywhere
+        self.assertIsNone(getattr(storage._connections, "connection", None))
+
+        # created once per process
+        self.assertIs(storage, media_upload_storage())
+
+    def test_existing_clients_keep_their_retries(self):
+        self.assertEqual(3, S3_CLIENT_MAX_RETRY_ATTEMPTS)
 
 
 class SelectTest(TembaTest):

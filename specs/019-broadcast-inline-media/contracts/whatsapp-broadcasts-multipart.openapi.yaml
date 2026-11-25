@@ -1,0 +1,265 @@
+openapi: 3.1.0
+info:
+  title: Flows WhatsApp broadcasts, multipart media variant
+  version: 1.0.0
+  description: |
+    Fragment covering only the request variant added by specs/019-broadcast-inline-media.
+    The JSON variant of both operations is unchanged and is described by the endpoint docstring;
+    it is referenced here as an opaque object so the two variants can be compared.
+
+    Uploaded files are appended to `msg.attachments` after the URLs already in `payload.msg.attachments`,
+    in the order the `files` parts were received. Each appended entry is
+    `<detected mime>:<STORAGE_URL>/attachments/<org_id>/broadcasts/<sha256>.<ext>`, unsigned.
+    Courier signs it before each send attempt.
+
+paths:
+  /api/v2/whatsapp_broadcasts.json:
+    post:
+      operationId: createWhatsappBroadcast
+      summary: Send a WhatsApp broadcast (public)
+      security:
+        - apiToken: []
+        - basicToken: []
+        - jwt: []
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BroadcastPayload"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/BroadcastMultipart"
+            encoding:
+              payload:
+                contentType: application/json
+              files:
+                contentType: image/jpeg, image/png, image/webp, video/mp4, video/3gpp, audio/*, application/*, text/plain
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          description: Invalid payload, invalid file, too many files, or files too large. Nothing was uploaded and no broadcast was created, unless the error was raised while creating the broadcast (see the plan's orphan note).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrors"
+              examples:
+                badFile:
+                  value: {"files": {"1": ["Unsupported file type: image/gif."]}}
+                emptyFile:
+                  value: {"files": {"0": ["The submitted file is empty."]}}
+                fileTooLarge:
+                  value: {"files": {"0": ["File is too large for image/jpeg: the limit is 5 MiB."]}}
+                badPayload:
+                  value: {"payload": ["Payload must be a JSON object."]}
+                payloadNotJson:
+                  value: {"payload": ["Payload must be valid JSON."]}
+                payloadMissing:
+                  value: {"payload": ["This field is required."]}
+                payloadTwice:
+                  value: {"payload": ["Only one payload field is accepted."]}
+                unknownField:
+                  value: {"payload": ["Unexpected field 'file'. Only 'payload' and 'files' are accepted."]}
+                payloadRules:
+                  value: {"payload": {"non_field_errors": ["Must provide either urns, contacts or groups"]}}
+                attachmentsNotAList:
+                  value: {"payload": {"msg": {"attachments": ["Expected a list of items."]}}}
+                tooMany:
+                  description: Each file after the tenth is reported, by its position.
+                  value: {"files": {"10": ["At most 10 files can be sent."]}}
+                totalTooLarge:
+                  description: The file that takes the total over 100 MiB is reported, by its position.
+                  value: {"files": {"2": ["The files add up to more than 100 MiB."]}}
+                requestTooLarge:
+                  description: A Content-Length above the most a valid request can have, rejected before it is read.
+                  value: {"files": ["The request is too large."]}
+                payloadTooLarge:
+                  value: {"payload": ["Payload is too large."]}
+        "503":
+          description: Media storage (S3 or the dedup cache) failed or timed out. No broadcast was created. Safe to retry.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [detail]
+                properties:
+                  detail:
+                    type: string
+                    const: Media storage temporarily unavailable
+
+  /api/v2/internals/whatsapp_broadcasts:
+    post:
+      operationId: createInternalWhatsappBroadcast
+      summary: Send a WhatsApp broadcast (internal)
+      security:
+        - internalOidc: []
+        - jwt: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: |
+            Optional, at most 200 characters. For multipart, the body hash covers the parsed payload and the ordered
+            sha256 of each file. A replay returns the stored response without uploading.
+          schema:
+            type: string
+            maxLength: 200
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BroadcastPayload"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/BroadcastMultipart"
+            encoding:
+              payload:
+                contentType: application/json
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          description: |
+            Same rules and bodies as the public endpoint. Nothing was uploaded and no broadcast was created. When an
+            `Idempotency-Key` was sent, a request that is rejected before its payload is read (the payload, the files and
+            their sizes) never claims it, and any other 400 releases it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrors"
+        "401":
+          description: Unchanged. Project or user not provided.
+        "403":
+          description: |
+            Unchanged. Project mismatch between the token and `payload.project` / `payload.project_uuid`, and a user who
+            is not of the project in the payload, which is decided by the same permissions as for a JSON body.
+        "404":
+          description: Unchanged. Project not found.
+        "409":
+          description: Unchanged bodies. Key reused with a different body hash (different payload, different file bytes, or different file order), or still in flight.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Media storage failed or timed out. No broadcast was created and the Idempotency-Key was released.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                    const: Media storage temporarily unavailable
+
+components:
+  securitySchemes:
+    apiToken:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: "Token <api key>"
+    basicToken:
+      type: http
+      scheme: basic
+    jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    session:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    internalOidc:
+      type: http
+      scheme: bearer
+      description: Keycloak OIDC token of an internal service
+
+  schemas:
+    BroadcastPayload:
+      type: object
+      description: The current JSON body of the endpoint, unchanged. See the endpoint docstring for its fields.
+      additionalProperties: true
+      required: [msg]
+
+    BroadcastMultipart:
+      type: object
+      required: [payload]
+      additionalProperties: false
+      properties:
+        payload:
+          type: string
+          contentMediaType: application/json
+          description: |
+            Exactly one part. A JSON object with the same fields and rules as the JSON body. Its non-file size is
+            limited by Django DATA_UPLOAD_MAX_MEMORY_SIZE (2.5 MB).
+        files:
+          type: array
+          maxItems: 10
+          description: |
+            Zero to 10 parts named `files`, in attachment order. Total size at most 100 MiB. The type is detected from
+            the bytes; the declared content type and the file name are ignored.
+
+            | Detected type | Max size |
+            |---|---|
+            | image/jpeg, image/png | 5 MiB |
+            | image/webp (sticker) | 500 KiB |
+            | video/mp4, video/3gpp | 16 MiB |
+            | audio/aac, audio/amr, audio/mpeg, audio/mp4, audio/ogg | 16 MiB |
+            | text/plain, application/pdf, Word, Excel, PowerPoint (binary and Office Open XML) | 100 MiB |
+          items:
+            type: string
+            contentEncoding: binary
+
+    ValidationErrors:
+      type: object
+      description: |
+        Errors keyed by `payload` or `files`. File errors are keyed by the zero-based position of the part in `files`,
+        never by file name, including too many files and files that are too large together. Serializer errors on the
+        parsed payload are nested under `payload`. An unexpected form field is reported under `payload`.
+      properties:
+        payload:
+          oneOf:
+            - type: array
+              items: {type: string}
+            - type: object
+        files:
+          oneOf:
+            - type: array
+              items: {type: string}
+            - type: object
+              additionalProperties:
+                type: array
+                items: {type: string}
+      additionalProperties: false
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+  responses:
+    Created:
+      description: Broadcast created. Same body as the JSON variant (WhatsappBroadcastReadSerializer).
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              id: {type: integer}
+              metadata:
+                type: object
+                description: The `msg` of the broadcast, whose `attachments` include the appended unsigned URLs.
+          example:
+            id: 123456
+            metadata:
+              text: Black Friday
+              attachments:
+                - "image/png:https://example.com/a.png"
+                - "image/jpeg:https://flows-bucket.s3.sa-east-1.amazonaws.com/attachments/42/broadcasts/9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08.jpg"

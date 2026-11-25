@@ -5,9 +5,11 @@ from urllib.parse import unquote, urlparse
 
 import boto3
 from botocore.client import Config
+from storages.backends.s3 import S3Storage
 
 from django.conf import settings
 from django.core.files.storage import DefaultStorage
+from django.utils.module_loading import import_string
 
 from temba.utils import json
 
@@ -16,6 +18,12 @@ private_file_storage = DefaultStorage()
 _s3_client = None
 
 S3_CLIENT_MAX_RETRY_ATTEMPTS = 3
+
+# limits of every HTTP call made by media_upload_storage(); botocore standard mode retries with exponential backoff
+# and jitter, which is safe because uploads are content-addressed and so idempotent
+S3_UPLOAD_CONNECT_TIMEOUT_SECONDS = 5
+S3_UPLOAD_READ_TIMEOUT_SECONDS = 30
+S3_UPLOAD_MAX_RETRY_ATTEMPTS = 2
 S3_HOST_REGEX = re.compile(r"(?:(?P<bucket>.+)\.)?s3(?:[.-](?P<region>[a-z0-9-]+))?\.amazonaws\.com")
 
 
@@ -53,6 +61,33 @@ def regional_client(region_name: str | None):
         retries={"max_attempts": S3_CLIENT_MAX_RETRY_ATTEMPTS},
     )
     return session.client("s3", region_name=region_name, config=config)
+
+
+@lru_cache(maxsize=None)
+def media_upload_storage():
+    """
+    Returns the storage used to upload media files received by the API, created once per process.
+
+    Under S3 it is an instance of the configured storage class with explicit connect and read timeouts and a bounded,
+    backed-off retry on every HTTP call, scoped to these uploads so that AWS_S3_CLIENT_CONFIG and every other upload in
+    the project stay as they are. Objects are overwritten, as their keys are content-addressed. With any other storage
+    (local and test filesystem) the shared private_file_storage is returned. No connection is made here.
+    """
+    storage_class = import_string(settings.DEFAULT_FILE_STORAGE)
+    if not (isinstance(storage_class, type) and issubclass(storage_class, S3Storage)):
+        return private_file_storage
+
+    storage = storage_class(file_overwrite=True)
+
+    # merging keeps the signature version, addressing style and proxies that django-storages sets by default
+    storage.client_config = storage.client_config.merge(
+        Config(
+            connect_timeout=S3_UPLOAD_CONNECT_TIMEOUT_SECONDS,
+            read_timeout=S3_UPLOAD_READ_TIMEOUT_SECONDS,
+            retries={"mode": "standard", "max_attempts": S3_UPLOAD_MAX_RETRY_ATTEMPTS},
+        )
+    )
+    return storage
 
 
 def parse_s3_url(url: str) -> S3Location | None:

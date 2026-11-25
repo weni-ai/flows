@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from rest_framework import generics, status, views
 from rest_framework.pagination import CursorPagination
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
@@ -27,6 +27,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 
 from temba.api.models import APIToken, Resthook, ResthookSubscriber, WebHookEvent
+from temba.api.v2.broadcast_media import BroadcastMultiPartParser, payload_with_media, prepare_broadcast_request
 from temba.api.v2.broadcasts_statistics.views import BroadcastsStatisticsEndpoint
 from temba.api.v2.elasticsearch.views import ContactsElasticSearchEndpoint
 from temba.api.v2.pagination import FlowsPagination
@@ -115,6 +116,7 @@ from .serializers import (
     UserReadSerializer,
     WebHookEventReadSerializer,
     WhatsappBroadcastReadSerializer,
+    WhatsappBroadcastWithMediaWriteSerializer,
     WhatsappBroadcastWriteSerializer,
     WhatsappFlowReadSerializer,
     WorkspaceReadSerializer,
@@ -1101,6 +1103,47 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                 }
             }
         }
+
+    ## Sending media files
+
+    Instead of a link to a file, the file itself can be sent with the request, as `multipart/form-data` instead of JSON.
+    A request with `Content-Type: application/json` works exactly as described above. The multipart request has two
+    kinds of fields:
+
+      * **payload** - a text field with the JSON body described above, with the same fields and rules (exactly one)
+      * **files** - the files to send, one field for each, with at most 10 files (optional)
+
+    Each file is added to `msg.attachments` after the entries that `payload` already has there, and in the order the
+    `files` fields were sent. The order matters: the header of a template uses `attachments[0]` and the card N of a
+    carousel uses `attachments[N]`. The same file sent more than once in a request gets the same attachment each time.
+    The broadcast stores each attachment as `<type>:<url>`, with an unsigned URL of the file, which is signed when it
+    is sent.
+
+    The type of each file is detected from the bytes of the file. The name of the file and the content type that
+    were sent with it are not used, and a file of a type that is not allowed is rejected. These are the types that
+    are allowed, and the size that each file can have at most. All the files of a request together can have at most
+    100 MiB.
+
+      * **Images** - `image/jpeg`, `image/png`: 5 MiB
+      * **Stickers** - `image/webp`: 500 KiB
+      * **Video** - `video/mp4`, `video/3gpp`: 16 MiB
+      * **Audio** - `audio/aac`, `audio/amr`, `audio/mpeg`, `audio/mp4`, `audio/ogg`: 16 MiB
+      * **Documents** - `text/plain`, `application/pdf`, `application/msword` (.doc), `application/vnd.ms-excel` (.xls),
+        `application/vnd.ms-powerpoint` (.ppt) and the Office Open XML files (.docx, .xlsx, .pptx): 100 MiB
+
+    Example:
+
+        curl -X POST "https://<host>/api/v2/whatsapp_broadcasts.json" -H "Authorization: Token <api key>" -F 'payload={"urns": ["whatsapp:5561912345678"], "msg": {"text": "Black Friday", "attachments": ["image/png:https://example.com/a.png"]}}' -F 'files=@promo.jpg' -F 'files=@offer.pdf'
+
+    The broadcast above has `msg.attachments` with the PNG link, then `promo.jpg`, then `offer.pdf`.
+
+    The response is `201` with the broadcast, as for JSON, and:
+
+      * **400** - the request is not valid, and nothing was stored or sent. The errors are under **payload** (a message,
+        or the errors of the fields of the payload) or **files**, where each file is identified by its position in
+        `files`, starting at 0, and never by its name: `{"files": {"1": ["Unsupported file type: image/gif."]}}`.
+      * **503** - the storage of the files is not available at the moment, and no broadcast was created. The request can
+        be sent again: `{"detail": "Media storage temporarily unavailable"}`.
     """
 
     permission = "msgs.broadcast_api"
@@ -1111,6 +1154,27 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
     write_with_transaction = False
     pagination_class = CreatedOnCursorPagination
     throttle_scope = "v2.broadcasts"
+
+    # the defaults of REST framework, with a multipart parser that rejects oversize requests with a 400
+    parser_classes = (JSONParser, FormParser, BroadcastMultiPartParser)
+
+    def get_write_serializer_class(self, instance, data, context):
+        """
+        JSON requests are handled exactly as always. A multipart request, with or without files, has its payload and
+        files read and validated here, and is handled by the serializer that also stores the files.
+        """
+        prepared = prepare_broadcast_request(self.request)
+        if not prepared.is_multipart:
+            return super().get_write_serializer_class(instance, data, context)
+
+        org = context["org"]
+        if not org:
+            raise InvalidQueryError("Organization not found")
+
+        context["inline_media"] = prepared.media
+        return WhatsappBroadcastWithMediaWriteSerializer(
+            instance=instance, data=payload_with_media(prepared, org), context=context
+        )
 
     def filter_queryset(self, queryset):
         org = self.get_org()
@@ -1214,9 +1278,21 @@ class WhatsappBroadcastsEndpoint(ListAPIMixin, WriteAPIMixin, BaseAPIView):
                         {
                             "name": "attachments",
                             "required": False,
-                            "help": 'The attachments to be sent. Ex: ["image/png:https://example.com/image.png"]',
+                            "help": (
+                                'The attachments to be sent. Ex: ["image/png:https://example.com/image.png"]. '
+                                "Files sent in files (multipart requests only) are added after these, in the order "
+                                "they were sent."
+                            ),
                         },
                     ],
+                },
+                {
+                    "name": "files",
+                    "required": False,
+                    "help": (
+                        "Multipart requests only, the explorer sends JSON: up to 10 files sent as multipart/form-data, "
+                        "with the rest of the fields above as a JSON object in a payload field. See Sending media files."
+                    ),
                 },
             ],
         }
