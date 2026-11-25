@@ -1035,6 +1035,202 @@ class GetDepartmentsViewTest(TembaTest):
         self.assertIn(expected_data, response_results)
 
     @patch.object(LambdaURLValidator, "protected_resource")
+    def test_get_departments_generic_ticketer_returns_default_topic(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        ticketer = Ticketer.create(
+            self.org,
+            self.admin,
+            "generic",
+            "External Generic",
+            {"base_url": "https://example.com", "api_token": "token"},
+        )
+
+        topic_count = self.org.topics.count()
+        queue_count = TicketerQueue.objects.filter(ticketer=ticketer).count()
+
+        url = f"/api/v2/internals/get_departments?project={self.org.proj_uuid}&uuid={ticketer.uuid}"
+        response = self.client.get(url)
+
+        default_topic = self.org.default_ticket_topic
+        self.assertNotEqual(str(default_topic.uuid), str(default_topic.queue_uuid))
+        expected_data = {
+            "ticketer_uuid": str(ticketer.uuid),
+            "ticketer_name": ticketer.name,
+            "type": "generic",
+            "created_on": ticketer.created_on.isoformat().replace("+00:00", "Z"),
+            "topics": [
+                {
+                    "topic_name": default_topic.name,
+                    "topic_uuid": str(default_topic.uuid),
+                    "topic_purpose": None,
+                }
+            ],
+        }
+
+        self.assertEqual(response.status_code, 200)
+        response_results = [dict(item) for item in response.data.get("results", [])]
+        self.assertIn(expected_data, response_results)
+        self.assertEqual(self.org.topics.count(), topic_count)
+        self.assertEqual(TicketerQueue.objects.filter(ticketer=ticketer).count(), queue_count)
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_get_departments_generic_ticketer_with_active_queue_returns_only_queue(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        ticketer = Ticketer.create(
+            self.org,
+            self.admin,
+            "generic",
+            "Generic With Queue",
+            {"base_url": "https://example.com", "api_token": "token"},
+        )
+        queue = TicketerQueue.objects.create(
+            created_by=self.user,
+            modified_by=self.user,
+            org=self.org,
+            name="Billing",
+            queue_purpose="Billing conversations",
+            ticketer=ticketer,
+        )
+
+        url = f"/api/v2/internals/get_departments?project={self.org.proj_uuid}&uuid={ticketer.uuid}"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        result = self._department_for(response, ticketer)
+        self.assertEqual(
+            result["topics"],
+            [
+                {
+                    "topic_name": queue.name,
+                    "topic_uuid": str(queue.uuid),
+                    "topic_purpose": queue.queue_purpose,
+                }
+            ],
+        )
+        self.assertNotIn(str(self.org.default_ticket_topic.uuid), [topic["topic_uuid"] for topic in result["topics"]])
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_get_departments_non_generic_ticketer_without_queue_returns_empty_topics(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        ticketer = Ticketer.create(
+            self.org,
+            self.admin,
+            "wenichats",
+            "Chats Without Queue",
+            {"sector_uuid": "bae31477-1a17-4302-9b1a-902f1b22fdce"},
+        )
+
+        url = f"/api/v2/internals/get_departments?project={self.org.proj_uuid}&uuid={ticketer.uuid}"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        result = self._department_for(response, ticketer)
+        self.assertEqual(result["topics"], [])
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_get_departments_generic_ticketer_with_only_inactive_queue_returns_default_topic(
+        self, mock_protected_resource
+    ):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        ticketer = Ticketer.create(
+            self.org,
+            self.admin,
+            "generic",
+            "Generic Inactive Queue",
+            {"base_url": "https://example.com", "api_token": "token"},
+        )
+        inactive_queue = TicketerQueue.objects.create(
+            created_by=self.user,
+            modified_by=self.user,
+            org=self.org,
+            name="Retired",
+            queue_purpose="No longer used",
+            ticketer=ticketer,
+            is_active=False,
+        )
+
+        url = f"/api/v2/internals/get_departments?project={self.org.proj_uuid}&uuid={ticketer.uuid}"
+        response = self.client.get(url)
+
+        default_topic = self.org.default_ticket_topic
+        self.assertEqual(response.status_code, 200)
+        result = self._department_for(response, ticketer)
+        self.assertEqual(
+            result["topics"],
+            [
+                {
+                    "topic_name": default_topic.name,
+                    "topic_uuid": str(default_topic.uuid),
+                    "topic_purpose": None,
+                }
+            ],
+        )
+        self.assertNotIn(str(inactive_queue.uuid), [topic["topic_uuid"] for topic in result["topics"]])
+
+    @patch.object(LambdaURLValidator, "protected_resource")
+    def test_get_departments_fills_wenichats_and_generic_ticketers_independently(self, mock_protected_resource):
+        mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
+
+        chats = Ticketer.create(
+            self.org,
+            self.admin,
+            "wenichats",
+            "Chats With Queue",
+            {"sector_uuid": "bae31477-1a17-4302-9b1a-902f1b22fdce"},
+        )
+        queue = TicketerQueue.objects.create(
+            created_by=self.user,
+            modified_by=self.user,
+            org=self.org,
+            name="Support",
+            queue_purpose="Support conversations",
+            ticketer=chats,
+        )
+        generic = Ticketer.create(
+            self.org,
+            self.admin,
+            "generic",
+            "Generic Beside Chats",
+            {"base_url": "https://example.com", "api_token": "token"},
+        )
+
+        url = f"/api/v2/internals/get_departments?project={self.org.proj_uuid}"
+        response = self.client.get(url)
+
+        default_topic = self.org.default_ticket_topic
+        self.assertEqual(response.status_code, 200)
+        chats_result = self._department_for(response, chats)
+        generic_result = self._department_for(response, generic)
+        self.assertEqual(
+            chats_result["topics"],
+            [
+                {
+                    "topic_name": queue.name,
+                    "topic_uuid": str(queue.uuid),
+                    "topic_purpose": queue.queue_purpose,
+                }
+            ],
+        )
+        self.assertEqual(
+            generic_result["topics"],
+            [
+                {
+                    "topic_name": default_topic.name,
+                    "topic_uuid": str(default_topic.uuid),
+                    "topic_purpose": None,
+                }
+            ],
+        )
+
+    def _department_for(self, response, ticketer):
+        results = [dict(item) for item in response.data.get("results", [])]
+        return next(item for item in results if item["ticketer_uuid"] == str(ticketer.uuid))
+
+    @patch.object(LambdaURLValidator, "protected_resource")
     def test_get_departments_without_project(self, mock_protected_resource):
         mock_protected_resource.return_value = Response({"message": "Access granted!"}, status=status.HTTP_200_OK)
 
