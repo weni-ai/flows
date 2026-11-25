@@ -186,7 +186,21 @@ class GetDepartmentsSerializer(serializers.ModelSerializer):
 
     def get_topics(self, obj):
         queues = TicketerQueue.objects.filter(ticketer=obj, is_active=True)
-        return GetTicketerQueueSerializer(queues, many=True).data
+        if queues.exists():
+            return GetTicketerQueueSerializer(queues, many=True).data
+
+        if obj.ticketer_type == GenericType.slug:
+            # topic_uuid is the topic identifier open_ticket resolves, not Topic.queue_uuid.
+            topic = obj.org.default_ticket_topic
+            return [
+                {
+                    "topic_name": topic.name,
+                    "topic_uuid": str(topic.uuid),
+                    "topic_purpose": None,
+                }
+            ]
+
+        return []
 
     class Meta:
         model = Ticketer

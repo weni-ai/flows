@@ -1,3 +1,7 @@
+3.115.1
+----------
+* fix: feat: Return default topic of generic ticketer in get departments endpoints
+
 3.115.0
 ----------
 * feat: accept media files inline (multipart) on WhatsApp broadcasts, public and internal endpoints
