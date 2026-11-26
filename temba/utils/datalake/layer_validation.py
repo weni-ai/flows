@@ -125,13 +125,17 @@ def validate_layers(now: datetime, project_uuids: List[str]) -> List[ProjectRepo
     return reports
 
 
-def _format_result(result: TableResult) -> str:
+def _format_result(result: TableResult) -> List[str]:
+    lines = [f"_{result.table}_"]
     if result.error:
-        return f"• {result.table}: ERROR"
+        return lines + ["• ERROR"]
 
     diff = result.silver - result.bronze
-    diff_text = f" ({diff:+d})" if diff else ""
-    return f"• {result.table}: bronze={result.bronze} silver={result.silver}{diff_text} {result.status}"
+    return lines + [
+        f"• Silver: {result.silver}",
+        f"• Bronze: {result.bronze}",
+        f"• Difference: {diff:+d} {result.status}" if diff else f"• Difference: 0 {result.status}",
+    ]
 
 
 def format_report(reports: List[ProjectReport]) -> str:
@@ -143,7 +147,8 @@ def format_report(reports: List[ProjectReport]) -> str:
 
     for report in reports:
         lines += ["", f"*{report.org_name}* (`{report.project_uuid}`) | {report.day.isoformat()} ({report.timezone})"]
-        lines += [_format_result(result) for result in report.results]
+        for result in report.results:
+            lines += _format_result(result)
 
     return "\n".join(lines)
 
