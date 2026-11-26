@@ -1,6 +1,6 @@
 import io
 import smtplib
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 from urllib.parse import urlencode
@@ -17,6 +17,8 @@ from django.core import mail
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -5194,6 +5196,63 @@ class UniqueContactCountTest(TembaTest):
 
         count = UniqueContactCount.objects.create(org=self.org, day="2026-01-15", count=100)
         self.assertEqual(str(count), f"{self.org.name} - 2026-01-15: 100")
+
+    def _create_backfill_msgs(self):
+        joe = self.create_contact("Joe", phone="+250788000001")
+        ann = self.create_contact("Ann", phone="+250788000002")
+        bob = self.create_contact("Bob", phone="+250788000003", org=self.org2)
+        day = datetime(2026, 1, 15, tzinfo=pytz.UTC)
+
+        self.create_incoming_msg(joe, "hi", created_on=day + timedelta(hours=1))
+        self.create_incoming_msg(joe, "again", created_on=day + timedelta(hours=23, minutes=59))
+        self.create_incoming_msg(ann, "hello", created_on=day + timedelta(hours=12))
+        self.create_incoming_msg(bob, "yesterday", created_on=day - timedelta(seconds=1))
+        self.create_incoming_msg(bob, "tomorrow", created_on=day + timedelta(days=1))
+        self.create_outgoing_msg(bob, "outgoing", created_on=day + timedelta(hours=12))
+
+    def test_backfill_unique_contact_counts_dry_run(self):
+        from temba.orgs.models import UniqueContactCount
+
+        self._create_backfill_msgs()
+        UniqueContactCount.objects.create(org=self.org, day="2026-01-15", count=0)
+
+        out = io.StringIO()
+        call_command("backfill_unique_contact_counts", "2026-01-15", stdout=out)
+
+        self.assertIn("2026-01-15: stored total=0 (1 rows), recalculated total=2", out.getvalue())
+        self.assertNotIn("saved", out.getvalue())
+        self.assertEqual(
+            {(self.org.id, 0)}, set(UniqueContactCount.objects.filter(day="2026-01-15").values_list("org", "count"))
+        )
+
+    def test_backfill_unique_contact_counts_commit(self):
+        from temba.orgs.models import UniqueContactCount
+
+        self._create_backfill_msgs()
+        Org.objects.create(
+            name="Inactive",
+            timezone=pytz.UTC,
+            brand=settings.DEFAULT_BRAND,
+            created_by=self.admin,
+            modified_by=self.admin,
+            is_active=False,
+        )
+        UniqueContactCount.objects.create(org=self.org, day="2026-01-15", count=1)
+        UniqueContactCount.objects.create(org=self.org, day="2026-01-16", count=7)
+
+        out = io.StringIO()
+        call_command("backfill_unique_contact_counts", "2026-01-15", "--commit", stdout=out)
+
+        self.assertIn("2026-01-15: saved", out.getvalue())
+        self.assertEqual(
+            {(self.org.id, 2), (self.org2.id, 0)},
+            set(UniqueContactCount.objects.filter(day="2026-01-15").values_list("org", "count")),
+        )
+        self.assertEqual(7, UniqueContactCount.objects.get(org=self.org, day="2026-01-16").count)
+
+    def test_backfill_unique_contact_counts_invalid_day(self):
+        with self.assertRaises(CommandError):
+            call_command("backfill_unique_contact_counts", "2026-01-15", "15/01/2026", stdout=io.StringIO())
 
 
 class BackupTokenTest(TembaTest):
