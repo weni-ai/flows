@@ -2307,6 +2307,18 @@ msgstr "Identificator Slack"
 msgid "Teams identifier"
 msgstr "Identificator Teams"
 
+msgid "Mercado Livre identifier"
+msgstr "Identificator Mercado Livre"
+
+msgid "This address is already connected to an active channel."
+msgstr "Această adresă este deja conectată la un canal activ."
+
+msgid "The seller id is required."
+msgstr "ID-ul vânzătorului este obligatoriu."
+
+msgid "The seller id must be a number."
+msgstr "ID-ul vânzătorului trebuie să fie un număr."
+
 msgid "Text"
 msgstr "Text"
 

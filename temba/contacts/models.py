@@ -77,6 +77,11 @@ class URN:
     INSTAGRAM_SCHEME = "instagram"
     SLACK_SCHEME = "slack"
     TEAMS_SCHEME = "teams"
+    MERCADOLIVRE_SCHEME = "mercadolivre"
+
+    # the path of a Mercado Livre URN is the buyer id, digits only. This is the only place the path format is defined, so
+    # a later change to include another id would touch only this pattern
+    MERCADOLIVRE_PATH_PATTERN = r"^[0-9]+\Z"
 
     SCHEME_CHOICES = (
         (TEL_SCHEME, _("Phone number")),
@@ -100,6 +105,7 @@ class URN:
         (WENIWEBCHAT_SCHEME, _("Weni Web Chat identifier")),
         (SLACK_SCHEME, _("Slack identifier")),
         (TEAMS_SCHEME, _("Teams identifier")),
+        (MERCADOLIVRE_SCHEME, _("Mercado Livre identifier")),
     )
 
     VALID_SCHEMES = {s[0] for s in SCHEME_CHOICES}
@@ -234,6 +240,10 @@ class URN:
         # telegram and instagram use integer ids
         elif scheme in [cls.TELEGRAM_SCHEME, cls.INSTAGRAM_SCHEME]:
             return regex.match(r"^[0-9]+$", path, regex.V0)
+
+        # mercado livre uses the numeric buyer id, the format is all that is checked here
+        elif scheme == cls.MERCADOLIVRE_SCHEME:
+            return regex.match(cls.MERCADOLIVRE_PATH_PATTERN, path, regex.V0)
 
         # whatsapp supports phone digits and Meta BSUID paths (portfolio and parent), aligned with gocommon
         elif scheme == cls.WHATSAPP_SCHEME:

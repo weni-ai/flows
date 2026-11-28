@@ -16,8 +16,8 @@ from django.conf import settings
 from django.conf.urls import url
 from django.contrib.auth.models import Group, User
 from django.contrib.postgres.fields import ArrayField
-from django.core.exceptions import ObjectDoesNotExist
-from django.db import models
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.db import IntegrityError, models, transaction
 from django.db.models import Max, Q, Sum
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
@@ -34,6 +34,27 @@ from temba.utils.models import JSONAsTextField, SquashableModel, TembaModel, gen
 from temba.utils.text import random_string
 
 logger = logging.getLogger(__name__)
+
+# the Mercado Livre channel type code. It is defined here, and only here, because the database constraint on Channel
+# needs it and this module cannot import the channel types. It must be the same text in Courier and Mailroom
+MERCADOLIVRE_CHANNEL_TYPE_CODE = "ML"
+
+# the partial unique index that allows only one active Mercado Livre channel per seller id. The migration that creates
+# it holds this same name as a literal, so keep both in step
+MERCADOLIVRE_ACTIVE_ADDRESS_CONSTRAINT = "channels_channel_ml_active_address_uniq"
+
+
+class ChannelAddressConflict(ValidationError):
+    """
+    Raised when a channel is created for an address that an active channel of the same type already holds. The message
+    does not say which organization, user or channel holds the address.
+    """
+
+    CODE = "address_conflict"
+    MESSAGE = _("This address is already connected to an active channel.")
+
+    def __init__(self):
+        super().__init__(self.MESSAGE, code=self.CODE)
 
 
 class ChannelType(metaclass=ABCMeta):
@@ -90,8 +111,19 @@ class ChannelType(metaclass=ABCMeta):
     # during activation. Channels should make sure their claim view is non-atomic if a callback will be involved
     async_activation = True
 
+    # name of a unique database index that allows only one active channel of this type per address. Types that set it get
+    # a ChannelAddressConflict from Channel.create when the index rejects the insert. None means no such rule
+    unique_active_address_constraint = None
+
     redact_request_keys = set()
     redact_response_keys = set()
+
+    def clean_address(self, address):
+        """
+        Called by Channel.create with the address of the new channel. Types can return the normalized address, or raise
+        a ValidationError for an address that is not valid for them. By default the address is returned unchanged.
+        """
+        return address
 
     def is_available_to(self, user):
         """
@@ -450,6 +482,8 @@ class Channel(TembaModel, DependencyMixin):
         if config is None:
             config = {}
 
+        address = channel_type.clean_address(address)
+
         create_args = dict(
             org=org,
             country=country,
@@ -467,7 +501,18 @@ class Channel(TembaModel, DependencyMixin):
         if "uuid" not in create_args:
             create_args["uuid"] = generate_uuid()
 
-        channel = cls.objects.create(**create_args)
+        if channel_type.unique_active_address_constraint:
+            # a savepoint lets the caller keep using its transaction after the database rejects a duplicate address
+            try:
+                with transaction.atomic():
+                    channel = cls.objects.create(**create_args)
+            except IntegrityError as e:
+                violated = getattr(getattr(e.__cause__, "diag", None), "constraint_name", None)
+                if violated == channel_type.unique_active_address_constraint:
+                    raise ChannelAddressConflict()
+                raise
+        else:
+            channel = cls.objects.create(**create_args)
 
         # normalize any telephone numbers that we may now have a clue as to country
         if org and country:
@@ -1049,6 +1094,15 @@ class Channel(TembaModel, DependencyMixin):
 
     class Meta:
         ordering = ("-last_seen", "-pk")
+        constraints = [
+            # one active Mercado Livre channel per seller id, across all organizations, so that the shared notification
+            # endpoint can find a single channel by type and address
+            models.UniqueConstraint(
+                fields=("channel_type", "address"),
+                condition=Q(channel_type=MERCADOLIVRE_CHANNEL_TYPE_CODE, is_active=True),
+                name=MERCADOLIVRE_ACTIVE_ADDRESS_CONSTRAINT,
+            )
+        ]
 
 
 class ChannelCount(SquashableModel):

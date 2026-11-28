@@ -3970,6 +3970,21 @@ class ContactURNTest(TembaTest):
             mock_lookup.side_effect = [None, urn]
             ContactURN.get_or_create(self.org, None, "twitterid:12345#fooman")
 
+    def test_mercadolivre_identity_is_one_per_org(self):
+        first = ContactURN.get_or_create(self.org, None, "mercadolivre:162981404#nick_one")
+        again = ContactURN.get_or_create(self.org, None, "mercadolivre:162981404#nick_two")
+
+        # same buyer in the same org is the same URN, whatever the nickname
+        self.assertEqual(first, again)
+        self.assertEqual("mercadolivre:162981404", first.identity)
+        self.assertEqual(1, ContactURN.objects.filter(org=self.org, identity="mercadolivre:162981404").count())
+
+        # another org has its own URN for the same buyer
+        other = ContactURN.get_or_create(self.org2, None, "mercadolivre:162981404#nick_one")
+        self.assertNotEqual(first.id, other.id)
+        self.assertEqual(self.org2, other.org)
+        self.assertEqual(1, ContactURN.objects.filter(org=self.org2, identity="mercadolivre:162981404").count())
+
     def test_get_display(self):
         urn = ContactURN.objects.create(
             org=self.org, scheme="tel", path="+250788383383", identity="tel:+250788383383", priority=50
@@ -5269,6 +5284,26 @@ class URNTest(TembaTest):
 
     def test_instagram_urn(self):
         self.assertTrue(URN.validate("instagram:12345678901234567"))
+
+    def test_mercadolivre_urn(self):
+        # the path is the buyer id and has digits only
+        self.assertTrue(URN.validate("mercadolivre:162981404"))
+        self.assertTrue(URN.validate("mercadolivre:162981404#buyer_nick"))
+
+        # anything else is rejected, including the composite buyer and pack ids
+        self.assertFalse(URN.validate("mercadolivre:abc"))
+        self.assertFalse(URN.validate("mercadolivre:1629.81404"))
+        self.assertFalse(URN.validate("mercadolivre:-162981404"))
+        self.assertFalse(URN.validate("mercadolivre:162981404:2000000089077943"))
+        self.assertFalse(URN.validate("mercadolivre:"))
+
+        # the display is the nickname and is not part of the identity
+        self.assertEqual("mercadolivre:162981404", URN.identity("mercadolivre:162981404#nick_one"))
+        self.assertEqual(
+            URN.identity("mercadolivre:162981404#nick_one"), URN.identity("mercadolivre:162981404#nick_two")
+        )
+        self.assertEqual("nick_one", URN.format("mercadolivre:162981404#nick_one"))
+        self.assertEqual("162981404", URN.format("mercadolivre:162981404"))
 
     def test_discord_urn(self):
         self.assertEqual("discord:750841288886321253", URN.from_discord("750841288886321253"))
